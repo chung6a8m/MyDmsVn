@@ -6,3 +6,7 @@ For each later task produce a new dated evidence file in this directory with exa
 
 Existing WEB2/WEB3 evidence remains immutable and candidate-specific. WEB4 source must be verified independently. Frontend F tasks/evidence live in ReactWebUI. CEX WinForms acceptance and full IIS/production remain independent.
 
+
+## B01 contract candidate
+
+[2026-11-01 B01 evidence](20261101-b01-contract.md) records source/canonical corpus validation and the frontend pin/signoff gate. Runtime/SQL/CI/browser are not implied.

@@ -1,0 +1,400 @@
+{
+  "contractVersion": "web4-v1",
+  "sourceBaseline": "48e9cd7ae096ecadd184e6ea6a372306d77f41b1",
+  "fixtures": [
+    {
+      "file": "sales-create-request.json",
+      "kind": "body",
+      "operationKind": "Sales.Create",
+      "intent": "sales-create-intent.json"
+    },
+    {
+      "file": "sales-create-intent.json",
+      "kind": "intent"
+    },
+    {
+      "file": "sales-create-response.json",
+      "kind": "outcome",
+      "operationKind": "Sales.Create",
+      "status": 200
+    },
+    {
+      "file": "sales-create-status.json",
+      "kind": "status",
+      "intent": "sales-create-intent.json",
+      "status": 200
+    },
+    {
+      "file": "sales-update-request.json",
+      "kind": "body",
+      "operationKind": "Sales.Update",
+      "intent": "sales-update-intent.json"
+    },
+    {
+      "file": "sales-update-intent.json",
+      "kind": "intent"
+    },
+    {
+      "file": "sales-update-response.json",
+      "kind": "outcome",
+      "operationKind": "Sales.Update",
+      "status": 200
+    },
+    {
+      "file": "sales-update-status.json",
+      "kind": "status",
+      "intent": "sales-update-intent.json",
+      "status": 200
+    },
+    {
+      "file": "sales-post-request.json",
+      "kind": "body",
+      "operationKind": "Sales.Post",
+      "intent": "sales-post-intent.json"
+    },
+    {
+      "file": "sales-post-intent.json",
+      "kind": "intent"
+    },
+    {
+      "file": "sales-post-response.json",
+      "kind": "outcome",
+      "operationKind": "Sales.Post",
+      "status": 200
+    },
+    {
+      "file": "sales-post-status.json",
+      "kind": "status",
+      "intent": "sales-post-intent.json",
+      "status": 200
+    },
+    {
+      "file": "receipt-create-request.json",
+      "kind": "body",
+      "operationKind": "Receipt.Create",
+      "intent": "receipt-create-intent.json"
+    },
+    {
+      "file": "receipt-create-intent.json",
+      "kind": "intent"
+    },
+    {
+      "file": "receipt-create-response.json",
+      "kind": "outcome",
+      "operationKind": "Receipt.Create",
+      "status": 200
+    },
+    {
+      "file": "receipt-create-status.json",
+      "kind": "status",
+      "intent": "receipt-create-intent.json",
+      "status": 200
+    },
+    {
+      "file": "receipt-update-request.json",
+      "kind": "body",
+      "operationKind": "Receipt.Update",
+      "intent": "receipt-update-intent.json"
+    },
+    {
+      "file": "receipt-update-intent.json",
+      "kind": "intent"
+    },
+    {
+      "file": "receipt-update-response.json",
+      "kind": "outcome",
+      "operationKind": "Receipt.Update",
+      "status": 200
+    },
+    {
+      "file": "receipt-update-status.json",
+      "kind": "status",
+      "intent": "receipt-update-intent.json",
+      "status": 200
+    },
+    {
+      "file": "receipt-post-request.json",
+      "kind": "body",
+      "operationKind": "Receipt.Post",
+      "intent": "receipt-post-intent.json"
+    },
+    {
+      "file": "receipt-post-intent.json",
+      "kind": "intent"
+    },
+    {
+      "file": "receipt-post-response.json",
+      "kind": "outcome",
+      "operationKind": "Receipt.Post",
+      "status": 200
+    },
+    {
+      "file": "receipt-post-status.json",
+      "kind": "status",
+      "intent": "receipt-post-intent.json",
+      "status": 200
+    },
+    {
+      "file": "context-response.json",
+      "kind": "context",
+      "status": 200
+    },
+    {
+      "file": "status-result-expired.json",
+      "kind": "status",
+      "intent": "sales-create-intent.json",
+      "status": 200
+    },
+    {
+      "file": "status-result-unavailable.json",
+      "kind": "status",
+      "intent": "sales-create-intent.json",
+      "status": 200
+    },
+    {
+      "file": "error-validationerror.json",
+      "kind": "error",
+      "status": 400
+    },
+    {
+      "file": "error-auth-unauthorized.json",
+      "kind": "error",
+      "status": 401
+    },
+    {
+      "file": "error-auth-forbidden.json",
+      "kind": "error",
+      "status": 403
+    },
+    {
+      "file": "error-deployment-epochmismatch.json",
+      "kind": "error",
+      "status": 409
+    },
+    {
+      "file": "error-idempotency-fingerprintmismatch.json",
+      "kind": "error",
+      "status": 409
+    },
+    {
+      "file": "error-idempotency-keyconflict.json",
+      "kind": "error",
+      "status": 409
+    },
+    {
+      "file": "error-operation-notobserved.json",
+      "kind": "error",
+      "status": 404
+    },
+    {
+      "file": "error-operation-resultexpired.json",
+      "kind": "error",
+      "status": 410
+    },
+    {
+      "file": "error-operation-resultunavailable.json",
+      "kind": "error",
+      "status": 503
+    },
+    {
+      "file": "error-operation-unavailable.json",
+      "kind": "error",
+      "status": 503
+    },
+    {
+      "file": "error-internalerror.json",
+      "kind": "error",
+      "status": 500
+    }
+  ],
+  "artifacts": [
+    {
+      "file": ".gitattributes",
+      "sha256": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9"
+    },
+    {
+      "file": "README.md",
+      "sha256": "f9115eb1cd15d45b90f99cd1d2ffdd735b308e2a442e7799d028060c2e0a74f2"
+    },
+    {
+      "file": "build-manifest.py",
+      "sha256": "ab3cc6f3647564c31d7e37efc4e8d3a76c7d725d4e899e5834e54b5bc1aa5331"
+    },
+    {
+      "file": "context-response.json",
+      "sha256": "3bc94b3f1272b9856c116ccfef0473fa7a49a53bfca0f063eff612af7874a65b"
+    },
+    {
+      "file": "error-auth-forbidden.json",
+      "sha256": "41292303b1e3fc2317a81a9396a5e9c2da07eb26f30b7390291831c661492e4f"
+    },
+    {
+      "file": "error-auth-unauthorized.json",
+      "sha256": "340d303825f9251113196c78a26f32f935aa853d7187e7826c4d4f50a7344440"
+    },
+    {
+      "file": "error-deployment-epochmismatch.json",
+      "sha256": "11e12eefa42469c1a5fd81e19ddfed9b6b5f5e5b633c7eef0d19bb5613a34dfd"
+    },
+    {
+      "file": "error-idempotency-fingerprintmismatch.json",
+      "sha256": "0748f0a509bd6813c6425cd0db90a1514b415569eb5e8cc22afd41165e6033c5"
+    },
+    {
+      "file": "error-idempotency-keyconflict.json",
+      "sha256": "5f3165520e1a2519f9f1940bfc20b8ec453e962e07ff983a6572d008810732d4"
+    },
+    {
+      "file": "error-internalerror.json",
+      "sha256": "e5051aecf503480e7bd58c45e91d046dfa8668decd372c8105ac0c6858fbc556"
+    },
+    {
+      "file": "error-operation-notobserved.json",
+      "sha256": "dab663569327e1657babd4d8a2e1c3f22192b2c557d78e7c139591b0fbccee91"
+    },
+    {
+      "file": "error-operation-resultexpired.json",
+      "sha256": "310730069828dafeb958572f6a5eaaa61735cdec3b5313fcc4dd87f45684aa1d"
+    },
+    {
+      "file": "error-operation-resultunavailable.json",
+      "sha256": "ac6803d71b952cadd2554cbda8a0d1f8408b60b36ad8c04f676fc730252ada36"
+    },
+    {
+      "file": "error-operation-unavailable.json",
+      "sha256": "7c4ae4ce4dce2813a85155007cd5d008a835320dff9bc19f57ca6b1638da7ed3"
+    },
+    {
+      "file": "error-validationerror.json",
+      "sha256": "6f0c52dac2b351f5a2b0040aaaba64947c4600cfb8e08589823fa422407b8fe2"
+    },
+    {
+      "file": "fingerprint-vectors.json",
+      "sha256": "23616d7332f999ff7068c127ea9fd01b991798131dec155534641b9880a7a35c"
+    },
+    {
+      "file": "fixture-index.json",
+      "sha256": "41582ae45ecb9ca69944ad72aec8552d9978663faca2505ea20770e6de82a986"
+    },
+    {
+      "file": "generate-vectors.py",
+      "sha256": "8f65ebfe5fbb83506e192de5b970d26725a4e85083a1e183e4cb7d1e892deae0"
+    },
+    {
+      "file": "protocol-scenarios.json",
+      "sha256": "0700e3a9d24f40f550de3781364b1cdc0100904dbae7c79e6bc8cd5e128382c5"
+    },
+    {
+      "file": "receipt-create-intent.json",
+      "sha256": "3ee22a5dfb2fe6cac8368e9df4ad6eae4b408447d47e5f0d8015880958410c8c"
+    },
+    {
+      "file": "receipt-create-request.json",
+      "sha256": "71fb1759b0e3805844b263a0e4c61811c57e574f950967712e615b611e411ccb"
+    },
+    {
+      "file": "receipt-create-response.json",
+      "sha256": "26713eb980ed70b392427c294e0ad0ad16afa9be28f2ce1948fd73793b64d476"
+    },
+    {
+      "file": "receipt-create-status.json",
+      "sha256": "0735ba0f844db4f9c1f64c55c7de9e463faafce1acf5f5011851c646ca0e858d"
+    },
+    {
+      "file": "receipt-post-intent.json",
+      "sha256": "e8c1883cd69e7459db5d6ae57a5e8e4bb45e14816ea6d902e7effbb9e4568f02"
+    },
+    {
+      "file": "receipt-post-request.json",
+      "sha256": "41da3793f95b8822d8cae9fa91296568d54ad335938576b4e7efb3b8ca2ee19e"
+    },
+    {
+      "file": "receipt-post-response.json",
+      "sha256": "5775fb066526cee44c011939a6ad0e8cc726bb71e7393a1d3984732c4dfcf5c6"
+    },
+    {
+      "file": "receipt-post-status.json",
+      "sha256": "6be0824e7ccd4c8becf762a22d4319d63b50bcd5ffb4f74b42623e284eb40ec1"
+    },
+    {
+      "file": "receipt-update-intent.json",
+      "sha256": "d33eb0199bdb0b0ef54b279fe67ea5a82b92b5f4282a430787e0e99adbf3ce9d"
+    },
+    {
+      "file": "receipt-update-request.json",
+      "sha256": "caf8cf95aef6d28c42a4b56ef848c32539cc192a8f5c8c81bbc44ea400fc688d"
+    },
+    {
+      "file": "receipt-update-response.json",
+      "sha256": "ed13bcd29bb42548528e880ae61d4e4c6af01fd6dc84f149861fafe54ff83ad5"
+    },
+    {
+      "file": "receipt-update-status.json",
+      "sha256": "ba2071bdf6d63ba5d9828dc6d60289ea45717c71c6afc8b687dc8cdb602822b5"
+    },
+    {
+      "file": "sales-create-intent.json",
+      "sha256": "fd99dc4dc88d74d492dd04afc20f74af86986156d15b022de00d33d66f7f6bd4"
+    },
+    {
+      "file": "sales-create-request.json",
+      "sha256": "35095f4babb487fab2f35eea7e3db1d3f0be8f5ce1008a1e2f6c442ee8486208"
+    },
+    {
+      "file": "sales-create-response.json",
+      "sha256": "d1d05e17f472c1a6c57b004a33c98986936ead88f068ee10a98335b4ff577a6a"
+    },
+    {
+      "file": "sales-create-status.json",
+      "sha256": "157ed10d9a8143d6b3b9e8afbefe5312e31d397e99625d8209fb6937c19c232e"
+    },
+    {
+      "file": "sales-post-intent.json",
+      "sha256": "b604b023fd9735d9268a93269612dc532d1e4ed41d3cc147f2b7941a2dfd1e0e"
+    },
+    {
+      "file": "sales-post-request.json",
+      "sha256": "41da3793f95b8822d8cae9fa91296568d54ad335938576b4e7efb3b8ca2ee19e"
+    },
+    {
+      "file": "sales-post-response.json",
+      "sha256": "a8875833d56c90f47195bd08eb243fd23a657a3fb9a2566d1e94dfc0bdd0b77d"
+    },
+    {
+      "file": "sales-post-status.json",
+      "sha256": "2f155cc2731da74495fa24f6693f32afe0dea8a6ab61994dddd8922c4be4ff9a"
+    },
+    {
+      "file": "sales-update-intent.json",
+      "sha256": "cd2c295b960fea9bb94d8d01721861ed9172d3eff75579bd73c0b21d8ec52dd2"
+    },
+    {
+      "file": "sales-update-request.json",
+      "sha256": "42c6c3fd74c968a30885d5fe382538f47413d6f7345d407100c9842efc04fff9"
+    },
+    {
+      "file": "sales-update-response.json",
+      "sha256": "c0c67247761a21fd6a89cf5525beb70d2e0f3417dff9f4c111eb05ca46b79b69"
+    },
+    {
+      "file": "sales-update-status.json",
+      "sha256": "bc7fcb11cbd83d2aabe846c387957e8056c49b60a74e28fe3dc96da86a5b1511"
+    },
+    {
+      "file": "status-result-expired.json",
+      "sha256": "b4aa1c2c7cf493c0475cdba4d45d027b13c4e5ac4eda55f6e2b86d1d2abc2519"
+    },
+    {
+      "file": "status-result-unavailable.json",
+      "sha256": "1d8f9ce80208b9d201a7bac5da1047352232bc12c0623700389743392a97c958"
+    },
+    {
+      "file": "validate-corpus.mjs",
+      "sha256": "50bc96bf0d3b3c8d2aa8d151a50bc2d3957b34a4ad17a57b73988421b7fcf0d4"
+    },
+    {
+      "file": "validate-corpus.test.mjs",
+      "sha256": "339dc424e0bda11a7cfc9c2b01cb1c5cb721b372ce17f5a6089a60f8ade6066f"
+    }
+  ]
+}

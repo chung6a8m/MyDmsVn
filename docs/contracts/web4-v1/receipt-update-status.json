@@ -1,0 +1,49 @@
+{
+  "data": {
+    "deploymentEpoch": "11111111-2222-4333-8444-555555555555",
+    "operationId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "operationKind": "Receipt.Update",
+    "method": "PUT",
+    "routeScope": "/api/v1/goods-receipts/{receiptId}/draft",
+    "requestTargetId": "9007199254740993",
+    "requestFingerprint": "506d037bfd166b73e39b65939204d9830714934c3b98d1d78911b5ec3a8e1292",
+    "state": "COMMITTED",
+    "outcome": {
+      "data": {
+        "receiptId": "9007199254740993",
+        "receiptNumber": "GR0000000042",
+        "receiptDate": "2024-02-29",
+        "warehouseId": 1,
+        "warehouseDisplayName": null,
+        "warehouseIsActive": true,
+        "employeeId": 2,
+        "employeeDisplayName": null,
+        "employeeIsActive": true,
+        "status": "Draft",
+        "note": "Nhập hàng — đã kiểm đếm",
+        "postedAtUtc": null,
+        "version": "AAAAAAAAAAI=",
+        "lines": [
+          {
+            "receiptLineId": "9007199254740996",
+            "lineNumber": 1,
+            "productId": 8,
+            "quantity": "3.0000",
+            "unitCost": "0.0000",
+            "productDisplayName": null,
+            "productIsActive": true
+          },
+          {
+            "receiptLineId": "9007199254740997",
+            "lineNumber": 2,
+            "productId": 7,
+            "quantity": "1.5000",
+            "unitCost": "12.3456",
+            "productDisplayName": null,
+            "productIsActive": true
+          }
+        ]
+      }
+    }
+  }
+}

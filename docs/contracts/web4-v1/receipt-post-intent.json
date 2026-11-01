@@ -1,0 +1,9 @@
+{
+  "operationKind": "Receipt.Post",
+  "method": "POST",
+  "routeScope": "/api/v1/goods-receipts/{receiptId}/post",
+  "requestTargetId": "9007199254740993",
+  "body": {
+    "expectedVersion": "AAAAAAAAAAI="
+  }
+}

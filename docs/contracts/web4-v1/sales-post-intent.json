@@ -1,0 +1,9 @@
+{
+  "operationKind": "Sales.Post",
+  "method": "POST",
+  "routeScope": "/api/v1/sales-receipts/{saleId}/post",
+  "requestTargetId": "9223372036854775807",
+  "body": {
+    "expectedVersion": "AAAAAAAAAAI="
+  }
+}

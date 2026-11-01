@@ -1,0 +1,58 @@
+{
+  "data": {
+    "saleId": "9223372036854775807",
+    "saleNumber": "SA0000000042",
+    "saleDate": "2024-02-29",
+    "customerId": 101,
+    "warehouseId": 102,
+    "employeeId": 103,
+    "note": "Phiếu thử — hàng tặng và dòng trùng sản phẩm",
+    "lines": [
+      {
+        "saleLineId": "9007199254740993",
+        "productId": 104,
+        "qty": "1.2500",
+        "unitPrice": "2.0000",
+        "isGift": false,
+        "lineNo": 1,
+        "unit": "cái",
+        "lineAmount": "2.5000",
+        "productDisplayName": "SP104 - Sản phẩm cũ",
+        "productIsActive": true
+      },
+      {
+        "saleLineId": "9007199254740994",
+        "productId": 104,
+        "qty": "0.0001",
+        "unitPrice": "0.5000",
+        "isGift": false,
+        "lineNo": 2,
+        "unit": "cái",
+        "lineAmount": "0.0001",
+        "productDisplayName": "SP104 - Sản phẩm cũ",
+        "productIsActive": true
+      },
+      {
+        "saleLineId": "9223372036854775807",
+        "productId": 104,
+        "qty": "2.0000",
+        "unitPrice": "3.0000",
+        "isGift": true,
+        "lineNo": 3,
+        "unit": "cái",
+        "lineAmount": "0.0000",
+        "productDisplayName": "SP104 - Sản phẩm cũ",
+        "productIsActive": true
+      }
+    ],
+    "status": "Draft",
+    "version": "AAAAAAAAAAE=",
+    "totalAmount": "2.5001",
+    "customerDisplayName": "KH101 - Khách hàng cũ",
+    "customerIsActive": true,
+    "warehouseDisplayName": "K102 - Kho cũ",
+    "warehouseIsActive": true,
+    "employeeDisplayName": "NV103 - Nhân viên cũ",
+    "employeeIsActive": true
+  }
+}

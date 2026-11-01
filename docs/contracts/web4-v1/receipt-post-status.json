@@ -1,0 +1,19 @@
+{
+  "data": {
+    "deploymentEpoch": "11111111-2222-4333-8444-555555555555",
+    "operationId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "operationKind": "Receipt.Post",
+    "method": "POST",
+    "routeScope": "/api/v1/goods-receipts/{receiptId}/post",
+    "requestTargetId": "9007199254740993",
+    "requestFingerprint": "519d7bcfa0f068db0a89cc031f00eed1b7327835fe4dd9ab4ddd4afe4341803f",
+    "state": "COMMITTED",
+    "outcome": {
+      "data": {
+        "receiptId": "9007199254740993",
+        "status": "Posted",
+        "postedAtUtc": "2026-11-01T02:03:04.1234567Z"
+      }
+    }
+  }
+}

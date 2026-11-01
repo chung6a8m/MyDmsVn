@@ -1,0 +1,3233 @@
+{
+  "algorithm": "SHA-256",
+  "independentAuthor": "Python json/decimal/hashlib; no JS oracle import",
+  "vectors": [
+    {
+      "name": "sales-create",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Phiếu thử — hàng tặng và dòng trùng sản phẩm",
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":\"Phiếu thử — hàng tặng và dòng trùng sản phẩm\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "3329e3500edf5e8a851ad303d88d1938853421c5c8f4526ef1e1a68ec6050b78"
+    },
+    {
+      "name": "sales-update",
+      "intent": {
+        "operationKind": "Sales.Update",
+        "method": "PUT",
+        "routeScope": "/api/v1/sales-receipts/{saleId}/draft",
+        "requestTargetId": "9223372036854775807",
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Đã cập nhật",
+          "lines": [
+            {
+              "saleLineId": "9007199254740993",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9007199254740994",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9223372036854775807",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "expectedVersion": "AAAAAAAAAAE="
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"expectedVersion\":\"AAAAAAAAAAE=\",\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"9007199254740993\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"9007199254740994\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"9223372036854775807\",\"unitPrice\":\"3.0000\"}],\"note\":\"Đã cập nhật\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"PUT\",\"operationKind\":\"Sales.Update\",\"requestTargetId\":\"9223372036854775807\",\"routeScope\":\"/api/v1/sales-receipts/{saleId}/draft\"}",
+      "sha256": "eef4ef10bf08505c7d182f1b087a411e02e73f59829651494991aaba2c7cf93a"
+    },
+    {
+      "name": "sales-post",
+      "intent": {
+        "operationKind": "Sales.Post",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts/{saleId}/post",
+        "requestTargetId": "9223372036854775807",
+        "body": {
+          "expectedVersion": "AAAAAAAAAAI="
+        }
+      },
+      "canonical": "{\"body\":{\"expectedVersion\":\"AAAAAAAAAAI=\"},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Post\",\"requestTargetId\":\"9223372036854775807\",\"routeScope\":\"/api/v1/sales-receipts/{saleId}/post\"}",
+      "sha256": "02dd986466df1b938b3a1304543b17d1bfbea182b2096713e4ab72397929029c"
+    },
+    {
+      "name": "receipt-create",
+      "intent": {
+        "operationKind": "Receipt.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/goods-receipts",
+        "requestTargetId": null,
+        "body": {
+          "receiptDate": "2024-02-29",
+          "warehouseId": 1,
+          "employeeId": 2,
+          "note": null,
+          "lines": [
+            {
+              "productId": 7,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 8,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"employeeId\":2,\"lines\":[{\"productId\":7,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":8,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"}],\"note\":null,\"receiptDate\":\"2024-02-29\",\"warehouseId\":1},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Receipt.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/goods-receipts\"}",
+      "sha256": "b963f81cae4fe681816b1a7a747d5452f5ce241247382d8dcfadac93b4f2ee89"
+    },
+    {
+      "name": "receipt-update",
+      "intent": {
+        "operationKind": "Receipt.Update",
+        "method": "PUT",
+        "routeScope": "/api/v1/goods-receipts/{receiptId}/draft",
+        "requestTargetId": "9007199254740993",
+        "body": {
+          "receiptDate": "2024-02-29",
+          "warehouseId": 1,
+          "employeeId": 2,
+          "note": "Nhập hàng — đã kiểm đếm",
+          "lines": [
+            {
+              "productId": 8,
+              "quantity": "3.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 7,
+              "quantity": "1.5000",
+              "unitCost": "12.3456"
+            }
+          ],
+          "expectedVersion": "AAAAAAAAAAE="
+        }
+      },
+      "canonical": "{\"body\":{\"employeeId\":2,\"expectedVersion\":\"AAAAAAAAAAE=\",\"lines\":[{\"productId\":8,\"quantity\":\"3.0000\",\"unitCost\":\"0.0000\"},{\"productId\":7,\"quantity\":\"1.5000\",\"unitCost\":\"12.3456\"}],\"note\":\"Nhập hàng — đã kiểm đếm\",\"receiptDate\":\"2024-02-29\",\"warehouseId\":1},\"contract\":\"web4-v1\",\"method\":\"PUT\",\"operationKind\":\"Receipt.Update\",\"requestTargetId\":\"9007199254740993\",\"routeScope\":\"/api/v1/goods-receipts/{receiptId}/draft\"}",
+      "sha256": "506d037bfd166b73e39b65939204d9830714934c3b98d1d78911b5ec3a8e1292"
+    },
+    {
+      "name": "receipt-post",
+      "intent": {
+        "operationKind": "Receipt.Post",
+        "method": "POST",
+        "routeScope": "/api/v1/goods-receipts/{receiptId}/post",
+        "requestTargetId": "9007199254740993",
+        "body": {
+          "expectedVersion": "AAAAAAAAAAI="
+        }
+      },
+      "canonical": "{\"body\":{\"expectedVersion\":\"AAAAAAAAAAI=\"},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Receipt.Post\",\"requestTargetId\":\"9007199254740993\",\"routeScope\":\"/api/v1/goods-receipts/{receiptId}/post\"}",
+      "sha256": "519d7bcfa0f068db0a89cc031f00eed1b7327835fe4dd9ab4ddd4afe4341803f"
+    },
+    {
+      "name": "one-line",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Phiếu thử — hàng tặng và dòng trùng sản phẩm",
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"}],\"note\":\"Phiếu thử — hàng tặng và dòng trùng sản phẩm\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "5c6e45b84dd17cad680cd29b6941987a6fdd761b58ff15d7aa4374d3600ecf13"
+    },
+    {
+      "name": "200-ordered-sales-lines",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Phiếu thử — hàng tặng và dòng trùng sản phẩm",
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 1,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 2,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 3,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 4,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 5,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 6,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 7,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 8,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 9,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 10,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 11,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 12,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 13,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 14,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 15,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 16,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 17,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 18,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 19,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 20,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 21,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 22,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 23,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 24,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 25,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 26,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 27,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 28,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 29,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 30,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 31,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 32,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 33,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 34,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 35,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 36,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 37,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 38,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 39,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 40,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 41,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 42,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 43,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 44,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 45,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 46,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 47,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 48,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 49,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 50,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 51,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 52,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 53,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 54,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 55,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 56,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 57,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 58,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 59,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 60,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 61,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 62,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 63,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 64,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 65,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 66,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 67,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 68,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 69,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 70,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 71,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 72,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 73,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 74,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 75,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 76,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 77,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 78,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 79,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 80,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 81,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 82,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 83,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 84,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 85,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 86,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 87,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 88,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 89,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 90,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 91,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 92,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 93,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 94,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 95,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 96,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 97,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 98,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 99,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 100,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 101,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 102,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 103,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 105,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 106,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 107,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 108,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 109,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 110,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 111,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 112,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 113,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 114,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 115,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 116,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 117,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 118,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 119,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 120,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 121,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 122,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 123,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 124,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 125,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 126,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 127,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 128,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 129,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 130,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 131,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 132,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 133,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 134,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 135,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 136,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 137,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 138,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 139,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 140,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 141,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 142,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 143,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 144,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 145,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 146,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 147,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 148,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 149,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 150,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 151,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 152,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 153,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 154,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 155,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 156,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 157,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 158,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 159,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 160,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 161,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 162,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 163,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 164,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 165,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 166,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 167,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 168,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 169,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 170,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 171,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 172,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 173,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 174,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 175,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 176,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 177,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 178,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 179,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 180,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 181,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 182,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 183,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 184,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 185,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 186,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 187,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 188,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 189,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 190,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 191,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 192,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 193,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 194,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 195,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 196,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 197,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 198,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 199,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 200,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":1,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":2,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":3,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":4,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":5,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":6,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":7,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":8,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":9,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":10,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":11,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":12,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":13,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":14,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":15,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":16,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":17,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":18,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":19,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":20,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":21,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":22,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":23,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":24,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":25,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":26,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":27,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":28,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":29,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":30,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":31,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":32,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":33,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":34,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":35,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":36,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":37,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":38,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":39,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":40,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":41,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":42,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":43,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":44,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":45,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":46,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":47,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":48,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":49,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":50,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":51,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":52,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":53,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":54,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":55,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":56,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":57,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":58,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":59,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":60,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":61,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":62,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":63,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":64,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":65,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":66,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":67,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":68,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":69,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":70,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":71,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":72,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":73,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":74,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":75,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":76,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":77,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":78,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":79,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":80,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":81,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":82,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":83,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":84,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":85,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":86,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":87,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":88,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":89,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":90,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":91,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":92,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":93,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":94,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":95,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":96,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":97,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":98,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":99,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":100,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":101,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":102,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":103,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":105,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":106,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":107,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":108,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":109,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":110,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":111,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":112,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":113,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":114,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":115,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":116,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":117,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":118,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":119,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":120,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":121,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":122,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":123,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":124,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":125,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":126,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":127,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":128,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":129,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":130,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":131,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":132,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":133,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":134,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":135,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":136,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":137,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":138,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":139,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":140,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":141,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":142,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":143,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":144,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":145,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":146,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":147,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":148,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":149,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":150,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":151,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":152,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":153,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":154,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":155,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":156,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":157,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":158,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":159,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":160,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":161,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":162,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":163,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":164,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":165,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":166,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":167,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":168,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":169,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":170,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":171,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":172,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":173,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":174,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":175,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":176,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":177,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":178,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":179,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":180,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":181,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":182,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":183,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":184,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":185,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":186,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":187,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":188,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":189,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":190,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":191,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":192,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":193,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":194,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":195,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":196,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":197,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":198,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":199,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":200,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"}],\"note\":\"Phiếu thử — hàng tặng và dòng trùng sản phẩm\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "5836f61173047b9768cda542010f7d972a7f03df60dc0dcaa708163757e162fc"
+    },
+    {
+      "name": "200-ordered-receipt-lines",
+      "intent": {
+        "operationKind": "Receipt.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/goods-receipts",
+        "requestTargetId": null,
+        "body": {
+          "receiptDate": "2024-02-29",
+          "warehouseId": 1,
+          "employeeId": 2,
+          "note": null,
+          "lines": [
+            {
+              "productId": 1,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 2,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 3,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 4,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 5,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 6,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 7,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 8,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 9,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 10,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 11,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 12,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 13,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 14,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 15,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 16,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 17,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 18,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 19,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 20,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 21,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 22,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 23,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 24,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 25,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 26,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 27,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 28,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 29,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 30,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 31,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 32,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 33,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 34,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 35,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 36,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 37,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 38,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 39,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 40,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 41,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 42,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 43,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 44,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 45,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 46,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 47,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 48,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 49,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 50,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 51,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 52,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 53,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 54,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 55,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 56,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 57,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 58,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 59,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 60,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 61,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 62,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 63,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 64,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 65,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 66,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 67,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 68,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 69,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 70,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 71,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 72,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 73,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 74,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 75,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 76,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 77,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 78,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 79,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 80,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 81,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 82,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 83,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 84,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 85,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 86,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 87,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 88,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 89,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 90,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 91,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 92,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 93,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 94,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 95,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 96,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 97,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 98,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 99,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 100,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 101,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 102,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 103,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 104,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 105,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 106,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 107,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 108,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 109,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 110,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 111,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 112,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 113,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 114,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 115,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 116,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 117,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 118,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 119,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 120,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 121,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 122,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 123,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 124,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 125,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 126,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 127,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 128,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 129,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 130,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 131,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 132,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 133,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 134,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 135,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 136,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 137,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 138,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 139,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 140,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 141,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 142,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 143,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 144,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 145,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 146,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 147,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 148,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 149,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 150,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 151,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 152,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 153,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 154,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 155,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 156,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 157,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 158,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 159,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 160,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 161,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 162,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 163,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 164,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 165,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 166,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 167,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 168,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 169,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 170,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 171,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 172,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 173,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 174,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 175,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 176,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 177,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 178,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 179,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 180,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 181,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 182,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 183,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 184,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 185,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 186,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 187,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 188,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 189,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 190,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 191,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 192,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 193,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 194,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 195,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 196,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 197,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 198,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            },
+            {
+              "productId": 199,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            },
+            {
+              "productId": 200,
+              "quantity": "2.0000",
+              "unitCost": "0.0000"
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"employeeId\":2,\"lines\":[{\"productId\":1,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":2,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":3,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":4,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":5,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":6,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":7,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":8,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":9,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":10,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":11,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":12,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":13,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":14,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":15,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":16,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":17,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":18,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":19,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":20,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":21,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":22,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":23,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":24,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":25,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":26,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":27,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":28,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":29,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":30,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":31,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":32,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":33,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":34,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":35,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":36,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":37,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":38,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":39,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":40,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":41,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":42,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":43,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":44,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":45,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":46,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":47,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":48,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":49,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":50,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":51,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":52,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":53,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":54,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":55,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":56,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":57,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":58,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":59,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":60,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":61,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":62,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":63,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":64,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":65,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":66,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":67,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":68,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":69,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":70,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":71,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":72,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":73,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":74,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":75,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":76,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":77,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":78,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":79,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":80,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":81,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":82,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":83,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":84,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":85,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":86,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":87,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":88,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":89,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":90,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":91,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":92,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":93,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":94,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":95,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":96,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":97,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":98,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":99,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":100,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":101,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":102,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":103,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":104,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":105,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":106,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":107,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":108,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":109,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":110,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":111,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":112,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":113,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":114,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":115,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":116,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":117,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":118,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":119,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":120,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":121,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":122,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":123,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":124,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":125,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":126,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":127,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":128,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":129,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":130,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":131,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":132,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":133,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":134,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":135,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":136,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":137,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":138,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":139,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":140,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":141,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":142,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":143,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":144,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":145,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":146,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":147,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":148,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":149,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":150,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":151,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":152,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":153,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":154,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":155,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":156,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":157,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":158,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":159,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":160,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":161,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":162,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":163,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":164,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":165,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":166,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":167,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":168,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":169,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":170,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":171,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":172,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":173,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":174,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":175,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":176,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":177,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":178,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":179,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":180,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":181,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":182,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":183,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":184,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":185,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":186,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":187,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":188,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":189,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":190,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":191,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":192,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":193,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":194,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":195,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":196,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":197,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":198,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"},{\"productId\":199,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":200,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"}],\"note\":null,\"receiptDate\":\"2024-02-29\",\"warehouseId\":1},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Receipt.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/goods-receipts\"}",
+      "sha256": "80d326c2f3f0757ba341b452f68027232229587395117dd66f6914bad2d4423d"
+    },
+    {
+      "name": "max-exact-decimal",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Phiếu thử — hàng tặng và dòng trùng sản phẩm",
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "99999999999999.9999",
+              "unitPrice": "999999999999999.9999",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"99999999999999.9999\",\"saleLineId\":\"0\",\"unitPrice\":\"999999999999999.9999\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":\"Phiếu thử — hàng tặng và dòng trùng sản phẩm\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "de25b2892ca205dd5bc33bdfeea4a81d5578127f52d389a4182b6cecb32a62cf"
+    },
+    {
+      "name": "equivalent-precision",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Phiếu thử — hàng tặng và dòng trùng sản phẩm",
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0001.25",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":\"Phiếu thử — hàng tặng và dòng trùng sản phẩm\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "3329e3500edf5e8a851ad303d88d1938853421c5c8f4526ef1e1a68ec6050b78"
+    },
+    {
+      "name": "missing-note",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":null,\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "136c3f351781438843b4d146d6105831c4bb5372d8460b1b709f942cac636bd0"
+    },
+    {
+      "name": "null-note",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "note": null
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":null,\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "136c3f351781438843b4d146d6105831c4bb5372d8460b1b709f942cac636bd0"
+    },
+    {
+      "name": "empty-note",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "note": ""
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":\"\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "2298d9bee2bda368b68e03f7e8f46fd53b7da2d33bf301871895f398810b25fc"
+    },
+    {
+      "name": "unicode-escaping",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "note": "Tiếng Việt 😀 / \\ \"\n\t\b\f\r\u0001  "
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":\"Tiếng Việt 😀 / \\\\ \\\"\\n\\t\\b\\f\\r\\u0001  \",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "c4ec2476a9d75c6facd814794d3a932c50c8e136af8a58978374c74226cf507c"
+    },
+    {
+      "name": "unicode-composed",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "note": "é"
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":\"é\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "4ad336be24d782175569ca2852d8e37168ebb9b555c957a90734e37c4c8e2273"
+    },
+    {
+      "name": "unicode-decomposed-distinct",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "note": "é"
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":\"é\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "6bcd6a3d51ff8aac572e478f0c36bb0e66d6fbce3a05c814bf321b1633f221a6"
+    },
+    {
+      "name": "line-order-different",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Phiếu thử — hàng tặng và dòng trùng sản phẩm",
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"}],\"note\":\"Phiếu thử — hàng tặng và dòng trùng sản phẩm\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "9aa850894d723f587bcb82ad870bb60cde06996a11ffbf7bad93cadeb868eb8e"
+    },
+    {
+      "name": "gift-different",
+      "intent": {
+        "operationKind": "Sales.Create",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts",
+        "requestTargetId": null,
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Phiếu thử — hàng tặng và dòng trùng sản phẩm",
+          "lines": [
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": true
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "0",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ]
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"lines\":[{\"isGift\":true,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"0\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"0\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"0\",\"unitPrice\":\"3.0000\"}],\"note\":\"Phiếu thử — hàng tặng và dòng trùng sản phẩm\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Create\",\"requestTargetId\":null,\"routeScope\":\"/api/v1/sales-receipts\"}",
+      "sha256": "55e72ad9a8fdf11c5b841cc8be6ba65e60fbce351a54724e1aec0916023101b9"
+    },
+    {
+      "name": "version-different",
+      "intent": {
+        "operationKind": "Sales.Update",
+        "method": "PUT",
+        "routeScope": "/api/v1/sales-receipts/{saleId}/draft",
+        "requestTargetId": "9223372036854775807",
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Đã cập nhật",
+          "lines": [
+            {
+              "saleLineId": "9007199254740993",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9007199254740994",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9223372036854775807",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "expectedVersion": "AAAAAAAAAAM="
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"expectedVersion\":\"AAAAAAAAAAM=\",\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"9007199254740993\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"9007199254740994\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"9223372036854775807\",\"unitPrice\":\"3.0000\"}],\"note\":\"Đã cập nhật\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"PUT\",\"operationKind\":\"Sales.Update\",\"requestTargetId\":\"9223372036854775807\",\"routeScope\":\"/api/v1/sales-receipts/{saleId}/draft\"}",
+      "sha256": "8594724b78eee8c4474f737e571b03babb410dd8265e1860bd54d208db96bb56"
+    },
+    {
+      "name": "sales-version-whitespace-equivalent",
+      "intent": {
+        "operationKind": "Sales.Update",
+        "method": "PUT",
+        "routeScope": "/api/v1/sales-receipts/{saleId}/draft",
+        "requestTargetId": "9223372036854775807",
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Đã cập nhật",
+          "lines": [
+            {
+              "saleLineId": "9007199254740993",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9007199254740994",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9223372036854775807",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "expectedVersion": " AA\tAAAAAAAAM=\r\n"
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"expectedVersion\":\"AAAAAAAAAAM=\",\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"9007199254740993\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"9007199254740994\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"9223372036854775807\",\"unitPrice\":\"3.0000\"}],\"note\":\"Đã cập nhật\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"PUT\",\"operationKind\":\"Sales.Update\",\"requestTargetId\":\"9223372036854775807\",\"routeScope\":\"/api/v1/sales-receipts/{saleId}/draft\"}",
+      "sha256": "8594724b78eee8c4474f737e571b03babb410dd8265e1860bd54d208db96bb56"
+    },
+    {
+      "name": "sales-version-padbits-equivalent",
+      "intent": {
+        "operationKind": "Sales.Update",
+        "method": "PUT",
+        "routeScope": "/api/v1/sales-receipts/{saleId}/draft",
+        "requestTargetId": "9223372036854775807",
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Đã cập nhật",
+          "lines": [
+            {
+              "saleLineId": "9007199254740993",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9007199254740994",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9223372036854775807",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "expectedVersion": "AAAAAAAAAAF="
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"expectedVersion\":\"AAAAAAAAAAE=\",\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"9007199254740993\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"9007199254740994\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"9223372036854775807\",\"unitPrice\":\"3.0000\"}],\"note\":\"Đã cập nhật\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"PUT\",\"operationKind\":\"Sales.Update\",\"requestTargetId\":\"9223372036854775807\",\"routeScope\":\"/api/v1/sales-receipts/{saleId}/draft\"}",
+      "sha256": "eef4ef10bf08505c7d182f1b087a411e02e73f59829651494991aaba2c7cf93a"
+    },
+    {
+      "name": "target-different",
+      "intent": {
+        "operationKind": "Sales.Post",
+        "method": "POST",
+        "routeScope": "/api/v1/sales-receipts/{saleId}/post",
+        "requestTargetId": "9007199254740993",
+        "body": {
+          "expectedVersion": "AAAAAAAAAAI="
+        }
+      },
+      "canonical": "{\"body\":{\"expectedVersion\":\"AAAAAAAAAAI=\"},\"contract\":\"web4-v1\",\"method\":\"POST\",\"operationKind\":\"Sales.Post\",\"requestTargetId\":\"9007199254740993\",\"routeScope\":\"/api/v1/sales-receipts/{saleId}/post\"}",
+      "sha256": "a14a1ee3769deda9ce66cc99de7d8bae6443a4d5a0a5e18266156d3c1c0e570e"
+    },
+    {
+      "name": "line-id-different",
+      "intent": {
+        "operationKind": "Sales.Update",
+        "method": "PUT",
+        "routeScope": "/api/v1/sales-receipts/{saleId}/draft",
+        "requestTargetId": "9223372036854775807",
+        "body": {
+          "saleDate": "2024-02-29",
+          "customerId": 101,
+          "warehouseId": 102,
+          "employeeId": 103,
+          "note": "Đã cập nhật",
+          "lines": [
+            {
+              "saleLineId": "9007199254740995",
+              "productId": 104,
+              "qty": "1.2500",
+              "unitPrice": "2.0000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9007199254740994",
+              "productId": 104,
+              "qty": "0.0001",
+              "unitPrice": "0.5000",
+              "isGift": false
+            },
+            {
+              "saleLineId": "9223372036854775807",
+              "productId": 104,
+              "qty": "2.0000",
+              "unitPrice": "3.0000",
+              "isGift": true
+            }
+          ],
+          "expectedVersion": "AAAAAAAAAAE="
+        }
+      },
+      "canonical": "{\"body\":{\"customerId\":101,\"employeeId\":103,\"expectedVersion\":\"AAAAAAAAAAE=\",\"lines\":[{\"isGift\":false,\"productId\":104,\"qty\":\"1.2500\",\"saleLineId\":\"9007199254740995\",\"unitPrice\":\"2.0000\"},{\"isGift\":false,\"productId\":104,\"qty\":\"0.0001\",\"saleLineId\":\"9007199254740994\",\"unitPrice\":\"0.5000\"},{\"isGift\":true,\"productId\":104,\"qty\":\"2.0000\",\"saleLineId\":\"9223372036854775807\",\"unitPrice\":\"3.0000\"}],\"note\":\"Đã cập nhật\",\"saleDate\":\"2024-02-29\",\"warehouseId\":102},\"contract\":\"web4-v1\",\"method\":\"PUT\",\"operationKind\":\"Sales.Update\",\"requestTargetId\":\"9223372036854775807\",\"routeScope\":\"/api/v1/sales-receipts/{saleId}/draft\"}",
+      "sha256": "756f049dbe7d48391eaf805c3edd19af1bcf93c9fb7caa07938b4b2815877ea6"
+    }
+  ]
+}

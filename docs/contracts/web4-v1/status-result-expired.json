@@ -1,0 +1,13 @@
+{
+  "data": {
+    "deploymentEpoch": "11111111-2222-4333-8444-555555555555",
+    "operationId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "operationKind": "Sales.Create",
+    "method": "POST",
+    "routeScope": "/api/v1/sales-receipts",
+    "requestTargetId": null,
+    "requestFingerprint": "3329e3500edf5e8a851ad303d88d1938853421c5c8f4526ef1e1a68ec6050b78",
+    "state": "RESULT_EXPIRED",
+    "outcome": null
+  }
+}

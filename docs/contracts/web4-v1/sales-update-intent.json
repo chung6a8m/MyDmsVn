@@ -1,0 +1,37 @@
+{
+  "operationKind": "Sales.Update",
+  "method": "PUT",
+  "routeScope": "/api/v1/sales-receipts/{saleId}/draft",
+  "requestTargetId": "9223372036854775807",
+  "body": {
+    "saleDate": "2024-02-29",
+    "customerId": 101,
+    "warehouseId": 102,
+    "employeeId": 103,
+    "note": "Đã cập nhật",
+    "lines": [
+      {
+        "saleLineId": "9007199254740993",
+        "productId": 104,
+        "qty": "1.2500",
+        "unitPrice": "2.0000",
+        "isGift": false
+      },
+      {
+        "saleLineId": "9007199254740994",
+        "productId": 104,
+        "qty": "0.0001",
+        "unitPrice": "0.5000",
+        "isGift": false
+      },
+      {
+        "saleLineId": "9223372036854775807",
+        "productId": 104,
+        "qty": "2.0000",
+        "unitPrice": "3.0000",
+        "isGift": true
+      }
+    ],
+    "expectedVersion": "AAAAAAAAAAE="
+  }
+}

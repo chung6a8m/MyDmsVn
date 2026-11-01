@@ -1,0 +1,206 @@
+[
+  {
+    "file": "sales-create-request.json",
+    "kind": "body",
+    "operationKind": "Sales.Create",
+    "intent": "sales-create-intent.json"
+  },
+  {
+    "file": "sales-create-intent.json",
+    "kind": "intent"
+  },
+  {
+    "file": "sales-create-response.json",
+    "kind": "outcome",
+    "operationKind": "Sales.Create",
+    "status": 200
+  },
+  {
+    "file": "sales-create-status.json",
+    "kind": "status",
+    "intent": "sales-create-intent.json",
+    "status": 200
+  },
+  {
+    "file": "sales-update-request.json",
+    "kind": "body",
+    "operationKind": "Sales.Update",
+    "intent": "sales-update-intent.json"
+  },
+  {
+    "file": "sales-update-intent.json",
+    "kind": "intent"
+  },
+  {
+    "file": "sales-update-response.json",
+    "kind": "outcome",
+    "operationKind": "Sales.Update",
+    "status": 200
+  },
+  {
+    "file": "sales-update-status.json",
+    "kind": "status",
+    "intent": "sales-update-intent.json",
+    "status": 200
+  },
+  {
+    "file": "sales-post-request.json",
+    "kind": "body",
+    "operationKind": "Sales.Post",
+    "intent": "sales-post-intent.json"
+  },
+  {
+    "file": "sales-post-intent.json",
+    "kind": "intent"
+  },
+  {
+    "file": "sales-post-response.json",
+    "kind": "outcome",
+    "operationKind": "Sales.Post",
+    "status": 200
+  },
+  {
+    "file": "sales-post-status.json",
+    "kind": "status",
+    "intent": "sales-post-intent.json",
+    "status": 200
+  },
+  {
+    "file": "receipt-create-request.json",
+    "kind": "body",
+    "operationKind": "Receipt.Create",
+    "intent": "receipt-create-intent.json"
+  },
+  {
+    "file": "receipt-create-intent.json",
+    "kind": "intent"
+  },
+  {
+    "file": "receipt-create-response.json",
+    "kind": "outcome",
+    "operationKind": "Receipt.Create",
+    "status": 200
+  },
+  {
+    "file": "receipt-create-status.json",
+    "kind": "status",
+    "intent": "receipt-create-intent.json",
+    "status": 200
+  },
+  {
+    "file": "receipt-update-request.json",
+    "kind": "body",
+    "operationKind": "Receipt.Update",
+    "intent": "receipt-update-intent.json"
+  },
+  {
+    "file": "receipt-update-intent.json",
+    "kind": "intent"
+  },
+  {
+    "file": "receipt-update-response.json",
+    "kind": "outcome",
+    "operationKind": "Receipt.Update",
+    "status": 200
+  },
+  {
+    "file": "receipt-update-status.json",
+    "kind": "status",
+    "intent": "receipt-update-intent.json",
+    "status": 200
+  },
+  {
+    "file": "receipt-post-request.json",
+    "kind": "body",
+    "operationKind": "Receipt.Post",
+    "intent": "receipt-post-intent.json"
+  },
+  {
+    "file": "receipt-post-intent.json",
+    "kind": "intent"
+  },
+  {
+    "file": "receipt-post-response.json",
+    "kind": "outcome",
+    "operationKind": "Receipt.Post",
+    "status": 200
+  },
+  {
+    "file": "receipt-post-status.json",
+    "kind": "status",
+    "intent": "receipt-post-intent.json",
+    "status": 200
+  },
+  {
+    "file": "context-response.json",
+    "kind": "context",
+    "status": 200
+  },
+  {
+    "file": "status-result-expired.json",
+    "kind": "status",
+    "intent": "sales-create-intent.json",
+    "status": 200
+  },
+  {
+    "file": "status-result-unavailable.json",
+    "kind": "status",
+    "intent": "sales-create-intent.json",
+    "status": 200
+  },
+  {
+    "file": "error-validationerror.json",
+    "kind": "error",
+    "status": 400
+  },
+  {
+    "file": "error-auth-unauthorized.json",
+    "kind": "error",
+    "status": 401
+  },
+  {
+    "file": "error-auth-forbidden.json",
+    "kind": "error",
+    "status": 403
+  },
+  {
+    "file": "error-deployment-epochmismatch.json",
+    "kind": "error",
+    "status": 409
+  },
+  {
+    "file": "error-idempotency-fingerprintmismatch.json",
+    "kind": "error",
+    "status": 409
+  },
+  {
+    "file": "error-idempotency-keyconflict.json",
+    "kind": "error",
+    "status": 409
+  },
+  {
+    "file": "error-operation-notobserved.json",
+    "kind": "error",
+    "status": 404
+  },
+  {
+    "file": "error-operation-resultexpired.json",
+    "kind": "error",
+    "status": 410
+  },
+  {
+    "file": "error-operation-resultunavailable.json",
+    "kind": "error",
+    "status": 503
+  },
+  {
+    "file": "error-operation-unavailable.json",
+    "kind": "error",
+    "status": 503
+  },
+  {
+    "file": "error-internalerror.json",
+    "kind": "error",
+    "status": 500
+  }
+]

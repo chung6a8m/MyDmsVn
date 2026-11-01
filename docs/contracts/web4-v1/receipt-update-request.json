@@ -1,0 +1,19 @@
+{
+  "receiptDate": "2024-02-29",
+  "warehouseId": 1,
+  "employeeId": 2,
+  "note": "Nhập hàng — đã kiểm đếm",
+  "lines": [
+    {
+      "productId": 8,
+      "quantity": "3.0000",
+      "unitCost": "0.0000"
+    },
+    {
+      "productId": 7,
+      "quantity": "1.5000",
+      "unitCost": "12.3456"
+    }
+  ],
+  "expectedVersion": "AAAAAAAAAAE="
+}
