@@ -219,10 +219,12 @@ public sealed class WebAuthHttpSqlTests
         public int Bob { get; private set; }
         private ServiceProvider? _provider;
         private TestServer? _server;
+        private bool _web4Enabled;
         private Scenario(string connectionString) { Admin = new SqlConnection(connectionString); }
-        public static async Task<Scenario> Create(string connectionString)
+        public static async Task<Scenario> Create(string connectionString, bool web4Enabled = false)
         {
             var test = new Scenario(connectionString);
+            test._web4Enabled = web4Enabled;
             try
             {
                 await test.Admin.OpenAsync();
@@ -236,15 +238,8 @@ public sealed class WebAuthHttpSqlTests
                 }
                 var factory = new RestrictedFactory(connectionString);
                 using (var runtime = (SqlConnection)await factory.OpenConnectionAsync(CancellationToken.None))
-                    await new SqlWebRuntimePrincipalValidator(requireJournal: false).ValidateConnectionAsync(runtime, CancellationToken.None);
-                var services = new ServiceCollection();
-                services.AddServerApplication().AddHttpRequestIdentity();
-                services.AddSqlPersistence(connectionString);
-                services.Replace(ServiceDescriptor.Singleton<IDbConnectionFactory>(factory));
-                services.Replace(ServiceDescriptor.Singleton<ISecurityAuditSink>(test.Audit));
-                test._provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-                var options = new WebHostOptions(Origin, Origin, "http-sql-tests", "sql-test", new Dictionary<string, byte[]> { ["sql-test"] = Encoding.UTF8.GetBytes("test-only-key-for-real-sql-http-auth-boundary") });
-                test._server = TestServer.Create(app => Web2Pipeline.Configure(app, options, test._provider));
+                    await new SqlWebRuntimePrincipalValidator(requireJournal: web4Enabled).ValidateConnectionAsync(runtime, CancellationToken.None);
+                test.RestartHost();
                 return test;
             }
             catch { test.Dispose(); throw; }
@@ -259,7 +254,7 @@ public sealed class WebAuthHttpSqlTests
         }
         public Task<Reply> Get(string path, string access) => Request(HttpMethod.Get, path, null, null, access);
         public Task<Reply> Post(string path, string? body = null, string? cookie = null) => Request(HttpMethod.Post, path, body, cookie, null);
-        internal async Task<Reply> Request(HttpMethod method, string path, string? body, string? cookie, string? access)
+        internal async Task<Reply> Request(HttpMethod method, string path, string? body, string? cookie, string? access, IDictionary<string, string[]>? headers = null)
         {
             using var request = new HttpRequestMessage(method, Origin + "/api/v1/" + path);
             request.Headers.TryAddWithoutValidation("Origin", Origin);
@@ -268,10 +263,25 @@ public sealed class WebAuthHttpSqlTests
             request.Headers.TryAddWithoutValidation("X-Correlation-ID", "http-sql-test");
             if (cookie != null) request.Headers.TryAddWithoutValidation("Cookie", "__Host-mydmsvn-rt=" + cookie);
             if (access != null) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + access);
+            if (headers != null) foreach (var header in headers) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             if (body != null) request.Content = new StringContent(body, Encoding.UTF8, "application/json");
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
             using var response = await _server!.HttpClient.SendAsync(request, timeout.Token);
-            return new Reply((int)response.StatusCode, await response.Content.ReadAsStringAsync(), response.Headers.TryGetValues("Set-Cookie", out var values) ? values.ToArray() : Array.Empty<string>());
+            return new Reply((int)response.StatusCode, await response.Content.ReadAsStringAsync(), response.Headers.TryGetValues("Set-Cookie", out var values) ? values.ToArray() : Array.Empty<string>(),
+                response.Headers.Concat(response.Content.Headers).ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase));
+        }
+        public void RestartHost()
+        {
+            _server?.Dispose(); _server = null;
+            _provider?.Dispose(); _provider = null;
+            var services = new ServiceCollection();
+            services.AddServerApplication().AddHttpRequestIdentity();
+            services.AddSqlPersistence(Admin.ConnectionString);
+            services.Replace(ServiceDescriptor.Singleton<IDbConnectionFactory>(new RestrictedFactory(Admin.ConnectionString)));
+            services.Replace(ServiceDescriptor.Singleton<ISecurityAuditSink>(Audit));
+            _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+            var options = new WebHostOptions(Origin, Origin, "http-sql-tests", "sql-test", new Dictionary<string, byte[]> { ["sql-test"] = Encoding.UTF8.GetBytes("test-only-key-for-real-sql-http-auth-boundary") }, web4Enabled: _web4Enabled);
+            _server = TestServer.Create(app => Web2Pipeline.Configure(app, options, _provider));
         }
         public void Dispose() { _server?.Dispose(); _provider?.Dispose(); Admin.Dispose(); }
         private static string ReadProvisioning()
@@ -286,7 +296,9 @@ public sealed class WebAuthHttpSqlTests
     }
     internal sealed class Reply
     {
-        public Reply(int status, string body, string[] cookies) { Status = status; Body = body; SetCookies = cookies; Json = JObject.Parse(body); }
+        public Reply(int status, string body, string[] cookies, IReadOnlyDictionary<string, string[]>? headers = null)
+        { Status = status; Body = body; SetCookies = cookies; Json = JObject.Parse(body); Headers = headers ?? new Dictionary<string, string[]>(); }
+        public IReadOnlyDictionary<string, string[]> Headers { get; }
         public int Status { get; }
         public string Body { get; }
         public JObject Json { get; }
@@ -317,12 +329,20 @@ public sealed class WebAuthHttpSqlTests
     internal sealed class AuditSink : ISecurityAuditSink
     {
         private int _refreshFailures;
+        private int _postFailures;
         public bool ThrowOnRefreshSuccess { get; set; }
+        public bool ThrowOnPostSuccess { get; set; }
         public int RefreshFailures => _refreshFailures;
+        public int PostFailures => _postFailures;
         public ConcurrentQueue<SecurityAuditEntry> Entries { get; } = new ConcurrentQueue<SecurityAuditEntry>();
         public Task WriteAsync(SecurityAuditEntry entry, CancellationToken cancellationToken)
         {
             Entries.Enqueue(entry);
+            if (ThrowOnPostSuccess && (entry.Action == SecurityAuditAction.SalesReceiptPost || entry.Action == SecurityAuditAction.GoodsReceiptPost) && entry.Outcome == SecurityAuditOutcome.Succeeded)
+            {
+                Interlocked.Increment(ref _postFailures);
+                throw new InvalidOperationException("Injected post audit sink failure.");
+            }
             if (ThrowOnRefreshSuccess && entry.DocumentType == "WebAuthRefresh" && entry.Outcome == SecurityAuditOutcome.Succeeded)
             {
                 Interlocked.Increment(ref _refreshFailures);

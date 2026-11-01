@@ -6,6 +6,7 @@ using MediatR;
 using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application;
 using MyDmsVn.Server.Application.Inventory;
+using MyDmsVn.Server.Application.Operations;
 
 namespace MyDmsVn.Server.HttpHost;
 
@@ -33,7 +34,8 @@ public sealed class GoodsReceiptsController : WireApiController
     public Task<HttpResponseMessage> Create(CancellationToken cancellationToken) => Execute<GoodsReceiptDto>(async () =>
     {
         var body = await InventoryWireInput.Body(Request).ConfigureAwait(false);
-        return await Mediator.Send(new CreateGoodsReceiptDraftCommand(InventoryWireInput.Create(body)), cancellationToken).ConfigureAwait(false);
+        var input = InventoryWireInput.Create(body);
+        return await Mediator.Send(new CreateGoodsReceiptDraftCommand(input, Operation(WebOperationKind.ReceiptCreate, null, body)), cancellationToken).ConfigureAwait(false);
     }, InventoryWireOutput.Detail);
 
     [HttpPut, Route("{receiptId}/draft")]
@@ -41,7 +43,8 @@ public sealed class GoodsReceiptsController : WireApiController
     {
         var id = InventoryWireInput.Long(receiptId);
         var body = await InventoryWireInput.Body(Request).ConfigureAwait(false);
-        return await Mediator.Send(new UpdateGoodsReceiptDraftCommand(InventoryWireInput.Update(id, body)), cancellationToken).ConfigureAwait(false);
+        var input = InventoryWireInput.Update(id, body);
+        return await Mediator.Send(new UpdateGoodsReceiptDraftCommand(input, Operation(WebOperationKind.ReceiptUpdate, id, body)), cancellationToken).ConfigureAwait(false);
     }, InventoryWireOutput.Detail);
 
     [HttpPost, Route("{receiptId}/post")]
@@ -49,7 +52,8 @@ public sealed class GoodsReceiptsController : WireApiController
     {
         var id = InventoryWireInput.Long(receiptId);
         var body = await InventoryWireInput.Body(Request).ConfigureAwait(false);
-        return await Mediator.Send(new PostGoodsReceiptCommand(InventoryWireInput.Post(id, body)), cancellationToken).ConfigureAwait(false);
+        var input = InventoryWireInput.Post(id, body);
+        return await Mediator.Send(new PostGoodsReceiptCommand(input, Operation(WebOperationKind.ReceiptPost, id, body)), cancellationToken).ConfigureAwait(false);
     }, InventoryWireOutput.Post);
 }
 

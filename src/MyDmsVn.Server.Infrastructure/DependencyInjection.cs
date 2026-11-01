@@ -83,6 +83,7 @@ namespace MyDmsVn.Server.Infrastructure
             });
             return new SqlPersistenceBuilder(services)
                 .AddRepository<IWebOperationJournal, SqlWebOperationJournal>()
+                .AddRepository<IWebOperationReadRepository, SqlWebOperationReadRepository>()
                 .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>()
                 .AddRepository<IGoodsReceiptWriteRepository, SqlGoodsReceiptWriteRepository>()
                 .AddRepository<ISalesReceiptWriteRepository, SqlSalesReceiptWriteRepository>()

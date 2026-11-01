@@ -332,9 +332,9 @@ internal sealed class AuthFixture : IDisposable
     private readonly ServiceProvider _provider;
     public WebHostOptions Options { get; }
     public TestServer Server { get; }
-    public AuthFixture(Action<IServiceCollection>? configure = null, Action<IOwinContext>? configureRequest = null)
+    public AuthFixture(Action<IServiceCollection>? configure = null, Action<IOwinContext>? configureRequest = null, bool web4Enabled = false)
     {
-        Options = new WebHostOptions(Origin, Origin, "auth-tests", "active", new Dictionary<string, byte[]> { ["active"] = Encoding.UTF8.GetBytes("active-test-key-at-least-32-bytes-long"), ["previous"] = Encoding.UTF8.GetBytes("previous-test-key-at-least-32-bytes-long") });
+        Options = new WebHostOptions(Origin, Origin, "auth-tests", "active", new Dictionary<string, byte[]> { ["active"] = Encoding.UTF8.GetBytes("active-test-key-at-least-32-bytes-long"), ["previous"] = Encoding.UTF8.GetBytes("previous-test-key-at-least-32-bytes-long") }, web4Enabled: web4Enabled);
         var services = new ServiceCollection();
         services.AddServerApplication().AddHttpRequestIdentity();
         services.AddSingleton<IUtcClock>(Clock);

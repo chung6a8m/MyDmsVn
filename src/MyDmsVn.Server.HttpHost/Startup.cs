@@ -27,9 +27,11 @@ public sealed class Startup
                 throw new InvalidOperationException();
             using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
             {
-                var compatibility = new SqlWebSchema11CompatibilityChecker(connection!).CheckAsync(timeout.Token).GetAwaiter().GetResult();
+                var compatibility = (options.Web4Enabled
+                    ? new SqlWebSchemaCompatibilityChecker(connection!).CheckAsync(timeout.Token)
+                    : new SqlWebSchema11CompatibilityChecker(connection!).CheckAsync(timeout.Token)).GetAwaiter().GetResult();
                 if (!compatibility.IsCompatible) throw new InvalidOperationException();
-                new SqlWebRuntimePrincipalValidator(requireJournal: false).ValidateAsync(connection!, timeout.Token).GetAwaiter().GetResult();
+                new SqlWebRuntimePrincipalValidator(requireJournal: options.Web4Enabled).ValidateAsync(connection!, timeout.Token).GetAwaiter().GetResult();
                 new SqlSuperuserBindingValidator().ValidateAsync(connection!, superuser!, timeout.Token).GetAwaiter().GetResult();
             }
             var services = new ServiceCollection();

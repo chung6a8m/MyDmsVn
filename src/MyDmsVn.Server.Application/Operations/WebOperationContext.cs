@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application.Persistence;
 using MyDmsVn.Server.Application.Security;
 
@@ -63,8 +64,24 @@ public interface IWebOperationResultCodec
 
 public interface IWebOperationJournal
 {
-    Task<byte[]?> AdmitAsync(WebOperationContext context, int actorUserId, CancellationToken token);
+    Task<WebOperationReplay?> AdmitAsync(WebOperationContext context, int actorUserId, CancellationToken token);
     Task CompleteAsync(WebOperationContext context, int actorUserId, long resultDocumentId, byte[] bytes, CancellationToken token);
+}
+
+// The immutable SQL result identity travels with the retained bytes. A valid codec shape alone
+// cannot establish that a decoded result belongs to the committed command.
+public sealed class WebOperationReplay
+{
+    private readonly byte[] _resultBytes;
+    public WebOperationReplay(long resultDocumentId, byte[] resultBytes)
+    {
+        if (resultDocumentId <= 0 || resultBytes == null || resultBytes.Length == 0 || resultBytes.Length > 1048576)
+            throw new WebOperationException("Operation.ResultUnavailable");
+        ResultDocumentId = resultDocumentId;
+        _resultBytes = (byte[])resultBytes.Clone();
+    }
+    public long ResultDocumentId { get; }
+    public byte[] ResultBytes => (byte[])_resultBytes.Clone();
 }
 
 public sealed class WebOperationException : Exception
@@ -83,12 +100,23 @@ internal static class WebOperationExecution
             return null;
         if (context.Kind != kind || context.RequestTargetId != target)
             throw new WebOperationException("Idempotency.KeyConflict");
-        var bytes = await uow.Repository<IWebOperationJournal>().AdmitAsync(context, actor, token).ConfigureAwait(false);
-        if (bytes == null)
+        var replay = await uow.Repository<IWebOperationJournal>().AdmitAsync(context, actor, token).ConfigureAwait(false);
+        if (replay == null)
             return null;
         try
         {
-            return context.Codec.Decode<T>(kind, bytes) ?? throw new WebOperationException("Operation.ResultUnavailable");
+            var result = context.Codec.Decode<T>(kind, replay.ResultBytes) ?? throw new WebOperationException("Operation.ResultUnavailable");
+            var decodedId = kind switch
+            {
+                WebOperationKind.SalesCreate or WebOperationKind.SalesUpdate when result is SalesReceiptDto sale => sale.SaleId,
+                WebOperationKind.SalesPost when result is PostSalesReceiptResponse salePost => salePost.SaleId,
+                WebOperationKind.ReceiptCreate or WebOperationKind.ReceiptUpdate when result is GoodsReceiptDto receipt => receipt.Id,
+                WebOperationKind.ReceiptPost when result is PostGoodsReceiptResponse receiptPost => receiptPost.ReceiptId,
+                _ => throw new WebOperationException("Operation.ResultUnavailable")
+            };
+            if (decodedId != replay.ResultDocumentId || (target.HasValue && decodedId != target.Value))
+                throw new WebOperationException("Operation.ResultUnavailable");
+            return result;
         }
         catch { throw new WebOperationException("Operation.ResultUnavailable"); }
     }

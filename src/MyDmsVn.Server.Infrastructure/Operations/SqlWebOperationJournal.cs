@@ -27,31 +27,17 @@ public sealed class SqlWebOperationJournal : IWebOperationJournal
         _superuser = superuser;
     }
 
-    public async Task<byte[]?> AdmitAsync(WebOperationContext operation, int actorUserId, CancellationToken token)
+    public async Task<WebOperationReplay?> AdmitAsync(WebOperationContext operation, int actorUserId, CancellationToken token)
     {
         RequireTransaction();
         if (_admitted != null)
             throw new InvalidOperationException("One operation per transaction is required.");
-        if (!_current.Current.IsAuthenticated || !_current.Current.IsActive || _current.Current.UserId != actorUserId)
-            throw new WebOperationException("Auth.Unauthorized");
+        RequireCurrentActor(_current, actorUserId);
         await FenceAsync(_context, operation.DeploymentEpoch, actorUserId, operation.OperationId, token).ConfigureAwait(false);
-        // Users precedes session, matching account-disable and refresh lock order. HOLDLOCK retains
-        // shared keys/ranges through the caller's commit, including absent grants and membership.
+        await AuthorizeSessionAsync(_context, actorUserId, operation.SessionId, token).ConfigureAwait(false);
+        await AuthorizeOperationAsync(_context, _current, _registry, _superuser, actorUserId, operation.Kind, token).ConfigureAwait(false);
         using (var command = SqlRead.Command(_context.Connection, _context.Transaction,
-            "SELECT IsActive FROM dbo.Users WITH (HOLDLOCK) WHERE UserId=@actor;",
-            SqlRead.P("@actor", SqlDbType.Int, actorUserId)))
-            if (!Equals(await command.ExecuteScalarAsync(token).ConfigureAwait(false), true))
-                throw new WebOperationException("Auth.Unauthorized");
-        using (var command = SqlRead.Command(_context.Connection, _context.Transaction,
-            "SELECT COUNT(*) FROM dbo.WebAuthSessions WITH (HOLDLOCK) WHERE SessionId=@session AND UserId=@actor AND RevokedAtUtc IS NULL AND AbsoluteExpiresAtUtc>SYSUTCDATETIME() AND IdleExpiresAtUtc>SYSUTCDATETIME();",
-            SqlRead.P("@session", SqlDbType.UniqueIdentifier, operation.SessionId), SqlRead.P("@actor", SqlDbType.Int, actorUserId)))
-            if (Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false)) != 1)
-                throw new WebOperationException("Auth.Unauthorized");
-        var auth = new PermissionAuthorizationService(_current, new TransactionPermissionStore(_context), _registry, _superuser);
-        if (!await auth.IsAllowedAsync(actorUserId, WebOperationContext.Permission(operation.Kind), token).ConfigureAwait(false))
-            throw new WebOperationException("Auth.Forbidden");
-        using (var command = SqlRead.Command(_context.Connection, _context.Transaction,
-            "SELECT DeploymentEpoch,OperationKind,RequestTargetId,RequestFingerprint,Disposition,ResultBytes,CASE WHEN ResultExpiresAtUtc<=SYSUTCDATETIME() THEN 1 ELSE 0 END,ContractVersion,CodecVersion FROM dbo.WebOperationJournal WHERE ActorUserId=@actor AND OperationId=@operation;",
+            "SELECT DeploymentEpoch,OperationKind,RequestTargetId,RequestFingerprint,Disposition,ResultBytes,CASE WHEN ResultExpiresAtUtc<=SYSUTCDATETIME() THEN 1 ELSE 0 END,ContractVersion,CodecVersion,ResultDocumentId FROM dbo.WebOperationJournal WHERE ActorUserId=@actor AND OperationId=@operation;",
             SqlRead.P("@actor", SqlDbType.Int, actorUserId), SqlRead.P("@operation", SqlDbType.UniqueIdentifier, operation.OperationId)))
         using (var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false))
         {
@@ -62,9 +48,9 @@ public sealed class SqlWebOperationJournal : IWebOperationJournal
                     throw new WebOperationException("Idempotency.KeyConflict");
                 if (reader.GetString(4) == "EXPIRED" || reader.GetInt32(6) == 1)
                     throw new WebOperationException("Operation.ResultExpired");
-                if (reader.GetString(4) != "COMMITTED" || reader.IsDBNull(5) || reader.GetInt16(7) != 1 || reader.GetInt16(8) != 1)
+                if (reader.GetString(4) != "COMMITTED" || reader.IsDBNull(5) || reader.GetInt16(7) != 1 || reader.GetInt16(8) != 1 || reader.IsDBNull(9))
                     throw new WebOperationException("Operation.ResultUnavailable");
-                return (byte[])reader[5];
+                return new WebOperationReplay(reader.GetInt64(9), (byte[])reader[5]);
             }
         }
         _admitted = operation;
@@ -88,6 +74,36 @@ public sealed class SqlWebOperationJournal : IWebOperationJournal
             SqlRead.P("@result", SqlDbType.BigInt, resultDocumentId), SqlRead.P("@bytes", SqlDbType.VarBinary, bytes));
         await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         _admitted = null;
+    }
+
+    internal static void RequireCurrentActor(ICurrentUserAccessor current, int actorUserId)
+    {
+        if (!current.Current.IsAuthenticated || !current.Current.IsActive || current.Current.UserId != actorUserId)
+            throw new WebOperationException("Auth.Unauthorized");
+    }
+
+    internal static async Task AuthorizeSessionAsync(ISqlExecutionContext context, int actorUserId, Guid sessionId, CancellationToken token)
+    {
+        // Users precedes session, matching account-disable and refresh lock order. HOLDLOCK retains
+        // shared keys/ranges through the caller's commit, including absent grants and membership.
+        using (var command = SqlRead.Command(context.Connection, context.Transaction,
+            "SELECT IsActive FROM dbo.Users WITH (HOLDLOCK) WHERE UserId=@actor;",
+            SqlRead.P("@actor", SqlDbType.Int, actorUserId)))
+            if (!Equals(await command.ExecuteScalarAsync(token).ConfigureAwait(false), true))
+                throw new WebOperationException("Auth.Unauthorized");
+        using (var command = SqlRead.Command(context.Connection, context.Transaction,
+            "SELECT COUNT(*) FROM dbo.WebAuthSessions WITH (HOLDLOCK) WHERE SessionId=@session AND UserId=@actor AND RevokedAtUtc IS NULL AND AbsoluteExpiresAtUtc>SYSUTCDATETIME() AND IdleExpiresAtUtc>SYSUTCDATETIME();",
+            SqlRead.P("@session", SqlDbType.UniqueIdentifier, sessionId), SqlRead.P("@actor", SqlDbType.Int, actorUserId)))
+            if (Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false)) != 1)
+                throw new WebOperationException("Auth.Unauthorized");
+    }
+
+    internal static async Task AuthorizeOperationAsync(ISqlExecutionContext context, ICurrentUserAccessor current,
+        IPermissionRegistry registry, SuperuserIdentityPolicy? superuser, int actorUserId, WebOperationKind kind, CancellationToken token)
+    {
+        var auth = new PermissionAuthorizationService(current, new TransactionPermissionStore(context), registry, superuser);
+        if (!await auth.IsAllowedAsync(actorUserId, WebOperationContext.Permission(kind), token).ConfigureAwait(false))
+            throw new WebOperationException("Auth.Forbidden");
     }
 
     internal static async Task FenceAsync(ISqlExecutionContext context, Guid epoch, int actor, Guid operation, CancellationToken token)

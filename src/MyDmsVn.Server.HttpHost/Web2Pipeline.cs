@@ -66,6 +66,7 @@ public static class Web2Pipeline
                     var admission = scope.ServiceProvider.GetRequiredService<RequestIdentityAdmission>();
                     admission.BeginCorrelation(correlation);
                     var actor = CurrentUser.Anonymous;
+                    Guid? sessionId = null;
                     var cookieEndpoint = context.Request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase) && IsCookieEndpoint(context.Request.Path.Value);
                     var anonymous = cookieEndpoint || context.Request.Method.Equals("GET", StringComparison.OrdinalIgnoreCase) && context.Request.Path.Value == "/api/v1/health";
                     var authorization = context.Request.Headers.GetValues("Authorization");
@@ -80,8 +81,9 @@ public static class Web2Pipeline
                         if (user == null || !user.IsAuthenticated || !user.IsActive || user.UserId != valid.UserId)
                         { using var denied = Unauthorized(correlation); await WriteAsync(context, denied); return; }
                         actor = user;
+                        sessionId = valid.SessionId;
                     }
-                    admission.Admit(actor);
+                    admission.Admit(actor, sessionId);
                     context.Set(ScopeKey, scope.ServiceProvider);
                     context.Set(AuthController.OptionsKey, options);
                     context.Set(AuthController.LimiterKey, limiter);
@@ -154,6 +156,7 @@ public static class Web2Pipeline
         response.Headers.Set("X-Correlation-ID", correlation);
         response.Headers.Set("Cache-Control", "no-store");
         response.Headers.Set("Pragma", "no-cache");
+        response.Headers.Set("Expires", "0");
         response.Headers.Set("X-Content-Type-Options", "nosniff");
         response.Headers.Set("Strict-Transport-Security", "max-age=31536000");
         response.Headers.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");

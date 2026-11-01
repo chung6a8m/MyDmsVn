@@ -29,6 +29,7 @@ public static class RequestServices
 internal sealed class RequestIdentityAdmission
 {
     private CurrentUser? _current;
+    public Guid? SessionId { get; private set; }
     public CurrentUser Current => _current ?? throw new InvalidOperationException("HTTP identity has not been admitted.");
     private string? _correlation;
     public string CorrelationId => _correlation ?? throw new InvalidOperationException("HTTP correlation has not been initialized.");
@@ -37,10 +38,11 @@ internal sealed class RequestIdentityAdmission
         if (_correlation != null) throw new InvalidOperationException("HTTP correlation was already initialized.");
         _correlation = correlationId;
     }
-    public void Admit(CurrentUser current)
+    public void Admit(CurrentUser current, Guid? sessionId = null)
     {
         if (_current != null) throw new InvalidOperationException("HTTP identity was already admitted.");
         _current = current;
+        SessionId = sessionId;
     }
 }
 public sealed class HttpCurrentUserAccessor : ICurrentUserAccessor

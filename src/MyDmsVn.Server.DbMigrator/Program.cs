@@ -73,7 +73,7 @@ internal static class Program
         }
 
         Console.Error.WriteLine(
-            "DbMigrator.InvalidArguments: Unknown command. Use no arguments for desktop schema10, --web for explicit schema11, " +
+            "DbMigrator.InvalidArguments: Unknown command. Use no arguments for desktop schema10, --web for explicit schema12, " +
             "or use security bootstrap-superuser, recover-superuser or rename-superuser.");
         return 2;
     }

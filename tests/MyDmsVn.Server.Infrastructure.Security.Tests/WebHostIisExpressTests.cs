@@ -103,6 +103,7 @@ public sealed partial class WebHostIisExpressTests
             foreach (string name in start.EnvironmentVariables.Keys) if (name.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase)) inherited.Add(name);
             foreach (var name in inherited) start.EnvironmentVariables.Remove(name);
             start.EnvironmentVariables["MYDMSVN_WEB_ORIGIN"] = "https://localhost:44321";
+            start.EnvironmentVariables["MYDMSVN_WEB_OPERATION_MODE"] = "legacy-web11";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_ISSUER"] = "https://localhost:44321";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_AUDIENCE"] = "web-smoke";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_ACTIVE_KID"] = "smoke";
