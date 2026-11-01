@@ -21,6 +21,132 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 // TestServer restart is a fresh HTTP/service-provider lifetime, not an OS-process crash.
 public sealed class WebOperationHttpSqlTests
 {
+    [WebFrontendPortSqlFact]
+    [Trait("Category", "SecurityProvisioning")]
+    public Task Frontend_ports_recover_six_commands_through_actual_TestServer() => Owned(async data =>
+    {
+        await data.GrantMutations(data.Http.Alice);
+        var observed = await WebFrontendPortBridge.RunAsync(data.Http, new JObject
+        {
+            ["actor"] = new JObject { ["username"] = "alice", ["password"] = HttpScenario.Password, ["userId"] = data.Http.Alice },
+            ["catalog"] = new JObject { ["customerId"] = data.Customer, ["warehouseId"] = data.Warehouse,
+                ["employeeId"] = data.Employee, ["productId"] = data.Product, ["otherProductId"] = data.OtherProduct }
+        });
+        Assert.Equal(1, observed.CompletedTests);
+        Assert.Equal(6, observed.MutationDispatches.Count);
+        Assert.All(observed.MutationDispatches, mutation =>
+        {
+            Assert.True(Guid.TryParseExact(mutation.Key, "D", out var key) && key != Guid.Empty);
+            Assert.Equal(2, mutation.Value); // One initial send and one explicit same-intent replay.
+        });
+        Assert.True(observed.StatusReads >= 6);
+        Assert.Equal(2, observed.DeniedDocumentReads);
+        Assert.Equal(1, observed.Restarts);
+        Assert.Equal(6, await data.Http.Admin.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE Disposition='COMMITTED';"));
+        await data.Oracle();
+    });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task First_unique_key_business_rejections_leave_source_inventory_and_journal_unchanged() => Owned(async data =>
+    {
+        await data.GrantMutations(data.Http.Alice);
+        var access = (await data.Http.Login("alice")).Access;
+        await data.Context(access);
+        var keys = new HashSet<Guid>();
+        var rejected = 0;
+        async Task<Completed> Execute(Intent intent)
+        {
+            Assert.True(keys.Add(intent.Key), "Every HTTP invocation in this case must have a fresh key.");
+            return await data.Execute(intent, access);
+        }
+        async Task Reject(Intent intent, int status, string code, string? detailCode = null)
+        {
+            Assert.True(keys.Add(intent.Key), "A known rejection must not stand in for an older unknown attempt.");
+            var before = await data.State();
+            Assert.Equal(0, await data.Http.Admin.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE ActorUserId=@actor AND OperationId=@key;",
+                new { actor = data.Http.Alice, key = intent.Key }));
+            var reply = await data.Send(intent, access); // Exactly one dispatch; no status lookup or retry.
+            Error(reply, status, code);
+            Assert.Equal(new[] { "error" }, Names(reply.Json));
+            var error = reply.Json["error"]!;
+            Assert.Equal(new[] { "code", "correlationId", "details", "message" }, Names(error));
+            Assert.Equal(JTokenType.String, error["message"]!.Type);
+            Assert.Equal(JTokenType.String, error["correlationId"]!.Type);
+            var details = Assert.IsType<JArray>(error["details"]);
+            Assert.NotEmpty(details);
+            Assert.All(details, detail =>
+            {
+                Assert.Equal(detailCode ?? code, (string?)detail["code"]);
+                Assert.Equal(JTokenType.String, detail["message"]!.Type);
+                Assert.All(Names(detail), name => Assert.Contains(name, new[] { "code", "field", "message" }));
+                if (detail["field"] != null) Assert.Equal(JTokenType.String, detail["field"]!.Type);
+            });
+            Assert.Equal(before, await data.State());
+            Assert.Equal(0, await data.Http.Admin.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE ActorUserId=@actor AND OperationId=@key;",
+                new { actor = data.Http.Alice, key = intent.Key }));
+            rejected++;
+        }
+
+        var receiptCreate = await Execute(new Intent("Receipt.Create", data.Receipt()));
+        var saleCreate = await Execute(new Intent("Sales.Create", data.Sale()));
+        var receiptId = (string)receiptCreate.Result["receiptId"]!;
+        var saleId = (string)saleCreate.Result["saleId"]!;
+        // Valid wire requests reach first-execution business validation. Inactive
+        // Product is shared by all six commands; no malformed-header shortcut.
+        await data.Http.Admin.ExecuteAsync("UPDATE dbo.Products SET IsActive=0 WHERE ProductId=@product;", new { product = data.Product });
+        foreach (var intent in new[]
+        {
+            new Intent("Receipt.Create", data.Receipt()),
+            new Intent("Receipt.Update", Save(receiptCreate.Result, false), receiptId),
+            new Intent("Receipt.Post", Post(receiptCreate.Result), receiptId),
+            new Intent("Sales.Create", data.Sale()),
+            new Intent("Sales.Update", Save(saleCreate.Result, true), saleId),
+            new Intent("Sales.Post", Post(saleCreate.Result), saleId)
+        }) await Reject(intent, 400, "ValidationError", intent.Kind.StartsWith("Sales.", StringComparison.Ordinal)
+            ? "SalesReceipt.ProductInactive" : "GoodsReceipt.ProductInactive");
+        await data.Http.Admin.ExecuteAsync("UPDATE dbo.Products SET IsActive=1 WHERE ProductId=@product;", new { product = data.Product });
+
+        const string missing = "9223372036854775807";
+        foreach (var intent in new[]
+        {
+            new Intent("Receipt.Update", Save(receiptCreate.Result, false), missing),
+            new Intent("Receipt.Post", Post(receiptCreate.Result), missing),
+            new Intent("Sales.Update", Save(saleCreate.Result, true), missing),
+            new Intent("Sales.Post", Post(saleCreate.Result), missing)
+        }) await Reject(intent, 404, intent.Kind.StartsWith("Sales.", StringComparison.Ordinal) ? "SalesReceipt.NotFound" : "GoodsReceipt.NotFound");
+
+        var receiptUpdateBody = Save(receiptCreate.Result, false);
+        receiptUpdateBody["lines"] = new JArray(data.ReceiptLine(data.OtherProduct, "4.0000", "2.5000"), data.ReceiptLine(data.Product, "20.0000", "15.0000"));
+        var receiptUpdate = await Execute(new Intent("Receipt.Update", receiptUpdateBody, receiptId));
+        var saleUpdateBody = Save(saleCreate.Result, true);
+        ((JArray)saleUpdateBody["lines"]!).Add(data.SaleLine(data.OtherProduct, "1.0000", "10.0000", false));
+        var saleUpdate = await Execute(new Intent("Sales.Update", saleUpdateBody, saleId));
+        foreach (var intent in new[]
+        {
+            new Intent("Receipt.Update", Save(receiptCreate.Result, false), receiptId),
+            new Intent("Receipt.Post", Post(receiptCreate.Result), receiptId),
+            new Intent("Sales.Update", Save(saleCreate.Result, true), saleId),
+            new Intent("Sales.Post", Post(saleCreate.Result), saleId)
+        }) await Reject(intent, 409, intent.Kind.StartsWith("Sales.", StringComparison.Ordinal) ? "SalesReceipt.ConcurrencyConflict" : "GoodsReceipt.ConcurrencyConflict");
+
+        await Execute(new Intent("Receipt.Post", Post(receiptUpdate.Result), receiptId));
+        await Execute(new Intent("Sales.Post", Post(saleUpdate.Result), saleId));
+        foreach (var intent in new[]
+        {
+            new Intent("Receipt.Update", Save(receiptUpdate.Result, false), receiptId),
+            new Intent("Receipt.Post", Post(receiptUpdate.Result), receiptId),
+            new Intent("Sales.Update", Save(saleUpdate.Result, true), saleId),
+            new Intent("Sales.Post", Post(saleUpdate.Result), saleId)
+        }) await Reject(intent, 409, intent.Kind.StartsWith("Sales.", StringComparison.Ordinal) ? "SalesReceipt.AlreadyPosted" : "GoodsReceipt.AlreadyPosted");
+
+        Assert.Equal(18, rejected); // Eighteen rejection assertions inside ONE xUnit case.
+        Assert.Equal(24, keys.Count); // Six successful setup commands, eighteen fresh rejected intents.
+        Assert.Equal(6, await data.Http.Admin.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE Disposition='COMMITTED';"));
+        await data.Oracle();
+    });
+
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Six_commands_recover_original_results_after_acknowledgement_suppression_and_host_restart_without_Read() =>
         Owned(data => Lifecycle(data, concurrent: false));

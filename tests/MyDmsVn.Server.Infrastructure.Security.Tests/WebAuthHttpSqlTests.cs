@@ -265,6 +265,10 @@ public sealed class WebAuthHttpSqlTests
             if (access != null) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + access);
             if (headers != null) foreach (var header in headers) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             if (body != null) request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            return await Send(request);
+        }
+        internal async Task<Reply> Send(HttpRequestMessage request)
+        {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
             using var response = await _server!.HttpClient.SendAsync(request, timeout.Token);
             return new Reply((int)response.StatusCode, await response.Content.ReadAsStringAsync(), response.Headers.TryGetValues("Set-Cookie", out var values) ? values.ToArray() : Array.Empty<string>(),
