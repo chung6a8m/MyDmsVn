@@ -1,6 +1,6 @@
 # Roadmap 04 backend — Reliable mutations, operation journal, and CI
 
-**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / B01 DONE (bounded contract; Owner acceptance/merge pending); B02–B06 PLANNED / NOT RUN. **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md. **Activation baseline:** 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd; **B01 source baseline:** main@48e9cd7ae096ecadd184e6ea6a372306d77f41b1. Reinspect current main and existing test owners before starting each task. B01 publishes [source/schema decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), [canonical corpus](../contracts/web4-v1/README.md) and [evidence](../evidence/web4/20261101-b01-contract.md); it does not implement or verify runtime, SQL, browser, CI, or IIS.
+**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / B01 DONE (bounded contract; Owner accepted; PR #80 merged 2026-11-01); B02–B06 PLANNED / NOT RUN. **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md. **Activation baseline:** 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd; **B01 source baseline:** main@48e9cd7ae096ecadd184e6ea6a372306d77f41b1. Reinspect current main and existing test owners before starting each task. B01 publishes [source/schema decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), [canonical corpus](../contracts/web4-v1/README.md) and [evidence](../evidence/web4/20261101-b01-contract.md); it does not implement or verify runtime, SQL, browser, CI, or IIS.
 
 ## 0. Mission, constraints, ownership
 
@@ -112,3 +112,7 @@ Status transitions: PLANNED → IN_PROGRESS only after source/review checkpoint;
 
 **Bounded completion requires:** B01 authoritative protocol; B02 hosted CI; B03 schema+atomic journal; B04 six APIs/status; B05 local real SQL + HTTPS browser oracle jointly with Web F04; B06 operational reference and Owner disposition. Release/full IIS remain NOT APPROVED regardless of completion.
 
+
+## Owner acceptance and merge — 2026-11-01
+
+Owner accepted the recorded bounded scope and limits and authorized merge after Web CI PASS. PR #80 merged at `13197325e8518f195beb9863e1fb980c7d31f896`. [Task evidence](../evidence/web4/20261101-b01-contract.md) records exact CI candidate/results and both merge SHAs. B01/F01 remain DONE (bounded contract); subsequent tasks remain PLANNED. No runtime/SQL/production acceptance is added.
