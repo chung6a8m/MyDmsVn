@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "Auth.RateLimited",
+    "message": "Too many authentication attempts. Try again later.",
+    "details": [],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

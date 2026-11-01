@@ -1,0 +1,37 @@
+{
+  "data": {
+    "receiptId": "9007199254740993",
+    "receiptNumber": "GR0000000042",
+    "receiptDate": "2024-02-29",
+    "warehouseId": 1,
+    "warehouseDisplayName": "WH01 - Kho chính",
+    "warehouseIsActive": true,
+    "employeeId": 2,
+    "employeeDisplayName": "E02 - Nhân viên",
+    "employeeIsActive": true,
+    "status": "Draft",
+    "note": "Nhập hàng — đã kiểm đếm",
+    "postedAtUtc": null,
+    "version": "AAAAAAAAAAI=",
+    "lines": [
+      {
+        "receiptLineId": "9007199254740996",
+        "lineNumber": 1,
+        "productId": 8,
+        "quantity": "3.0000",
+        "unitCost": "0.0000",
+        "productDisplayName": "P8 - Sản phẩm",
+        "productIsActive": true
+      },
+      {
+        "receiptLineId": "9007199254740997",
+        "lineNumber": 2,
+        "productId": 7,
+        "quantity": "1.5000",
+        "unitCost": "12.3456",
+        "productDisplayName": "P7 - Sản phẩm",
+        "productIsActive": true
+      }
+    ]
+  }
+}

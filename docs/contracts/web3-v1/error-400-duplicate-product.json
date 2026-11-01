@@ -1,0 +1,14 @@
+{
+  "error": {
+    "code": "ValidationError",
+    "message": "The request is invalid.",
+    "details": [
+      {
+        "code": "GoodsReceipt.DuplicateProduct",
+        "message": "A product can appear only once in a goods receipt.",
+        "field": "lines[1].productId"
+      }
+    ],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "GoodsReceipt.ConcurrencyConflict",
+    "message": "The goods receipt was changed by another operation.",
+    "details": [
+      {
+        "code": "GoodsReceipt.ConcurrencyConflict",
+        "message": "The goods receipt was changed by another operation."
+      }
+    ],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

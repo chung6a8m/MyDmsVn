@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "Auth.Unauthorized",
+    "message": "Authentication is required.",
+    "details": [],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

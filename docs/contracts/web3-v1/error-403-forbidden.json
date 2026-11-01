@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "Auth.Forbidden",
+    "message": "The operation is not permitted.",
+    "details": [],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

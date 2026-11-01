@@ -1,0 +1,7 @@
+{
+  "data": {
+    "read": false,
+    "write": true,
+    "post": true
+  }
+}

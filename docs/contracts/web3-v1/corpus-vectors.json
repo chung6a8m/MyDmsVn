@@ -1,0 +1,1866 @@
+{
+  "description": "Contract examples and attacks, not runtime HTTP/SQL results. expandLines constructs actual unique rows before validation.",
+  "scalarVectors": [
+    {
+      "name": "int64-positive-accept-string-1",
+      "scalar": "int64-positive",
+      "value": "1",
+      "valid": true
+    },
+    {
+      "name": "int64-positive-accept-string-9007199254740993",
+      "scalar": "int64-positive",
+      "value": "9007199254740993",
+      "valid": true
+    },
+    {
+      "name": "int64-positive-accept-string-9223372036854775807",
+      "scalar": "int64-positive",
+      "value": "9223372036854775807",
+      "valid": true
+    },
+    {
+      "name": "int64-positive-reject-string-0",
+      "scalar": "int64-positive",
+      "value": "0",
+      "valid": false
+    },
+    {
+      "name": "int64-positive-reject-string-01",
+      "scalar": "int64-positive",
+      "value": "01",
+      "valid": false
+    },
+    {
+      "name": "int64-positive-reject-string--1",
+      "scalar": "int64-positive",
+      "value": "-1",
+      "valid": false
+    },
+    {
+      "name": "int64-positive-reject-string-1e3",
+      "scalar": "int64-positive",
+      "value": "1e3",
+      "valid": false
+    },
+    {
+      "name": "int64-positive-reject-string-9223372036854775808",
+      "scalar": "int64-positive",
+      "value": "9223372036854775808",
+      "valid": false
+    },
+    {
+      "name": "int64-positive-reject-number-9007199254740992",
+      "scalar": "int64-positive",
+      "value": 9007199254740992,
+      "valid": false
+    },
+    {
+      "name": "int64-positive-reject-string-1.0",
+      "scalar": "int64-positive",
+      "value": "1.0",
+      "valid": false
+    },
+    {
+      "name": "int64-positive-reject-string- 1",
+      "scalar": "int64-positive",
+      "value": " 1",
+      "valid": false
+    },
+    {
+      "name": "int64-count-accept-string-0",
+      "scalar": "int64-count",
+      "value": "0",
+      "valid": true
+    },
+    {
+      "name": "int64-count-accept-string-9007199254740993",
+      "scalar": "int64-count",
+      "value": "9007199254740993",
+      "valid": true
+    },
+    {
+      "name": "int64-count-accept-string-9223372036854775807",
+      "scalar": "int64-count",
+      "value": "9223372036854775807",
+      "valid": true
+    },
+    {
+      "name": "int64-count-reject-number--1",
+      "scalar": "int64-count",
+      "value": -1,
+      "valid": false
+    },
+    {
+      "name": "int64-count-reject-number-0",
+      "scalar": "int64-count",
+      "value": 0,
+      "valid": false
+    },
+    {
+      "name": "int64-count-reject-string--1",
+      "scalar": "int64-count",
+      "value": "-1",
+      "valid": false
+    },
+    {
+      "name": "int64-count-reject-string-9223372036854775808",
+      "scalar": "int64-count",
+      "value": "9223372036854775808",
+      "valid": false
+    },
+    {
+      "name": "int32-accept-number-1",
+      "scalar": "int32",
+      "value": 1,
+      "valid": true
+    },
+    {
+      "name": "int32-accept-number-2147483647",
+      "scalar": "int32",
+      "value": 2147483647,
+      "valid": true
+    },
+    {
+      "name": "int32-reject-number-0",
+      "scalar": "int32",
+      "value": 0,
+      "valid": false
+    },
+    {
+      "name": "int32-reject-number--1",
+      "scalar": "int32",
+      "value": -1,
+      "valid": false
+    },
+    {
+      "name": "int32-reject-number-2147483648",
+      "scalar": "int32",
+      "value": 2147483648,
+      "valid": false
+    },
+    {
+      "name": "int32-reject-number-1.5",
+      "scalar": "int32",
+      "value": 1.5,
+      "valid": false
+    },
+    {
+      "name": "int32-reject-string-1",
+      "scalar": "int32",
+      "value": "1",
+      "valid": false
+    },
+    {
+      "name": "quantity-accept-string-0.0001",
+      "scalar": "quantity",
+      "value": "0.0001",
+      "valid": true
+    },
+    {
+      "name": "quantity-accept-string-99999999999999.9999",
+      "scalar": "quantity",
+      "value": "99999999999999.9999",
+      "valid": true
+    },
+    {
+      "name": "quantity-accept-string-1.2300",
+      "scalar": "quantity",
+      "value": "1.2300",
+      "valid": true
+    },
+    {
+      "name": "quantity-reject-string-0",
+      "scalar": "quantity",
+      "value": "0",
+      "valid": false
+    },
+    {
+      "name": "quantity-reject-string--1",
+      "scalar": "quantity",
+      "value": "-1",
+      "valid": false
+    },
+    {
+      "name": "quantity-reject-string-100000000000000",
+      "scalar": "quantity",
+      "value": "100000000000000",
+      "valid": false
+    },
+    {
+      "name": "quantity-reject-string-1.00001",
+      "scalar": "quantity",
+      "value": "1.00001",
+      "valid": false
+    },
+    {
+      "name": "quantity-reject-string-1.00000",
+      "scalar": "quantity",
+      "value": "1.00000",
+      "valid": false
+    },
+    {
+      "name": "quantity-reject-string-1e3",
+      "scalar": "quantity",
+      "value": "1e3",
+      "valid": false
+    },
+    {
+      "name": "quantity-reject-string-NaN",
+      "scalar": "quantity",
+      "value": "NaN",
+      "valid": false
+    },
+    {
+      "name": "quantity-reject-number-1",
+      "scalar": "quantity",
+      "value": 1,
+      "valid": false
+    },
+    {
+      "name": "quantity-reject-string-1,5",
+      "scalar": "quantity",
+      "value": "1,5",
+      "valid": false
+    },
+    {
+      "name": "unit-price-accept-string-0",
+      "scalar": "unit-price",
+      "value": "0",
+      "valid": true
+    },
+    {
+      "name": "unit-price-accept-string-999999999999999.9999",
+      "scalar": "unit-price",
+      "value": "999999999999999.9999",
+      "valid": true
+    },
+    {
+      "name": "unit-price-reject-string--0.0001",
+      "scalar": "unit-price",
+      "value": "-0.0001",
+      "valid": false
+    },
+    {
+      "name": "unit-price-reject-string-1000000000000000",
+      "scalar": "unit-price",
+      "value": "1000000000000000",
+      "valid": false
+    },
+    {
+      "name": "unit-price-reject-string-0.00001",
+      "scalar": "unit-price",
+      "value": "0.00001",
+      "valid": false
+    },
+    {
+      "name": "amount-accept-string-0",
+      "scalar": "amount",
+      "value": "0",
+      "valid": true
+    },
+    {
+      "name": "amount-accept-string-999999999999999999999999.9999",
+      "scalar": "amount",
+      "value": "999999999999999999999999.9999",
+      "valid": true
+    },
+    {
+      "name": "amount-reject-string--1",
+      "scalar": "amount",
+      "value": "-1",
+      "valid": false
+    },
+    {
+      "name": "amount-reject-string-1000000000000000000000000",
+      "scalar": "amount",
+      "value": "1000000000000000000000000",
+      "valid": false
+    },
+    {
+      "name": "amount-reject-string-0.00001",
+      "scalar": "amount",
+      "value": "0.00001",
+      "valid": false
+    },
+    {
+      "name": "signed-amount-accept-string--999999999999999999999999.9999",
+      "scalar": "signed-amount",
+      "value": "-999999999999999999999999.9999",
+      "valid": true
+    },
+    {
+      "name": "signed-amount-accept-string-999999999999999999999999.9999",
+      "scalar": "signed-amount",
+      "value": "999999999999999999999999.9999",
+      "valid": true
+    },
+    {
+      "name": "signed-amount-accept-string-0.0000",
+      "scalar": "signed-amount",
+      "value": "0.0000",
+      "valid": true
+    },
+    {
+      "name": "signed-amount-reject-string--1000000000000000000000000",
+      "scalar": "signed-amount",
+      "value": "-1000000000000000000000000",
+      "valid": false
+    },
+    {
+      "name": "signed-amount-reject-string-1.00001",
+      "scalar": "signed-amount",
+      "value": "1.00001",
+      "valid": false
+    },
+    {
+      "name": "signed-amount-reject-string--0",
+      "scalar": "signed-amount",
+      "value": "-0",
+      "valid": false
+    },
+    {
+      "name": "average-unit-cost-accept-string-0",
+      "scalar": "average-unit-cost",
+      "value": "0",
+      "valid": true
+    },
+    {
+      "name": "average-unit-cost-accept-string-0.33333333",
+      "scalar": "average-unit-cost",
+      "value": "0.33333333",
+      "valid": true
+    },
+    {
+      "name": "average-unit-cost-accept-string-99999999999999999999.99999999",
+      "scalar": "average-unit-cost",
+      "value": "99999999999999999999.99999999",
+      "valid": true
+    },
+    {
+      "name": "average-unit-cost-reject-string--1",
+      "scalar": "average-unit-cost",
+      "value": "-1",
+      "valid": false
+    },
+    {
+      "name": "average-unit-cost-reject-string-100000000000000000000",
+      "scalar": "average-unit-cost",
+      "value": "100000000000000000000",
+      "valid": false
+    },
+    {
+      "name": "average-unit-cost-reject-string-0.000000001",
+      "scalar": "average-unit-cost",
+      "value": "0.000000001",
+      "valid": false
+    },
+    {
+      "name": "signed-quantity-accept-string--99999999999999.9999",
+      "scalar": "signed-quantity",
+      "value": "-99999999999999.9999",
+      "valid": true
+    },
+    {
+      "name": "signed-quantity-accept-string-0",
+      "scalar": "signed-quantity",
+      "value": "0",
+      "valid": true
+    },
+    {
+      "name": "signed-quantity-accept-string-99999999999999.9999",
+      "scalar": "signed-quantity",
+      "value": "99999999999999.9999",
+      "valid": true
+    },
+    {
+      "name": "signed-quantity-reject-string--100000000000000",
+      "scalar": "signed-quantity",
+      "value": "-100000000000000",
+      "valid": false
+    },
+    {
+      "name": "signed-quantity-reject-string-0.00001",
+      "scalar": "signed-quantity",
+      "value": "0.00001",
+      "valid": false
+    },
+    {
+      "name": "date-accept-string-2024-02-29",
+      "scalar": "date",
+      "value": "2024-02-29",
+      "valid": true
+    },
+    {
+      "name": "date-accept-string-9999-12-31",
+      "scalar": "date",
+      "value": "9999-12-31",
+      "valid": true
+    },
+    {
+      "name": "date-reject-string-0001-01-01",
+      "scalar": "date",
+      "value": "0001-01-01",
+      "valid": false
+    },
+    {
+      "name": "date-reject-string-2026-02-29",
+      "scalar": "date",
+      "value": "2026-02-29",
+      "valid": false
+    },
+    {
+      "name": "date-reject-string-2026-13-01",
+      "scalar": "date",
+      "value": "2026-13-01",
+      "valid": false
+    },
+    {
+      "name": "date-reject-string-2026-11-01T00:00:00Z",
+      "scalar": "date",
+      "value": "2026-11-01T00:00:00Z",
+      "valid": false
+    },
+    {
+      "name": "utc-accept-string-2026-11-01T00:00:00Z",
+      "scalar": "utc",
+      "value": "2026-11-01T00:00:00Z",
+      "valid": true
+    },
+    {
+      "name": "utc-accept-string-2026-11-01T00:00:00.1Z",
+      "scalar": "utc",
+      "value": "2026-11-01T00:00:00.1Z",
+      "valid": true
+    },
+    {
+      "name": "utc-accept-string-2026-11-01T00:00:00.1234567Z",
+      "scalar": "utc",
+      "value": "2026-11-01T00:00:00.1234567Z",
+      "valid": true
+    },
+    {
+      "name": "utc-reject-string-2026-11-01T00:00:00",
+      "scalar": "utc",
+      "value": "2026-11-01T00:00:00",
+      "valid": false
+    },
+    {
+      "name": "utc-reject-string-2026-11-01T00:00:00+07:00",
+      "scalar": "utc",
+      "value": "2026-11-01T00:00:00+07:00",
+      "valid": false
+    },
+    {
+      "name": "utc-reject-string-2026-11-01T00:00:00.12345678Z",
+      "scalar": "utc",
+      "value": "2026-11-01T00:00:00.12345678Z",
+      "valid": false
+    },
+    {
+      "name": "utc-reject-string-2026-02-29T00:00:00Z",
+      "scalar": "utc",
+      "value": "2026-02-29T00:00:00Z",
+      "valid": false
+    },
+    {
+      "name": "utc-reject-string-2026-11-01T24:00:00Z",
+      "scalar": "utc",
+      "value": "2026-11-01T24:00:00Z",
+      "valid": false
+    },
+    {
+      "name": "version-accept-string-AAAAAAAAAAE=",
+      "scalar": "version",
+      "value": "AAAAAAAAAAE=",
+      "valid": true
+    },
+    {
+      "name": "version-accept-string-//////////8=",
+      "scalar": "version",
+      "value": "//////////8=",
+      "valid": true
+    },
+    {
+      "name": "version-reject-string-",
+      "scalar": "version",
+      "value": "",
+      "valid": false
+    },
+    {
+      "name": "version-reject-string-AAAA",
+      "scalar": "version",
+      "value": "AAAA",
+      "valid": false
+    },
+    {
+      "name": "version-reject-string-AAAAAAAAAAE",
+      "scalar": "version",
+      "value": "AAAAAAAAAAE",
+      "valid": false
+    },
+    {
+      "name": "version-reject-string- AAAAAAAAAAE=",
+      "scalar": "version",
+      "value": " AAAAAAAAAAE=",
+      "valid": false
+    },
+    {
+      "name": "version-reject-string-AAAAAAAAAAF=",
+      "scalar": "version",
+      "value": "AAAAAAAAAAF=",
+      "valid": false
+    }
+  ],
+  "roundingVectors": [
+    {
+      "name": "tie-away-from-zero",
+      "quantity": "0.0001",
+      "unitCost": "0.5000",
+      "expectedLineAmount": "0.0001"
+    },
+    {
+      "name": "below-half",
+      "quantity": "0.0001",
+      "unitCost": "0.4999",
+      "expectedLineAmount": "0.0000"
+    },
+    {
+      "name": "carry-to-integer",
+      "quantity": "1.0001",
+      "unitCost": "0.9999",
+      "expectedLineAmount": "1.0000"
+    },
+    {
+      "name": "normal-exact",
+      "quantity": "1.2500",
+      "unitCost": "12.3456",
+      "expectedLineAmount": "15.4320"
+    }
+  ],
+  "cases": [
+    {
+      "name": "one-line",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "lines"
+          ],
+          "value": [
+            {
+              "productId": 7,
+              "quantity": "1.2500",
+              "unitCost": "12.3456"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "two-hundred-unique-lines",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": true,
+      "expandLines": 200
+    },
+    {
+      "name": "two-hundred-response-lines",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": true,
+      "expandLines": 200
+    },
+    {
+      "name": "empty-lines",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "lines"
+          ],
+          "value": []
+        }
+      ]
+    },
+    {
+      "name": "two-hundred-one-lines",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "expandLines": 201
+    },
+    {
+      "name": "duplicate-product",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "lines",
+            1,
+            "productId"
+          ],
+          "value": 7
+        }
+      ]
+    },
+    {
+      "name": "null-line",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "lines",
+            0
+          ],
+          "value": null
+        }
+      ]
+    },
+    {
+      "name": "missing-required-header",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "employeeId"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "omitted-note-maps-null",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "note"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "empty-note-retained",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "note"
+          ],
+          "value": ""
+        }
+      ]
+    },
+    {
+      "name": "note-too-long",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "note"
+          ],
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "name": "nul-note",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "note"
+          ],
+          "value": "a\u0000b"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-receiptLineId",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "lines",
+            0,
+            "receiptLineId"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-lineNumber",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "lines",
+            0,
+            "lineNumber"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-clientLineId",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "lines",
+            0,
+            "clientLineId"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-lineAmount",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "lines",
+            0,
+            "lineAmount"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-receiptId",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "receiptId"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-status",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "status"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-receiptNumber",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "receiptNumber"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-createdBy",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "createdBy"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-postedAtUtc",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "postedAtUtc"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "save-forbids-inventoryValue",
+      "kind": "receipt-create-request",
+      "base": "receipt-create-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "inventoryValue"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "update-version-required",
+      "kind": "receipt-update-request",
+      "base": "receipt-update-request.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "expectedVersion"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "post-ack-no-version",
+      "kind": "receipt-post-response",
+      "base": "receipt-post-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "version"
+          ],
+          "value": "AAAAAAAAAAM="
+        }
+      ]
+    },
+    {
+      "name": "post-must-be-posted",
+      "kind": "receipt-post-response",
+      "base": "receipt-post-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "status"
+          ],
+          "value": "Draft"
+        }
+      ]
+    },
+    {
+      "name": "line-id-cannot-be-zero",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "lines",
+            0,
+            "receiptLineId"
+          ],
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "name": "sequence-number-cap",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "receiptNumber"
+          ],
+          "value": "GR10000000000"
+        }
+      ]
+    },
+    {
+      "name": "sequence-number-positive",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "receiptNumber"
+          ],
+          "value": "GR0000000000"
+        }
+      ]
+    },
+    {
+      "name": "request-line-order-enforced",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "lines",
+            0,
+            "lineNumber"
+          ],
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "duplicate-line-identity",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "lines",
+            1,
+            "receiptLineId"
+          ],
+          "value": "9007199254740994"
+        }
+      ]
+    },
+    {
+      "name": "explicit-null-note",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "note"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "explicit-null-postedAtUtc",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "postedAtUtc"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "explicit-null-warehouseDisplayName",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "warehouseDisplayName"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "explicit-null-employeeDisplayName",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "employeeDisplayName"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "explicit-null-product-label",
+      "kind": "receipt-detail",
+      "base": "receipt-create-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "lines",
+            0,
+            "productDisplayName"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "null-average-not-omitted",
+      "kind": "balances-page",
+      "base": "balances-zero-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "averageUnitCost"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "zero-stock-average-not-zero",
+      "kind": "balances-page",
+      "base": "balances-zero-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "averageUnitCost"
+          ],
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "name": "zero-quantity-nonzero-value",
+      "kind": "balances-page",
+      "base": "balances-zero-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "inventoryValue"
+          ],
+          "value": "0.0001"
+        }
+      ]
+    },
+    {
+      "name": "wrong-average-rejected",
+      "kind": "balances-page",
+      "base": "balances-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "averageUnitCost"
+          ],
+          "value": "15.00000001"
+        }
+      ]
+    },
+    {
+      "name": "eight-digit-average",
+      "kind": "balances-page",
+      "base": "balances-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "quantity"
+          ],
+          "value": "3"
+        },
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "inventoryValue"
+          ],
+          "value": "1"
+        },
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "averageUnitCost"
+          ],
+          "value": "0.33333333"
+        }
+      ]
+    },
+    {
+      "name": "big-count-retains-int64",
+      "kind": "receipt-list-page",
+      "base": "receipt-list-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "totalCount"
+          ],
+          "value": "9223372036854775807"
+        }
+      ]
+    },
+    {
+      "name": "numeric-count-lossy",
+      "kind": "receipt-list-page",
+      "base": "receipt-list-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "totalCount"
+          ],
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "list-full-detail-not-summary",
+      "kind": "receipt-list-page",
+      "base": "receipt-list-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "lines"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "empty-stock-card",
+      "kind": "stock-card-page",
+      "base": "stock-card-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items"
+          ],
+          "value": []
+        },
+        {
+          "path": [
+            "data",
+            "totalCount"
+          ],
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "name": "stock-card-not-running-balance",
+      "kind": "stock-card-page",
+      "base": "stock-card-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "runningBalance"
+          ],
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "name": "receipt-positive-movement",
+      "kind": "stock-card-page",
+      "base": "stock-card-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "quantityChange"
+          ],
+          "value": "-1"
+        }
+      ]
+    },
+    {
+      "name": "sale-negative-value",
+      "kind": "stock-card-page",
+      "base": "stock-card-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            1,
+            "valueChange"
+          ],
+          "value": "60"
+        }
+      ]
+    },
+    {
+      "name": "zero-value-movement-allowed",
+      "kind": "stock-card-page",
+      "base": "stock-card-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "valueChange"
+          ],
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "name": "stock-card-order",
+      "kind": "stock-card-page",
+      "base": "stock-card-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "postedAtUtc"
+          ],
+          "value": "2026-11-01T02:03:06Z"
+        }
+      ]
+    },
+    {
+      "name": "unknown-document-type-read-only",
+      "kind": "stock-card-page",
+      "base": "stock-card-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "documentType"
+          ],
+          "value": "HistoricalSource"
+        },
+        {
+          "path": [
+            "data",
+            "items",
+            0,
+            "documentNumber"
+          ],
+          "value": "HistoricalSource#9007199254740993"
+        }
+      ]
+    },
+    {
+      "name": "readonly-capability-no-write",
+      "kind": "capabilities-read-only",
+      "base": "capabilities-balances-response.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "capability-all-denied",
+      "kind": "capabilities-receipt",
+      "base": "capabilities-receipts-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": false
+        },
+        {
+          "path": [
+            "data",
+            "post"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "capability-independent-0",
+      "kind": "capabilities-receipt",
+      "base": "capabilities-receipts-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": false
+        },
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": false
+        },
+        {
+          "path": [
+            "data",
+            "post"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "capability-independent-1",
+      "kind": "capabilities-receipt",
+      "base": "capabilities-receipts-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": true
+        },
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": false
+        },
+        {
+          "path": [
+            "data",
+            "post"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "capability-independent-2",
+      "kind": "capabilities-receipt",
+      "base": "capabilities-receipts-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": false
+        },
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": true
+        },
+        {
+          "path": [
+            "data",
+            "post"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "capability-independent-3",
+      "kind": "capabilities-receipt",
+      "base": "capabilities-receipts-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": true
+        },
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": true
+        },
+        {
+          "path": [
+            "data",
+            "post"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "capability-independent-4",
+      "kind": "capabilities-receipt",
+      "base": "capabilities-receipts-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": false
+        },
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": false
+        },
+        {
+          "path": [
+            "data",
+            "post"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "capability-independent-5",
+      "kind": "capabilities-receipt",
+      "base": "capabilities-receipts-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": true
+        },
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": false
+        },
+        {
+          "path": [
+            "data",
+            "post"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "capability-independent-6",
+      "kind": "capabilities-receipt",
+      "base": "capabilities-receipts-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": false
+        },
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": true
+        },
+        {
+          "path": [
+            "data",
+            "post"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "capability-independent-7",
+      "kind": "capabilities-receipt",
+      "base": "capabilities-receipts-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": true
+        },
+        {
+          "path": [
+            "data",
+            "write"
+          ],
+          "value": true
+        },
+        {
+          "path": [
+            "data",
+            "post"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "balance-hint-denied",
+      "kind": "capabilities-read-only",
+      "base": "capabilities-balances-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "card-hint-allowed",
+      "kind": "capabilities-read-only",
+      "base": "capabilities-stock-card-response.json",
+      "valid": true,
+      "changes": [
+        {
+          "path": [
+            "data",
+            "read"
+          ],
+          "value": true
+        }
+      ]
+    },
+    {
+      "name": "auth-details-sanitized",
+      "kind": "error",
+      "base": "error-403-forbidden.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "error",
+            "details"
+          ],
+          "value": [
+            {
+              "code": "SQL",
+              "message": "private"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "fieldless-error-valid",
+      "kind": "error",
+      "base": "error-400-valuation-post.json",
+      "valid": true
+    },
+    {
+      "name": "error-field-cannot-use-Request-root",
+      "kind": "error",
+      "base": "error-400-duplicate-product.json",
+      "valid": false,
+      "changes": [
+        {
+          "path": [
+            "error",
+            "details",
+            0,
+            "field"
+          ],
+          "value": "Request.Lines[1].ProductId"
+        }
+      ]
+    },
+    {
+      "name": "explicit-default-page",
+      "kind": "receipt-list-query",
+      "rawQuery": "pageNumber=1&pageSize=25",
+      "valid": true
+    },
+    {
+      "name": "last-int32-page",
+      "kind": "balances-query",
+      "rawQuery": "pageNumber=2147483647&pageSize=200",
+      "valid": true
+    },
+    {
+      "name": "missing-page",
+      "kind": "balances-query",
+      "rawQuery": "pageSize=25",
+      "valid": false
+    },
+    {
+      "name": "zero-page",
+      "kind": "balances-query",
+      "rawQuery": "pageNumber=0&pageSize=25",
+      "valid": false
+    },
+    {
+      "name": "int32-page-overflow",
+      "kind": "balances-query",
+      "rawQuery": "pageNumber=2147483648&pageSize=25",
+      "valid": false
+    },
+    {
+      "name": "oversize-page",
+      "kind": "balances-query",
+      "rawQuery": "pageNumber=1&pageSize=201",
+      "valid": false
+    },
+    {
+      "name": "duplicate-page",
+      "kind": "balances-query",
+      "rawQuery": "pageNumber=1&pageNumber=2&pageSize=25",
+      "valid": false
+    },
+    {
+      "name": "escaped-duplicate",
+      "kind": "balances-query",
+      "rawQuery": "pageNumber=1&%70ageNumber=2&pageSize=25",
+      "valid": false
+    },
+    {
+      "name": "unknown-query",
+      "kind": "receipt-list-query",
+      "rawQuery": "pageNumber=1&pageSize=25&cursor=x",
+      "valid": false
+    },
+    {
+      "name": "unsupported-date-filter",
+      "kind": "receipt-list-query",
+      "rawQuery": "pageNumber=1&pageSize=25&fromDate=2026-11-01",
+      "valid": false
+    },
+    {
+      "name": "malformed-percent",
+      "kind": "balances-query",
+      "rawQuery": "pageNumber=1&pageSize=25&search=%ZZ",
+      "valid": false
+    },
+    {
+      "name": "malformed-utf8",
+      "kind": "balances-query",
+      "rawQuery": "pageNumber=1&pageSize=25&search=%C0%AF",
+      "valid": false
+    },
+    {
+      "name": "search-nul",
+      "kind": "balances-query",
+      "rawQuery": "pageNumber=1&pageSize=25&search=%00",
+      "valid": false
+    },
+    {
+      "name": "status-case",
+      "kind": "receipt-list-query",
+      "rawQuery": "pageNumber=1&pageSize=25&status=draft",
+      "valid": false
+    },
+    {
+      "name": "missing-stock-key",
+      "kind": "stock-card-query",
+      "rawQuery": "pageNumber=1&pageSize=25&warehouseId=1",
+      "valid": false
+    },
+    {
+      "name": "reversed-range",
+      "kind": "stock-card-query",
+      "rawQuery": "pageNumber=1&pageSize=25&warehouseId=1&productId=7&fromUtc=2026-11-02T00%3A00%3A00Z&toUtc=2026-11-01T00%3A00%3A00Z",
+      "valid": false
+    },
+    {
+      "name": "same-tick-inclusive",
+      "kind": "stock-card-query",
+      "rawQuery": "pageNumber=1&pageSize=25&warehouseId=1&productId=7&fromUtc=2026-11-01T00%3A00%3A00.1234567Z&toUtc=2026-11-01T00%3A00%3A00.1234567Z",
+      "valid": true
+    },
+    {
+      "name": "known-capability-sales",
+      "kind": "capabilities-query",
+      "rawQuery": "feature=sales",
+      "valid": true
+    },
+    {
+      "name": "known-capability-goods-receipts",
+      "kind": "capabilities-query",
+      "rawQuery": "feature=goods-receipts",
+      "valid": true
+    },
+    {
+      "name": "known-capability-inventory-balances",
+      "kind": "capabilities-query",
+      "rawQuery": "feature=inventory-balances",
+      "valid": true
+    },
+    {
+      "name": "known-capability-inventory-stock-card",
+      "kind": "capabilities-query",
+      "rawQuery": "feature=inventory-stock-card",
+      "valid": true
+    },
+    {
+      "name": "invalid-capability-feature=goods-receipt",
+      "kind": "capabilities-query",
+      "rawQuery": "feature=goods-receipt",
+      "valid": false
+    },
+    {
+      "name": "invalid-capability-feature=unknown",
+      "kind": "capabilities-query",
+      "rawQuery": "feature=unknown",
+      "valid": false
+    },
+    {
+      "name": "invalid-capability-feature=sales&feature=goods-receipts",
+      "kind": "capabilities-query",
+      "rawQuery": "feature=sales&feature=goods-receipts",
+      "valid": false
+    },
+    {
+      "name": "invalid-capability-feature=sales&permission=Inventory.GoodsReceipts.Post",
+      "kind": "capabilities-query",
+      "rawQuery": "feature=sales&permission=Inventory.GoodsReceipts.Post",
+      "valid": false
+    },
+    {
+      "name": "duplicate-json-member",
+      "kind": "receipt-post-request",
+      "rawJson": "{\"expectedVersion\":\"AAAAAAAAAAI=\",\"expectedVersion\":\"AAAAAAAAAAI=\"}",
+      "valid": false
+    },
+    {
+      "name": "escaped-duplicate-json-member",
+      "kind": "receipt-post-request",
+      "rawJson": "{\"expectedVersion\":\"AAAAAAAAAAI=\",\"expected\\u0056ersion\":\"AAAAAAAAAAI=\"}",
+      "valid": false
+    },
+    {
+      "name": "trailing-json",
+      "kind": "receipt-post-request",
+      "rawJson": "{\"expectedVersion\":\"AAAAAAAAAAI=\"} true",
+      "valid": false
+    },
+    {
+      "name": "unpaired-surrogate",
+      "kind": "receipt-post-request",
+      "rawJson": "{\"expectedVersion\":\"\\ud800\"}",
+      "valid": false
+    },
+    {
+      "name": "comments",
+      "kind": "receipt-post-request",
+      "rawJson": "{/*x*/\"expectedVersion\":\"AAAAAAAAAAI=\"}",
+      "valid": false
+    },
+    {
+      "name": "numeric-version",
+      "kind": "receipt-post-request",
+      "rawJson": "{\"expectedVersion\":1}",
+      "valid": false
+    },
+    {
+      "name": "numeric-int-exponent",
+      "kind": "receipt-create-request",
+      "rawJson": "{\"receiptDate\":\"2024-02-29\",\"warehouseId\":1e0,\"employeeId\":2,\"note\":null,\"lines\":[{\"productId\":7,\"quantity\":\"1.2500\",\"unitCost\":\"12.3456\"},{\"productId\":8,\"quantity\":\"2.0000\",\"unitCost\":\"0.0000\"}]}",
+      "valid": false
+    }
+  ]
+}

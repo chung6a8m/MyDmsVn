@@ -1,0 +1,19 @@
+{
+  "error": {
+    "code": "ValidationError",
+    "message": "The request is invalid.",
+    "details": [
+      {
+        "code": "GoodsReceipt.WarehouseInactive",
+        "message": "The referenced catalog item is inactive.",
+        "field": "warehouseId"
+      },
+      {
+        "code": "GoodsReceipt.ProductInactive",
+        "message": "The referenced catalog item is inactive.",
+        "field": "lines[0].productId"
+      }
+    ],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}

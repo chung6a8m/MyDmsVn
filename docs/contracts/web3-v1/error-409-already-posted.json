@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "GoodsReceipt.AlreadyPosted",
+    "message": "The goods receipt is already posted.",
+    "details": [
+      {
+        "code": "GoodsReceipt.AlreadyPosted",
+        "message": "The goods receipt is already posted."
+      }
+    ],
+    "correlationId": "WEB3_FIXTURE_ONLY"
+  }
+}
