@@ -13,7 +13,7 @@ Sales, schema10 and fixed-point valuation are implemented using the existing net
 | SQL integration and other product test projects | All twelve active test projects target `net48`; use actual project declarations and source cases. |
 | Desktop.AppCore | Retained `net8.0-windows` source, parked outside the active solution/release. |
 | Historical modern product/SQL/GUI cases | `PARKED / NOT RUN`; no current modern product coverage is claimed. |
-| WEB2 HTTP host | Active net48 Web API2/OWIN/SystemWeb host and schema11 session store; [bounded evidence](evidence/web2/20261031-http-jwt-sales.md), auth/Sales/browser integration pending. |
+| WEB2 HTTP host | Implemented net48 Web API 2 / OWIN / System.Web host with schema11 session store; [bounded evidence](evidence/web2/20261031-http-jwt-sales.md) verifies IIS Express HTTPS + SQL + browser integration. Roadmap [closed with Owner-accepted full IIS NOT RUN exception](archive/20261101-web2-http-jwt-sales/README.md); production approval remains absent. |
 
 The user retains the repository's current net48 profile. Neither [RESP](archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md) nor [L2DB](archive/20261023-pre-ui-next/plans/20261018-001-linq2db-net48-persistence-migration.md) restores net8 product targets or upgrades to .NET 10. Windows verification requires the .NET Framework 4.8 developer targeting pack, the existing .NET 8 SDK for tooling and the repository's pinned source dependencies. [ADR 0008](adr/0008-temporary-net8-target-pause.md) records the runtime pause; [HISTORY](HISTORY.md) retains historical acceptance and the unmeasured duration comparison. No speedup is inferred from that waiver.
 

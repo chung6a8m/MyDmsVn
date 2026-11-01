@@ -1,6 +1,6 @@
 # MyDmsVn
 
-**Parallel WEB2 workstream:** WEB2-01–05 are complete within bounded contract, net48 HTTP host, SQL refresh-session, auth and Sales/Catalog HTTP scope. See [plan](docs/plans/20261031-003-web2-http-jwt-sales-server.md), [host runbook](src/MyDmsVn.Server.HttpHost/README.md) and [actual evidence](docs/evidence/web2/20261031-http-jwt-sales.md). WEB2-06–09 are complete in the web companion; WEB2-10 is in progress and full IIS acceptance remains blocked; CEX/desktop work is independent.
+**WEB2 workstream closed — Owner 2026-11-01:** [archived Roadmap 02](docs/archive/20261101-web2-http-jwt-sales/README.md) is **COMPLETED WITH OWNER_ACCEPTED_EXCEPTION**. WEB2-01–09 DONE (bounded); WEB2-10 DONE in IIS Express HTTPS + real SQL + Chromium/Edge scope; **full IIS NOT RUN** was accepted as the final exception, not PASS/production approval. Keep [HTTP/JWT/Sales design](docs/design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md), [host runbook](src/MyDmsVn.Server.HttpHost/README.md) and [original evidence](docs/evidence/web2/20261031-http-jwt-sales.md) as references. CEX/desktop remains independently active; no new WEB2 tasks are selected.
 
 Windows desktop-first SME business software for Sales and Inventory. Local v1 invokes Application handlers in process through the Local adapter.
 

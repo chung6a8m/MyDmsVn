@@ -1,6 +1,6 @@
 # WEB2 — HTTP host, JWT, refresh sessions và Sales wire contract
 
-**Chọn bởi Owner:** 2026-10-31. **Trạng thái:** APPROVED DESIGN / WEB2-01–05 IMPLEMENTED (bounded host/session/auth/Sales/Catalog HTTP); WEB2-06–09 completed trong web companion; WEB2-10 IN PROGRESS / full IIS BLOCKED. **Runtime:** giữ `net48`, Windows/IIS, ASP.NET Web API 2; frontend tương ứng: [MyDmsVn.ReactWebUI](https://github.com/chung6a8m/MyDmsVn.ReactWebUI). Đây là companion cho [server plan](../plans/20261031-003-web2-http-jwt-sales-server.md); không thay thế roadmap WinForms CEX đang active. Source baseline: `main@5b9f960ee4048581f107e9ee6350e1dfad462b53`. Mọi giả định về dependency/hosting phải được xác minh ở WEB2-01/02 trước khi code.
+**Chọn bởi Owner:** 2026-10-31. **Current disposition (Owner 2026-11-01): COMPLETED WITH OWNER_ACCEPTED_EXCEPTION.** WEB2-01–09 DONE (bounded); WEB2-10 DONE in proven IIS Express HTTPS + SQL Server + Chromium/Edge scope; **full IIS acceptance NOT RUN / Owner-accepted exception**, not PASS or production approval. [Archive](../archive/20261101-web2-http-jwt-sales/README.md), [backend evidence](../evidence/web2/20261031-http-jwt-sales.md#2026-11-01--owner-closeout-and-full-iis-exception). The HTTP/auth/wire contract remains implemented technical guidance: keep `net48`, Windows/IIS, ASP.NET Web API 2, JWT short access in browser localStorage, GUID HttpOnly Secure Strict rotating refresh; historical implementation instructions are not active.
 
 ## 1. Bất biến và phạm vi
 
