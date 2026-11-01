@@ -2,6 +2,8 @@
 > **WEB2 boundary update, 2026-11-01:** The expressly selected net48 HTTP/JWT/Sales parallel pilot [completed with Owner-accepted full-IIS exception](archive/20261101-web2-http-jwt-sales/README.md); it is no longer an active implementation queue. The original UI-NEXT HTTP exclusion in this historical table still applies only to UI-NEXT, not the implemented WEB2 host. **Full IIS NOT RUN, no production rollout approved.** The [current plan selector](plans/README.md) retains the independent CEX WinForms selection.
 
 
+**New WEB3 selection 2026-11-01:** the [WEB3 HTTP/Inventory server companion](plans/20261101-002-web3-goods-receipt-inventory-http.md) is active at **PLANNED / docs-only** stage alongside the independently active CEX WinForms workstream. Existing net48 WEB2 host is implemented and retained; WEB3 will extend that host. Historical UI-NEXT exclusion of new HTTP work **does not** prohibit separately selected WEB3. Neither WEB3 activation nor WEB2 IIS Express evidence approves full IIS/production, operational audit/limiter policy, durable draft or idempotent operation journal.
+
 **Routing updated:** 2026-10-24; the prior scope record used merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. This page remains non-executable. Use the [execution index](plans/README.md) for current work; there are no tasks to execute from this page.
 
 ## Active scope is recorded elsewhere
@@ -22,7 +24,7 @@ GUI-P5 is complete only in its signed scope, including the Warehouse 125% Dark D
 
 | Direction | Current boundary |
 |---|---|
-| P7 / HTTP / remote adapter | Not part of UI-NEXT; no new API host, remote security boundary or adapter parity claim |
+| P7 / HTTP / remote adapter (historical UI-NEXT limit) | Excluded from original UI-NEXT only; WEB2 separately implemented scoped net48 HTTP/JWT Sales pilot and WEB3 is now selected to extend it to GoodsReceipt/Inventory. Full remote parity beyond selected features and production acceptance remain out of scope. |
 | AppCore / modern runtime | Parked, not shipped; all active product/tests remain net48. The unimplemented reactivation procedure was deleted; no automatic target/lock/package restoration is authorized |
 | Business expansion beyond implemented contracts | Orders/POS, payments, debt, returns/reversal, pricing engine, tax/fiscal invoicing, FIFO/periodic/revaluation, transfers, lots/serials, sync and multi-tenancy remain excluded; direct sales and moving-average valuation are implemented source contracts with archived incomplete acceptance |
 | Unapproved receipt fields | Supplier/tax/discount/lot and other fields beyond the explicit SAL seven-column/header contract remain excluded; Goods Receipt keeps its business fields |

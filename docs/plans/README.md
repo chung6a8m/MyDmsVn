@@ -1,6 +1,14 @@
 # Execution-plan index
 
-**Updated:** 2026-11-01 (WEB2 closeout only) · **Status:** ACTIVE — EDITABLE LINES COMPOSITION AND SAL ADOPTION · **Activation source:** [`main@014e82d0`](https://github.com/chung6a8m/MyDmsVn/commit/014e82d0013b0a16d73da0b35287d79d5848cc10)
+**Updated:** 2026-11-01 (WEB3 docs-only activation) · **Status:** TWO INDEPENDENT ACTIVE WORKSTREAMS — WEB3 HTTP/Inventory (PLANNED) and CEX WinForms Composition (unchanged). Existing CEX activation source remains `main@014e82d0`.
+
+## Active parallel workstream — WEB3 Goods Receipt & Inventory HTTP (2026-11-01)
+
+**Owner decision:** Start [backend WEB3 companion plan](20261101-002-web3-goods-receipt-inventory-http.md), owning **WEB3-B01–B05, all PLANNED**; this is a **documentation-only activation, not implementation/SQL/HTTP/IIS verification**. The [Web Roadmap 03](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-001-web3-goods-receipt-inventory-web.md) independently owns F01–F06.
+
+**Read:** [WEB3 HTTP wire design](../design/WEB3_INVENTORY_HTTP_WIRE.md) · [independent SQL stock/COGS acceptance](../design/WEB3_STOCK_LEDGER_ACCEPTANCE.md) · [ADR 0013](../adr/0013-web3-inventory-http-and-multimodule.md) · [backend Codex handoff](../development/WEB3_CODEX_HANDOFF.md) · [evidence (NOT RUN)](../evidence/web3/README.md). B01 freezes authoritative wire fields/fixtures before B02/B03; existing host net48/JWT/cookie, Application handlers, explicit UoW, actual ledger/cost and restricted SQL principal remain unchanged until selected runtime PRs.
+
+**Scope isolation:** WEB3 extends only WEB HTTP/Inventory and necessary shared non-WinForms contracts/tests. The independently active **CEX-A01–A05** under the next section remains selected, unarchived and unchanged; no WinFormsKit/gitlink, native UI or CEX evidence is implicitly altered. Roadmap 02 remains closed with Owner-accepted full IIS NOT RUN, not production approval. Full IIS, operation idempotency/durable drafts, audit/limiter production policy remain deferred.
 
 ## Completed parallel workstream — WEB2 net48 HTTP/JWT/Sales
 
