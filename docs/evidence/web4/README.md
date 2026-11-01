@@ -13,4 +13,4 @@ Existing WEB2/WEB3 evidence remains immutable and candidate-specific. WEB4 sourc
 
 ## B02 — Windows/net48 CI
 
-[B02 execution evidence](20261101-b02-windows-ci.md): selected by Owner; IN_PROGRESS pending final hosted push/PR verification. B01 acceptance and old evidence remain unchanged.
+[B02 execution evidence](20261101-b02-windows-ci.md): selected by Owner; DONE (bounded): final executable candidate hosted push/PR PASS, Owner acceptance/merge pending. B01 acceptance and old evidence remain unchanged.
