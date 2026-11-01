@@ -2,6 +2,14 @@
 
 Applies to the whole repository. Human-facing discussion is Vietnamese; technical documentation and identifiers are generally English unless an established runbook is Vietnamese.
 
+## Active parallel Roadmap 03 — Goods Receipt & Inventory Web HTTP (Owner 2026-11-01)
+
+**This is a NEW, OWNER-SELECTED docs-only activation, not runtime implementation.** [WEB3 backend plan](docs/plans/20261101-002-web3-goods-receipt-inventory-http.md) owns **WEB3-B01–B05 (all PLANNED)**. Read [strict HTTP wire design](docs/design/WEB3_INVENTORY_HTTP_WIRE.md), [independent SQL stock/value oracle](docs/design/WEB3_STOCK_LEDGER_ACCEPTANCE.md), [ADR 0013](docs/adr/0013-web3-inventory-http-and-multimodule.md), [Codex handoff](docs/development/WEB3_CODEX_HANDOFF.md) and [new evidence (NOT RUN)](docs/evidence/web3/README.md). Frontend [WEB3 F01–F06 roadmap](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-001-web3-goods-receipt-inventory-web.md) independently owns Web tasks. Do not treat plans, proposed wire fields or fixture paths as implemented APIs.
+
+Extend existing **net48** WEB2 host and authorized Application Goods Receipt/Inventory queries, retain strict JWT/refresh and Web principal. Preserve explicit UoW, valued receipt/sale posting, unique Product receipt lines versus legal Sales duplicate Product/gifts, Receipt Post ack **without version**, Stock Balances/Card read-only. B01 source-verify/freeze canonical Web wire corpus before B02/B03 runtime. Independently test real SQL Q/V/COGS and browser, no automatic write retry/valuation rewrite/broad SQL grants. Full IIS/production/durable operation recovery not approved.
+
+**Independent CEX selection remains active and unchanged:** the WinForms Editable Lines/SAL composition tasks, WinFormsKit pin, UI Lab and acceptance still belong to their own CEX plan; do not archive, retarget or mix their status with WEB3. WEB2 remains closed with full IIS NOT RUN/Owner-accepted exception, never full IIS PASS.
+
 ## Completed parallel WEB2 server workstream (Owner 2026-11-01)
 
 **WEB2 HTTP/JWT/Sales is ARCHIVED — COMPLETED WITH OWNER_ACCEPTED_EXCEPTION.** WEB2-01–09 DONE in bounded scopes; WEB2-10 DONE within the verified IIS Express HTTPS + SQL + Chromium/Edge pilot, with **full IIS acceptance NOT RUN / Owner-accepted exception**. The Owner explicitly accepted **only** this final full-IIS blocker for Roadmap 02 closeout on 2026-11-01. Read the [archive](docs/archive/20261101-web2-http-jwt-sales/README.md), [HTTP/auth/wire design](docs/design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) and [original evidence with Owner decision](docs/evidence/web2/20261031-http-jwt-sales.md#2026-11-01--owner-closeout-and-full-iis-exception) as reference, **not as active tasks**. Full IIS, operations/audit acceptance and production release are NOT APPROVED.
