@@ -2,6 +2,8 @@
 > **WEB2 closeout — 2026-11-01, OWNER_ACCEPTED_EXCEPTION:** [archive](archive/20261101-web2-http-jwt-sales/README.md), [HTTP/JWT/wire contract](design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) and [original evidence](evidence/web2/20261031-http-jwt-sales.md#2026-11-01--owner-closeout-and-full-iis-exception). Net48 HTTP host, auth and Sales/Catalog integration are implemented; live IIS Express HTTPS/SQL/Chromium/Edge pilot passed in its scoped candidate. **Full IIS NOT RUN / Owner-accepted exception, not PASS/production approval.** Local/WinForms and CEX roadmap retain their independent authorization/evidence boundaries.
 
 
+**WEB3 additional architecture direction — Owner 2026-11-01:** [selected server companion](plans/20261101-002-web3-goods-receipt-inventory-http.md), [HTTP wire design](design/WEB3_INVENTORY_HTTP_WIRE.md), [SQL oracle](design/WEB3_STOCK_LEDGER_ACCEPTANCE.md), [ADR 0013](adr/0013-web3-inventory-http-and-multimodule.md). The **existing** WEB2 net48 System.Web API host/SQL-backed JWT session and Sales/Catalog routes remain the implemented Web transport. WEB3 proposes GoodsReceipt/Inventory endpoints and multi-module React integration, **not implemented/tested by this docs PR**. The diagram below describes the independent Local/WinForms path only. CEX WinForms composition remains active and unaffected. No full IIS/production sign-off.
+
 **Inspected architecture baseline:** Local v1 at historical commit `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639` (merged PR #43), 2026-10-23. The [execution index](plans/README.md) selects the Business Compact and independent UI Labs roadmap; [the 2026-10-27 main archive](archive/20261027-main-roadmap-reset/README.md) and [UI-NEXT](ui-next/README.md) retain historical design/implementation evidence. This routing update does not re-audit every technical statement below. The [archive boundary](archive/20261023-pre-ui-next/README.md) retains source contracts and candidate acceptance limits.
 
 ## Implemented Sales and active UI direction
@@ -20,7 +22,7 @@ MyDmsVn is a Windows desktop modular monolith organized into Identity, Catalog, 
 
 The [frozen pre-UI-NEXT index](archive/20261023-pre-ui-next/plans/README.md) records archived BCF and BCI alongside [RESP](archive/20261023-pre-ui-next/plans/20261018-002-respawn-fixture-reuse.md), [L2DB](archive/20261023-pre-ui-next/plans/20261018-001-linq2db-net48-persistence-migration.md) and [GUI-P5](archive/20261023-pre-ui-next/plans/20261019-001-full-winforms-gui-p5-acceptance.md) history. Current product persistence uses LINQ to DB for Catalog/Inventory/Sales and typed native SqlClient for Identity/Security/operations; DbUp remains the schema owner. [T07 correctness/package/limited authenticated Local smoke](L2DB_VERIFICATION.md#l2db-t07--frozen-revision-acceptance-and-package-smoke) is accepted in its original scope; GUI-P5 supplies later, separately scoped GUI evidence. Neither acceptance establishes production release readiness. Current Local direct-SQL trust and runtime boundaries are unchanged.
 
-HTTP v2 and modern product runtimes remain [out of scope](DEFERRED_WORK.md#out-of-scope-directions). The future HTTP design preserves the same ViewModels, feature API interfaces, DTOs and Application behavior, with an HTTP adapter and a separately trusted API host. It requires a separate runtime decision before implementation; UI-NEXT does not create an HTTP host or restore a modern product target.
+**Historical UI-NEXT boundary, superseded for Web transport by WEB2/WEB3:** UI-NEXT itself did not add HTTP. WEB2 subsequently implemented a separate trusted net48 System.Web HTTP host that reuses Application handlers and HTTP-specific lossless wire DTOs. WEB3 is now authorized **as a planned extension** to Goods Receipt and Inventory; no new HTTP runtime, desktop transport cutover or modern net8 product target is authorized. See the WEB2/WEB3 design links above. Modern product runtimes remain parked; production release remains unapproved.
 
 ```mermaid
 flowchart TD
@@ -33,7 +35,7 @@ flowchart TD
     MIG["Controlled DbUp migrator"] --> SQL
 ```
 
-The diagram shows the current runtime call path; the host binds interfaces to implementations. Compile-time dependency rules are specified below. Local executes server logic inside the desktop process and is a two-tier deployment. Someone controlling the desktop process or runtime SQL credentials can bypass Application checks. Restricted SQL permissions reduce exposure, but a separately enforceable hostile-client boundary belongs to the deferred HTTP host. Keep maintenance credentials out of Desktop configuration.
+The diagram shows the **Local/WinForms runtime call path only**; WEB2 added a separate implemented browser → HTTPS/System.Web → Application → Infrastructure path. The host binds interfaces to implementations. Compile-time dependency rules are specified below. Local executes server logic inside the desktop process and is a two-tier deployment. Someone controlling the desktop process or runtime SQL credentials can bypass Application checks. Restricted SQL permissions reduce exposure; WEB2's separately authenticated HTTP host establishes a browser-client boundary for its verified pilot, not an approved full-IIS/production deployment. Keep maintenance credentials out of Desktop configuration.
 
 ## 2. Dependency rules
 
@@ -46,7 +48,7 @@ The diagram shows the current runtime call path; the host binds interfaces to im
 | Desktop.WinForms | Desktop.Application and presentation controls; no direct SQL or Server.Infrastructure reference. |
 | Desktop.Infrastructure.Local | Desktop abstractions and Server.Application dispatch; Infrastructure is wired at the host composition root. |
 | Desktop.App | Current net48 host; composes UI, Local adapter, Application and SQL Infrastructure. |
-| Future HTTP components | The HTTP adapter depends on Desktop.Application/Contracts; the API host composes Application/Infrastructure. These components are deferred. |
+| HTTP Host (WEB2 implemented; WEB3 extension selected) | Separate net48 System.Web API host composes Server.Application/Infrastructure with dedicated strict HTTP wire mapper, SQL-backed auth and restricted principal. Browser frontend does not hold direct SQL or server Infrastructure. WEB3 Inventory endpoints remain planned. |
 
 Public Contracts do not expose Domain entities, provider types, ADO.NET connections, transactions, MediatR requests, ErrorOr objects or UI classes. Application handlers do not return HTTP framework results. LINQ to DB types, mapping attributes and `IQueryable` remain outside inner layers and public contracts.
 
@@ -66,7 +68,7 @@ See [PERSISTENCE](PERSISTENCE.md) and [ADR 0002](adr/0002-explicit-unit-of-work.
 
 Identity owns account validation, code-defined permission evaluation and security administration. Catalog owns Products, Warehouses, Employees and Customers. Inventory owns goods receipt draft/posting, quantity/value ledger, stock inquiries and reconciliation. Sales owns direct sales Draft/Post and keyset queries, sharing inventory valuation and transaction coordination. Commands, queries, validators, handlers and DTO mapping remain near their feature. Business expansion beyond those implemented contracts needs a separately approved scope.
 
-A request enters a Local adapter, receives an immutable request identity, passes through authentication/authorization and FluentValidation, and reaches an Application handler returning `ErrorOr<T>`. A transport-neutral mapper produces `ApiResponse<T>`. Preserve the current pipeline ordering, deterministic error mapping, field paths, cancellation and safe diagnostics. A future HTTP adapter must preserve the same behavior with meaningful HTTP statuses. See [CONTRACTS](CONTRACTS.md).
+A request enters a Local adapter, receives an immutable request identity, passes through authentication/authorization and FluentValidation, and reaches an Application handler returning `ErrorOr<T>`. A transport-neutral mapper produces `ApiResponse<T>`. Preserve the current pipeline ordering, deterministic error mapping, field paths, cancellation and safe diagnostics. The implemented WEB2 HTTP adapter preserves the same Application behavior with meaningful HTTP statuses; WEB3 extensions must retain it. See [CONTRACTS](CONTRACTS.md).
 
 ## 4. Transactions and inventory invariants
 
