@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using MyDmsVn.Server.Application.Operations;
+using MyDmsVn.Server.Infrastructure.Operations;
+using Microsoft.Extensions.DependencyInjection;
 
 using System;
 using System.Linq;
@@ -80,6 +82,7 @@ namespace MyDmsVn.Server.Infrastructure
                     registrations);
             });
             return new SqlPersistenceBuilder(services)
+                .AddRepository<IWebOperationJournal, SqlWebOperationJournal>()
                 .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>()
                 .AddRepository<IGoodsReceiptWriteRepository, SqlGoodsReceiptWriteRepository>()
                 .AddRepository<ISalesReceiptWriteRepository, SqlSalesReceiptWriteRepository>()

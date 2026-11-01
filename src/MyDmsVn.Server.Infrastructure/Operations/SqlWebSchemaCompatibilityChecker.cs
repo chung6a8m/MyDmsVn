@@ -8,7 +8,7 @@ namespace MyDmsVn.Server.Infrastructure.Operations;
 // Explicit web boundary. The desktop manifest and exact10 fingerprint remain frozen.
 public sealed class SqlWebSchemaCompatibilityChecker : ISchemaCompatibilityChecker
 {
-    public static readonly IReadOnlyList<string> Scripts = SchemaCompatibilityPolicy.CurrentScripts.Concat(new[] { "011_WebAuthSessions.sql" }).ToArray();
+    public static readonly IReadOnlyList<string> Scripts = SchemaCompatibilityPolicy.CurrentScripts.Concat(new[] { "011_WebAuthSessions.sql", "012_WebOperationJournal.sql" }).ToArray();
     private readonly string _connectionString;
     public SqlWebSchemaCompatibilityChecker(string connectionString) { _connectionString = connectionString; }
     public async Task<SchemaCompatibilityResult> CheckAsync(CancellationToken cancellationToken)
@@ -37,14 +37,19 @@ public sealed class SqlWebSchemaCompatibilityChecker : ISchemaCompatibilityCheck
         if (scripts.Distinct(StringComparer.Ordinal).Count() != scripts.Count || !scripts.Take(Scripts.Count).SequenceEqual(Scripts.Take(scripts.Count), StringComparer.Ordinal))
             return Result(SchemaCompatibilityStatus.UnknownHistory);
         if (scripts.Count > Scripts.Count) return Result(SchemaCompatibilityStatus.TooNew);
+        if (scripts.Count == 11)
+        {
+            var prior = await SqlWebSchema11CompatibilityChecker.CheckConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
+            return prior.IsCompatible ? Result(SchemaCompatibilityStatus.TooOld) : prior;
+        }
         if (scripts.Count < 11)
         {
             var desktop = await new SqlSchemaCompatibilityChecker(connection.ConnectionString).CheckConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
             return desktop.IsCompatible ? Result(SchemaCompatibilityStatus.TooOld) : desktop;
         }
-        return string.Equals(await SqlSchemaDefinitionFingerprint.ReadAsync(connection, cancellationToken).ConfigureAwait(false), SqlSchemaDefinitionFingerprint.Schema11, StringComparison.Ordinal)
+        return string.Equals(await SqlSchemaDefinitionFingerprint.ReadAsync(connection, cancellationToken).ConfigureAwait(false), SqlSchemaDefinitionFingerprint.Schema12, StringComparison.Ordinal)
             ? Result(SchemaCompatibilityStatus.Compatible) : Result(SchemaCompatibilityStatus.Partial);
     }
     private static SchemaCompatibilityResult Result(SchemaCompatibilityStatus status) => new SchemaCompatibilityResult(status, "Schema." + status,
-        status == SchemaCompatibilityStatus.Compatible ? "Web schema11 is compatible." : "Web schema11 admission refused: " + status + ".");
+        status == SchemaCompatibilityStatus.Compatible ? "Web schema12 is compatible." : "Web schema12 admission refused: " + status + ".");
 }

@@ -1,7 +1,7 @@
 # Roadmap 04 backend — Reliable mutations, operation journal, and CI
 
-**Current selected task (2026-11-01): B02 Windows/net48 SQL-free CI DONE (bounded); Owner accepted; PR #81 merged 2026-11-01.** [B02 evidence](../evidence/web4/20261101-b02-windows-ci.md) owns current execution/hosted results. B01 is accepted/merged; B03–B06 remain PLANNED. B02 execution is separate from the accepted B01 contract checkpoint.
-**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / B01 DONE (bounded contract; Owner accepted; PR #80 merged 2026-11-01); B03–B06 PLANNED / NOT RUN. **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md. **Activation baseline:** 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd; **B01 source baseline:** main@48e9cd7ae096ecadd184e6ea6a372306d77f41b1. Reinspect current main and existing test owners before starting each task. B01 publishes [source/schema decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), [canonical corpus](../contracts/web4-v1/README.md) and [evidence](../evidence/web4/20261101-b01-contract.md); it does not implement or verify runtime, SQL, browser, CI, or IIS.
+**Current selected task (2026-11-01; verified 2026-11-02): B03 Web-only schema12 and transaction-owned journal VERIFIED CANDIDATE; Owner acceptance/merge pending.** [B03 evidence](../evidence/web4/20261101-b03-schema-journal.md) owns current implementation/verification. B01/B02 are accepted and merged; B04–B06 remain PLANNED. No B04 endpoint or production rollout is selected.
+**Selected by Owner:** 2026-11-01. **State:** ACTIVE ROADMAP / B01/B02 DONE (bounded, Owner accepted/merged); B03 VERIFIED CANDIDATE (Owner pending); B04–B06 PLANNED / NOT RUN. **Repository:** chung6a8m/MyDmsVn; companion frontend plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md. **Activation baseline:** 8114cc92267f8eb8b59ff75f5c9ca6b9c7a37ddd; **B01 source baseline:** main@48e9cd7ae096ecadd184e6ea6a372306d77f41b1. Reinspect current main and existing test owners before starting each task. B01 publishes [source/schema decisions](../design/WEB4_B01_SOURCE_CHECKPOINT.md), [canonical corpus](../contracts/web4-v1/README.md) and [evidence](../evidence/web4/20261101-b01-contract.md); it does not implement or verify runtime, SQL, browser, CI, or IIS.
 
 ## 0. Mission, constraints, ownership
 
@@ -62,7 +62,7 @@ Add focused SQL-free Application/architecture tests when source/test ownership j
 
 **Exit:** hosted PR and push run at final code head show build + selected nonzero net48 tests PASS, no credentials or SQL allocation. If GitHub runner cannot support the target, record blocked status; never substitute Linux compile or local .NET tests for Windows hosted evidence.
 
-## 4. B03 — Web-only schema 12 and transaction-owned journal (PLANNED)
+## 4. B03 — Web-only schema 12 and transaction-owned journal (VERIFIED CANDIDATE; Owner pending)
 
 **Prerequisite:** B01 canonical schema/atomicity design merged. Tentative migration name 012_WebOperationJournal.sql; final path/name must match inspected DbMigrator and schema-source conventions. **Source-specific patch required:** DatabaseMigrationRunner.ValidateWebSchemaStateBeforeMigration currently permits exact10→Web on TooOld but not an exact11→12 upgrade; introduce a frozen exact11 gate, not a loose script count check. Do NOT edit scripts 001–011 or desktop CurrentScripts. Web checker must admit exact new Web script+fingerprint and reject schema10/11 when WEB4-enabled host expects 12, too-new and partial/unmanaged variants. DbMigrator opt-in --web must have safe 11→12 admission; no automatic Desktop migration; preserve exact10 desktop behavior and refuse mixed desktop/schema12 writer claims.
 
@@ -121,3 +121,8 @@ Owner accepted the recorded bounded scope and limits and authorized merge after 
 ## B02 Owner acceptance and merge — 2026-11-01
 
 Owner accepted the recorded B02 scope/limits and authorized PR #81 merge conditional on CI PASS at its current HEAD. Both hosted push and pull_request checks passed at `d3364d9e8c30186e289d26b2efed65e3f3af5f2f`, 415/415 tests each, 0 failed/skipped. PR #81 merged at `c7e83cf3b9a6d4d860f8d7adcda6556fed8ad059`. [B02 evidence](../evidence/web4/20261101-b02-windows-ci.md#owner-acceptance-and-merge--2026-11-01) records exact runs/jobs and retained limits. B02 is DONE (bounded), accepted/merged; B03–B06 remain PLANNED. This decision grants no SQL/journal/browser/production acceptance.
+
+
+## B03 implementation checkpoint — 2026-11-02
+
+[Draft PR #82](https://github.com/chung6a8m/MyDmsVn/pull/82), source/test/deployment `e2976715bb106cc22c702e60ca2dd4536d6894ae`. [B03 evidence](../evidence/web4/20261101-b03-schema-journal.md) records253 selected local passing rows (including real SQL and SQL-free scopes), development failures/corrections, independent review and hosted Windows415/415 push checks. B03 is a verified candidate awaiting Owner acceptance/merge; B04–B06 remain PLANNED. Existing HttpHost remains exact11 until B04 implements mandatory keyed admission and the actual codec/status API; schema12 alone is not Web rollout. No merge or production approval is granted by this checkpoint.

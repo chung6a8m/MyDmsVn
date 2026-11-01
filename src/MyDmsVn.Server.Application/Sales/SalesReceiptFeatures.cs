@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MyDmsVn.Server.Application.Operations;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -19,14 +20,18 @@ namespace MyDmsVn.Server.Application.Sales;
 
 public sealed class CreateSalesReceiptDraftCommand : AuthorizedActorApplicationRequest<SalesReceiptDto>
 {
-    public CreateSalesReceiptDraftCommand(SaveSalesReceiptRequest request) => Request = request ?? throw new ArgumentNullException(nameof(request));
+    public CreateSalesReceiptDraftCommand(SaveSalesReceiptRequest request, WebOperationContext? operation = null)
+    { Request = request ?? throw new ArgumentNullException(nameof(request)); Operation=operation; }
+    public WebOperationContext? Operation { get; }
     public SaveSalesReceiptRequest Request { get; }
     public override string PermissionKey => PermissionKeys.SalesReceiptsWrite;
 }
 
 public sealed class UpdateSalesReceiptDraftCommand : AuthorizedActorApplicationRequest<SalesReceiptDto>
 {
-    public UpdateSalesReceiptDraftCommand(UpdateSalesReceiptDraftRequest request) => Request = request ?? throw new ArgumentNullException(nameof(request));
+    public UpdateSalesReceiptDraftCommand(UpdateSalesReceiptDraftRequest request, WebOperationContext? operation = null)
+    { Request = request ?? throw new ArgumentNullException(nameof(request)); Operation=operation; }
+    public WebOperationContext? Operation { get; }
     public UpdateSalesReceiptDraftRequest Request { get; }
     public override string PermissionKey => PermissionKeys.SalesReceiptsWrite;
 }
@@ -154,6 +159,8 @@ internal sealed class CreateSalesReceiptDraftCommandHandler : IRequestHandler<Cr
         var body = command.Request;
         using var uow = await _factory.CreateAsync(cancellationToken).ConfigureAwait(false);
         uow.BeginTransaction();
+        var replay = await WebOperationExecution.ReplayAsync<SalesReceiptDto>(uow, command.Operation, command.AuthorizedUserId, WebOperationKind.SalesCreate, null, cancellationToken).ConfigureAwait(false);
+        if (replay != null) { uow.Commit(); return replay; }
         var repository = uow.Repository<ISalesReceiptWriteRepository>();
         var references = await repository.GetReferenceSnapshotAsync(body.CustomerId, body.WarehouseId, body.EmployeeId,
             body.Lines.Select(line => line.ProductId).Distinct().ToArray(), cancellationToken).ConfigureAwait(false);
@@ -171,6 +178,7 @@ internal sealed class CreateSalesReceiptDraftCommandHandler : IRequestHandler<Cr
         var lines = CreateLines(body.Lines, references, command.AuthorizedUserId);
         var persisted = await repository.InsertDraftAsync(header, lines, cancellationToken).ConfigureAwait(false);
         var result = ToDraftDto(persisted, lines, references);
+        await WebOperationExecution.CompleteAsync(uow, command.Operation, command.AuthorizedUserId, result.SaleId, result, cancellationToken).ConfigureAwait(false);
         uow.Commit();
         return result;
     }
@@ -210,6 +218,8 @@ internal sealed class UpdateSalesReceiptDraftCommandHandler : IRequestHandler<Up
         var body = command.Request;
         using var uow = await _factory.CreateAsync(cancellationToken).ConfigureAwait(false);
         uow.BeginTransaction();
+        var replay = await WebOperationExecution.ReplayAsync<SalesReceiptDto>(uow, command.Operation, command.AuthorizedUserId, WebOperationKind.SalesUpdate, command.Request.SaleId, cancellationToken).ConfigureAwait(false);
+        if (replay != null) { uow.Commit(); return replay; }
         var repository = uow.Repository<ISalesReceiptWriteRepository>();
         var header = await repository.LockHeaderAsync(body.SaleId, cancellationToken).ConfigureAwait(false);
         if (header == null) return Error.NotFound("SalesReceipt.NotFound", "The sales receipt was not found.");
@@ -243,6 +253,7 @@ internal sealed class UpdateSalesReceiptDraftCommandHandler : IRequestHandler<Up
         header.EmployeeId = body.EmployeeId; header.Note = body.Note; header.UpdatedAtUtc = stamp; header.UpdatedByUserId = command.AuthorizedUserId;
         var persisted = await repository.ReplaceDraftAsync(header, lines, cancellationToken).ConfigureAwait(false);
         var result = CreateSalesReceiptDraftCommandHandler.ToDraftDto(persisted, lines, references);
+        await WebOperationExecution.CompleteAsync(uow, command.Operation, command.AuthorizedUserId, result.SaleId, result, cancellationToken).ConfigureAwait(false);
         uow.Commit();
         return result;
     }

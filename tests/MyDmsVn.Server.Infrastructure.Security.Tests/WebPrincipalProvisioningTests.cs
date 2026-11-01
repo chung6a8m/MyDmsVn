@@ -45,7 +45,9 @@ public sealed class WebPrincipalProvisioningTests
                 Assert.True(await c.QuerySingleAsync<long>("SELECT NEXT VALUE FOR dbo.SalesReceiptNumberSequence;") > 0);
                 Assert.True(await c.QuerySingleAsync<long>("SELECT NEXT VALUE FOR dbo.GoodsReceiptNumberSequence;") > 0);
                 await c.ExecuteAsync("DECLARE @s uniqueidentifier=NEWID(),@n datetime2=SYSUTCDATETIME(); INSERT dbo.WebAuthSessions VALUES(@s,1,@n,DATEADD(day,30,@n),DATEADD(day,7,@n),NULL); INSERT dbo.WebRefreshTokens VALUES(HASHBYTES('SHA2_256','probe'),@s,@n,DATEADD(day,7,@n),NULL,NULL,NULL); UPDATE dbo.WebAuthSessions SET RevokedAtUtc=@n WHERE SessionId=@s;");
-                foreach (var denied in new[] { "CREATE TABLE dbo.Forbidden(Id int);", "UPDATE dbo.GoodsReceiptLines SET Quantity=1;", "DELETE dbo.GoodsReceipts;", "UPDATE dbo.StockLedger SET QuantityChange=1;", "DELETE dbo.StockLedger;", "UPDATE dbo.StockValuationEntries SET ValueChange=1;", "DELETE dbo.StockValuationEntries;", "UPDATE dbo.Users SET IsActive=0;", "INSERT dbo.Products(Code,Name,Unit) VALUES(N'blocked',N'blocked',N'EA');", "DELETE dbo.WebRefreshTokens;", "UPDATE dbo.SchemaVersions SET Applied=SYSUTCDATETIME();", "ALTER ROLE db_owner ADD MEMBER WebProbe;", "EXEC dbo.ApplySecurityAdministration;" })
+                await c.ExecuteAsync("DECLARE @now datetime2(7)=SYSUTCDATETIME(); INSERT dbo.WebOperationJournal SELECT 1,NEWID(),DeploymentEpoch,1,1,1,NULL,HASHBYTES('SHA2_256','probe'),1,'COMMITTED',0x7B7D,@now,@now,DATEADD(day,7,@now) FROM dbo.WebDeploymentState WHERE Id=1;");
+                Assert.Equal(1,await c.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal;"));
+                foreach (var denied in new[] { "UPDATE dbo.WebDeploymentState SET DeploymentEpoch=NEWID();", "DELETE dbo.WebOperationJournal;", "UPDATE dbo.WebOperationJournal SET ActorUserId=2;", "INSERT dbo.WebDeploymentState VALUES(1,NEWID(),SYSUTCDATETIME());",  "CREATE TABLE dbo.Forbidden(Id int);", "UPDATE dbo.GoodsReceiptLines SET Quantity=1;", "DELETE dbo.GoodsReceipts;", "UPDATE dbo.StockLedger SET QuantityChange=1;", "DELETE dbo.StockLedger;", "UPDATE dbo.StockValuationEntries SET ValueChange=1;", "DELETE dbo.StockValuationEntries;", "UPDATE dbo.Users SET IsActive=0;", "INSERT dbo.Products(Code,Name,Unit) VALUES(N'blocked',N'blocked',N'EA');", "DELETE dbo.WebRefreshTokens;", "UPDATE dbo.SchemaVersions SET Applied=SYSUTCDATETIME();", "ALTER ROLE db_owner ADD MEMBER WebProbe;", "EXEC dbo.ApplySecurityAdministration;" })
                     await Assert.ThrowsAsync<SqlException>(() => c.ExecuteAsync(denied));
             }
             finally { await c.ExecuteAsync("REVERT;"); }
@@ -82,6 +84,38 @@ public sealed class WebPrincipalProvisioningTests
     public Task Excess_receipt_line_column_update_is_refused() => RejectExcess("GRANT UPDATE(Quantity) ON dbo.GoodsReceiptLines TO WebProbe;");
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Excess_receipt_header_delete_is_refused() => RejectExcess("GRANT DELETE ON dbo.GoodsReceipts TO WebProbe;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Excess_inherited_journal_update_is_refused() => RejectExcess("CREATE ROLE Extra; ALTER ROLE Extra ADD MEMBER WebProbe; GRANT UPDATE ON dbo.WebOperationJournal TO Extra;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Excess_epoch_column_update_is_refused() => RejectExcess("GRANT UPDATE(DeploymentEpoch) ON dbo.WebDeploymentState TO WebProbe;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Excess_journal_delete_is_refused() => RejectExcess("GRANT DELETE ON dbo.WebOperationJournal TO WebProbe;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Missing_journal_insert_is_refused() => RejectMissing("REVOKE INSERT ON dbo.WebOperationJournal FROM MyDmsVnWebRuntimeRole;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Denied_result_column_is_refused() => RejectMissing("DENY SELECT(ResultBytes) ON dbo.WebOperationJournal TO WebProbe;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Missing_epoch_select_is_refused() => RejectMissing("REVOKE SELECT ON dbo.WebDeploymentState FROM MyDmsVnWebRuntimeRole;");
+    private async Task RejectMissing(string change)
+    {
+        var db=await Create(); Exception? failure=null;
+        try
+        {
+            Assert.True(new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString).Successful);
+            using var c=new SqlConnection(db.ConnectionString); await c.OpenAsync();
+            await c.ExecuteAsync("CREATE USER WebProbe WITHOUT LOGIN; CREATE USER MigrationProbe WITHOUT LOGIN;");
+            await c.ExecuteAsync(Script("Provision-MyDmsVnWebPrincipals.sql").Replace("$(WebRuntimeUser)","WebProbe").Replace("$(MigrationUser)","MigrationProbe"));
+            await c.ExecuteAsync(change); await c.ExecuteAsync("EXECUTE AS USER=N'WebProbe';");
+            try { Assert.Equal("Security.WebRuntimePrincipalUnderprivileged",(await Assert.ThrowsAsync<DesktopStartupException>(()=>new SqlWebRuntimePrincipalValidator().ValidateConnectionAsync(c,CancellationToken.None))).Code); }
+            finally { await c.ExecuteAsync("REVERT;"); }
+        }
+        catch(Exception error){failure=error;throw;}
+        finally{try{await db.DisposeAsync();}catch(Exception cleanup)when(failure!=null){throw new AggregateException(failure,cleanup);}}
+    }
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Direct_journal_grant_option_is_refused() => RejectExcess("GRANT SELECT ON dbo.WebOperationJournal TO WebProbe WITH GRANT OPTION;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Inherited_epoch_grant_option_is_refused() => RejectExcess("CREATE ROLE Delegator;ALTER ROLE Delegator ADD MEMBER WebProbe;GRANT SELECT ON dbo.WebDeploymentState TO Delegator WITH GRANT OPTION;");
     private async Task RejectExcess(string grant)
     {
         var db = await Create();

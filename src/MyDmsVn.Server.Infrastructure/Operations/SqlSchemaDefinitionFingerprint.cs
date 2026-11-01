@@ -10,6 +10,7 @@ public static class SqlSchemaDefinitionFingerprint
     public const string Schema9 = "F4DEEC00E8CE56F7B031F12A203A6F0B33A5991DE60E489DEE598E12AB0F412B";
     public const string Schema10 = "D8119C144DE35212FD495CF7F7BE7060A7FE6CAE55106ABD25AF795717BC0349";
     public const string Schema11 = "1B1CF2B760E4651A06D10F162E44418BB2A0DEF2E425EC9A901F55B71B03EC4F";
+    public const string Schema12 = "50552E3ADC1AF4C68591D9C582B5340ED4744BB6883F085E8A7EC7053308BC87";
     public static async Task<string> ReadAsync(SqlConnection connection, CancellationToken cancellationToken)
     {
         using var command = connection.CreateCommand();

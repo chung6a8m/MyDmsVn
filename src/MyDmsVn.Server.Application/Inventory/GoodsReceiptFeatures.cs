@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MyDmsVn.Server.Application.Operations;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -18,8 +19,9 @@ namespace MyDmsVn.Server.Application.Inventory;
 
 public sealed class CreateGoodsReceiptDraftCommand : AuthorizedActorApplicationRequest<GoodsReceiptDto>
 {
-    public CreateGoodsReceiptDraftCommand(SaveGoodsReceiptRequest request) =>
-        Request = request ?? throw new ArgumentNullException(nameof(request));
+    public CreateGoodsReceiptDraftCommand(SaveGoodsReceiptRequest request, WebOperationContext? operation = null)
+    { Request = request ?? throw new ArgumentNullException(nameof(request)); Operation=operation; }
+    public WebOperationContext? Operation { get; }
 
     public SaveGoodsReceiptRequest Request { get; }
 
@@ -28,8 +30,9 @@ public sealed class CreateGoodsReceiptDraftCommand : AuthorizedActorApplicationR
 
 public sealed class UpdateGoodsReceiptDraftCommand : AuthorizedActorApplicationRequest<GoodsReceiptDto>
 {
-    public UpdateGoodsReceiptDraftCommand(UpdateGoodsReceiptDraftRequest request) =>
-        Request = request ?? throw new ArgumentNullException(nameof(request));
+    public UpdateGoodsReceiptDraftCommand(UpdateGoodsReceiptDraftRequest request, WebOperationContext? operation = null)
+    { Request = request ?? throw new ArgumentNullException(nameof(request)); Operation=operation; }
+    public WebOperationContext? Operation { get; }
 
     public UpdateGoodsReceiptDraftRequest Request { get; }
 
@@ -39,8 +42,9 @@ public sealed class UpdateGoodsReceiptDraftCommand : AuthorizedActorApplicationR
 public sealed class PostGoodsReceiptCommand
     : AuthorizedActorApplicationRequest<PostGoodsReceiptResponse>, ISecurityAuditedRequest
 {
-    public PostGoodsReceiptCommand(PostGoodsReceiptRequest request) =>
-        Request = request ?? throw new ArgumentNullException(nameof(request));
+    public PostGoodsReceiptCommand(PostGoodsReceiptRequest request, WebOperationContext? operation = null)
+    { Request = request ?? throw new ArgumentNullException(nameof(request)); Operation=operation; }
+    public WebOperationContext? Operation { get; }
 
     public PostGoodsReceiptRequest Request { get; }
 
@@ -265,6 +269,8 @@ internal sealed class CreateGoodsReceiptDraftCommandHandler
     {
         using var unitOfWork = await _unitOfWorkFactory.CreateAsync(cancellationToken).ConfigureAwait(false);
         unitOfWork.BeginTransaction();
+        var replay = await WebOperationExecution.ReplayAsync<GoodsReceiptDto>(unitOfWork, command.Operation, command.AuthorizedUserId, WebOperationKind.ReceiptCreate, null, cancellationToken).ConfigureAwait(false);
+        if (replay != null) { unitOfWork.Commit(); return replay; }
         var repository = unitOfWork.Repository<IGoodsReceiptWriteRepository>();
         var referenceSnapshot = await repository.GetReferenceSnapshotAsync(
             command.Request.WarehouseId,
@@ -281,6 +287,7 @@ internal sealed class CreateGoodsReceiptDraftCommandHandler
         var lines = CreateLines(command.Request.Lines, command.AuthorizedUserId);
         var persisted = await repository.InsertDraftAsync(header, lines, cancellationToken).ConfigureAwait(false);
         var response = ToDto(persisted, lines);
+        await WebOperationExecution.CompleteAsync(unitOfWork, command.Operation, command.AuthorizedUserId, response.Id, response, cancellationToken).ConfigureAwait(false);
         unitOfWork.Commit();
         return response;
     }
@@ -353,6 +360,8 @@ internal sealed class UpdateGoodsReceiptDraftCommandHandler
     {
         using var unitOfWork = await _unitOfWorkFactory.CreateAsync(cancellationToken).ConfigureAwait(false);
         unitOfWork.BeginTransaction();
+        var replay = await WebOperationExecution.ReplayAsync<GoodsReceiptDto>(unitOfWork, command.Operation, command.AuthorizedUserId, WebOperationKind.ReceiptUpdate, command.Request.ReceiptId, cancellationToken).ConfigureAwait(false);
+        if (replay != null) { unitOfWork.Commit(); return replay; }
         var repository = unitOfWork.Repository<IGoodsReceiptWriteRepository>();
 
         var locked = await repository.LockHeaderAsync(
@@ -403,6 +412,7 @@ internal sealed class UpdateGoodsReceiptDraftCommandHandler
 
         var persisted = await repository.ReplaceDraftAsync(locked, lines, cancellationToken).ConfigureAwait(false);
         var response = CreateGoodsReceiptDraftCommandHandler.ToDto(persisted, lines);
+        await WebOperationExecution.CompleteAsync(unitOfWork, command.Operation, command.AuthorizedUserId, response.Id, response, cancellationToken).ConfigureAwait(false);
         unitOfWork.Commit();
         return response;
     }
@@ -433,6 +443,8 @@ internal sealed class PostGoodsReceiptCommandHandler
             .CreateAsync(cancellationToken)
             .ConfigureAwait(false);
         unitOfWork.BeginTransaction();
+        var replay = await WebOperationExecution.ReplayAsync<PostGoodsReceiptResponse>(unitOfWork, command.Operation, command.AuthorizedUserId, WebOperationKind.ReceiptPost, command.Request.ReceiptId, cancellationToken).ConfigureAwait(false);
+        if (replay != null) { unitOfWork.Commit(); return replay; }
         var repository = unitOfWork.Repository<IGoodsReceiptWriteRepository>();
         await repository.AcquirePostingGateAsync(cancellationToken).ConfigureAwait(false);
         var header = await repository
@@ -498,6 +510,8 @@ internal sealed class PostGoodsReceiptCommandHandler
         await repository.ApplyPostedInventoryAsync(header, snapshot.Lines, postedAtUtc,
             command.AuthorizedUserId, cancellationToken).ConfigureAwait(false);
 
+        var response = new PostGoodsReceiptResponse(header.Id, GoodsReceiptStatuses.Posted, postedAtUtc);
+        await WebOperationExecution.CompleteAsync(unitOfWork, command.Operation, command.AuthorizedUserId, response.ReceiptId, response, cancellationToken).ConfigureAwait(false);
         unitOfWork.Commit();
         await _auditWriter.WriteAsync(
             new SecurityAuditEntry(
@@ -509,7 +523,7 @@ internal sealed class PostGoodsReceiptCommandHandler
                 header.Id.ToString(CultureInfo.InvariantCulture)),
             businessOperationCommitted: true,
             CancellationToken.None).ConfigureAwait(false);
-        return new PostGoodsReceiptResponse(header.Id, GoodsReceiptStatuses.Posted, postedAtUtc);
+        return response;
     }
 
     private static List<Error> ValidateSnapshot(GoodsReceiptPostSnapshot snapshot)

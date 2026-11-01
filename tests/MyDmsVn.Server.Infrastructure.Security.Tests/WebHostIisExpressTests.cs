@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -65,7 +65,7 @@ public sealed partial class WebHostIisExpressTests
         IntegratedCatalog? integrated = null;
         try
         {
-            var migration = new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString);
+            var migration = FrozenWeb11Migration.Install(database.ConnectionString);
             Assert.True(migration.Successful, "Fresh web migration must succeed.");
             await login.CreateAsync();
             using (var connection = new SqlConnection(database.ConnectionString))

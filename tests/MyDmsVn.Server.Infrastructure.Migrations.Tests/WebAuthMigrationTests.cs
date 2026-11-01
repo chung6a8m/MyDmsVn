@@ -15,7 +15,90 @@ public sealed class WebAuthMigrationTests
 {
     private static Task<SqlTestDatabase> Create() => SqlTestDatabase.CreateAsync(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
     [SqlServerFact(SqlTestCategory.MigrationSchema)]
-    public async Task Fresh11_exact_noop_and_desktop_refusal()
+    public async Task Spoofed11_history_without_auth_artifacts_is_refused()
+    {
+        var db=await Create(); Exception? failure=null;
+        try
+        {
+            Assert.True(new DatabaseMigrationRunner().Migrate(db.ConnectionString).Successful);
+            using var c=new SqlConnection(db.ConnectionString);
+            await c.ExecuteAsync("INSERT dbo.SchemaVersions(ScriptName,Applied) VALUES(N'011_WebAuthSessions.sql',SYSUTCDATETIME());");
+            Assert.Equal(SchemaCompatibilityStatus.Partial,(await new SqlWebSchema11CompatibilityChecker(db.ConnectionString).CheckAsync(CancellationToken.None)).Status);
+            Assert.Throws<DatabaseMigrationPreflightException>(()=>new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString));
+            Assert.Equal(0,await c.QuerySingleAsync<int>("SELECT COUNT(*) FROM sys.tables WHERE name=N'WebOperationJournal';"));
+        }
+        catch(Exception error){failure=error;throw;}
+        finally {try{await db.DisposeAsync();}catch(Exception cleanup)when(failure!=null){throw new AggregateException(failure,cleanup);}}
+    }
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
+    public async Task Interrupted012_retains_exact11_without_partial_epoch_journal_or_history()
+    {
+        var db=await Create(); Exception? failure=null;
+        try
+        {
+            Assert.True(new DatabaseMigrationRunner().Migrate(db.ConnectionString).Successful);
+            var assembly=typeof(DatabaseMigrationRunner).Assembly;
+            Assert.True(DeployChanges.To.SqlDatabase(db.ConnectionString).WithScriptsEmbeddedInAssembly(assembly,n=>n.EndsWith(".Scripts.011_WebAuthSessions.sql",StringComparison.Ordinal)).JournalToSqlTable("dbo","SchemaVersions").WithTransactionPerScript().LogToNowhere().Build().PerformUpgrade().Successful);
+            using var reader=new StreamReader(assembly.GetManifestResourceStream(assembly.GetManifestResourceNames().Single(n=>n.EndsWith(".Scripts.012_WebOperationJournal.sql",StringComparison.Ordinal)))!);
+            var failed=DeployChanges.To.SqlDatabase(db.ConnectionString).WithScript("012_WebOperationJournal.sql",reader.ReadToEnd()+"\nGO\nTHROW 51998, 'Expected interruption.',1;").JournalToSqlTable("dbo","SchemaVersions").WithTransactionPerScript().LogToNowhere().Build().PerformUpgrade();
+            Assert.False(failed.Successful);
+            Assert.True((await new SqlWebSchema11CompatibilityChecker(db.ConnectionString).CheckAsync(CancellationToken.None)).IsCompatible);
+            using var c=new SqlConnection(db.ConnectionString);
+            Assert.Equal(11,await c.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.SchemaVersions;"));
+            Assert.Equal(0,await c.QuerySingleAsync<int>("SELECT COUNT(*) FROM sys.tables WHERE name IN(N'WebOperationJournal',N'WebDeploymentState');"));
+        }
+        catch(Exception error){failure=error;throw;}
+        finally {try{await db.DisposeAsync();}catch(Exception cleanup)when(failure!=null){throw new AggregateException(failure,cleanup);}}
+    }
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
+    public async Task Frozen11_upgrade_requires_exact_artifacts_and_drained_maintenance()
+    {
+        var db=await Create(); Exception? failure=null;
+        try
+        {
+            Assert.True(new DatabaseMigrationRunner().Migrate(db.ConnectionString).Successful);
+            var result=DeployChanges.To.SqlDatabase(db.ConnectionString).WithScriptsEmbeddedInAssembly(typeof(DatabaseMigrationRunner).Assembly,n=>n.EndsWith(".Scripts.011_WebAuthSessions.sql",StringComparison.Ordinal))
+                .JournalToSqlTable("dbo","SchemaVersions").WithTransactionPerScript().LogToNowhere().Build().PerformUpgrade();
+            Assert.True(result.Successful);
+            Assert.True((await new SqlWebSchema11CompatibilityChecker(db.ConnectionString).CheckAsync(CancellationToken.None)).IsCompatible);
+            Assert.Equal(SchemaCompatibilityStatus.TooOld,(await new SqlWebSchemaCompatibilityChecker(db.ConnectionString).CheckAsync(CancellationToken.None)).Status);
+            Assert.Equal("Migration.MaintenanceAccessRequired",Assert.Throws<DatabaseMigrationPreflightException>(()=>new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString)).Code);
+            using(var c=new SqlConnection(db.ConnectionString))
+            {
+                await c.OpenAsync(); await db.VerifyOwnershipAsync(c,CancellationToken.None);
+                await c.ExecuteAsync("ALTER TABLE dbo.WebAuthSessions ADD Spoof int NULL;");
+                Assert.Throws<DatabaseMigrationPreflightException>(()=>new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString));
+                await c.ExecuteAsync("ALTER TABLE dbo.WebAuthSessions DROP COLUMN Spoof; ALTER DATABASE CURRENT SET RESTRICTED_USER;");
+                Assert.Equal("Migration.WritersNotDrained",Assert.Throws<DatabaseMigrationPreflightException>(()=>new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString)).Code);
+            }
+            var upgrade=new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString); Assert.True(upgrade.Successful); Assert.Single(upgrade.Scripts);
+            Assert.True((await new SqlWebSchemaCompatibilityChecker(db.ConnectionString).CheckAsync(CancellationToken.None)).IsCompatible);
+            Assert.Equal(SchemaCompatibilityStatus.TooNew,(await new SqlWebSchema11CompatibilityChecker(db.ConnectionString).CheckAsync(CancellationToken.None)).Status);
+        }
+        catch(Exception error){failure=error;throw;}
+        finally {try{await db.DisposeAsync();}catch(Exception cleanup)when(failure!=null){throw new AggregateException(failure,cleanup);}}
+    }
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
+    public async Task Implemented12_definition_fingerprint_is_frozen()
+    {
+        var db = await Create();
+        Exception? failure=null;
+        try
+        {
+            Assert.True(new DatabaseMigrationRunner().Migrate(db.ConnectionString).Successful);
+            var result=DeployChanges.To.SqlDatabase(db.ConnectionString)
+                .WithScriptsEmbeddedInAssembly(typeof(DatabaseMigrationRunner).Assembly,n=>n.Contains(".Scripts.") && SqlWebSchemaCompatibilityChecker.Scripts.Skip(10).Any(s=>n.EndsWith(".Scripts."+s,StringComparison.Ordinal)))
+                .JournalToSqlTable("dbo","SchemaVersions").WithTransactionPerScript().LogToNowhere().Build().PerformUpgrade();
+            Assert.True(result.Successful,result.Error?.Message);
+            using var c=new SqlConnection(db.ConnectionString); await c.OpenAsync();
+            var fingerprint=await SqlSchemaDefinitionFingerprint.ReadAsync(c,CancellationToken.None);
+            Assert.True(fingerprint==SqlSchemaDefinitionFingerprint.Schema12,fingerprint);
+        }
+        catch(Exception error) { failure=error; throw; }
+        finally { try { await db.DisposeAsync(); } catch(Exception cleanup) when(failure!=null) { throw new AggregateException(failure,cleanup); } }
+    }
+    [SqlServerFact(SqlTestCategory.MigrationSchema)]
+    public async Task Fresh12_exact_noop_and_desktop_refusal()
     {
         var db = await Create();
         Exception? scenarioFailure = null;
@@ -23,10 +106,10 @@ public sealed class WebAuthMigrationTests
         {
             var result = new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString);
             Assert.True(result.Successful, result.Error?.ToString());
-            Assert.Equal(11, result.Scripts.Count());
+            Assert.Equal(12, result.Scripts.Count());
             using var c = new SqlConnection(db.ConnectionString); await c.OpenAsync();
             var fingerprint = await SqlSchemaDefinitionFingerprint.ReadAsync(c, CancellationToken.None);
-            Assert.True(fingerprint == SqlSchemaDefinitionFingerprint.Schema11, fingerprint);
+            Assert.True(fingerprint == SqlSchemaDefinitionFingerprint.Schema12, fingerprint);
             Assert.True((await new SqlWebSchemaCompatibilityChecker(db.ConnectionString).CheckAsync(CancellationToken.None)).IsCompatible);
             Assert.Equal(SchemaCompatibilityStatus.TooNew, (await new SqlSchemaCompatibilityChecker(db.ConnectionString).CheckAsync(CancellationToken.None)).Status);
             Assert.Empty(new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString).Scripts);
@@ -58,7 +141,7 @@ public sealed class WebAuthMigrationTests
                 Assert.Equal("Migration.WritersNotDrained", Assert.Throws<DatabaseMigrationPreflightException>(() => new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString)).Code);
             }
             var result = new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString);
-            Assert.True(result.Successful, result.Error?.ToString()); Assert.Single(result.Scripts);
+            Assert.True(result.Successful, result.Error?.ToString()); Assert.Equal(2, result.Scripts.Count());
         }
         catch (Exception error) { scenarioFailure = error; throw; }
         finally
@@ -176,13 +259,13 @@ public sealed class WebAuthMigrationTests
     }
 
     [SqlServerFact(SqlTestCategory.MigrationSchema)]
-    public async Task Explicit_web_cli_installs11_default_cli_refuses11_and_web_cli_noops()
+    public async Task Explicit_web_cli_installs12_default_cli_refuses12_and_web_cli_noops()
     {
         var db = await Create();
         Exception? scenarioFailure = null;
         try
         {
-            foreach (var entry in new[] { new { Argument="--web", Exit=0, Marker="11 script" }, new { Argument="", Exit=4, Marker="Migration.SchemaTooNew" }, new { Argument="--web", Exit=0, Marker="0 script" } })
+            foreach (var entry in new[] { new { Argument="--web", Exit=0, Marker="12 script" }, new { Argument="", Exit=4, Marker="Migration.SchemaTooNew" }, new { Argument="--web", Exit=0, Marker="0 script" } })
             {
                 var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "MyDmsVn.Server.DbMigrator.exe"), entry.Argument)
                 { UseShellExecute=false, RedirectStandardOutput=true, RedirectStandardError=true, CreateNoWindow=true };
