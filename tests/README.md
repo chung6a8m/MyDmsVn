@@ -232,3 +232,24 @@ Source/test `991530f` implements guarded receipt List/Detail. [T05 evidence](../
 The workflow verifies Framework runtime/targeting pack and records SDK/image versions. `global.json` continues selecting SDK 8.0.400/latestFeature; setup installs the current 8.0 SDK. The TRX step rejects missing/zero/partial/skipped/failed/aborted execution even if the test process exits 0. Only a count summary is uploaded for 7 days; no raw TRX, test output, cookie/token or credentials artifact. No secrets or SQL configuration are passed. SQL, IIS Express and browser pilot remain separately owned gates.
 
 Direct local commands remain the existing `dotnet restore --locked-mode`, `dotnet build -c Release -f net48 --no-restore` and `dotnet test -c Release -f net48 --no-build --no-restore` against `tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj`. Local success does not establish hosted acceptance. [B02 evidence](../docs/evidence/web4/20261101-b02-windows-ci.md) records exact candidate, runnable counts and hosted run IDs.
+
+
+## WEB4 B03 schema and transaction journal checks
+
+Run the selected existing project owners sequentially for SQL, with the configured `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` and their ownership-checked disposable fixtures. Missing configuration/SQL skips are NOT PASS. Keep raw TRX and SQL diagnostics outside Git. [B03 evidence](../docs/evidence/web4/20261101-b03-schema-journal.md) owns exact candidate, selected regression filters, execution counts, failures/corrections and cleanup; [test policy](../docs/TEST_POLICY.md) remains authoritative.
+
+| Existing project owner | New or changed focused class | Boundary |
+|---|---|---|
+| MyDmsVn.Server.Infrastructure.Migrations.Tests | `WebAuthMigrationTests` plus affected migration-lock regressions | Current12, frozen11 upgrade admission, exact10 compatibility, failed-script rollback and lock release |
+| MyDmsVn.Server.Infrastructure.Security.Tests | `WebOperationJournalTests`, `WebPrincipalProvisioningTests` | Real SQL epoch/key/authority fences, expiry/compaction, effective minimum/maximum grants |
+| MyDmsVn.Server.Infrastructure.Inventory.Tests | `WebOperationCommandTests` plus selected existing Sales/Receipt rollback/concurrency cases | All six actual Local10 and Web12 handlers, original outcomes, ledger/value/COGS and precommit failures |
+| MyDmsVn.Server.Infrastructure.Foundation.Tests | `WebAuthResetTests` | Existing frozen11 fixture reset boundary |
+| MyDmsVn.Server.Application.Tests | `WebOperationContextTests`, affected pipeline cases | SQL-free operation metadata and safe error conversion |
+
+For example, after locked restore of the selected project, run the ordinary existing test entry point and inspect actual nonzero TRX counts:
+
+```powershell
+dotnet test tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj -c Release -f net48 --no-restore --filter 'FullyQualifiedName~WebOperationCommandTests' --logger 'trx;LogFileName=web4-b03-commands.trx' --results-directory "$env:TEMP/web4-b03-commands"
+```
+
+Schema12 tests use fresh owned databases. The existing reusable Web profile and legacy HTTP SQL fixtures stay on frozen11 via the test-only `FrozenWeb11Migration` helper; Desktop profiles stay exact10. Do not reset durable journal/epoch state with the schema11 Respawn allowlist. Existing unkeyed HttpHost startup remains frozen11 until B04 supplies mandatory operation admission and the actual HTTP codec/status routes. The B03 test codec proves original Application-result capture and rollback, not B04 wire compatibility or browser recovery.

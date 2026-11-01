@@ -14,3 +14,7 @@ Existing WEB2/WEB3 evidence remains immutable and candidate-specific. WEB4 sourc
 ## B02 — Windows/net48 CI
 
 [B02 execution evidence](20261101-b02-windows-ci.md): selected by Owner; DONE (bounded): final executable candidate hosted push/PR PASS, Owner accepted; PR #81 merged 2026-11-01. B01 acceptance and old evidence remain unchanged.
+
+## B03 — schema12 and transaction-owned journal
+
+[B03 execution evidence](20261101-b03-schema-journal.md): VERIFIED CANDIDATE through [draft PR82](https://github.com/chung6a8m/MyDmsVn/pull/82); Owner acceptance/merge pending. Source,253 selected local rows (SQL and SQL-free), Local compatibility and hosted415/415 checks are recorded separately. B01/B02 historical evidence remains unchanged.
