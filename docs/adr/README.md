@@ -21,8 +21,9 @@ Current decisions and explicit owner instructions supersede older examples. Impl
 | [0011](0011-direct-sales-and-moving-average-costing.md) | Direct sales, moving weighted average, coherent value inventory and LINQ/keyset | Accepted and source implemented; SAL queue archived, native125/attended/Owner acceptance OPEN |
 | [0012](0012-web2-net48-host-preflight.md) | WEB2 net48/IIS host, immutable request actor, schema11 admission and origin | WEB2 IIS Express HTTPS/SQL/browser pilot completed; full IIS NOT RUN / Owner-accepted exception, no production approval |
 
-| [0013](0013-web3-inventory-http-and-multimodule.md) | WEB3 bounded expansion to Goods Receipt and read-only Inventory via existing HTTP/JWT and multi-module Web workspace | Owner selected direction; B01–B05 implementation/verification PLANNED, no production authorization |
+| [0013](0013-web3-inventory-http-and-multimodule.md) | WEB3 bounded expansion to Goods Receipt and read-only Inventory via existing HTTP/JWT and multi-module Web workspace | COMPLETED (bounded), 2026-11-01; full IIS/production not approved |
 
-Historical approvals and measurements are indexed in [History](../HISTORY.md). Do not describe a documentation decision as delivered code, restore an obsolete policy from Git, or reopen a completed plan from its old task ID.
+| [0014](0014-web4-durable-operations.md) | WEB4 transaction-owned Web operation journal, durable browser drafts and Windows SQL-free backend CI | Owner-selected direction; B01 source proof and F01 consumer checkpoint PLANNED, runtime NOT RUN |
+\nHistorical approvals and measurements are indexed in [History](../HISTORY.md). Do not describe a documentation decision as delivered code, restore an obsolete policy from Git, or reopen a completed plan from its old task ID.
 
 A new decision record should state date, owner decision/status, context, scope, consequences, verification and superseded documents. Record a real changed decision explicitly; routine implementation choices within an approved plan do not create a new approval gate.

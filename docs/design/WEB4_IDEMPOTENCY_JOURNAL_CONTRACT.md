@@ -1,6 +1,6 @@
 # WEB4 operation journal and HTTP idempotency contract — proposed v1
 
-**Owner:** MyDmsVn backend. **Status:** PROPOSED TECHNICAL BASELINE for WEB4-B01 review, NOT an implemented API or approved schema. **Last revised:** 2026-11-01. See [owning backend plan](../plans/20261101-003-web4-reliability-server.md), [ADR 0014](../adr/0014-web4-durable-operations.md), [backend test matrix](../development/WEB4_BACKEND_ACCEPTANCE.md) and frontend [durable recovery design](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/codex/activate-web4-reliability/docs/design/WEB4_DURABLE_DRAFT_AND_RECOVERY.md).
+**Owner:** MyDmsVn backend. **Status:** PROPOSED TECHNICAL BASELINE for WEB4-B01 review, NOT an implemented API or approved schema. **Last revised:** 2026-11-01. See [owning backend plan](../plans/20261101-003-web4-reliability-server.md), [ADR 0014](../adr/0014-web4-durable-operations.md), [backend test matrix](../development/WEB4_BACKEND_ACCEPTANCE.md) and frontend [durable recovery design](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/design/WEB4_DURABLE_DRAFT_AND_RECOVERY.md).
 
 ## 1. Source facts and deliberate change
 

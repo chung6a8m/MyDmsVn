@@ -1,6 +1,6 @@
 # Codex handoff — WEB4 backend, atomic journal and Windows CI
 
-**Active selected direction; tasks B01–B06 PLANNED until source PRs/evidence.** Start with [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → [plan selector](../plans/README.md) → [owning WEB4 backend plan](../plans/20261101-003-web4-reliability-server.md) → [idempotency design](../design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) → [ADR 0014](../adr/0014-web4-durable-operations.md) → [acceptance](WEB4_BACKEND_ACCEPTANCE.md) → [TEST_POLICY](../TEST_POLICY.md). Frontend partner plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/codex/activate-web4-reliability/docs/plans/20261101-002-web4-reliability-web.md.
+**Active selected direction; tasks B01–B06 PLANNED until source PRs/evidence.** Start with [AGENTS](../../AGENTS.md) → [AI_CONTEXT](../../AI_CONTEXT.md) → [plan selector](../plans/README.md) → [owning WEB4 backend plan](../plans/20261101-003-web4-reliability-server.md) → [idempotency design](../design/WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) → [ADR 0014](../adr/0014-web4-durable-operations.md) → [acceptance](WEB4_BACKEND_ACCEPTANCE.md) → [TEST_POLICY](../TEST_POLICY.md). Frontend partner plan: https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md.
 
 ## Source preflight before every task
 
