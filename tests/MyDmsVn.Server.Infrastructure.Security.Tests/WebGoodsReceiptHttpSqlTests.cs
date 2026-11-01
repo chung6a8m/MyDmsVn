@@ -211,7 +211,7 @@ public sealed class WebGoodsReceiptHttpSqlTests
         Exception? failure = null;
         try
         {
-            Assert.True(new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString).Successful);
+            Assert.True(FrozenWeb11Migration.Install(database.ConnectionString).Successful);
             using var http = await HttpScenario.Create(database.ConnectionString);
             await body(await Data.Seed(http));
         }

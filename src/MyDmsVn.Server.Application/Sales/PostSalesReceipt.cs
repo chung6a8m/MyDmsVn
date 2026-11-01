@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MyDmsVn.Server.Application.Operations;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -18,7 +19,9 @@ namespace MyDmsVn.Server.Application.Sales;
 
 public sealed class PostSalesReceiptCommand : AuthorizedActorApplicationRequest<PostSalesReceiptResponse>, ISecurityAuditedRequest
 {
-    public PostSalesReceiptCommand(PostSalesReceiptRequest request) => Request = request ?? throw new ArgumentNullException(nameof(request));
+    public PostSalesReceiptCommand(PostSalesReceiptRequest request, WebOperationContext? operation = null)
+    { Request = request ?? throw new ArgumentNullException(nameof(request)); Operation=operation; }
+    public WebOperationContext? Operation { get; }
     public PostSalesReceiptRequest Request { get; }
     public override string PermissionKey => PermissionKeys.SalesReceiptsPost;
     public SecurityAuditAction AuditAction => SecurityAuditAction.SalesReceiptPost;
@@ -47,6 +50,8 @@ internal sealed class PostSalesReceiptCommandHandler : IRequestHandler<PostSales
     {
         using var uow = await _factory.CreateAsync(token).ConfigureAwait(false);
         uow.BeginTransaction();
+        var replay = await WebOperationExecution.ReplayAsync<PostSalesReceiptResponse>(uow, command.Operation, command.AuthorizedUserId, WebOperationKind.SalesPost, command.Request.SaleId, token).ConfigureAwait(false);
+        if (replay != null) { uow.Commit(); return replay; }
         var repository = uow.Repository<ISalesReceiptWriteRepository>();
         await repository.AcquirePostingGateAsync(token).ConfigureAwait(false);
         var header = await repository.LockHeaderAsync(command.Request.SaleId, token).ConfigureAwait(false);
@@ -99,6 +104,7 @@ internal sealed class PostSalesReceiptCommandHandler : IRequestHandler<PostSales
             !posted.PostedAtUtc.HasValue || posted.Version == null || posted.Version.Length != 8)
             throw new InvalidOperationException("The authoritative posted header is incomplete.");
         var response = new PostSalesReceiptResponse(posted.SaleId, posted.Status, posted.PostedAtUtc!.Value, Convert.ToBase64String(posted.Version));
+        await WebOperationExecution.CompleteAsync(uow, command.Operation, command.AuthorizedUserId, response.SaleId, response, token).ConfigureAwait(false);
         uow.Commit();
         await _audit.WriteAsync(new SecurityAuditEntry(SecurityAuditAction.SalesReceiptPost, SecurityAuditOutcome.Succeeded,
             command.AuthorizedUserId, stamp, "SalesReceipt", posted.SaleId.ToString(CultureInfo.InvariantCulture)),

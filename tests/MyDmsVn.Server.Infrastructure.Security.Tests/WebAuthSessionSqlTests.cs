@@ -280,7 +280,7 @@ public sealed class WebAuthSessionSqlTests
         Scenario? scenario = null;
         try
         {
-            var migration = new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString);
+            var migration = FrozenWeb11Migration.Install(database.ConnectionString);
             Assert.True(migration.Successful, migration.Error?.GetType().Name);
             using var connection = new SqlConnection(database.ConnectionString);
             await connection.OpenAsync();

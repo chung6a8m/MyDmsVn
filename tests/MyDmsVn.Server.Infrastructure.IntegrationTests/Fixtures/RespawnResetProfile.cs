@@ -305,7 +305,7 @@ SELECT CONVERT(nvarchar(max),(SELECT s.schema_id,s.name,s.principal_id
             {
                 await database.VerifyOwnershipAsync(connection, budget.Token).ConfigureAwait(false);
                 var compatibility = web
-                    ? await SqlWebSchemaCompatibilityChecker.CheckConnectionAsync(connection, budget.Token).ConfigureAwait(false)
+                    ? await SqlWebSchema11CompatibilityChecker.CheckConnectionAsync(connection, budget.Token).ConfigureAwait(false)
                     : await new SqlSchemaCompatibilityChecker(database.ConnectionString).CheckConnectionAsync(connection, budget.Token).ConfigureAwait(false);
                 if (compatibility.Status != SchemaCompatibilityStatus.Compatible)
                 {

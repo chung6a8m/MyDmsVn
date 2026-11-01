@@ -303,7 +303,7 @@ public sealed class WebSalesHttpSqlTests
         Exception? failure = null;
         try
         {
-            Assert.True(new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString).Successful);
+            Assert.True(FrozenWeb11Migration.Install(database.ConnectionString).Successful);
             using var http = await HttpScenario.Create(database.ConnectionString);
             var data = await Data.Seed(http);
             await body(data);

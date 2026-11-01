@@ -164,6 +164,31 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Empty(reporter.Exceptions);
         }
 
+        [Theory]
+        [InlineData("Auth.Unauthorized", ErrorType.Unauthorized)]
+        [InlineData("Auth.Forbidden", ErrorType.Forbidden)]
+        [InlineData("Idempotency.KeyConflict", ErrorType.Conflict)]
+        [InlineData("Deployment.EpochMismatch", ErrorType.Conflict)]
+        [InlineData("Operation.ResultExpired", ErrorType.Conflict)]
+        [InlineData("Operation.ResultUnavailable", ErrorType.Conflict)]
+        [InlineData("Operation.Unavailable", ErrorType.Unexpected)]
+        public async Task Operation_failures_preserve_only_closed_protected_reason_codes(string code, ErrorType type)
+        {
+            var behavior=new ExceptionHandlingBehavior<ThrowingProbeCommand,ErrorOr<string>>(new CapturingExceptionReporter());
+            var result=await behavior.Handle(new ThrowingProbeCommand(),_=>Task.FromException<ErrorOr<string>>(new MyDmsVn.Server.Application.Operations.WebOperationException(code)),CancellationToken.None);
+            Assert.Equal(code,result.FirstError.Code);
+            Assert.Equal(type,result.FirstError.Type);
+        }
+
+        [Fact]
+        public async Task Arbitrary_operation_exception_text_is_not_disclosed()
+        {
+            var behavior=new ExceptionHandlingBehavior<ThrowingProbeCommand,ErrorOr<string>>(new CapturingExceptionReporter());
+            var result=await behavior.Handle(new ThrowingProbeCommand(),_=>Task.FromException<ErrorOr<string>>(new MyDmsVn.Server.Application.Operations.WebOperationException("private diagnostic")),CancellationToken.None);
+            Assert.Equal("InternalError",result.FirstError.Code);
+            Assert.DoesNotContain("private",result.FirstError.Description,StringComparison.Ordinal);
+        }
+
         private sealed class ValidationProbeCommand : ApplicationRequest<string>
         {
             public ValidationProbeCommand(IReadOnlyList<ValidationProbeLine> lines)

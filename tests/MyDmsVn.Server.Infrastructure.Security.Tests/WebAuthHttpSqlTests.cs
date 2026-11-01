@@ -197,7 +197,7 @@ public sealed class WebAuthHttpSqlTests
         Exception? failure = null;
         try
         {
-            Assert.True(new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString).Successful);
+            Assert.True(FrozenWeb11Migration.Install(database.ConnectionString).Successful);
             using var scenario = await Scenario.Create(database.ConnectionString);
             await body(scenario);
         }
@@ -236,7 +236,7 @@ public sealed class WebAuthHttpSqlTests
                 }
                 var factory = new RestrictedFactory(connectionString);
                 using (var runtime = (SqlConnection)await factory.OpenConnectionAsync(CancellationToken.None))
-                    await new SqlWebRuntimePrincipalValidator().ValidateConnectionAsync(runtime, CancellationToken.None);
+                    await new SqlWebRuntimePrincipalValidator(requireJournal: false).ValidateConnectionAsync(runtime, CancellationToken.None);
                 var services = new ServiceCollection();
                 services.AddServerApplication().AddHttpRequestIdentity();
                 services.AddSqlPersistence(connectionString);

@@ -350,11 +350,8 @@ public sealed class DatabaseMigrationTests
                 .WithScriptsEmbeddedInAssembly(
                     assembly,
                     resourceName =>
-                        resourceName.Contains(".Scripts.") && !resourceName.EndsWith("011_WebAuthSessions.sql", StringComparison.Ordinal) &&
-                        !resourceName.EndsWith("007_Inventory_Stock.sql", StringComparison.Ordinal) &&
-                        !resourceName.EndsWith("008_Security_Administration.sql", StringComparison.Ordinal) &&
-                        !resourceName.EndsWith("009_Security_Permission_Import.sql", StringComparison.Ordinal) &&
-                        !resourceName.EndsWith("010_DirectSalesAndValuation.sql", StringComparison.Ordinal))
+                        MyDmsVn.Server.Infrastructure.Operations.SchemaCompatibilityPolicy.Schema9Scripts.Take(6)
+                            .Any(script => resourceName.EndsWith(".Scripts." + script, StringComparison.Ordinal)))
                 .JournalToSqlTable("dbo", "SchemaVersions")
                 .WithTransactionPerScript()
                 .LogToNowhere()

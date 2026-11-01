@@ -49,4 +49,7 @@
     <Compile Include="..\SqlOracle\SqlTestOracle.cs" Link="SqlOracle\SqlTestOracle.cs" />
     <Compile Include="..\MyDmsVn.Desktop.Tests\GuiOwnedProcess.cs" Link="Fixtures\GuiOwnedProcess.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\FrozenWeb11Migration.cs" Link="FrozenWeb11Migration.cs" />
+  </ItemGroup>
 </Project>

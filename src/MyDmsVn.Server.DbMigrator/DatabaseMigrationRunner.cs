@@ -36,8 +36,8 @@ public sealed class DatabaseMigrationRunner
         using var migrationLock = DatabaseMigrationLock.Acquire(connectionString);
         if (web) ValidateWebSchemaStateBeforeMigration(connectionString, migrationLock.Connection);
         else ValidateSchemaStateBeforeMigration(connectionString, migrationLock.Connection);
-        var connectionManager = new SqlConnectionManager(
-            migrationLock.TransferConnectionOwnership);
+        var connectionManager = new MigrationConnectionManager(
+            new SqlConnectionManager(migrationLock.TransferConnectionOwnership), migrationLock.ReleaseSessionLock);
 
         var assembly = typeof(DatabaseMigrationRunner).Assembly;
         var engine = DeployChanges.To
@@ -70,6 +70,12 @@ public sealed class DatabaseMigrationRunner
         }
         if (state.Status == SchemaCompatibilityStatus.TooOld)
         {
+            var source11 = SqlWebSchema11CompatibilityChecker.CheckConnectionAsync(connection, System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+            if (source11.IsCompatible)
+            {
+                Schema11WebMaintenanceValidator.Validate(connection);
+                return;
+            }
             // Frozen exact10 checker is independent of the web manifest. Never infer 9->11.
             var source = new SqlSchemaCompatibilityChecker(connectionString).CheckConnectionAsync(connection, System.Threading.CancellationToken.None).GetAwaiter().GetResult();
             if (source.IsCompatible)
@@ -213,6 +219,7 @@ internal sealed class DatabaseMigrationLock : IDisposable
     private readonly SqlConnection _connection;
     private bool _disposed;
     private bool _connectionOwnershipTransferred;
+    private bool _sessionLockReleased;
 
     private DatabaseMigrationLock(SqlConnection connection)
     {
@@ -272,29 +279,26 @@ internal sealed class DatabaseMigrationLock : IDisposable
         return _connection;
     }
 
+    internal void ReleaseSessionLock()
+    {
+        if (_sessionLockReleased || _connection.State != System.Data.ConnectionState.Open) return;
+        using var command = _connection.CreateCommand();
+        command.CommandTimeout = 30;
+        command.CommandText = "DECLARE @result int; EXEC @result=sys.sp_releaseapplock @Resource=@Resource,@LockOwner=N'Session'; SELECT @result;";
+        command.Parameters.AddWithValue("@Resource", DatabaseMigrationRunner.MigrationLockResource);
+        if (Convert.ToInt32(command.ExecuteScalar()) < 0)
+            throw new InvalidOperationException("The migration session lock could not be released.");
+        _sessionLockReleased = true;
+    }
+
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        if (_connectionOwnershipTransferred)
-        {
-            _disposed = true;
-            return;
-        }
-
+        if (_disposed) return;
         try
         {
-            if (_connection.State == System.Data.ConnectionState.Open)
-            {
-                using var command = _connection.CreateCommand();
-                command.CommandText =
-                    "EXEC sys.sp_releaseapplock @Resource = @Resource, @LockOwner = N'Session';";
-                command.Parameters.AddWithValue("@Resource", DatabaseMigrationRunner.MigrationLockResource);
-                command.ExecuteNonQuery();
-            }
+            // DbUp normally releases/disposes through MigrationConnectionManager. Retain ownership
+            // cleanup if initialization fails after the connection factory handed it to DbUp.
+            ReleaseSessionLock();
         }
         finally
         {

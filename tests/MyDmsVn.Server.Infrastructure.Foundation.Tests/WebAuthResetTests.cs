@@ -15,7 +15,7 @@ public sealed class WebAuthResetTests
         Exception? scenarioFailure = null;
         try
         {
-            Assert.True(new DatabaseMigrationRunner().MigrateWeb(db.ConnectionString).Successful);
+            Assert.True(FrozenWeb11Migration.Install(db.ConnectionString).Successful);
             await Assert.ThrowsAsync<InvalidOperationException>(() => RespawnResetProfile.CreateAsync(db));
             var profile = await RespawnResetProfile.CreateAsync(db, web: true);
             for (var iteration=0; iteration<2; iteration++)
