@@ -43,8 +43,9 @@ public sealed class WebPrincipalProvisioningTests
                 await Assert.ThrowsAsync<DesktopStartupException>(() => new SqlRuntimePrincipalValidator().ValidateConnectionAsync(c, CancellationToken.None));
                 await c.ExecuteAsync("UPDATE dbo.Users SET PasswordHash=N'rehashed',PasswordSalt=N'',PasswordAlgorithm=N'BCrypt',UpdatedAtUtc=SYSUTCDATETIME(),UpdatedByUserId=UserId;");
                 Assert.True(await c.QuerySingleAsync<long>("SELECT NEXT VALUE FOR dbo.SalesReceiptNumberSequence;") > 0);
+                Assert.True(await c.QuerySingleAsync<long>("SELECT NEXT VALUE FOR dbo.GoodsReceiptNumberSequence;") > 0);
                 await c.ExecuteAsync("DECLARE @s uniqueidentifier=NEWID(),@n datetime2=SYSUTCDATETIME(); INSERT dbo.WebAuthSessions VALUES(@s,1,@n,DATEADD(day,30,@n),DATEADD(day,7,@n),NULL); INSERT dbo.WebRefreshTokens VALUES(HASHBYTES('SHA2_256','probe'),@s,@n,DATEADD(day,7,@n),NULL,NULL,NULL); UPDATE dbo.WebAuthSessions SET RevokedAtUtc=@n WHERE SessionId=@s;");
-                foreach (var denied in new[] { "CREATE TABLE dbo.Forbidden(Id int);", "UPDATE dbo.Users SET IsActive=0;", "INSERT dbo.Products(Code,Name,Unit) VALUES(N'blocked',N'blocked',N'EA');", "DELETE dbo.WebRefreshTokens;", "UPDATE dbo.SchemaVersions SET Applied=SYSUTCDATETIME();", "ALTER ROLE db_owner ADD MEMBER WebProbe;", "EXEC dbo.ApplySecurityAdministration;" })
+                foreach (var denied in new[] { "CREATE TABLE dbo.Forbidden(Id int);", "UPDATE dbo.GoodsReceiptLines SET Quantity=1;", "DELETE dbo.GoodsReceipts;", "UPDATE dbo.StockLedger SET QuantityChange=1;", "DELETE dbo.StockLedger;", "UPDATE dbo.StockValuationEntries SET ValueChange=1;", "DELETE dbo.StockValuationEntries;", "UPDATE dbo.Users SET IsActive=0;", "INSERT dbo.Products(Code,Name,Unit) VALUES(N'blocked',N'blocked',N'EA');", "DELETE dbo.WebRefreshTokens;", "UPDATE dbo.SchemaVersions SET Applied=SYSUTCDATETIME();", "ALTER ROLE db_owner ADD MEMBER WebProbe;", "EXEC dbo.ApplySecurityAdministration;" })
                     await Assert.ThrowsAsync<SqlException>(() => c.ExecuteAsync(denied));
             }
             finally { await c.ExecuteAsync("REVERT;"); }
@@ -75,6 +76,12 @@ public sealed class WebPrincipalProvisioningTests
     public Task Excess_schema_grant_is_refused() => RejectExcess("GRANT SELECT ON SCHEMA::dbo TO WebProbe;");
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Excess_owner_role_is_refused() => RejectExcess("ALTER ROLE db_owner ADD MEMBER WebProbe;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Excess_receipt_line_update_is_refused() => RejectExcess("GRANT UPDATE ON dbo.GoodsReceiptLines TO WebProbe;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Excess_receipt_line_column_update_is_refused() => RejectExcess("GRANT UPDATE(Quantity) ON dbo.GoodsReceiptLines TO WebProbe;");
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Excess_receipt_header_delete_is_refused() => RejectExcess("GRANT DELETE ON dbo.GoodsReceipts TO WebProbe;");
     private async Task RejectExcess(string grant)
     {
         var db = await Create();

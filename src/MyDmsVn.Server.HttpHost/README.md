@@ -1,4 +1,4 @@
-# WEB2 IIS/System.Web host, auth and Sales/Catalog endpoints
+# IIS/System.Web host, auth and Sales/Catalog/Inventory endpoints
 
 > **Roadmap disposition (2026-11-01):** WEB2 implementation and IIS Express HTTPS/SQL/real-browser pilot completed within its verified scope. Owner accepted **full IIS NOT RUN** as the final roadmap exception; **not** full IIS PASS or production deployment approval. [Archive](../../docs/archive/20261101-web2-http-jwt-sales/README.md) and [evidence](../../docs/evidence/web2/20261031-http-jwt-sales.md#2026-11-01--owner-closeout-and-full-iis-exception) preserve the decision. This operational host runbook remains valid; any future full IIS rollout/audit acceptance requires separate authorization.
 
@@ -14,6 +14,10 @@ Sales List/Get/Create/Update/Post dispatch the existing Application queries/comm
 The [canonical v1 field tables and corpus](../../docs/contracts/web2-v1/README.md) own routes and exact payloads. Dedicated HTTP mapping keeps int64 IDs and decimal values as invariant strings, int32 values as JSON integers, document dates as `yyyy-MM-dd` and versions/cursors opaque. Strict UTF-8 JSON/query parsing rejects duplicate/unknown members, numeric int64/decimal wire values, coercion and invalid dates/ranges before mutation. Sales list defaults to25; lookups require explicit `limit`. HTTP wire mapping does not change Local DTO serialization or its default page size.
 
 ## Operator configuration
+
+WEB3-B02/B03 adds Goods Receipt List/Get/Create/Update/Post and read-only Stock Balances/Stock Card in this same host. The [WEB3 canonical contract](../../docs/contracts/web3-v1/README.md) owns the exact payloads and required paging. Capabilities additionally accepts `goods-receipts` (`read`, `write`, `post`), `inventory-balances` (`read`) and `inventory-stock-card` (`read`); Application authorizes each operation independently. Receipt Update replaces unique-Product lines; Create/Update return the existing pre-commit DTO without a subsequent Get; Post acknowledgement has no version. The [WEB3 evidence](../../docs/evidence/web3/20261101-b02-b03-http-inventory.md) separates TestServer/real-SQL verification from the still-unrun WEB3 IIS Express/browser pilot.
+
+Before using WEB3 routes against an existing Web database, apply the reviewed [Web principal provisioner](../../deployment/sql/Provision-MyDmsVnWebPrincipals.sql) with the deployment principal under its existing operator procedure. The additional runtime rights are exactly `SELECT, INSERT, UPDATE` on `GoodsReceipts`, `SELECT, INSERT, DELETE` on `GoodsReceiptLines`, and `UPDATE` on `GoodsReceiptNumberSequence`. The runtime principal cannot provision itself. No schema migration, GoodsReceiptLines UPDATE, GoodsReceipts DELETE, blanket DML or elevated runtime role is required.
 
 Use a CLR v4 Integrated IIS app pool with ASP.NET 4.8 enabled; disable Windows/Forms auth for this application and allow anonymous IIS admission so the application can authenticate Bearer requests. Restrict the TLS binding to the configured host. Operator-provision process environment, readable only to the app-pool identity:
 

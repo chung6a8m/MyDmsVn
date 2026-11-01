@@ -92,10 +92,21 @@ public sealed class AuthController : ApiController
     [HttpGet, Route("capabilities")]
     public async Task<HttpResponseMessage> Capabilities(CancellationToken cancellationToken)
     {
-        if (Request.RequestUri.Query != "?feature=sales" || HasTokenHeaders() || !await EmptyBody().ConfigureAwait(false)) return Invalid();
-        var read = await _permissions.IsAllowedAsync("Sales.Receipts.Read", cancellationToken).ConfigureAwait(false);
-        var write = await _permissions.IsAllowedAsync("Sales.Receipts.Write", cancellationToken).ConfigureAwait(false);
-        var post = await _permissions.IsAllowedAsync("Sales.Receipts.Post", cancellationToken).ConfigureAwait(false);
+        if (HasTokenHeaders() || !await EmptyBody().ConfigureAwait(false)) return Invalid();
+        string permission;
+        switch (Request.RequestUri.Query)
+        {
+            case "?feature=sales": permission = "Sales.Receipts"; break;
+            case "?feature=goods-receipts": permission = "Inventory.GoodsReceipts"; break;
+            case "?feature=inventory-balances":
+                return HttpJson.Success(new { read = await _permissions.IsAllowedAsync("Inventory.Balances.Read", cancellationToken).ConfigureAwait(false) });
+            case "?feature=inventory-stock-card":
+                return HttpJson.Success(new { read = await _permissions.IsAllowedAsync("Inventory.StockCard.Read", cancellationToken).ConfigureAwait(false) });
+            default: return Invalid();
+        }
+        var read = await _permissions.IsAllowedAsync(permission + ".Read", cancellationToken).ConfigureAwait(false);
+        var write = await _permissions.IsAllowedAsync(permission + ".Write", cancellationToken).ConfigureAwait(false);
+        var post = await _permissions.IsAllowedAsync(permission + ".Post", cancellationToken).ConfigureAwait(false);
         return HttpJson.Success(new { read, write, post });
     }
 

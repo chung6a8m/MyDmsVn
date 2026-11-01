@@ -1,8 +1,8 @@
 # WEB3 server companion — Goods Receipt & Inventory over net48 HTTP
 
-**Owner selection:** 2026-11-01, subsequently extended explicitly to backend B01 for WEB3-01. **Status:** ACTIVE / B01 CONTRACT CHECKPOINT; HTTP/SQL runtime implementation NOT STARTED. **Tasks owned here:** `WEB3-B01–B05`. The Web repo owns F01–F06 in its [Roadmap 03](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-001-web3-goods-receipt-inventory-web.md). **Milestones:** WEB3-01 through WEB3-06 cross-repo map. Never copy or independently mutate F task status here.
+**Owner selection:** 2026-11-01, subsequently extended explicitly to backend B01 for WEB3-01. **Status:** ACTIVE / B01 DONE (bounded, merged in PR #75); B02/B03 DONE (bounded implementation and automated verification) under explicit Owner selection of WEB3-03 on 2026-11-01. Candidate d2e7e3f3709a7e97cf91c7d4558c560303fa498d is published in [PR #76](https://github.com/chung6a8m/MyDmsVn/pull/76), not merged; [B02/B03 evidence](../evidence/web3/20261101-b02-b03-http-inventory.md) records exact checks and limits. B04/B05 PLANNED. **Tasks owned here:** `WEB3-B01–B05`. The Web repo owns F01–F06 in its [Roadmap 03](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-001-web3-goods-receipt-inventory-web.md). **Milestones:** WEB3-01 through WEB3-06 cross-repo map. Never copy or independently mutate F task status here.
 
-[HTTP/JSON authoritative proposed contract](../design/WEB3_INVENTORY_HTTP_WIRE.md) · [SQL/cross-module acceptance](../design/WEB3_STOCK_LEDGER_ACCEPTANCE.md) · [Codex handoff](../development/WEB3_CODEX_HANDOFF.md) · [evidence index](../evidence/web3/README.md) · [WEB2 archived contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) · [sole test policy](../TEST_POLICY.md).
+[HTTP/JSON authoritative contract](../design/WEB3_INVENTORY_HTTP_WIRE.md) · [SQL/cross-module acceptance](../design/WEB3_STOCK_LEDGER_ACCEPTANCE.md) · [Codex handoff](../development/WEB3_CODEX_HANDOFF.md) · [evidence index](../evidence/web3/README.md) · [WEB2 archived contract](../design/WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md) · [sole test policy](../TEST_POLICY.md).
 
 ## 0. Problem, scope, immutable boundaries
 
@@ -35,7 +35,7 @@ Inspected against `main` when selected; Codex **must re-inspect working main bef
 
 ## 2. WEB3-B01 — authoritative source/wire/permission freeze (milestone 01)
 
-**State: IN_PROGRESS — contract checkpoint implemented and SQL-free checks verified; cross-repo review/acceptance pending.** Owner explicitly authorized B01 on 2026-11-01. Source baseline `8b599c782816d9cd64f04a45d809a2b8eb1235c8`; [canonical field tables/corpus](../contracts/web3-v1/README.md), [manifest](../contracts/web3-v1/manifest.json), [source/SQL privilege gap matrix](../design/WEB3_B01_SOURCE_CHECKPOINT.md), [execution evidence](../evidence/web3/20261101-b01-contract-checkpoint.md). No runtime endpoint, SQL grant, .NET business source, shared push/PR/merge or production approval. B02–B05 remain PLANNED.
+**State: DONE (bounded) — contract checkpoint merged in PR #75 at `feb3b6cbc3bec3fe505c2b575fd4a8050973524d`; Owner selected subsequent B02/B03 implementation.** Owner explicitly authorized B01 on 2026-11-01. Source baseline `8b599c782816d9cd64f04a45d809a2b8eb1235c8`; [canonical field tables/corpus](../contracts/web3-v1/README.md), [manifest](../contracts/web3-v1/manifest.json), [source/SQL privilege gap matrix](../design/WEB3_B01_SOURCE_CHECKPOINT.md), [execution evidence](../evidence/web3/20261101-b01-contract-checkpoint.md). B01 supplied no runtime endpoint, SQL grant, .NET business source or production approval. B02/B03 are now separately selected; B04/B05 remain PLANNED.
 
 1. Read current `InventoryContracts.cs`, actual DTO constructor/nullable behavior, receipt/stock query services and exact validation. Inventory List: 1..200 pageSize, search <=128 and status Draft/Posted; Balance search <=256 and 1..200 pageSize; StockCard requires positive warehouse/product, optional UTC-range and <=200 pageSize. Confirm these are still true on implementation commit. Establish exact server response names without leaking Local numerical JSON format.
 2. Author canonical `WEB3` wire field/route/status corpus in `docs/contracts/web3-v1/` (B01 implementation deliverable; not created by docs activation) with test-owned fixtures/manifest. All int64s/decimals strings; int32s JSON numbers; UTC vs calendar dates; nullable avg vs zero; 1/200 lines, duplication forbidden, version tokens, max boundary. Verify both backend and frontend parse identical authoritative fixtures. Never duplicate authoritative payloads in Web repo.
@@ -48,7 +48,7 @@ Inspected against `main` when selected; Codex **must re-inspect working main bef
 
 ## 3. WEB3-B02 — net48 HTTP routes and fine-grained capabilities (milestone 03)
 
-**State: PLANNED. Depends on:** B01 + approved field tables.
+**State: DONE (bounded) — thin routes, independent capabilities and restricted SQL grants implemented; 415 HTTP host cases and relevant SQL checks passed.** See [candidate evidence](../evidence/web3/20261101-b02-b03-http-inventory.md). Owner selected WEB3-03 on 2026-11-01. **Depends on:** B01 + approved field tables.
 
 1. Add thin `GoodsReceiptsController` and `InventoryController` in the existing HttpHost assembly (proposed names; inspect source before adding). Use current `WireApiController.Execute<T>`, `IMediator.Send`, request-scoped authoritative actor, HttpJson/Asp.NET envelope and the same Web2Pipeline Bearer/session validation. Do not introduce a second `HttpConfiguration` or independent auth middleware.
 2. Expose method set in wire design: GET receipt list/detail, POST Create, PUT Draft, POST Post, GET balances and stock-card. No GET side effects; no POST retry in any host/client layer; anti-CSRF Origin protection for unsafe methods retained.
@@ -61,7 +61,7 @@ Inspected against `main` when selected; Codex **must re-inspect working main bef
 
 ## 4. WEB3-B03 — strict inventory/receipt wire, SQL parity and query semantics (milestones 03–05)
 
-**State: PLANNED. Depends on:** B01, B02.
+**State: DONE (bounded) — canonical mapping, query semantics and owned HTTP/SQL parity verified; no schema or business algorithm change.** See [candidate evidence](../evidence/web3/20261101-b02-b03-http-inventory.md) for the corrected test-only SQL oracle and actual passing coverage. B04/B05 integrated acceptance remains PLANNED. **Depends on:** B01, B02.
 
 1. Implement receipt wire DTO mapper with canonical invariant **string** ID/decimal output, string ReceiptDate `yyyy-MM-dd`, UTC PostedAtUtc, opaque Base64 expectedVersion. Create/Update only include actual Save fields; Update expectedVersion required, ID only from route; Post requires exactly `expectedVersion` body and returns {receiptId,status,postedAtUtc} **without version**. Detail uses source result including display names/active flags; no post-commit read added by controller.
 2. Receipt List preserves existing source ordering, 1-based pageNumber/pageSize, count, Warehouse/Status/Search filters. Reject unsupported date/Product filters rather than introducing them incidentally. No mandatory keyset rewrite or business data ordering change.

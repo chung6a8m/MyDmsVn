@@ -1,6 +1,6 @@
 # WEB3 — Inventory / Goods Receipt HTTP wire contract v1 (B01 checkpoint)
 
-**Decision scope:** Owner chose WEB3 on 2026-11-01 and explicitly authorized backend B01 to complete the contract checkpoint. This is the **normative design to implement**, not a claim that endpoints exist. [Canonical executable corpus and exhaustive field tables](../contracts/web3-v1/README.md), [manifest](../contracts/web3-v1/manifest.json) and [source/SQL gap checkpoint](WEB3_B01_SOURCE_CHECKPOINT.md) resolve the source reconciliation against `8b599c782816d9cd64f04a45d809a2b8eb1235c8`. Review/acceptance state remains in the [B01 owning plan](../plans/20261101-002-web3-goods-receipt-inventory-http.md). Existing [WEB2 host/auth contract](WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md), [Contracts](../CONTRACTS.md), [Data model](../DATA_MODEL.md) and exact source remain authorities for current runtime. This Web wire does **not** change Local/Desktop JSON DTO shape or Sales behavior.
+**Decision scope:** Owner chose WEB3 on 2026-11-01 and explicitly authorized backend B01 to complete the contract checkpoint. This is the normative contract frozen by B01. B02/B03 now implement it; [execution evidence](../evidence/web3/20261101-b02-b03-http-inventory.md) owns the bounded HTTP/TestServer + SQL verification, not IIS/browser or production acceptance. [Canonical executable corpus and exhaustive field tables](../contracts/web3-v1/README.md), [manifest](../contracts/web3-v1/manifest.json) and [source/SQL gap checkpoint](WEB3_B01_SOURCE_CHECKPOINT.md) resolve the source reconciliation against `8b599c782816d9cd64f04a45d809a2b8eb1235c8`. Review/acceptance state remains in the [B01–B05 owning plan](../plans/20261101-002-web3-goods-receipt-inventory-http.md). Existing [WEB2 host/auth contract](WEB2_HTTP_AUTH_AND_WIRE_CONTRACT.md), [Contracts](../CONTRACTS.md), [Data model](../DATA_MODEL.md) and exact source remain authorities for current runtime. This Web wire does **not** change Local/Desktop JSON DTO shape or Sales behavior.
 
 ## 1. Transport, security and authority
 
@@ -10,7 +10,7 @@
 - Server `Application` handlers enforce code-defined **active** permissions; UI capabilities are display hints only. Denials must not mutate business data; 401 for absent/expired/revoked actor, 403 for lacking specific operation, 409 conflict for stale/already-posted.
 - **No automatic retry** for any dispatched Create/Update/Post. Failed/timeout response after dispatch may have committed; client freezes unknown until authoritative reconciliation. Never infer transaction rollback from client AbortSignal. No operation journal/idempotency keys in WEB3.
 
-## 2. Proposed routes and exact ownership
+## 2. Routes and exact ownership
 
 | Verb and route | Required Application query/command | Permission | Wire response |
 |---|---|---|---|
