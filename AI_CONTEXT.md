@@ -1,5 +1,9 @@
 # MyDmsVn — Current context for Codex
 
+## Selected Roadmap 05 — backend operational safety (2026-11-02)
+
+**B01–B06 PLANNED / NOT RUN.** Current execution context: [WEB5 backend plan](docs/plans/20261102-001-web5-operational-safety-backend.md) · [terminal negative/crash protocol](docs/design/WEB5_OPERATION_SAFETY_PROTOCOL.md) · [acceptance matrix](docs/development/WEB5_BACKEND_ACCEPTANCE.md) · [Codex handoff](docs/development/WEB5_CODEX_HANDOFF.md) · [evidence](docs/evidence/web5/README.md). WEB5 will address process-crash/SQL journal proof, fenced terminal negative, operator tooling, protected SQL CI, full IIS staging and explicit release signoff. Do not infer NOT_EXECUTED from absence, automatically replay Post, edit WEB4 frozen contract or reuse WEB2 full IIS exception. WEB4 remains archived and CEX remains parallel and active.
+
 <a id="parallel-selected-web4--reliabilityci-2026-11-01"></a>
 
 ## Archived Roadmap 04 — WEB4 Reliability (2026-11-02)
