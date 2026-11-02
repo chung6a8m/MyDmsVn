@@ -55,24 +55,32 @@ function Verify-Quiescence($connection,$state) {
     } while($clock.Elapsed.TotalSeconds -lt 20)
     throw 'Owned SQL or test workers did not drain; quarantine required.'
 }
+$stage='Preflight'
 $state=$null
 try {
     if ($Action -eq 'Initialize') {
         if (Test-Path -LiteralPath $StatePath) { throw 'Existing instance state cannot be adopted.' }
+        $stage='DiscoverUtility'
         $utility=(Get-Command SqlLocalDB.exe -ErrorAction SilentlyContinue).Source
         if (-not $utility) {
             $utility=@('C:\Program Files\Microsoft SQL Server\160\Tools\Binn\SqlLocalDB.exe','C:\Program Files\Microsoft SQL Server\150\Tools\Binn\SqlLocalDB.exe')|Where-Object {Test-Path -LiteralPath $_}|Select-Object -First 1
         }
         if (-not $utility) { throw 'The runner image lacks the required LocalDB tool.' }
+        $stage='DiscoverVersions'
         $versions=@(& $utility versions 2>$null);if($LASTEXITCODE -ne 0){throw 'Cannot inspect LocalDB engines.'}
+        Write-Output ('Installed LocalDB versions: '+(($versions | Where-Object { $_ -match '^\d+(\.\d+){1,3}$' }) -join ','))
         $engine=@('15.0','16.0')|Where-Object { $candidate=$_; @($versions|Where-Object {$_.Trim() -like ($candidate+'*')}).Count -gt 0 }|Select-Object -First 1
         if (-not $engine) { throw 'No reviewed SQL2019/2022 LocalDB engine is installed.' }
+        $stage='AllocateState'
         $state=[pscustomobject]@{ name=('Web5_'+$env:GITHUB_RUN_ID+'_'+$env:GITHUB_RUN_ATTEMPT+'_'+[guid]::NewGuid().ToString('N').Substring(0,12));
             sid=$sid; runId=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; controlSha=$env:GITHUB_SHA; token=[guid]::NewGuid().ToString('D');
             sidHash=([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($sid))).Replace('-','').ToLowerInvariant()); utility=$utility; server='';masterCreated='';engineVersion='';edition='';phase='Allocating';verified=$false;quarantine=$false;userDatabases=-1;activeOwners=-1 }
         Save-State $state
+        $stage='CreateInstance'
         $null=& $utility create $state.name $engine 2>&1;if($LASTEXITCODE -ne 0){throw 'Owned instance creation failed.'}
+        $stage='StartInstance'
         $null=& $utility start $state.name 2>&1;if($LASTEXITCODE -ne 0){throw 'Owned instance startup failed.'}
+        $stage='ConnectOwnedInstance'
         $connection=Open-OwnedConnection $state
         try {
             if ([int](Query-Scalar $connection "SELECT CONVERT(int,SERVERPROPERTY('IsLocalDB'));") -ne 1){throw 'Wrong engine boundary.'}
@@ -80,10 +88,12 @@ try {
             $state.masterCreated=[string](Query-Scalar $connection "SELECT CONVERT(nvarchar(33),create_date,126) FROM sys.databases WHERE database_id=1;")
             $state.engineVersion=[string](Query-Scalar $connection "SELECT CONVERT(nvarchar(50),SERVERPROPERTY('ProductVersion'));")
             $state.edition=[string](Query-Scalar $connection "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('Edition'));")
+            $stage='StampOwnership'
             $command=$connection.CreateCommand();$command.CommandTimeout=10
             $command.CommandText="EXEC sys.sp_addextendedproperty @name=N'MyDmsVn.Web5CiOwnership',@value=@token; ALTER DATABASE model SET COMPATIBILITY_LEVEL=140;"
             $null=$command.Parameters.Add('@token',[Data.SqlDbType]::NVarChar,36);$command.Parameters['@token'].Value=$state.token
             try {$null=$command.ExecuteNonQuery()}finally{$command.Dispose()}
+            $stage='VerifyInitializedInstance'
             Verify-Identity $connection $state; Verify-Quiescence $connection $state
             if ([int](Query-Scalar $connection "SELECT compatibility_level FROM sys.databases WHERE name=N'model';") -ne 140){throw 'Model compatibility is not140.'}
             $state.verified=$true;$state.phase='Ready';Save-State $state
@@ -96,6 +106,7 @@ try {
         $state=Get-Content -LiteralPath $StatePath -Raw|ConvertFrom-Json
         if ((Test-Path -LiteralPath ($StatePath+'.active')) -or $state.quarantine -or $state.phase -ne 'Ready'){throw 'Uncertain or completed instance cannot be reused or deleted.'}
         $state.phase=if ($Action -eq 'Check') {'Checking'} else {'Completing'}; Save-State $state
+        $stage='ConnectOwnedInstance'
         $connection=Open-OwnedConnection $state
         try {Verify-Identity $connection $state;Verify-Quiescence $connection $state}finally{$connection.Dispose()}
         $state.verified=$true
@@ -111,6 +122,8 @@ try {
     Write-SafeSummary $state
 }
 catch {
+    # Bounded diagnostics, never exception bodies or provider arguments.
+    Write-Output (([ordered]@{ action=$Action; stage=$stage; scriptLine=$_.InvocationInfo.ScriptLineNumber; exceptionType=$_.Exception.GetType().Name }) | ConvertTo-Json -Compress)
     if ($state) {$state.quarantine=$true;$state.phase='Quarantined';Save-State $state;Write-SafeSummary $state}
     # Do not echo provider errors, credentials, SQL text, instance token or exception bodies.
     throw 'Protected SQL instance could not prove safe ownership/lifecycle; fail and retain uncertain resources for the lifetime of this isolated VM.'
