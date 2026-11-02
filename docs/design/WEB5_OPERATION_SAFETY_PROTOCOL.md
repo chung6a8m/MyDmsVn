@@ -5,7 +5,7 @@
 ## 1. Baseline source facts (observed at main 8de36c4)
 
 - `SqlWebOperationJournal` has `AdmitAsync`, `CompleteAsync` and `FenceAsync`; it requires the existing business SQL transaction, holds epoch/actor/key serialization and current session/permissions. Original successful result bytes and business effects commit once. The journal has seven-day result availability and an immutable actor/key tombstone.
-- `SqlWebOperationReadRepository` protects status by original actor/session/permission and fingerprint/epoch. A missing row is NOT rollback proof; `EXPIRED` is not NOT_EXECUTED.
+- `SqlWebOperationReadRepository` protects status by original actor/session/**permission derived from the stored original operation kind** (`SqlWebOperationJournal.AuthorizeOperationAsync` → `WebOperationContext.Permission(kind)`), fingerprint and epoch; Create/Update require their Write permission, Post requires Post permission. An ordinary document Read grant is **not** required for this protected original-result readback (WEB4 W4-OP-12), although a later fresh document Get may require Read. Missing row is NOT rollback proof; `EXPIRED` is not NOT_EXECUTED.
 - `SqlWebOperationMaintenance.CompactAsync` requires an explicit maintenance transaction + CONTROL and audited callback. It is **not registered in runtime DI**, has no deployed operator CLI, and does not itself commit the caller transaction.
 - Current WEB4 mode is exact schema12, legacy mode is exact11; Desktop exact10. B01 canonical 48 blobs remain frozen. Proposed `NOT_EXECUTED`, CLI, and any `web5` mode below **do not exist yet**.
 
@@ -70,6 +70,48 @@ Possible addition only if DDL requires: `013` migration and an explicit `web5`/e
 
 To release a local UNKNOWN after terminal negative, frontend must verify the **committed negative certificate**, current actor+epoch+fingerprint, and same owned immutable local intent. It may then preserve draft raw and request fresh authorized server baseline/rowversion before enabling a **new user-initiated** mutation with **new operation key**. This is never automatic. For irrevocable/expired COMMITTED without original Write result, preserve lock pending separate authoritative reconstruction and approval. Existing same-key resend remains independently gated by B01 crash proof and explicit UX acceptance.
 
+### 4.1 Positive business-commit case closure without editable result (P1-01)
+
+Seven days after an operation finishes, WEB4 status can report `RESULT_EXPIRED` even if physical bytes have not yet been compacted; expired is positive historical business evidence, never a rollback or terminal negative. When COMMITTED source/journal/ledger is independently proven but original Create/Update detail/version is missing, a separately authorized operator may close a SUPPORT CASE as `BUSINESS_COMMITTED_RESULT_UNAVAILABLE` using actor+epoch+operationId+fingerprint, source and Post journal/valuation/COGS, operator/correlation/UTC timestamp and a durable restricted audit trail. **Closing a support case is not settling, deleting, unlocking, retrying or allowing new-key writes for the existing UNKNOWN**. Client remains PROTECTED pending a separately approved local archival/recovery policy.
+
+A future user-consented local archival may retain minimal secure evidence/case ID and hide a protected document from active workspace only after exact actor/epoch/CAS, without deleting authoritative journal/tombstone or fabricating rowversion. A new editable session needs current permission and a fresh server baseline/version; Write-without-Read cannot infer this from an expired result. Otherwise leave protected and escalate. Record escalation before the seven-day window when possible; no fixed support SLA is currently authorized. Test expired/missing result and failed archival separately from NOT_EXECUTED.
+
+### 4.2 Browser contract compatibility versus strict cutover (P1-02)
+
+Choose and document ONE B02 ADR policy:
+
+- **A — additive:** keep old `web4-v1` six write/status contracts semantically safe; a loaded WEB4 client may keep working on the new host despite new terminal-negative capability. Require real old-client/new-host and new-client/old-host tests including delayed original, existing UNKNOWN, current authorization and old status safely failing closed on negative tombstone.
+- **B — strict:** enforce the new authenticated protocol/version fence **on every mutation** before business/journal writes and on new-version protected status; old clients/headers cannot fall back to unkeyed or WEB4 writes. **Exception is a deliberately narrow, read-only legacy WEB4 recovery/status route** for immutable WEB4 operations created before cutover; it authenticates current actor/session/**the original stored operation kind's Write/Post permission (not ordinary Read)**, epoch, operation key and original SHA-256 fingerprint, cannot write/replay, and never treats absence as rollback. Its contract and retirement policy must be frozen in B02 ADR and verified in B04-B. Test cached old JS, open tabs, session refresh, in-flight old command, status across upgrade, rollback and fresh new client. Database `DeploymentEpoch` is unrelated to application bundle version; rotate it only for database clone/rewind.
+
+The current backend `WebHostOptions` accepts `legacy-web11` or `web4` and frontend `operationsContext.ts` strictly parses `web4-v1`. They do not independently establish a version cutover fence. Pin separate compatibility vectors; frozen 48 WEB4 corpus blobs are immutable. The actual chosen B02 contract governs F02/F04 behavior, never a hypothetical URL/header in this proposal.
+
+### 4.3 Schema12 source admission and six-command race proof (P2-01/P2-03)
+
+Existing `012_WebOperationJournal.sql` permits `CANCELLED` INSERT but trigger permits only COMMITTED→EXPIRED updates; never update a success row to negative. If safe terminal audit can be added without DDL, prove current schema12 insertion under original lock. If migration013 is required, add explicit exact12→13 preflight and maintenance admission; current `DatabaseMigrationRunner.ValidateWebSchemaStateBeforeMigration` only recognizes exact11/exact10 as old. Validate exact12 objects/history/fingerprint/grants before 013, plus fresh13, admitted 10/11 sources, partial/spoofed/too-new, failed-migration rollback/rerun and unchanged old schema modes.
+
+B5-NEG-08 must exercise all six Sales.Create/Update/Post and Receipt.Create/Update/Post, each in **writer-first and operator-first** fence order (12 arrangements). Verify mutually exclusive COMMITTED and permanent CANCELLED outcomes, transaction-owned audit, original Write version/lines, Sales Post version versus Receipt Post no version, physical ledger/valuation/COGS and absence of unintended effects. Additional crash/revocation cases are separate tests; do not assert test case count just because 12 arrangements were described.
+
+### 4.4 Strict-cutover legacy recovery-only status (round-2 P1-01)
+
+A **strict mutation cutover must not strand WEB4 `DISPATCHED/UNKNOWN` intents that were durably created before deployment**. The existing backend `OperationsController.Status` + `SqlWebOperationReadRepository.ReadStatusAsync` use a transaction-owned operation fence and authorize current actor, session, **permission of the original stored operation** (Sales/Receipt Create/Update → Write; Sales/Receipt Post → Post), deployment epoch, operation ID and original fingerprint. The ordinary Read permission is not a prerequisite for protected operation-result readback; never derive permission from a caller-supplied kind. The client currently persists `schemaVersion: 1` / `DISPATCHED` with a frozen `web4-v1` request and validates `contractVersion: "web4-v1"` in its operations context. None of that constitutes a newly implemented WEB5 recovery route; **B02 must define and prove the transition**.
+
+In B02 ADR, specify **one narrow read-only legacy recovery compatibility mechanism** for strict mode: either keep the original authenticated `GET /api/v1/operations/{id}` as a recovery-only v1 status read, or introduce a separately versioned recovery endpoint that can read the **original** stored WEB4 journal outcome with the **original** v1 fingerprint. Both must reject any old `POST`/`PUT` mutation before the business transaction, and must not reclassify a v1 intent as v5 or fabricate a new operation ID, fingerprint, body, route, expectedVersion or actor/epoch. The route may return an authorized original `COMMITTED` result and operation-specific IDs/versions if still retained; no synthetic result when unavailable. Revoke legacy recovery access only after a separately reviewed retention/migration-support policy: do **not** use the 7-day result expiry as automatic permission to delete all status/tombstones.
+
+**State and authorization matrix (mandatory B5-COMP-03/04):**
+
+| Legacy v1 intent at strict cutover | Backend recovery-only action | Client consequence |
+|---|---|---|
+| Exact actor/epoch/key/fingerprint, valid session **and original Write/Post grant**, committed outcome still readable; ordinary document Read may be denied | Protected read of original WEB4 `COMMITTED` bytes/command-specific result; Sales Post retains original version, Receipt Post has none; no writes | New client may settle via original outcome + current local CAS |
+| Journal absent, original request delayed or still in-flight | Fence/serialize with live writer; return nonaffirmative `NOT_OBSERVED`/unknown (do not attest rollback) | Remain `UNKNOWN`, never resend with old or new key |
+| Original committed but result is `RESULT_EXPIRED`/`RESULT_UNAVAILABLE` | Report the true positive/indeterminate state without fabricating version/line data | Client stays protected, operator positive case reconciliation |
+| Original key terminal `CANCELLED` (if supported) | Old v1 response must fail closed, new versioned negative certificate only under B02 authority | No old automatic unlock/re-Post |
+| Wrong actor/current session, **revoked original Write/Post grant** for stored kind, wrong epoch/fingerprint/corrupt key | Deny or indistinguishable absence without cross-actor leakage (ordinary Read denial **alone** is not this case) | No settlement, no disclosure, no mutation |
+| New client/old backend or old cached JS/new strict backend | Compatible read only for frozen original v1; no protocol downgrade that enables old writes | Explicit upgrade/recovery UX; no second business effect |
+
+**Boot and upgrade path:** the new frontend may negotiate a new operations context while it has old v1 IndexedDB `DISPATCHED` records; it must not discard or rewrite them just because the runtime `web4-v1` context literal is superseded. Read only after fresh authentication/epoch/capability checks, decode and rehash the unmodified v1 frozen request, and apply the original result only after atomic local CAS. A v1 status read is never a permission to dispatch a new legacy operation. Invalid, missing, expired, denied, storage-aborted or cross-tab race states remain protected and explicitly documented.
+
+**Cutover gate (strict-only B5-COMP-03/04):** B02/B04-B must test old `web4-v1` pending operation → strict backend/new browser load → original positive status within retention, with **Read denied but original Create/Update Write or Post still granted** as an allowed case; also absent/in-flight, expired, CANCELLED, wrong scope, **revoked original Write/Post**, invalid session, fingerprint and stale epoch. For additive ADR mark strict-only B5-COMP-03/04 `NOT_APPLICABLE` with reason and separately prove common B5-COMP-01/02; do not count N/A as PASS or a skipped mandatory SQL test. B05/F04 repeat the old opened tab/new hosted bundle matrix on full IIS. If strict cutover cannot preserve this protected readback, B02 is **BLOCKED** and strict production admission is not allowed. This requirement does **not** authorize a general unversioned status bypass or change the frozen WEB4 corpus.
+
 ## 5. Operator command and maintenance safety
 
 Initial CLI commands are proposals to be verified against actual project/DB design, not runnable commands today:
@@ -87,6 +129,12 @@ Tool must never use raw browser token, generic service runtime connection, unche
 ## 6. Release topology, retention and nonclaims
 
 FULL IIS staging requires Windows IIS components (W3SVC/WAS), app pool, ASP.NET/System.Web mapping, TLS and versioned published `dist`; IIS Express evidence from WEB4 is not transferable. Re-test CSP nonce for Dockview/AG Grid, Zod non-JIT, asset routing, cookie/Origin/CSRF, proxy/header spoofing and SQL principal/startup mismatch on the actual staged process. A two-worker topology requires a shared atomic limiter or a documented one-worker bound; an in-memory per-worker limiter is not multi-worker proof. Audit sink ACL, retention/backup/restore and maintenance tooling need **actual rehearsal**, not merely documentation.
+
+### 6.1 Measurable production-readiness thresholds (P2-04)
+
+B05 must exercise a representative measured workload on actual full IIS with concurrent authenticated actors and Sales/Receipt Create/Update/Post, status, refresh and Inventory reads, both steady and restart/limiter/compaction stress. Record per-command p50/p95/p99 latency, timeouts/errors, throughput, worker CPU/RAM, SQL pool/locks/deadlocks, journal growth and maintenance impact. Rehearse consistent backup/restore and incident alert/escalation; measure actual RPO/RTO and unresolved UNKNOWN queue age. Publish exact runner/SQL/IIS configuration, test duration and sample sizes.
+
+**No arbitrary SLA values are preapproved.** B05 submits proposed numeric acceptance targets from baseline and representative risk; B06 obtains an explicit Owner threshold decision and compares each **target versus observed final candidate**. Missing gate/failed target is NOT RUN, BLOCKED or Owner DEFERRED, never green from historical WEB4 or overall averages.
 
 Release decision table:
 

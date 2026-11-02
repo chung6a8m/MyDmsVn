@@ -2,6 +2,12 @@
 
 **2026-11-02: selected Roadmap 05; B01–B06 PLANNED / NOT RUN.** This index is a placeholder for actual dated results; documentation creation does NOT execute runtime, SQL, real crash, IIS, operator drills or production rollout.
 
+**WEB5 roadmap review amendments (docs-only, 2026-11-02):** six review findings (P1-01/P1-02 and P2-01–04) addressed in the owning plan, protocol, acceptance and Codex handoff. New gates B5-NEG-08, B5-COMP-01/02, B5-MIG-01/02 conditional, B5-CI-04/05, B5-OPS-06/07, B5-IIS-07/08 and B5-REL-04/05 are all **PLANNED / NOT RUN**. No WEB5 runtime/SQL/CI/attended evidence is claimed.
+
+**Round-2 P1-01 docs clarification (2026-11-02):** Strict cutover must preserve protected **read-only** status for pre-cutover WEB4 schema-v1 UNKNOWN/COMMITTED intents without permitting legacy mutations; B5-COMP-03/04 added, B02 exit revised for ADR-selected additive OR strict-with-recovery. Backend implementation/SQL readback testing remains PLANNED / NOT RUN.
+
+**Review vòng 3 — docs-only correction (2026-11-02):** recovery permission follows stored original operation kind (Create/Update Write; Post Post), **not ordinary Read**; Read denied/original Write or Post granted remains an authorized positive result. B02 common B5-COMP-01/02 vs strict-only B5-COMP-03/04 is now explicit; additive records strict-only N/A with ADR rationale, not PASS or test skip. The Markdown acceptance table is continuous. All WEB5 gates remain PLANNED / NOT RUN.
+
 | Owner | Current state | Future evidence file |
 |---|---|---|
 | B01 process-death/Commit | PLANNED | `YYYYMMDD-b01-crash-commit.md` |
