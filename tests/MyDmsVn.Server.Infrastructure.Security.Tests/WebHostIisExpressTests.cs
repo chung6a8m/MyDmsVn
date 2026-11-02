@@ -43,7 +43,10 @@ public sealed partial class WebHostIisExpressTests
     [WebBrowserSqlFact, Trait("Category", "WebBrowserIntegration")]
     public Task Published_React_integrated_browser_preserves_same_key_QV_COGS_and_warehouse_isolation() => Run(true, receiptPilot: true, integratedPilot: true);
 
-    private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false)
+    [WebBrowserSqlFact, Trait("Category", "WebBrowserIntegration")]
+    public Task Published_React_WEB4_recovery_preserves_journal_and_physical_stock() => Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true);
+
+    private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false)
     {
         GuiTestSafety.ThrowIfPoisoned();
         if (browser) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
@@ -65,7 +68,7 @@ public sealed partial class WebHostIisExpressTests
         IntegratedCatalog? integrated = null;
         try
         {
-            var migration = FrozenWeb11Migration.Install(database.ConnectionString);
+            var migration = recoveryPilot ? new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString) : FrozenWeb11Migration.Install(database.ConnectionString);
             Assert.True(migration.Successful, "Fresh web migration must succeed.");
             await login.CreateAsync();
             using (var connection = new SqlConnection(database.ConnectionString))
@@ -103,7 +106,7 @@ public sealed partial class WebHostIisExpressTests
             foreach (string name in start.EnvironmentVariables.Keys) if (name.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase)) inherited.Add(name);
             foreach (var name in inherited) start.EnvironmentVariables.Remove(name);
             start.EnvironmentVariables["MYDMSVN_WEB_ORIGIN"] = "https://localhost:44321";
-            start.EnvironmentVariables["MYDMSVN_WEB_OPERATION_MODE"] = "legacy-web11";
+            start.EnvironmentVariables["MYDMSVN_WEB_OPERATION_MODE"] = recoveryPilot ? "web4" : "legacy-web11";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_ISSUER"] = "https://localhost:44321";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_AUDIENCE"] = "web-smoke";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_ACTIVE_KID"] = "smoke";
@@ -141,7 +144,7 @@ public sealed partial class WebHostIisExpressTests
                 foreach (var deniedPath in new[] { "/assets/missing.js", "/Web.config", "/bin/MyDmsVn.Server.HttpHost.dll" })
                     Assert.Equal(404, (await Request("https://localhost:44321" + deniedPath, thumbprint!)).Status);
                 Assert.Equal(401, (await Request("https://localhost:44321/api/v1/missing", thumbprint!)).Status);
-                await RunBrowser(database.ConnectionString, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated);
+                await RunBrowser(database.ConnectionString, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated, recoveryPilot);
             }
             else
             {
@@ -340,7 +343,7 @@ public sealed partial class WebHostIisExpressTests
         }
     }
 
-    private static async Task RunBrowser(string connectionString, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated)
+    private static async Task RunBrowser(string connectionString, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot)
     {
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
         var node = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_NODE") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe");
@@ -367,9 +370,18 @@ public sealed partial class WebHostIisExpressTests
             foreach (var name in new[] { "integratedEditor", "balanceReader", "cardReader" }) manifestJson["actors"]![name] = JObject.FromObject(Actor(name));
             manifestJson["integratedCatalog"] = JObject.FromObject(new { warehouseId = integrated.Warehouse, otherWarehouseId = integrated.OtherWarehouse, employeeId = employee, customerId = customer, productId = integrated.Product });
         }
-        File.WriteAllText(manifestPath, manifestJson.ToString(Formatting.None), new UTF8Encoding(false));
+        WebRecoveryPilotControl? recovery = null;
+        if (recoveryPilot)
+        {
+            Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web4-recovery-live.spec.ts")));
+            recovery = await WebRecoveryPilotControl.Start(connectionString);
+            manifestJson["mode"] = "web4-recovery";
+            manifestJson["recovery"] = recovery.Manifest;
+        }
+        Exception? browserFailure = null;
         try
         {
+            File.WriteAllText(manifestPath, manifestJson.ToString(Formatting.None), new UTF8Encoding(false));
             using (var certificates = new X509Store(StoreName.My, StoreLocation.LocalMachine))
             {
                 certificates.Open(OpenFlags.ReadOnly);
@@ -393,11 +405,17 @@ public sealed partial class WebHostIisExpressTests
             try { result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5)); }
             catch (GuiProcessException error)
             {
-                File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(error.StandardOutput + error.StandardError), new UTF8Encoding(false));
+                File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(recovery?.Redact(error.StandardOutput + error.StandardError) ?? error.StandardOutput + error.StandardError), new UTF8Encoding(false));
                 throw new InvalidOperationException("Browser process failed; cleanup verified=" + error.CleanupVerified + ". Inspect the sanitized local browser-output.log.");
             }
-            File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(result.StandardOutput + result.StandardError), new UTF8Encoding(false));
+            File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(recovery?.Redact(result.StandardOutput + result.StandardError) ?? result.StandardOutput + result.StandardError), new UTF8Encoding(false));
             Assert.True(result.ExitCode == 0, "Browser pilot failed; inspect the local browser-output.log (redact before sharing).");
+            if (recovery != null)
+            {
+                await recovery.Stop();
+                await VerifyRecoveryStock(connectionString, JObject.Parse(File.ReadAllText(resultPath)), recovery.Epochs, warehouse, product, receiptProduct, integrated!);
+                return;
+            }
             var posted = JArray.Parse(File.ReadAllText(resultPath));
             using var oracle = new SqlConnection(connectionString); await oracle.OpenAsync();
             VerifyPilotResultIdentities(posted,
@@ -436,7 +454,13 @@ public sealed partial class WebHostIisExpressTests
             if (integrated != null) await VerifyIntegratedStock(oracle, integratedRows, integrated);
             await VerifyAllPilotMovements(oracle, warehouse, product, receiptProduct, integrated);
         }
-        finally { File.Delete(manifestPath); File.Delete(certificatePath); }
+        catch (Exception error) { browserFailure = error; throw; }
+        finally
+        {
+            try { if (recovery != null) await recovery.Stop(); }
+            catch (Exception cleanup) when (browserFailure != null) { throw new AggregateException("Browser scenario and recovery control drain failed.", browserFailure, cleanup); }
+            finally { File.Delete(manifestPath); File.Delete(certificatePath); }
+        }
     }
     private static async Task VerifyReceiptStock(SqlConnection oracle, JToken[] receipts, int warehouse, int product)
     {
