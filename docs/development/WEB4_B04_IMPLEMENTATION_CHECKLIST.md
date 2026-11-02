@@ -19,4 +19,6 @@ Authentication and permission must be rechecked after a competing key releases. 
 
 ## Progress
 
-Verified candidate at runtime/test commit bd871518fd162927d938babd5535a2ddf91c2ad5: 604 selected final local rows passed, zero failed/skipped; independent review has no open P1/P2. Actual commands/counts and remaining gates belong to the new B04 evidence record; historical evidence stays unchanged. Owner acceptance/merge and B05 browser/process-crash gates are not implied.
+Verified candidate at runtime/test commit bd871518fd162927d938babd5535a2ddf91c2ad5: 604 selected final local rows passed, zero failed/skipped; independent review has no open P1/P2. Actual commands/counts and remaining gates belong to the new B04 evidence record; historical evidence stays unchanged. Owner accepted and PR #83 merged at `59ca21d16f7839c6d7c553395a367e465591652b` on 2026-11-02 after Windows CI PASS at `b225bee`; B04 is DONE (bounded). B05 browser/process-crash gates remain outstanding.
+
+- [x] Final independent review: no actionable P0/P1/P2; exact-head CI confirmed and expected-head merge completed. [Acceptance record](../evidence/web4/20261102-b04-http-operations.md#owner-acceptance-and-merge--2026-11-02) preserves scope and limits.

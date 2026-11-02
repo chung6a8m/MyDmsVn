@@ -1,6 +1,6 @@
 # WEB4 B04 — HTTP operation APIs
 
-Date: 2026-11-02, Asia/Bangkok. **VERIFIED CANDIDATE; Owner acceptance/merge pending.** Owner explicitly selected B04 in this session as the prerequisite for frontend milestone WEB4-04 (F02/F03). [Owning plan](../../plans/20261101-003-web4-reliability-server.md), [execution checklist](../../development/WEB4_B04_IMPLEMENTATION_CHECKLIST.md), [canonical contract](../../contracts/web4-v1/README.md).
+Date: 2026-11-02, Asia/Bangkok. **DONE (bounded); Owner accepted and PR #83 merged 2026-11-02.** Earlier candidate verification is preserved below; the final disposition is recorded at the end. Owner explicitly selected B04 in this session as the prerequisite for frontend milestone WEB4-04 (F02/F03). [Owning plan](../../plans/20261101-003-web4-reliability-server.md), [execution checklist](../../development/WEB4_B04_IMPLEMENTATION_CHECKLIST.md), [canonical contract](../../contracts/web4-v1/README.md).
 
 ## Source and scope
 
@@ -73,3 +73,13 @@ dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.In
 ```
 
 The IPC bridge uses a random current-user-only ACL pipe, strict bounded UTF-8 frames and finite lifetime, never persists/logs auth material, and suppresses child stdout/stderr on failure. These tests are actual port/TestServer/SQL integration, **not** live browser/IIS/HTTPS B05/F04, real socket loss or operating-system process crash. The production UI same-key resend gate remains closed. Known first direct business rejection can retire only that fresh local attempt; it cannot erase an older UNKNOWN, and status404/timeout still cannot prove rollback.
+
+## Owner acceptance and merge — 2026-11-02
+
+Owner instructed review, fixes if any, merge of both PRs and completion of WEB4-04. Independent read-only backend and frontend reviewers found no actionable P0/P1/P2. No runtime fix was needed. Documentation closeout corrects stale backend CI selectors and frontend test-policy wording; it does not claim new SQL/browser execution or waive the real crash/Commit gate.
+
+Immediately before merge, backend main was still `8f8091575bbdab4d85c97f14d44b82030d70927d`, reviewed head was `b225bee1370abac77d4e852302ca45572cd8d3be`, the worktree was clean and [Windows CI 41363414852](https://github.com/chung6a8m/MyDmsVn/actions/runs/41363414852) was confirmed PASS, including locked restore/build and the nonempty complete HttpHost test check. The companion frontend head `f61d1da80c4929abee23f600fd5780d25ff5b861` had [CI 41365960004](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/actions/runs/41365960004) PASS: 1,218 unit/component, 193 Chromium, 1 production-artifact case and typecheck/build. The prior local SQL/actual-port/Edge checks remain tied to their recorded source pins; this review did not rerun them.
+
+Backend [PR #83](https://github.com/chung6a8m/MyDmsVn/pull/83) merged first at `59ca21d16f7839c6d7c553395a367e465591652b`, followed by frontend [PR #20](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/pull/20) at `604c02e3cd1e959fd976fb80d194371c9ceec42b`. Both used expected-head SHA guards. Git comparisons confirmed that each merge tree exactly equals its reviewed CI-passing candidate. Only Markdown closeout follows; canonical corpus, executable source, schema, grants, package pins, CEX and historical WEB1–03 evidence remain unchanged by that closeout.
+
+**B04 and frontend WEB4-04/F02+F03 are accepted as DONE (bounded).** B05/F04 live production React/IIS Express HTTPS/SQL/browser acceptance, real OS process death/socket loss at Commit, B06/F05 complete operator handoff and full IIS/production are still outside the accepted scope. Same-key resend UI stays disabled; 404/timeout never proves rollback. No deployment occurred, B05/B06 are not selected, and Roadmap 04 is not archived.
