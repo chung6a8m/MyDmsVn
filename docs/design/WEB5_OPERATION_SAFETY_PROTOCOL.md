@@ -1,6 +1,6 @@
 # WEB5 — Process-crash, terminal disposition and operator safety design
 
-**Design proposal / NOT IMPLEMENTED (2026-11-02).** Backend is authoritative. This document specifies conditions that future B01/B02/B03 PRs must prove; it does not claim a safe negative operator path already exists. [Owning plan](../plans/20261102-001-web5-operational-safety-backend.md) · [WEB4 frozen contract](WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) · [WEB4 operator handoff](../development/WEB4_OPERATOR_HANDOFF.md) · [backend acceptance](../development/WEB5_BACKEND_ACCEPTANCE.md).
+**2026-11-02: B01 test-only crash proof is IMPLEMENTED / VERIFIED NONPRODUCTION ([evidence](../evidence/web5/20261102-b01-crash-commit.md)); B02/B03 remain design proposals / NOT IMPLEMENTED.** Backend is authoritative. This document specifies conditions for the separate B01/B02/B03 scopes; it does not claim a safe negative operator path already exists. [Owning plan](../plans/20261102-001-web5-operational-safety-backend.md) · [WEB4 frozen contract](WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) · [WEB4 operator handoff](../development/WEB4_OPERATOR_HANDOFF.md) · [backend acceptance](../development/WEB5_BACKEND_ACCEPTANCE.md).
 
 ## 1. Baseline source facts (observed at main 8de36c4)
 
