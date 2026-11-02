@@ -1,0 +1,179 @@
+name: WEB5 protected SQL baseline
+
+# Explicit Owner opt-in, including before this proposed workflow is merged.
+# Never consume fork/PR workflow code, arbitrary refs, secrets or downloaded artifacts.
+on:
+  push:
+    tags: ['web5-sql-baseline-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web5-sql-baseline
+  cancel-in-progress: false
+
+jobs:
+  sql-baseline:
+    if: >-
+      github.repository_id == '1409766698' && github.actor == 'chung6a8m' &&
+      github.triggering_actor == 'chung6a8m' && github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/web5-sql-baseline-')
+    environment: web5-sql-baseline
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING: ''
+      WEB5_RED: ${{ startsWith(github.ref, 'refs/tags/web5-sql-baseline-red-') }}
+    steps:
+      - name: Set private and sanitized evidence paths
+        run: |
+          "WEB5_STATE=$env:RUNNER_TEMP/web5-sql-state.json" >> $env:GITHUB_ENV
+          "WEB5_RAW=$env:RUNNER_TEMP/web5-sql-raw" >> $env:GITHUB_ENV
+          "WEB5_SAFE=$env:RUNNER_TEMP/web5-sql-safe" >> $env:GITHUB_ENV
+      - name: Checkout reviewed control commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+      - name: Checkout immutable existing WEB4 baseline
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: fc36c879fdd2d46ee77d136bdb6f9e70f7191b64
+          path: baseline
+          persist-credentials: false
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify evidence guard and immutable source
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path $env:WEB5_RAW,$env:WEB5_SAFE | Out-Null
+          if ((git -C baseline rev-parse HEAD) -ne 'fc36c879fdd2d46ee77d136bdb6f9e70f7191b64' -or $LASTEXITCODE -ne 0) { throw 'Baseline pin mismatch.' }
+          if ((git -C control rev-parse HEAD) -ne $env:GITHUB_SHA -or $LASTEXITCODE -ne 0) { throw 'Control commit mismatch.' }
+          & ./control/.github/scripts/Test-Web5SqlEvidence.ps1
+          if ($env:WEB5_RED -eq 'true') {
+            # One known SQL oracle failure in an ephemeral checkout, never a committed source edit.
+            $path=Join-Path $env:GITHUB_WORKSPACE 'baseline/tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/WebOperationCommandTests.cs'
+            $source=[IO.File]::ReadAllText($path)
+            $before='Assert.Equal(24m, await s.Oracle.QuerySingleAsync<decimal>("SELECT Quantity FROM dbo.StockBalances;"));'
+            if ([regex]::Matches($source,[regex]::Escape($before)).Count -ne 1) { throw 'RED assertion location changed.' }
+            [IO.File]::WriteAllText($path,$source.Replace($before,$before.Replace('24m','25m')),[Text.UTF8Encoding]::new($true))
+          }
+      - name: Allocate private SID-owned SQL instance
+        shell: powershell
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Initialize -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
+      - name: Security journal HTTP status and principals
+        if: ${{ env.WEB5_RED != 'true' }}
+        timeout-minutes: 10
+        working-directory: baseline
+        run: |
+          $ErrorActionPreference='Stop'
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          [IO.File]::WriteAllText($env:WEB5_STATE+'.active','Security')
+          $project='tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
+          $filter='(FullyQualifiedName~WebOperationJournalTests.|FullyQualifiedName~WebOperationReadTests.|FullyQualifiedName~WebOperationHttpSqlTests.|FullyQualifiedName~WebPrincipalProvisioningTests.)&FullyQualifiedName!~Frontend_ports_recover_six_commands_through_actual_TestServer'
+          dotnet restore $project --locked-mode *> "$env:WEB5_RAW/security-restore.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Security locked restore failed; raw output withheld.' }
+          dotnet build $project -c Release -f net48 --no-restore *> "$env:WEB5_RAW/security-build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Security build failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB5_RAW/security-discovery.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Security discovery failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 90s --blame-hang-dump-type none --logger 'trx;LogFileName=security.trx' --results-directory $env:WEB5_RAW *> "$env:WEB5_RAW/security-run.log"
+          $testExit=$LASTEXITCODE
+          Assert-Web5SqlEvidence -TrxPath "$env:WEB5_RAW/security.trx" -DiscoveryPath "$env:WEB5_RAW/security-discovery.log" -RequiredClasses @('WebOperationJournalTests','WebOperationReadTests','WebOperationHttpSqlTests','WebPrincipalProvisioningTests') -SummaryPath "$env:WEB5_SAFE/security.json" -Label Security
+          if ($testExit -ne 0) { throw 'Security test process failed.' }
+          Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Security owner did not drain.' }
+      - name: Inventory six-command SQL oracle
+        timeout-minutes: 10
+        working-directory: baseline
+        run: |
+          $ErrorActionPreference='Stop'
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          [IO.File]::WriteAllText($env:WEB5_STATE+'.active','Inventory')
+          $project='tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj'
+          $filter='FullyQualifiedName~WebOperationCommandTests.'
+          if ($env:WEB5_RED -eq 'true') { $filter='FullyQualifiedName~WebOperationCommandTests.Web_exact12_all_six_capture_original_results_and_replay_without_dynamic_work_or_Read' }
+          dotnet restore $project --locked-mode *> "$env:WEB5_RAW/inventory-restore.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Inventory locked restore failed; raw output withheld.' }
+          dotnet build $project -c Release -f net48 --no-restore *> "$env:WEB5_RAW/inventory-build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Inventory build failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB5_RAW/inventory-discovery.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Inventory discovery failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 90s --blame-hang-dump-type none --logger 'trx;LogFileName=inventory.trx' --results-directory $env:WEB5_RAW *> "$env:WEB5_RAW/inventory-run.log"
+          $testExit=$LASTEXITCODE
+          try {
+            Assert-Web5SqlEvidence -TrxPath "$env:WEB5_RAW/inventory.trx" -DiscoveryPath "$env:WEB5_RAW/inventory-discovery.log" -RequiredClasses @('WebOperationCommandTests') -SummaryPath "$env:WEB5_SAFE/inventory.json" -Label Inventory -RequireOracleRed:($env:WEB5_RED -eq 'true')
+          } catch {
+            $safe=Get-Content "$env:WEB5_SAFE/inventory.json" -Raw | ConvertFrom-Json
+            if ($env:WEB5_RED -eq 'true' -and $safe.oracleRedObserved -and $testExit -ne 0) {
+              Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
+            }
+            throw 'SQL evidence gate rejected the run; inspect sanitized counts.'
+          }
+          if ($testExit -ne 0) { throw 'Inventory test process failed.' }
+          Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Inventory owner did not drain.' }
+      - name: Migration compatibility and grant matrix
+        if: ${{ env.WEB5_RED != 'true' }}
+        timeout-minutes: 10
+        working-directory: baseline
+        run: |
+          $ErrorActionPreference='Stop'
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          [IO.File]::WriteAllText($env:WEB5_STATE+'.active','Migrations')
+          $project='tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj'
+          $filter='FullyQualifiedName~WebAuthMigrationTests.'
+          dotnet restore $project --locked-mode *> "$env:WEB5_RAW/migrations-restore.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Migrations locked restore failed; raw output withheld.' }
+          dotnet build $project -c Release -f net48 --no-restore *> "$env:WEB5_RAW/migrations-build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Migrations build failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB5_RAW/migrations-discovery.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Migrations discovery failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 90s --blame-hang-dump-type none --logger 'trx;LogFileName=migrations.trx' --results-directory $env:WEB5_RAW *> "$env:WEB5_RAW/migrations-run.log"
+          $testExit=$LASTEXITCODE
+          Assert-Web5SqlEvidence -TrxPath "$env:WEB5_RAW/migrations.trx" -DiscoveryPath "$env:WEB5_RAW/migrations-discovery.log" -RequiredClasses @('WebAuthMigrationTests') -SummaryPath "$env:WEB5_SAFE/migrations.json" -Label Migrations
+          if ($testExit -ne 0) { throw 'Migrations test process failed.' }
+          Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Migration owner did not drain.' }
+      - name: Verify unchanged GREEN baseline
+        if: ${{ env.WEB5_RED != 'true' }}
+        run: |
+          git -C baseline diff --exit-code --quiet
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned GREEN source changed.' }
+      - name: Prove ownership and drain before instance removal
+        if: ${{ always() }}
+        shell: powershell
+        timeout-minutes: 2
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Complete -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
+      - name: Require all SQL evidence and clean lifecycle
+        if: ${{ always() }}
+        run: |
+          $instance=Get-Content "$env:WEB5_SAFE/instance.json" -Raw | ConvertFrom-Json
+          if ($instance.phase -ne 'Removed' -or $instance.quarantine -or -not $instance.instanceOwnershipVerified -or $instance.userDatabases -ne 0 -or $instance.activeOwners -ne 0) { throw 'SQL lifecycle was not proven clean.' }
+          foreach ($owner in @('security','inventory','migrations')) {
+            $summary=Get-Content "$env:WEB5_SAFE/$owner.json" -Raw | ConvertFrom-Json
+            if (-not $summary.complete) { throw 'Required owner evidence failed or was deliberately RED.' }
+          }
+          'All three SQL owners completed with reconciled discovery/TRX and owned cleanup.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Publish sanitized evidence only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web5-sql-baseline-counts
+          path: ${{ env.WEB5_SAFE }}/*.json
+          if-no-files-found: error
+          retention-days: 14

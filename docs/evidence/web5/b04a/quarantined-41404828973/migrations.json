@@ -1,0 +1,12 @@
+{
+  "label": "Migrations",
+  "discovered": 0,
+  "total": 0,
+  "executed": 0,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "requiredClasses": {},
+  "oracleRedObserved": false,
+  "complete": false
+}

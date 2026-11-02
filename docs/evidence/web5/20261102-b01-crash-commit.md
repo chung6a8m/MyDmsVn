@@ -1,6 +1,6 @@
 # WEB5 B01 — Real process-crash and Commit proof
 
-**2026-11-02 — IMPLEMENTED / VERIFIED NONPRODUCTION (bounded). Owner acceptance and merge pending.** This is test-only nonproduction evidence. B02–B06 remain PLANNED / NOT RUN. No product resend, terminal negative, full IIS, browser acceptance or production release is enabled.
+**2026-11-02 — DONE (bounded), integrated by Owner request to complete WEB5-01.** [PR #88](https://github.com/chung6a8m/MyDmsVn/pull/88) merged at `b320c10acc0ddb2e7cf4b87c153bdf51f25c4bf0` from verified head `b15ba92ebfb65d3e1e6d794f81aed4e174173748`. The original checkpoint below records earlier pending dependencies; current [B04-A evidence](20261102-b04a-protected-sql-ci.md) supersedes its pending-CI status only. This is test-only nonproduction evidence. B02–B06 remain PLANNED / NOT RUN. No product resend, terminal negative, full IIS, browser acceptance or production release is enabled.
 
 ## Candidate and environment
 

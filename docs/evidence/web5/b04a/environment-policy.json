@@ -1,0 +1,21 @@
+{
+  "repository": "chung6a8m/MyDmsVn",
+  "repositoryId": "1409766698",
+  "environment": "web5-sql-baseline",
+  "readAtUtc": "2026-11-02T07:29:17.6243104Z",
+  "deploymentBranchPolicy": {
+    "protected_branches": false,
+    "custom_branch_policies": true
+  },
+  "protectionTypes": [
+    "branch_policy"
+  ],
+  "tagPolicies": [
+    {
+      "id": 65189351,
+      "name": "web5-sql-baseline-*",
+      "type": "tag"
+    }
+  ],
+  "environmentSecretCount": 0
+}

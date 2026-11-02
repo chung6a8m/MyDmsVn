@@ -1,0 +1,15 @@
+{
+  "label": "Migrations",
+  "discovered": 17,
+  "uniqueCases": 17,
+  "total": 17,
+  "executed": 17,
+  "passed": 17,
+  "failed": 0,
+  "skipped": 0,
+  "requiredClasses": {
+    "WebAuthMigrationTests": 17
+  },
+  "oracleRedObserved": false,
+  "complete": true
+}
