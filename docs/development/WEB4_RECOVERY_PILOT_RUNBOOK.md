@@ -1,5 +1,7 @@
 # WEB4-05 — recovery HTTPS/browser fixture
 
+**Historical bounded pilot reference; Roadmap 04 ARCHIVED / COMPLETED (2026-11-02).** [Archive decision](../archive/20261102-web4-reliability/README.md) and [B06 acceptance](../evidence/web4/20261102-b06-operator-handoff.md#owner-acceptance-and-merge--2026-11-02) close the execution queue. The fixture interface below remains a technical reference, not authorization to rerun SQL/browser work. B05 evidence retains its exact accepted candidates/results; full IIS/production and crash/resend gates remain unapproved or unverified.
+
 Owner selected frontend WEB4-05/F04 on 2026-11-02 and explicitly authorized this bounded backend test fixture plus fresh nonproduction SQL/IIS Express pilot. The [backend plan](../plans/20261101-003-web4-reliability-server.md#6-b05--focused-sql--integrated-https-browserphysical-oracle-done-bounded-owner-accepted) owns B05; [evidence](../evidence/web4/20261102-b05-recovery-pilot.md) owns executed results. No product runtime, schema, principal grants, machine TLS configuration or production deployment is changed.
 
 ## Selector and ownership
