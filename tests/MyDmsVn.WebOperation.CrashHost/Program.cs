@@ -38,6 +38,12 @@ internal static class Program
             await pipe.ConnectAsync(ControlChannel.TimeoutMilliseconds).ConfigureAwait(false);
             channel = new ControlChannel(pipe);
             var input = await channel.ReadRequestAsync().ConfigureAwait(false);
+            if (input.Method == "OPERATOR")
+            {
+                await TerminalOperation.RunAsync(channel, input).ConfigureAwait(false);
+                pipe.Dispose();
+                return 0;
+            }
             var barrier = new CommitBarrier(channel, input);
             var services = new ServiceCollection();
             services.AddServerApplication().AddHttpRequestIdentity();

@@ -1,0 +1,8 @@
+{
+  "data": {
+    "contractVersion": "web5-resolution-v1",
+    "deploymentEpoch": "11111111-2222-4333-8444-555555555555",
+    "actorUserId": 42,
+    "sameKeyResendEnabled": false
+  }
+}

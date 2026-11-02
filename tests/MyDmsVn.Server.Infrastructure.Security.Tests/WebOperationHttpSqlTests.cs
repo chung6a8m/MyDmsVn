@@ -155,7 +155,7 @@ public sealed partial class WebOperationHttpSqlTests
     public Task Concurrent_duplicates_of_all_six_commands_have_one_original_result_and_one_set_of_SQL_effects() =>
         Owned(data => Lifecycle(data, concurrent: true));
 
-    private static async Task Lifecycle(Data data, bool concurrent)
+    private static async Task Lifecycle(Data data, bool concurrent, Func<Data, Completed[], string, Task>? after = null)
     {
         await data.GrantMutations(data.Http.Alice);
         var access = (await data.Http.Login("alice")).Access;
@@ -233,6 +233,7 @@ public sealed partial class WebOperationHttpSqlTests
         Assert.Equal(6, await data.Http.Admin.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE Disposition='COMMITTED';"));
         Assert.Equal(2, data.Http.Audit.PostFailures); // Replay must not run Post or its success audit again.
         await data.Oracle();
+        if (after != null) await after(data, completed.ToArray(), access);
     }
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]

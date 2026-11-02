@@ -220,11 +220,13 @@ public sealed class WebAuthHttpSqlTests
         private ServiceProvider? _provider;
         private TestServer? _server;
         private bool _web4Enabled;
+        private bool _web5Enabled;
         private Scenario(string connectionString) { Admin = new SqlConnection(connectionString); }
-        public static async Task<Scenario> Create(string connectionString, bool web4Enabled = false)
+        public static async Task<Scenario> Create(string connectionString, bool web4Enabled = false, bool web5Enabled = false)
         {
             var test = new Scenario(connectionString);
-            test._web4Enabled = web4Enabled;
+            test._web4Enabled = web4Enabled || web5Enabled;
+            test._web5Enabled = web5Enabled;
             try
             {
                 await test.Admin.OpenAsync();
@@ -238,7 +240,7 @@ public sealed class WebAuthHttpSqlTests
                 }
                 var factory = new RestrictedFactory(connectionString);
                 using (var runtime = (SqlConnection)await factory.OpenConnectionAsync(CancellationToken.None))
-                    await new SqlWebRuntimePrincipalValidator(requireJournal: web4Enabled).ValidateConnectionAsync(runtime, CancellationToken.None);
+                    await new SqlWebRuntimePrincipalValidator(requireJournal: test._web4Enabled, requireResolution: web5Enabled).ValidateConnectionAsync(runtime, CancellationToken.None);
                 test.RestartHost();
                 return test;
             }
@@ -284,7 +286,7 @@ public sealed class WebAuthHttpSqlTests
             services.Replace(ServiceDescriptor.Singleton<IDbConnectionFactory>(new RestrictedFactory(Admin.ConnectionString)));
             services.Replace(ServiceDescriptor.Singleton<ISecurityAuditSink>(Audit));
             _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-            var options = new WebHostOptions(Origin, Origin, "http-sql-tests", "sql-test", new Dictionary<string, byte[]> { ["sql-test"] = Encoding.UTF8.GetBytes("test-only-key-for-real-sql-http-auth-boundary") }, web4Enabled: _web4Enabled);
+            var options = new WebHostOptions(Origin, Origin, "http-sql-tests", "sql-test", new Dictionary<string, byte[]> { ["sql-test"] = Encoding.UTF8.GetBytes("test-only-key-for-real-sql-http-auth-boundary") }, web4Enabled: _web4Enabled, web5Enabled: _web5Enabled);
             _server = TestServer.Create(app => Web2Pipeline.Configure(app, options, _provider));
         }
         public void Dispose() { _server?.Dispose(); _provider?.Dispose(); Admin.Dispose(); }

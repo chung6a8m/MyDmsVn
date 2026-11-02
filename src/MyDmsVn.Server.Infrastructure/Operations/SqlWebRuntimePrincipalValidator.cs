@@ -9,7 +9,9 @@ namespace MyDmsVn.Server.Infrastructure.Operations;
 public sealed class SqlWebRuntimePrincipalValidator : IRuntimeSqlPrincipalValidator
 {
     private readonly bool _requireJournal;
-    public SqlWebRuntimePrincipalValidator(bool requireJournal = true) { _requireJournal=requireJournal; }
+    private readonly bool _requireResolution;
+    public SqlWebRuntimePrincipalValidator(bool requireJournal = true, bool requireResolution = false)
+    { _requireJournal = requireJournal || requireResolution; _requireResolution = requireResolution; }
     private const string MissingPermissionSql = @"SELECT CASE WHEN ISNULL(HAS_PERMS_BY_NAME(DB_NAME(),N'DATABASE',N'VIEW DEFINITION'),0)<>1 OR EXISTS (
 SELECT 1 FROM (VALUES (N'Users',N'SELECT'),
 (N'Roles',N'SELECT'),
@@ -114,7 +116,9 @@ CROSS APPLY sys.fn_my_permissions(QUOTENAME(OBJECT_SCHEMA_NAME(o.object_id))+N'.
             throw new ArgumentException("The SQL connection must be open.", nameof(connection));
         }
 
-        using var command = SqlRead.Command(connection, null, ElevatedPermissionSql);
+        var elevated = _requireResolution ? ElevatedPermissionSql.Replace("N'WebDeploymentState', N'WebOperationJournal'",
+            "N'WebDeploymentState', N'WebOperationJournal', N'WebOperationTerminalAudit'") : ElevatedPermissionSql;
+        using var command = SqlRead.Command(connection, null, elevated);
         var hasElevatedPermissions = await SqlRead.SingleAsync(command, reader => reader.GetInt32(0), cancellationToken).ConfigureAwait(false);
         if (hasElevatedPermissions == 1)
         {
@@ -126,5 +130,15 @@ CROSS APPLY sys.fn_my_permissions(QUOTENAME(OBJECT_SCHEMA_NAME(o.object_id))+N'.
             SqlRead.P("@journal", System.Data.SqlDbType.Bit, _requireJournal));
         if (Convert.ToInt32(await minimum.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0)
             throw new DesktopStartupException("Security.WebRuntimePrincipalUnderprivileged", "Web runtime is missing required effective permissions.");
+        if (_requireResolution)
+        {
+            using var resolution = SqlRead.Command(connection, null, @"
+SELECT CASE WHEN ISNULL(HAS_PERMS_BY_NAME(N'dbo.WebOperationTerminalAudit',N'OBJECT',N'SELECT'),0)<>1
+OR EXISTS(SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.WebOperationTerminalAudit')
+AND ISNULL(HAS_PERMS_BY_NAME(N'dbo.WebOperationTerminalAudit',N'OBJECT',N'SELECT',name,N'COLUMN'),0)<>1)
+THEN 1 ELSE 0 END;");
+            if (Convert.ToInt32(await resolution.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0)
+                throw new DesktopStartupException("Security.WebRuntimePrincipalUnderprivileged", "Web resolution read authority is required.");
+        }
     }
 }

@@ -1,0 +1,16 @@
+{
+  "data": {
+    "contractVersion": "web5-resolution-v1",
+    "actorUserId": 42,
+    "deploymentEpoch": "11111111-2222-4333-8444-555555555555",
+    "operationId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "operationKind": "Receipt.Update",
+    "method": "PUT",
+    "routeScope": "/api/v1/goods-receipts/{receiptId}/draft",
+    "requestTargetId": "9007199254740993",
+    "requestFingerprint": "506d037bfd166b73e39b65939204d9830714934c3b98d1d78911b5ec3a8e1292",
+    "state": "RESULT_EXPIRED",
+    "outcome": null,
+    "terminal": null
+  }
+}

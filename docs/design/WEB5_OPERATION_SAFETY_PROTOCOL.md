@@ -1,15 +1,15 @@
 # WEB5 — Process-crash, terminal disposition and operator safety design
 
-**2026-11-02: B01 test-only crash proof is IMPLEMENTED / VERIFIED NONPRODUCTION ([evidence](../evidence/web5/20261102-b01-crash-commit.md)); B02/B03 remain design proposals / NOT IMPLEMENTED.** Backend is authoritative. This document specifies conditions for the separate B01/B02/B03 scopes; it does not claim a safe negative operator path already exists. [Owning plan](../plans/20261102-001-web5-operational-safety-backend.md) · [WEB4 frozen contract](WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) · [WEB4 operator handoff](../development/WEB4_OPERATOR_HANDOFF.md) · [backend acceptance](../development/WEB5_BACKEND_ACCEPTANCE.md).
+**2026-11-02: B01 is IMPLEMENTED / VERIFIED NONPRODUCTION; B02 is IMPLEMENTED / LOCAL VERIFICATION PASS; hosted B04-B remains PENDING (NOT RUN).** [B02 evidence](../evidence/web5/20261102-b02-terminal-resolution.md) and [B04-B evidence](../evidence/web5/20261102-b04b-candidate-sql.md) own exact candidate results; B02 acceptance and B04 completion remain pending the protected hosted gate. B03 CLI/operational rehearsal remains NOT RUN. Backend is authoritative; this document separates implemented safety mechanisms from later operational/release requirements. [Owning plan](../plans/20261102-001-web5-operational-safety-backend.md) · [WEB4 frozen contract](WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) · [WEB4 operator handoff](../development/WEB4_OPERATOR_HANDOFF.md) · [backend acceptance](../development/WEB5_BACKEND_ACCEPTANCE.md).
 
-**Current design decision:** [ADR0015](../adr/0015-web5-additive-recovery-boundary.md) selects additive v1 compatibility plus append-only013/explicit future web5 exact13 admission. The negative protocol below remains unimplemented; strict-only requirements are conditional N/A under this ADR. Exact HTTP/corpus and executable proofs remain B02/B04-B.
+**Current implementation:** [ADR0015](../adr/0015-web5-additive-recovery-boundary.md) selects additive v1 compatibility, append-only013 and explicit web5/exact13 admission. The [separate versioned contract](../contracts/web5-resolution-v1/README.md) publishes the exact v2 context/resolution reads without changing the frozen 48 WEB4 blobs. Operator-only `InspectWebOperationResolution` and `RecordWebOperationNotExecuted` run under the existing epoch/actor/key fence, with immutable audit and separate runtime/operator authority. Strict-only requirements are N/A; local proofs do not replace [hosted candidate verification](../development/WEB5_SQL_CANDIDATE.md), frontend acceptance or full IIS.
 
 ## 1. Baseline source facts (observed at main 8de36c4)
 
 - `SqlWebOperationJournal` has `AdmitAsync`, `CompleteAsync` and `FenceAsync`; it requires the existing business SQL transaction, holds epoch/actor/key serialization and current session/permissions. Original successful result bytes and business effects commit once. The journal has seven-day result availability and an immutable actor/key tombstone.
 - `SqlWebOperationReadRepository` protects status by original actor/session/**permission derived from the stored original operation kind** (`SqlWebOperationJournal.AuthorizeOperationAsync` → `WebOperationContext.Permission(kind)`), fingerprint and epoch; Create/Update require their Write permission, Post requires Post permission. An ordinary document Read grant is **not** required for this protected original-result readback (WEB4 W4-OP-12), although a later fresh document Get may require Read. Missing row is NOT rollback proof; `EXPIRED` is not NOT_EXECUTED.
 - `SqlWebOperationMaintenance.CompactAsync` requires an explicit maintenance transaction + CONTROL and audited callback. It is **not registered in runtime DI**, has no deployed operator CLI, and does not itself commit the caller transaction.
-- Current WEB4 mode is exact schema12, legacy mode is exact11; Desktop exact10. B01 canonical 48 blobs remain frozen. Proposed `NOT_EXECUTED`, CLI, and any `web5` mode below **do not exist yet**.
+- At this historical baseline, WEB4 mode was exact schema12, legacy mode exact11 and Desktop exact10; `NOT_EXECUTED` and web5 mode were not implemented. Current B02 adds web5/exact13 and the separate resolution contract described above; CLI/rehearsal remains B03. The canonical 48 WEB4 blobs stay frozen.
 
 ## 2. Crash classification and exactly-once observational rule
 
@@ -25,17 +25,17 @@
 
 Test hooks must be restricted to **test-host binaries or injected test seams** that cannot be enabled in a published release. Supervisor only kills its own disposable process and verifies clean child/SQL cleanup; a generic kill-switch route in real OWIN host is forbidden. Commit outcome is not always deterministically controllable; classify observed result rather than forcing a test to expect one side.
 
-## 3. Proposed terminal-negative protocol and invariant
+## 3. Terminal-negative protocol and invariant
 
 **Required invariant:** The system may claim `CONFIRMED_NOT_EXECUTED` only after the administrator has durably committed a terminal **CANCELLED/DO_NOT_EXECUTE** record under the **same actor/operation per-key transaction fence** used by ALL original writers. All future late originals and same-key requests must observe that record and be rejected before source/journal/ledger writes. A read of absent journal rows cannot provide this guarantee. This is a **safety protocol**, not a UI action, support guess or SQL UPDATE patch.
 
-Proposed state meanings:
+State meanings (the published contract owns exact wire values):
 - **COMMITTED:** original immutable successful result and business transaction (possibly outcome expired). Never convert to negative.
 - **RESULT_EXPIRED/UNAVAILABLE:** readback incomplete; do not fabricate version or negative.
 - **NOT_EXECUTED:** verified durable negative tombstone with exact epoch, actor, key, fingerprint, kind, method/target, operator identity, evidence and commit timestamp. It cannot later become COMMITTED.
 - **INDETERMINATE:** no sufficient record or proof; keep UNKNOWN and block future new-key write of the same logical pending document.
 
-**Proposed transaction order for administrative close:**
+**Required transaction order for administrative close:**
 
 ~~~text
 Separate authorized maintenance operator (not browser runtime)
@@ -61,13 +61,13 @@ If a late writer held the applock first, operator waits and must observe its COM
 
 ## 4. Compatibility and versioning
 
-Backend `web4-v1` contract corpus and route `GET /api/v1/operations/{id}` are frozen. **Do not add misleading COMMITTED responses for negative cases or widen its body silently.** The F02 consumer needs a separately agreed versioned, authenticated resolution read (example design: `GET /api/v2/operations/{id}/resolution`; exact path and schema MUST be fixed by B02 ADR) with actor + current epoch + original fingerprint, direct permission and no cross-user inference.
+Backend `web4-v1` contract corpus and route `GET /api/v1/operations/{id}` are frozen. **Do not add misleading COMMITTED responses for negative cases or widen its body silently.** The published backend contract for F02 is the separately versioned authenticated [resolution read](../contracts/web5-resolution-v1/README.md), `GET /api/v2/operations/{id}/resolution` with actor + current epoch + original fingerprint, direct permission and no cross-user inference.
 
-Possible addition only if DDL requires: `013` migration and an explicit `web5`/exact13 runtime mode. Decide after inspecting current 012 CHECK/trigger and migration validators. Always preserve:
+B02 implements append-only `013` and explicit `web5`/exact13 runtime/migrator admission, following ADR0015. Preserve:
 - Desktop exact10 and Local writer, no implicit connection to a WEB4/WEB5 database.
 - `legacy-web11` exact11 retains old client contract and denies keyed writes.
 - `web4` exact12 retains old WEB4 behavior, absent negative resolution is not proof.
-- New mode (if created) must require matched binary, exact schema/grants, updated pinned corpus and frontend. No mixed old client write against a new mode.
+- `web5` requires a matched exact13 binary/schema/principal. Under additive compatibility, frozen WEB4 keyed clients retain their exact v1 write/status contracts; new negative recovery uses the separately pinned v2 contract. Old server binaries refuse13.
 - Keep original Sales/Receipt Create/Update result/line identities, Sales Post version, Receipt Post no version, exact int64 and decimal strings.
 
 To release a local UNKNOWN after terminal negative, frontend must verify the **committed negative certificate**, current actor+epoch+fingerprint, and same owned immutable local intent. It may then preserve draft raw and request fresh authorized server baseline/rowversion before enabling a **new user-initiated** mutation with **new operation key**. This is never automatic. For irrevocable/expired COMMITTED without original Write result, preserve lock pending separate authoritative reconstruction and approval. Existing same-key resend remains independently gated by B01 crash proof and explicit UX acceptance.
@@ -80,16 +80,16 @@ A future user-consented local archival may retain minimal secure evidence/case I
 
 ### 4.2 Browser contract compatibility versus strict cutover (P1-02)
 
-Choose and document ONE B02 ADR policy:
+ADR0015 selects policy A below. Policy B is retained only as a conditional reference for a separately reviewed future change:
 
 - **A — additive:** keep old `web4-v1` six write/status contracts semantically safe; a loaded WEB4 client may keep working on the new host despite new terminal-negative capability. Require real old-client/new-host and new-client/old-host tests including delayed original, existing UNKNOWN, current authorization and old status safely failing closed on negative tombstone.
 - **B — strict:** enforce the new authenticated protocol/version fence **on every mutation** before business/journal writes and on new-version protected status; old clients/headers cannot fall back to unkeyed or WEB4 writes. **Exception is a deliberately narrow, read-only legacy WEB4 recovery/status route** for immutable WEB4 operations created before cutover; it authenticates current actor/session/**the original stored operation kind's Write/Post permission (not ordinary Read)**, epoch, operation key and original SHA-256 fingerprint, cannot write/replay, and never treats absence as rollback. Its contract and retirement policy must be frozen in B02 ADR and verified in B04-B. Test cached old JS, open tabs, session refresh, in-flight old command, status across upgrade, rollback and fresh new client. Database `DeploymentEpoch` is unrelated to application bundle version; rotate it only for database clone/rewind.
 
-The current backend `WebHostOptions` accepts `legacy-web11` or `web4` and frontend `operationsContext.ts` strictly parses `web4-v1`. They do not independently establish a version cutover fence. Pin separate compatibility vectors; frozen 48 WEB4 corpus blobs are immutable. The actual chosen B02 contract governs F02/F04 behavior, never a hypothetical URL/header in this proposal.
+The current backend `WebHostOptions` accepts `legacy-web11`, `web4` and `web5`, with exact11/12/13 admission respectively. The original context remains exactly `web4-v1`; the new context is separate `web5-resolution-v1`. This additive design does not implement a strict mutation-version cutover fence. Published B02 vectors govern F02/F04; the 48 frozen WEB4 blobs remain immutable.
 
 ### 4.3 Schema12 source admission and six-command race proof (P2-01/P2-03)
 
-Existing `012_WebOperationJournal.sql` permits `CANCELLED` INSERT but trigger permits only COMMITTED→EXPIRED updates; never update a success row to negative. If safe terminal audit can be added without DDL, prove current schema12 insertion under original lock. If migration013 is required, add explicit exact12→13 preflight and maintenance admission; current `DatabaseMigrationRunner.ValidateWebSchemaStateBeforeMigration` only recognizes exact11/exact10 as old. Validate exact12 objects/history/fingerprint/grants before 013, plus fresh13, admitted 10/11 sources, partial/spoofed/too-new, failed-migration rollback/rerun and unchanged old schema modes.
+Existing `012_WebOperationJournal.sql` permits `CANCELLED` INSERT but trigger permits only COMMITTED→EXPIRED updates; never update a success row to negative. ADR0015 rejects external/generic audit as sufficient authority and B02 adds explicit exact12→13 preflight in `ValidateWeb5SchemaStateBeforeMigration`; the separate original Web12 preflight retains its exact11/exact10 paths. Validate exact12 objects/history/fingerprint/grants before 013, plus fresh13, admitted 10/11 sources, partial/spoofed/too-new, failed-migration rollback/rerun and unchanged old schema modes.
 
 B5-NEG-08 must exercise all six Sales.Create/Update/Post and Receipt.Create/Update/Post, each in **writer-first and operator-first** fence order (12 arrangements). Verify mutually exclusive COMMITTED and permanent CANCELLED outcomes, transaction-owned audit, original Write version/lines, Sales Post version versus Receipt Post no version, physical ledger/valuation/COGS and absence of unintended effects. Additional crash/revocation cases are separate tests; do not assert test case count just because 12 arrangements were described.
 

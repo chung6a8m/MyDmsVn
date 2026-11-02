@@ -1,8 +1,8 @@
 # Codex handoff — WEB5 backend
 
-**Selected 2026-11-02; B01 DONE (bounded), merged PR #88; B04-A VERIFIED NONPRODUCTION (bounded); B04-B PLANNED / NOT RUN; B04 incomplete.** [B04-A evidence](../evidence/web5/20261102-b04a-protected-sql-ci.md) · [SQL runbook](WEB5_SQL_CI_BASELINE.md). Other milestones require their own candidate evidence. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [plan selector](../plans/README.md), [owning plan](../plans/20261102-001-web5-operational-safety-backend.md), [safety design](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [acceptance](WEB5_BACKEND_ACCEPTANCE.md), [TEST_POLICY](../TEST_POLICY.md), [WEB4 archived reference](WEB4_OPERATOR_HANDOFF.md), actual tests/lockfiles and latest `main`.
+**Selected 2026-11-02; B01 DONE (bounded), merged PR #88; B02 IMPLEMENTED / LOCAL VERIFICATION PASS; B04-A VERIFIED NONPRODUCTION (bounded); B04-B LOCAL VERIFICATION PASS / HOSTED PENDING (NOT RUN); B04 incomplete.** [B04-A evidence](../evidence/web5/20261102-b04a-protected-sql-ci.md) · [SQL runbook](WEB5_SQL_CI_BASELINE.md). Other milestones require their own candidate evidence. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [plan selector](../plans/README.md), [owning plan](../plans/20261102-001-web5-operational-safety-backend.md), [safety design](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [acceptance](WEB5_BACKEND_ACCEPTANCE.md), [TEST_POLICY](../TEST_POLICY.md), [WEB4 archived reference](WEB4_OPERATOR_HANDOFF.md), actual tests/lockfiles and latest `main`.
 
-**WEB5-01 agreement:** consume [ADR0015](../adr/0015-web5-additive-recovery-boundary.md). B01 PR #88 and B04-A PR #89 are merged. B02 begins from this design direction only when selected; exact DTO/corpus,013 implementation and B04-B proof remain pending. No same-key resend UI is authorized.
+**WEB5-01 agreement:** consume [ADR0015](../adr/0015-web5-additive-recovery-boundary.md). B01 PR #88 and B04-A PR #89 are merged. Owner subsequently selected B02/B04-B. The additive [resolution contract](../contracts/web5-resolution-v1/README.md),013 and operator inspection/recording are implemented. [B02 evidence](../evidence/web5/20261102-b02-terminal-resolution.md) and [B04-B local proof](../evidence/web5/20261102-b04b-candidate-sql.md) are current; [hosted candidate verification](WEB5_SQL_CANDIDATE.md) remains pending before acceptance. No same-key resend UI is authorized.
 
 ## Task order and independent PRs
 
@@ -10,8 +10,8 @@
 |---|---|---|
 | `codex/web5-b01-crash-proof` | Test-only process supervisor, failpoints, real SQL oracle for six commands | In parallel with B04-A; no product resend |
 | `codex/web5-b04a-sql-ci-foundation` | Isolated protected SQL lane, existing owners, intentional RED and owned cleanup | VERIFIED bounded: RED +2x103SQL PASS; see evidence; B01 proof remains independent |
-| `codex/web5-b02-terminal-negative` | B02 ADR, optional exact12→13, additive vs strict v1 recovery-only status, original operation Write/Post permission, six-command negative and versioned read | B01+B04-A proven; B04-B applicable gates (strict B5-COMP-03/04 only) before merge |
-| `codex/web5-b04b-sql-ci-terminal` | New B02 six-command race/migration/compatibility selectors and exact-candidate CI | Pass before B02 acceptance; B04 not DONE until A+B |
+| `codex/web5-b02-terminal-resolution` | Implemented additive exact13, separate operator inspection/recording, versioned resolution and original Write/Post authorization | Local proof PASS; hosted exact-candidate B04-B and final SQL-free CI pending before acceptance/merge |
+| B04-B stacked with the B02 candidate | New terminal/principal/inspection/crash/migration owners and protected exact-candidate CI | Local167/167 PASS; hosted NOT RUN; B04 not DONE until A+B |
 | `codex/web5-b03-operator-tools` | Operator CLI, positive COMMITTED/result unavailable ticket reconciliation, audited retention/rotation/backup rehearsal | B02 and B04-B accepted |
 | `codex/web5-b05-full-iis` | Real IIS, old/new cached-tab matrix, limiter/audit/proxy, p95/p99+RPO/RTO baseline, Web F04 pilot | B01–B04 (including B04-A/B) PASS |
 | `codex/web5-b06-release-handoff` | Positive/negative case closure and numeric threshold-vs-measured Owner decision dossier | Paired B05/F04 |
@@ -29,10 +29,11 @@ docs/TEST_POLICY.md and actual current main source/tests.
 Start isolated branch; map existing source/SQL lock-order/fixtures and publish exact change plan.
 Create meaningful RED behavior/crash evidence before minimal changes when possible.
 Prepare protected SQL CI B04-A before B02 changes; run B04-B on exact B02 candidate before acceptance.
-B02 ADR selects schema12 reuse or explicit exact12->13 path, and additive WEB4-safe old clients
-or strict server-side per-write/new-status fence WITH legacy v1 recovery-only readback.
-For existing schema-v1 DISPATCHED/UNKNOWN, preserve old actor/epoch/key/fingerprint and
-original COMMITTED result/version after cutover without allowing any old POST/PUT.
+ADR0015 selects additive WEB4-safe old clients plus explicit exact12->13/web5 admission.
+Consume the published web5-resolution-v1 contract; do not repeat completed B02 implementation.
+For existing schema-v1 DISPATCHED/UNKNOWN preserve actor/epoch/key/fingerprint and original
+COMMITTED outcomes. Additive preserves frozen v1 keyed writes/status; strict mutation denial
+is conditional on a future reviewed strict policy, not the selected implementation.
 B04-B tests common B5-COMP-01/02 under either ADR; strict-only B5-COMP-03/04 test v1 positive with Read denied but original Write/Post granted, NOT_OBSERVED, expiry, revoked original Write/Post, CANCELLED, stale epoch and Sales Post version/Receipt Post no version. In additive, strict-only B5-COMP-03/04 are NOT_APPLICABLE with evidence, not PASS or skipped mandatory tests.
 Prove all six commands x two lock orders.
 Do not use a test-only injection seam in published runtime. Preserve authoritative

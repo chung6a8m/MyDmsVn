@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "Idempotency.FingerprintMismatch",
+    "message": "The operation cannot be resolved.",
+    "details": [],
+    "correlationId": "web4-corpus-001"
+  }
+}

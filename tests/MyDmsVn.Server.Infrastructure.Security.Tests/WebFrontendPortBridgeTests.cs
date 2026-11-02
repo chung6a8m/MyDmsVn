@@ -54,6 +54,25 @@ public sealed class WebFrontendPortBridgeTests
     }
 
     [Theory]
+    [InlineData("GET", false, false)]
+    [InlineData("GET", true, true)]
+    [InlineData("POST", true, false)]
+    [InlineData("PUT", true, false)]
+    public void Resolution_extension_is_explicit_and_read_only(string method, bool extension, bool allowed)
+    {
+        var frame = new JObject { ["id"] = 1, ["type"] = "http", ["method"] = method,
+            ["path"] = "/api/v2/operations/context", ["headers"] = new JArray(), ["body"] = null };
+        if (!allowed) Assert.Throws<InvalidDataException>(() => WebFrontendPortBridge.CreateRequest(frame, extension));
+        else
+        {
+            using var request = WebFrontendPortBridge.CreateRequest(frame, extension);
+            Assert.Equal(method, request.Method.Method);
+            Assert.Equal("/api/v2/operations/context", request.RequestUri!.AbsolutePath);
+            Assert.False(request.Headers.Contains("Authorization"));
+        }
+    }
+
+    [Theory]
     [InlineData("{\"id\":1,\"id\":2}")]
     [InlineData("{\"id\":1} {}")]
     public async Task Framing_rejects_duplicate_properties_and_trailing_json(string json)
