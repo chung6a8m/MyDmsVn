@@ -1,6 +1,6 @@
 # WEB4 operator handoff — B06 candidate
 
-**2026-11-02: documentation candidate; Owner acceptance pending.** This is the backend companion to frontend F05. It documents inspected source at `473c6bfc39ca545c945a2387f1c644ff361a2132`; it does not authorize deployment, execute maintenance or establish a production recovery rehearsal. [Owning plan](../plans/20261101-003-web4-reliability-server.md#7-b06--runbook-handoff-and-closeout-planned) and [B06 evidence](../evidence/web4/20261102-b06-operator-handoff.md) own disposition. Historical [B05 evidence](../evidence/web4/20261102-b05-recovery-pilot.md) owns the accepted nonproduction pilot. Frontend F05 owns user-visible draft/recovery instructions in its [owning plan](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md).
+**2026-11-02: review-ready documentation candidate; independent review complete, Owner acceptance pending.** This is the backend companion to frontend F05. It documents inspected source at `473c6bfc39ca545c945a2387f1c644ff361a2132`; it does not authorize deployment, execute maintenance or establish a production recovery rehearsal. [Owning plan](../plans/20261101-003-web4-reliability-server.md#7-b06--runbook-handoff-and-closeout-planned) and [B06 evidence](../evidence/web4/20261102-b06-operator-handoff.md) own disposition. Historical [B05 evidence](../evidence/web4/20261102-b05-recovery-pilot.md) owns the accepted nonproduction pilot. Frontend F05 owns the reviewed [user recovery guide](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/3823b39aaf6736eb41cd097e0130c0d8a3d31f7c/docs/development/WEB4_USER_RECOVERY_GUIDE.md) and tracks its disposition in the [owning plan](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261101-002-web4-reliability-web.md).
 
 ## Deployment and admission
 
@@ -65,7 +65,7 @@ Backup the business tables, journal/tombstones and epoch as one consistent datab
 
 | Gate | Current boundary / required owner follow-up |
 |---|---|
-| B06/F05 bounded closeout | Candidate documentation and checks only; review and Owner disposition required. Do not mark DONE or archive execution plans before acceptance. Preserve WEB1–03 evidence and independent CEX. |
+| B06/F05 bounded closeout | Review-ready documentation candidate; independent review complete, Owner disposition pending. Do not mark DONE or archive execution plans before acceptance. Preserve WEB1–03 evidence and independent CEX. |
 | Crash/Commit and resend | Real process death/socket-loss-at-Commit proof remains unverified; no product resend activation or negative administrative unlock. Requires a new selected implementation/verification scope. |
 | Operator execution | Rotation, production reconciliation tooling, durable maintenance audit sink, compaction scheduler and backup/restore drill are not supplied as deployed B06 tooling or executed rehearsals. B4-OPS-01 is document coverage; B4-OPS-02 is not newly PASS. |
 | Full IIS/release | Full IIS app-pool identity/TLS/ACL, supported Windows/SQL deployment, clean install/upgrade/recovery and named release sign-off remain unapproved. IIS Express pilot and hosted SQL-free CI cannot substitute. |

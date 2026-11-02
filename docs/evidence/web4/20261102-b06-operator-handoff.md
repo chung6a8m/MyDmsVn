@@ -1,6 +1,6 @@
 # WEB4 B06 — operator handoff documentation candidate
 
-Date: 2026-11-02, Asia/Bangkok. **IN_PROGRESS / documentation candidate; review and Owner acceptance pending.** Owner selected WEB4-06/F05 and its backend B06 documentation companion. [Owning plan](../../plans/20261101-003-web4-reliability-server.md#7-b06--runbook-handoff-and-closeout-planned) · [operator handoff](../../development/WEB4_OPERATOR_HANDOFF.md). No DONE/archival/merge or production approval is inferred.
+Date: 2026-11-02, Asia/Bangkok. **IN_PROGRESS / review-ready documentation candidate; independent review complete, Owner acceptance pending.** Owner selected WEB4-06/F05 and its backend B06 documentation companion. [Owning plan](../../plans/20261101-003-web4-reliability-server.md#7-b06--runbook-handoff-and-closeout-planned) · [operator handoff](../../development/WEB4_OPERATOR_HANDOFF.md). No DONE/archival/merge or production approval is inferred.
 
 ## Baseline and scope
 
@@ -34,6 +34,12 @@ Source-reference review matched migration admission, grant delta, seven-day/1MiB
 
 **Runtime counts for B06: 0 executed tests.** Build, unit/integration, SQL allocation/migration/provisioning, IIS/IIS Express, browser, epoch rotation, compaction, backup/restore, process-crash/Commit and attended IME/Narrator: **NOT RUN**. Historical B03/B04/B05 passes are linked only, not repeated or relabelled B06 PASS. B4-OPS-01 is documentation coverage; B4-OPS-02 operator rehearsal is not newly verified.
 
+## Independent review — 2026-11-02
+
+Independent whole-milestone review examined backend `7be9ee3b45ac54bc3c7d642038fc77cf794ea944` and frontend `3823b39aaf6736eb41cd097e0130c0d8a3d31f7c` plus its compatibility anchors. Result: **no actionable P0/P1/P2 or minor findings**. The parent coordinator independently checked the backend candidate: **11 Markdown documents, 49 added local links including 4 anchors, 0 errors**. B06 runtime remains **0 tests executed / NOT RUN**. This review is not Owner acceptance, merge or production approval.
+
+The follow-up changes only review metadata and the direct frontend user-guide pin; the guide content at the pinned frontend SHA is the reviewed content. Final patch verification passed `git diff --check`, changed-path review and the inline Python check against the baseline: 11 Markdown files, 49 added local links including 4 anchors, 2 external URLs, 0 errors, UTF-8 without BOM/LF. The pinned frontend guide was verified with `git show` from the local frontend Git object; no remote availability is claimed. The follow-up diff changes only three Markdown files; no runtime execution is added.
+
 ## Disposition and retained limits
 
-Candidate prepared for independent review and Owner disposition. Same-key resend, negative administrative unlock, production operator tooling/audit/retention deployment, backup/restore drill, distributed limiter/proxy policy, full IIS and production release remain unapproved or unverified. B06/F05 completion routing and archive remain conditional on actual Owner acceptance; no earlier WEB1–03 or independent CEX status changes.
+Candidate is review-ready after independent review; Owner disposition remains pending. Same-key resend, negative administrative unlock, production operator tooling/audit/retention deployment, backup/restore drill, distributed limiter/proxy policy, full IIS and production release remain unapproved or unverified. B06/F05 completion routing and archive remain conditional on actual Owner acceptance; no earlier WEB1–03 or independent CEX status changes.

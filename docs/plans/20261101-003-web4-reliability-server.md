@@ -110,7 +110,7 @@ Frontend F04 owns keyboard/IndexedDB/reload DOM. Backend B05 owns SQL, fixture, 
 
 ## 7. B06 — Runbook, handoff and closeout (IN_PROGRESS — documentation candidate)
 
-**Selected 2026-11-02:** [Operator handoff](../development/WEB4_OPERATOR_HANDOFF.md) and [B06 evidence](../evidence/web4/20261102-b06-operator-handoff.md) provide the documentation candidate. Review and Owner disposition remain pending; no operator runtime rehearsal, completion or archive is claimed.
+**Selected 2026-11-02:** [Operator handoff](../development/WEB4_OPERATOR_HANDOFF.md) and [B06 evidence](../evidence/web4/20261102-b06-operator-handoff.md) provide the documentation candidate. Independent review is complete with no actionable findings; the candidate is review-ready and Owner disposition remains pending. No operator runtime rehearsal, completion or archive is claimed.
 
 Write deploy/admission runbook for Web11→12 with frozen source checker, restricted principal delta, stable Web database epoch and privileged rotation on clone/restore/rewind, coordinated frontend/backend artifact rollout, command-specific Write-without-Read outcome inspection WITHOUT secret leakage, operator-assisted unknown reconciliation, operator-backed retention strategy (no automatic deletion/reuse of old keys without a safe tombstone/expiry protocol), backup/restore impact and recovery. Record security audit/limiter/full-IIS as explicit production prerequisites, NOT PASS. Frontend partner records IndexedDB controls and user-visible recovery.
 
