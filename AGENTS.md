@@ -1,5 +1,9 @@
 # Codex instructions — MyDmsVn
 
+## Selected Roadmap 05 — WEB5 backend (2026-11-02)
+
+**B01–B06 PLANNED / NOT RUN.** Start at [execution selector](docs/plans/README.md) → [WEB5 owning plan](docs/plans/20261102-001-web5-operational-safety-backend.md) → [safety protocol](docs/design/WEB5_OPERATION_SAFETY_PROTOCOL.md) → [acceptance](docs/development/WEB5_BACKEND_ACCEPTANCE.md) → [Codex handoff](docs/development/WEB5_CODEX_HANDOFF.md). Execute one selected bounded Bxx in an isolated PR after inspecting latest main. B01 real OS process-crash/Commit proof must precede enabling any product resend. B02 NOT_EXECUTED requires immutable terminal negative under the original writer's exact transaction-owned actor/key/epoch fence; status404 or missing row is NOT proof. Maintain runtime least privilege, no manual journal deletion/admin web endpoint. Preserve pinned `web4-v1` corpus, `legacy-web11` exact11, `web4` exact12, Desktop exact10 and independently ACTIVE CEX. Full IIS and production release are NOT RUN/NOT APPROVED; WEB4 archive stays historical. This docs activation creates no runtime evidence.
+
 <a id="active-parallel-roadmap-04--web4-reliability-owner-selected-2026-11-01"></a>
 
 ## Archived Roadmap 04 — WEB4 Reliability (2026-11-02)

@@ -1,5 +1,9 @@
 # Execution-plan index
 
+## Selected Roadmap 05 — Operational Safety & Production Readiness (backend)
+
+**Owner selected 2026-11-02; B01–B06 PLANNED / NOT RUN.** [Owning plan](20261102-001-web5-operational-safety-backend.md) · [SQL/operation safety protocol](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md) · [acceptance matrix](../development/WEB5_BACKEND_ACCEPTANCE.md) · [Codex handoff](../development/WEB5_CODEX_HANDOFF.md) · [evidence index](../evidence/web5/README.md). [React companion (after paired merge)](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261102-001-web5-operational-safety-web.md) owns F01–F05. The selected Roadmap 05 is a **new web-specific workstream alongside existing CEX-A01–A05**, not a replacement. Individual implementation tasks require separate scoped PR/evidence. Documentation selection does not enable same-key resend, terminal NOT_EXECUTED, SQL maintenance, IIS staging or production deployment. Roadmap 04 remains archived.
+
 <a id="active-parallel-web-workstream--roadmap-04-reliability--delivery-foundation-selected-2026-11-01"></a>
 
 ## Archived Roadmap 04 — WEB4 Reliability (2026-11-02)
