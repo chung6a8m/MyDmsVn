@@ -253,3 +253,10 @@ dotnet test tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.I
 ```
 
 Schema12 tests use fresh owned databases. The existing reusable Web profile and legacy HTTP SQL fixtures stay on frozen11 via the test-only `FrozenWeb11Migration` helper; Desktop profiles stay exact10. Do not reset durable journal/epoch state with the schema11 Respawn allowlist. Existing unkeyed HttpHost startup remains frozen11 until B04 supplies mandatory operation admission and the actual HTTP codec/status routes. The B03 test codec proves original Application-result capture and rollback, not B04 wire compatibility or browser recovery.
+## WEB5 B01 process-crash proof
+
+The test-only `MyDmsVn.WebOperation.CrashHost` executable is built and copied by Security.Tests. It is not a shipping host or a separate test runner. [B01 design](../docs/design/WEB5_B01_CRASH_PROOF.md) owns the barrier, IPC, SQL quiescence and quarantine rules; [dated evidence](../docs/evidence/web5/20261102-b01-crash-commit.md) owns actual results and limits.
+
+After locked restore, run the Security owner with `FullyQualifiedName~WebOperation&FullyQualifiedName!~Frontend_ports_recover`, then the Inventory owner with `FullyQualifiedName~WebOperationCommandTests`, sequentially under the designated nonproduction master SQL environment. The first selection includes the five crash/fence facts (30 fresh-database arrangements) plus existing journal/status/HTTP negatives and the two SQL-free process-control cases. It deliberately excludes the optional frontend-port bridge; this exclusion is not a skipped required B01 case.
+
+Use `dotnet test <project> -c Release -f net48 --no-restore --filter '<filter>' --logger 'trx;LogFileName=<name>.trx' --results-directory TestResults/web5-b01`. Verify actual TRX outcomes and per-kind observations. Run `WebOperationCrashProcessTests` alone without SQL to exercise pre-dispatch external kill and malformed-control refusal. The existing SQL-free hosted CI includes that class and checks its execution presence; it is not the B04 protected SQL lane.

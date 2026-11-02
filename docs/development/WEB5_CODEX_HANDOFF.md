@@ -1,6 +1,6 @@
 # Codex handoff — WEB5 backend
 
-**Selected 2026-11-02; B04-A VERIFIED NONPRODUCTION (bounded); B04-B PLANNED / NOT RUN; B04 incomplete.** [B04-A evidence](../evidence/web5/20261102-b04a-protected-sql-ci.md) · [SQL runbook](WEB5_SQL_CI_BASELINE.md). Other milestones require their own candidate evidence. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [plan selector](../plans/README.md), [owning plan](../plans/20261102-001-web5-operational-safety-backend.md), [safety design](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [acceptance](WEB5_BACKEND_ACCEPTANCE.md), [TEST_POLICY](../TEST_POLICY.md), [WEB4 archived reference](WEB4_OPERATOR_HANDOFF.md), actual tests/lockfiles and latest `main`.
+**Selected 2026-11-02; B01 DONE (bounded), merged PR #88; B04-A VERIFIED NONPRODUCTION (bounded); B04-B PLANNED / NOT RUN; B04 incomplete.** [B04-A evidence](../evidence/web5/20261102-b04a-protected-sql-ci.md) · [SQL runbook](WEB5_SQL_CI_BASELINE.md). Other milestones require their own candidate evidence. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [plan selector](../plans/README.md), [owning plan](../plans/20261102-001-web5-operational-safety-backend.md), [safety design](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [acceptance](WEB5_BACKEND_ACCEPTANCE.md), [TEST_POLICY](../TEST_POLICY.md), [WEB4 archived reference](WEB4_OPERATOR_HANDOFF.md), actual tests/lockfiles and latest `main`.
 
 ## Task order and independent PRs
 

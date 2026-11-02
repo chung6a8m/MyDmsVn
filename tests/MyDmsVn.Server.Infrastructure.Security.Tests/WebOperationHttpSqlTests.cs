@@ -19,7 +19,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 // Real OWIN + SQL-backed session + Application + restricted Web SQL principal.
 // Administrative SQL arranges fixtures and observes physical rows independently.
 // TestServer restart is a fresh HTTP/service-provider lifetime, not an OS-process crash.
-public sealed class WebOperationHttpSqlTests
+public sealed partial class WebOperationHttpSqlTests
 {
     [WebFrontendPortSqlFact]
     [Trait("Category", "SecurityProvisioning")]

@@ -65,11 +65,12 @@ jobs:
         run: |
           dotnet build tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore
           if ($LASTEXITCODE -ne 0) { throw 'Recovery fixture Release/net48 build failed.' }
-      # Explicit pure validators only. Never run the containing SQL owner broadly
+      # Pure validators and owned-process pre-dispatch/control checks (no SQL).
+      # Never run the containing SQL owner broadly
       # or the opt-in IIS/Playwright selectors on this hosted secret-free runner.
       - name: Run SQL-free recovery result and control validators
         run: |
-          $filter = 'FullyQualifiedName~WebRecoveryPilotResultTests|FullyQualifiedName~WebIntegratedPilotResultTests|FullyQualifiedName~WebReceiptPilotResultTests|FullyQualifiedName~WebFrontendPortBridgeTests'
+          $filter = 'FullyQualifiedName~WebRecoveryPilotResultTests|FullyQualifiedName~WebIntegratedPilotResultTests|FullyQualifiedName~WebReceiptPilotResultTests|FullyQualifiedName~WebFrontendPortBridgeTests|FullyQualifiedName~WebOperationCrashProcessTests'
           dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-build --no-restore --filter $filter --logger "trx;LogFileName=recovery-fixture.trx" --results-directory TestResults/backend-web
           if ($LASTEXITCODE -ne 0) { throw 'SQL-free recovery fixture tests failed.' }
       - name: Verify nonempty complete test execution
@@ -96,7 +97,7 @@ jobs:
               throw "Required $suite tests were absent, skipped, failed or aborted."
             }
             if ($suite -eq 'recovery-fixture') {
-              foreach ($class in @('WebRecoveryPilotResultTests', 'WebIntegratedPilotResultTests', 'WebReceiptPilotResultTests', 'WebFrontendPortBridgeTests')) {
+              foreach ($class in @('WebRecoveryPilotResultTests', 'WebIntegratedPilotResultTests', 'WebReceiptPilotResultTests', 'WebFrontendPortBridgeTests', 'WebOperationCrashProcessTests')) {
                 if (@($results | Where-Object { $_.testName -like "*.$class.*" }).Count -le 0) {
                   throw "Required SQL-free validator class $class was not executed."
                 }

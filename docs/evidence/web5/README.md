@@ -1,6 +1,6 @@
 # WEB5 backend evidence
 
-**2026-11-02: B04-A VERIFIED NONPRODUCTION (bounded); B04-B PLANNED / NOT RUN; B04 incomplete.** [B04-A evidence](20261102-b04a-protected-sql-ci.md) records actual protected RED +two103-case GREEN SQL runs and owned cleanup. Other task results are separately owned; B01 has an independent [candidate PR #88](https://github.com/chung6a8m/MyDmsVn/pull/88). No production approval. The following activation/review notes are historical docs-only records, not current B04-A status.
+**2026-11-02: B01 DONE (bounded), merged PR #88; B04-A VERIFIED NONPRODUCTION (bounded); B04-B PLANNED / NOT RUN; B04 incomplete.** [B04-A evidence](20261102-b04a-protected-sql-ci.md) records actual protected RED +two103-case GREEN SQL runs and owned cleanup. Other task results are separately owned; B01 evidence is integrated through [PR #88](https://github.com/chung6a8m/MyDmsVn/pull/88), merge `b320c10acc0ddb2e7cf4b87c153bdf51f25c4bf0`. No production approval. The following activation/review notes are historical docs-only records, not current B04-A status.
 
 **WEB5 roadmap review amendments (docs-only, 2026-11-02):** six review findings (P1-01/P1-02 and P2-01–04) addressed in the owning plan, protocol, acceptance and Codex handoff. New gates B5-NEG-08, B5-COMP-01/02, B5-MIG-01/02 conditional, B5-CI-04/05, B5-OPS-06/07, B5-IIS-07/08 and B5-REL-04/05 are all **PLANNED / NOT RUN**. No WEB5 runtime/SQL/CI/attended evidence is claimed.
 
@@ -10,7 +10,7 @@
 
 | Owner | Current state | Future evidence file |
 |---|---|---|
-| B01 process-death/Commit | PLANNED | `YYYYMMDD-b01-crash-commit.md` |
+| B01 process-death/Commit | DONE (bounded), merged PR #88 | [Actual proof](20261102-b01-crash-commit.md) |
 | B02 terminal negative | PLANNED | `YYYYMMDD-b02-tombstone-protocol.md` |
 | B03 operator tooling/rehearsal | PLANNED | `YYYYMMDD-b03-operator-drill.md` |
 | B04 SQL CI | A VERIFIED bounded; B NOT RUN; task incomplete | [B04-A actual evidence](20261102-b04a-protected-sql-ci.md) |

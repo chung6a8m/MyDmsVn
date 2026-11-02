@@ -17,14 +17,14 @@ namespace MyDmsVn.Desktop.Tests
         public const int OutputLimit = 32768;
         private static readonly TimeSpan CleanupBudget = TimeSpan.FromSeconds(5);
 
-        public static Task<GuiProcessResult> RunAsync(ProcessStartInfo start, TimeSpan timeout, CancellationToken cancellationToken = default)
-            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(5), cancellationToken);
+        public static Task<GuiProcessResult> RunAsync(ProcessStartInfo start, TimeSpan timeout, CancellationToken cancellationToken = default, Action<int>? started = null)
+            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(5), cancellationToken, started);
 
         // Human walkthroughs use an explicit longer budget with the same job, fail-stop and drain policy.
         public static Task<GuiProcessResult> RunAttendedAsync(ProcessStartInfo start, TimeSpan timeout, CancellationToken cancellationToken = default)
             => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(30), cancellationToken);
 
-        private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout, CancellationToken cancellationToken)
+        private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout, CancellationToken cancellationToken, Action<int>? started = null)
         {
             GuiTestSafety.ThrowIfPoisoned();
             cancellationToken.ThrowIfCancellationRequested();
@@ -45,6 +45,7 @@ namespace MyDmsVn.Desktop.Tests
                 int exitCode = -1;
                 try
                 {
+                    started?.Invoke(child.ProcessId);
                     while (!child.RootExited)
                     {
                         if (cancellationToken.IsCancellationRequested)
@@ -132,6 +133,16 @@ namespace MyDmsVn.Desktop.Tests
                 _process = process;
                 Output = output;
                 Error = error;
+            }
+
+            public int ProcessId
+            {
+                get
+                {
+                    var id = GetProcessId(_process);
+                    Check(id != 0);
+                    return checked((int)id);
+                }
             }
 
             public bool RootExited
@@ -336,6 +347,7 @@ namespace MyDmsVn.Desktop.Tests
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool AssignProcessToJobObject(KernelHandle job, KernelHandle process);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool TerminateJobObject(KernelHandle job, uint code);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool TerminateProcess(KernelHandle process, uint code);
+        [DllImport("kernel32.dll", SetLastError = true)] private static extern uint GetProcessId(KernelHandle process);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetExitCodeProcess(KernelHandle process, out uint code);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern uint WaitForSingleObject(KernelHandle handle, uint milliseconds);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern uint ResumeThread(KernelHandle thread);
