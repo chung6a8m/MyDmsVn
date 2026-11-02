@@ -2,6 +2,8 @@
 
 **2026-11-02: B01 test-only crash proof is IMPLEMENTED / VERIFIED NONPRODUCTION ([evidence](../evidence/web5/20261102-b01-crash-commit.md)); B02/B03 remain design proposals / NOT IMPLEMENTED.** Backend is authoritative. This document specifies conditions for the separate B01/B02/B03 scopes; it does not claim a safe negative operator path already exists. [Owning plan](../plans/20261102-001-web5-operational-safety-backend.md) · [WEB4 frozen contract](WEB4_IDEMPOTENCY_JOURNAL_CONTRACT.md) · [WEB4 operator handoff](../development/WEB4_OPERATOR_HANDOFF.md) · [backend acceptance](../development/WEB5_BACKEND_ACCEPTANCE.md).
 
+**Current design decision:** [ADR0015](../adr/0015-web5-additive-recovery-boundary.md) selects additive v1 compatibility plus append-only013/explicit future web5 exact13 admission. The negative protocol below remains unimplemented; strict-only requirements are conditional N/A under this ADR. Exact HTTP/corpus and executable proofs remain B02/B04-B.
+
 ## 1. Baseline source facts (observed at main 8de36c4)
 
 - `SqlWebOperationJournal` has `AdmitAsync`, `CompleteAsync` and `FenceAsync`; it requires the existing business SQL transaction, holds epoch/actor/key serialization and current session/permissions. Original successful result bytes and business effects commit once. The journal has seven-day result availability and an immutable actor/key tombstone.

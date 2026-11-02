@@ -11,7 +11,7 @@
 | Owner | Current state | Future evidence file |
 |---|---|---|
 | B01 process-death/Commit | DONE (bounded), merged PR #88 | [Actual proof](20261102-b01-crash-commit.md) |
-| B02 terminal negative | PLANNED | `YYYYMMDD-b02-tombstone-protocol.md` |
+| B02 terminal negative | ADR0015 agreed for F01; runtime NOT RUN | [Design agreement](../../adr/0015-web5-additive-recovery-boundary.md); future runtime evidence required |
 | B03 operator tooling/rehearsal | PLANNED | `YYYYMMDD-b03-operator-drill.md` |
 | B04 SQL CI | A VERIFIED bounded; B NOT RUN; task incomplete | [B04-A actual evidence](20261102-b04a-protected-sql-ci.md) |
 | B05 full IIS and SQL/browser | PLANNED | `YYYYMMDD-b05-full-iis-staging.md` |

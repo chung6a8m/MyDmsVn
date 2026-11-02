@@ -2,6 +2,8 @@
 
 **Selected 2026-11-02; B01 DONE (bounded), merged PR #88; B04-A VERIFIED NONPRODUCTION (bounded); B04-B PLANNED / NOT RUN; B04 incomplete.** [B04-A evidence](../evidence/web5/20261102-b04a-protected-sql-ci.md) · [SQL runbook](WEB5_SQL_CI_BASELINE.md). Other milestones require their own candidate evidence. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [plan selector](../plans/README.md), [owning plan](../plans/20261102-001-web5-operational-safety-backend.md), [safety design](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [acceptance](WEB5_BACKEND_ACCEPTANCE.md), [TEST_POLICY](../TEST_POLICY.md), [WEB4 archived reference](WEB4_OPERATOR_HANDOFF.md), actual tests/lockfiles and latest `main`.
 
+**WEB5-01 agreement:** consume [ADR0015](../adr/0015-web5-additive-recovery-boundary.md). B01 PR #88 and B04-A PR #89 are merged. B02 begins from this design direction only when selected; exact DTO/corpus,013 implementation and B04-B proof remain pending. No same-key resend UI is authorized.
+
 ## Task order and independent PRs
 
 | Branch suggestion | Deliver only | Dependencies |
