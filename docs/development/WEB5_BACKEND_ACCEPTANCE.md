@@ -48,7 +48,6 @@
 | B5-REL-01 | B06 | Exact candidate source/tree/build/dependencies/schema/principal hashes and gate outcomes reconciled |
 | B5-REL-02 | B06 | Operator/attended/front-end evidence, recovery/rollback and residual risks reviewed |
 | B5-REL-03 | B06 | Explicit Owner production GO/NO-GO; otherwise NOT APPROVED |
-
 | B5-NEG-08 | B02 | Six Sales/Receipt Create/Update/Post operations × both writer-first/operator-first lock orders (12 arrangements); exactly one business or durable negative result, correct version/lines/audit/ledger |
 | B5-MIG-01 | B02 (conditional) | If migration013 selected: exact12 history, schema/trigger/fingerprint/maintenance/grant admission → exact13; fresh13 and allowed exact10/11 paths |
 | B5-MIG-02 | B02 (conditional) | Partial/spoofed/too-new schema, writer not drained, migration crash/rerun and failed grant/trigger preflight fail closed; never mutate existing 012 |

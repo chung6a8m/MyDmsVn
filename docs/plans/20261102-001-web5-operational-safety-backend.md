@@ -82,7 +82,7 @@ Include a seven-day original result-window escalation checklist (detection → t
 
 **B04-A, before B02 runtime (P2-02):** preserve existing `.github/workflows/backend-web.yml` Windows2022/net48 locked, secret-free SQL-free PR gate and frontend Linux CI. Configure **separate protected opt-in SQL runner** on isolated trusted Windows/SQL Server 2017-compatible disposable nonproduction database, never a shared/production DB. No secrets to fork PRs or untrusted scripts/artifacts. Reuse `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` (approved master), existing Security journal/HTTP/status/principal, Inventory, migration owners, sequential execution, actual TRX discovered/executed/passed/failed/skipped reconciliation, nonzero/zero-skip/fail-on-missing-class guards and SID/token-owned teardown. Force a known RED oracle failure then GREEN; quarantine uncertain cleanup. Run it twice against pinned existing WEB4 source and record runner/DB provenance. **B04-A PASS is a precondition for B02 executable work, not B04 completion.**
 
-**B04-B, after B02 code and before B02 acceptance:** extend the protected runner with new B5-NEG-08 all-six×two race cases, client-compatibility, exact12→13 migrations if selected, terminal audit/expiry/permission tests. Execute with **the exact B02 candidate SHA**, not inherited B04-A counts, verify independent physical source/journal/ledger oracle, rejected old-tab writes if strict mode, no leaked secrets and complete teardown. B02 cannot be accepted/merged without B04-B PASS. If runner unavailable record B02/B04-B BLOCKED; local SQL green is not hosted SQL CI.
+**B04-B, after B02 code and before B02 acceptance:** extend the protected runner with new B5-NEG-08 all-six×two race cases, client-compatibility, exact12→13 migrations if selected, terminal audit/expiry/permission tests. Execute with **the exact B02 candidate SHA**, not inherited B04-A counts, verify independent physical source/journal/ledger oracle, rejected old-tab writes if strict mode, no leaked secrets and complete teardown. Run B04-B using a trusted stacked branch or B02 candidate with BOTH new tests and selectors; selectors must never run/merge before their test owners exist. Require the protected SQL result on the combined candidate tree, verify the merge tree, and never execute untrusted PR code with SQL credentials. B02 cannot be accepted/merged without B04-B PASS. If runner unavailable record B02/B04-B BLOCKED; local SQL green is not hosted SQL CI.
 
 **Exit B04:** both A and B have reproducible hosted evidence on pinned candidates, zero required skips, authenticated runner provenance, deliberate RED/green guard and clean owned resource teardown. Do not restore `SqlTestHarness`, test-gates manifest or broad SQL runner.
 
@@ -107,7 +107,7 @@ Build a paired frontend/backend release dossier: source heads and tree hashes, i
 
 Decision states must distinguish `IMPLEMENTED`, `VERIFIED NONPRODUCTION`, `STAGING ACCEPTED` and `PRODUCTION GO`. A CI green, merged plan, Owner-accepted exception from WEB2 or archived WEB4 is not production GO. Request an explicit named Owner decision after both B06/F05 evidence packs are reviewed. Archive WEB5 only after disposition; preserve WEB4/WEB1–03 evidence and CEX. No production deployment is authorized by this plan.
 
-## 8. Roadmap review finding closure — documentation only (2026-11-02)
+## Roadmap review finding closure — documentation only (2026-11-02)
 
 | Review finding | Newly owned requirement | Mandatory acceptance |
 |---|---|---|
@@ -120,7 +120,7 @@ Decision states must distinguish `IMPLEMENTED`, `VERIFIED NONPRODUCTION`, `STAGI
 
 No implementation, data modification, SQL/CI/browser rehearsal or Owner production approval is implied by these docs corrections.
 
-## 9. Delivery protocol for Codex and PR boundaries
+## 8. Delivery protocol for Codex and PR boundaries
 
 - **Docs activation is this PR**, no runtime/test/SQL changes. After paired docs merge, create isolated worktree/branch from latest `main` for B01, B02, B03, B04, B05, B06; do not execute all tasks in one PR. A joint F task is a separate PR in the other repo, with exact backend source pin and dependency.
 - Before each task: inventory source + tests, publish threat model/changed file list and checkpoints, then RED failing behavior proof (where appropriate), narrow implementation, focused gates, independent review, actual evidence at `docs/evidence/web5/YYYYMMDD-...md`. Update this owning plan status only when evidence and Owner acceptance warrant it.
