@@ -6,7 +6,15 @@ $passed=0
 try {
     $name='MyDmsVn.Server.Infrastructure.IntegrationTests.WebOperationCommandTests.Probe'
     function Case([string]$label,[string]$counts,[string]$results,[string[]]$discovery,[bool]$accept,[string]$outcome='Completed',[bool]$red=$false,[bool]$observed=$false) {
-        [IO.File]::WriteAllText((Join-Path $root 'result.trx'), '<TestRun><Results>'+ $results+'</Results><ResultSummary outcome="'+$outcome+'"><Counters '+$counts+'/></ResultSummary></TestRun>')
+        [xml]$rowsXml='<Results>'+$results+'</Results>'
+        $definitions=''
+        foreach($row in @($rowsXml.Results.UnitTestResult)) {
+            if (-not $row) { continue }
+            if (-not $row.HasAttribute('testId')) { $row.SetAttribute('testId',[guid]::NewGuid().ToString('D')) }
+            $row.SetAttribute('executionId',[guid]::NewGuid().ToString('D'))
+            $definitions+='<UnitTest id="'+$row.testId+'"><Execution id="'+$row.executionId+'"/></UnitTest>'
+        }
+        [IO.File]::WriteAllText((Join-Path $root 'result.trx'), '<TestRun>'+ $rowsXml.OuterXml+'<TestDefinitions>'+$definitions+'</TestDefinitions><ResultSummary outcome="'+$outcome+'"><Counters '+$counts+'/></ResultSummary></TestRun>')
         [IO.File]::WriteAllLines((Join-Path $root 'discovery.log'), $discovery)
         $accepted=$true
         try { Assert-Web5SqlEvidence -TrxPath (Join-Path $root 'result.trx') -DiscoveryPath (Join-Path $root 'discovery.log') -RequiredClasses @('WebOperationCommandTests') -SummaryPath (Join-Path $root 'summary.json') -Label $label -RequireOracleRed:$red | Out-Null } catch { $accepted=$false }
@@ -22,7 +30,9 @@ try {
     Case 'false-counters' 'total="1" executed="1" passed="1" failed="0" notExecuted="0"' ('<UnitTestResult testName="'+$name+'" outcome="Failed"/>') @($name) $false
     Case 'missing-row' 'total="2" executed="2" passed="2" failed="0" notExecuted="0"' $good @($name) $false
     Case 'discovery-mismatch' 'total="1" executed="1" passed="1" failed="0" notExecuted="0"' $good @($name+'Other') $false
-    Case 'duplicate-discovery' 'total="2" executed="2" passed="2" failed="0" notExecuted="0"' ($good+$good) @($name,$name) $false
+    Case 'truncated-theory-names' 'total="2" executed="2" passed="2" failed="0" notExecuted="0"' ($good+$good) @($name,$name) $true
+    $duplicate='<UnitTestResult testId="11111111-1111-1111-1111-111111111111" testName="'+$name+'" outcome="Passed"/>'
+    Case 'duplicate-case-id' 'total="2" executed="2" passed="2" failed="0" notExecuted="0"' ($duplicate+$duplicate) @($name,$name) $false
     Case 'missing-class' 'total="1" executed="1" passed="1" failed="0" notExecuted="0"' ('<UnitTestResult testName="MyDmsVn.Server.Infrastructure.IntegrationTests.WebMissingTests.Probe" outcome="Passed"/>') @('MyDmsVn.Server.Infrastructure.IntegrationTests.WebMissingTests.Probe') $false
     Case 'aborted' 'total="1" executed="1" passed="1" failed="0" notExecuted="0"' $good @($name) $false 'Aborted'
     Case 'nonzero-error-counter' 'total="1" executed="1" passed="1" failed="0" notExecuted="0" error="1"' $good @($name) $false

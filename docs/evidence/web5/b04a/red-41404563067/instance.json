@@ -1,0 +1,17 @@
+{
+  "runId": "41404563067",
+  "attempt": "1",
+  "image": "20261026.347.1",
+  "runnerEnvironment": "github-hosted",
+  "controlSha": "21e8685b52b54e4603457c1a53e19f0d731de919",
+  "baselineSha": "fc36c879fdd2d46ee77d136bdb6f9e70f7191b64",
+  "phase": "Removed",
+  "engineVersion": "15.0.4382.1",
+  "edition": "Express Edition (64-bit)",
+  "compatibility": 140,
+  "ownerSidSha256": "22b1200025300d41b185a544db58abd6003a13757dbfa3c8310bff206db01ec2",
+  "instanceOwnershipVerified": true,
+  "userDatabases": 0,
+  "activeOwners": 0,
+  "quarantine": false
+}
