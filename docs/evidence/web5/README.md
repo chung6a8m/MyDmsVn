@@ -2,6 +2,8 @@
 
 **2026-11-02: selected Roadmap 05; B01–B06 PLANNED / NOT RUN.** This index is a placeholder for actual dated results; documentation creation does NOT execute runtime, SQL, real crash, IIS, operator drills or production rollout.
 
+**WEB5 roadmap review amendments (docs-only, 2026-11-02):** six review findings (P1-01/P1-02 and P2-01–04) addressed in the owning plan, protocol, acceptance and Codex handoff. New gates B5-NEG-08, B5-COMP-01/02, B5-MIG-01/02 conditional, B5-CI-04/05, B5-OPS-06/07, B5-IIS-07/08 and B5-REL-04/05 are all **PLANNED / NOT RUN**. No WEB5 runtime/SQL/CI/attended evidence is claimed.
+
 | Owner | Current state | Future evidence file |
 |---|---|---|
 | B01 process-death/Commit | PLANNED | `YYYYMMDD-b01-crash-commit.md` |

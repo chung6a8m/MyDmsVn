@@ -6,6 +6,8 @@
 
 <a id="active-parallel-web-workstream--roadmap-04-reliability--delivery-foundation-selected-2026-11-01"></a>
 
+**WEB5 review fixes (2026-11-02, documentation-only):** [owning plan](20261102-001-web5-operational-safety-backend.md) and design/acceptance/handoff now cover 2 P1 + 4 P2. B04-A precedes B02 executable changes and B04-B is mandatory before B02 acceptance; positive COMMITTED-result-unavailable ticket closure does not unlock Edit. No B01–B06 tests or implementations were executed by this doc update; CEX remains independent.
+
 ## Archived Roadmap 04 — WEB4 Reliability (2026-11-02)
 
 **Roadmap 04 is ARCHIVED / COMPLETED (bounded), Owner 2026-11-02.** Backend B01–B06 are DONE within their recorded scopes. Owner accepted B06/F05 and its limits, authorized final reviews/CI and merge of backend PR #85/frontend PR #22, then explicitly requested archival. Read the [archive decision](../archive/20261102-web4-reliability/README.md), [frozen completed plan](../archive/20261102-web4-reliability/plans/20261101-003-web4-reliability-server.md), [former heading anchors](20261101-003-web4-reliability-server.md) and [B06 acceptance evidence](../evidence/web4/20261102-b06-operator-handoff.md#owner-acceptance-and-merge--2026-11-02). No WEB4 task remains selected; future work needs a new explicit selection.

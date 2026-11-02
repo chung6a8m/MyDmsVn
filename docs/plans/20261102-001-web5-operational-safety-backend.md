@@ -19,11 +19,11 @@ Make the WEB4 implementation operable under **real host process death, SQL commi
 | WEB5-01 | **B01:** OS process-crash/Commit and duplicate-key safety harness | F01 contract/source checkpoint and browser negative assertions | SQL oracle + deterministic and non-deterministic process loss; no double effect |
 | WEB5-02 | **B02:** operator terminal disposition protocol, SQL tombstone and secure maintenance surface | F02 opt-in recovery UX consumes versioned authoritative disposition | Only after B01 proof; no 404-derived NOT_EXECUTED |
 | WEB5-03 | **B03:** usable operator CLI and safe rotation/compaction/backup-restore rehearsal | F03 support correlation/user guidance | Independent operator identity and auditable owned-database rehearsal |
-| WEB5-04 | **B04:** repeatable isolated SQL integration CI | F03 native/browser gates, F04 staging integration | Always-green secret-free CI; SQL lane distinct with cleanup |
+| WEB5-04 | **B04-A/B:** protected SQL CI baseline before B02; new B02 cases after implementation | F03 browser/SQL bridge; F04 staging | B04-A PASS before B02 code; B04-B PASS before B02 acceptance |
 | WEB5-05 | **B05:** full IIS staging + proxy/audit/limiter/security controls | F04 deployed Chromium/Edge and attended tests | Exact built assets, physical SQL oracle, hostile/negative checks |
 | WEB5-06 | **B06:** release-candidate matrix, restore/runbook, handoff and closeout | F05 versioned user guide and joint GO/NO-GO dossier | Owner-specific decision, not inferred from merged PR |
 
-**Dependency order:** docs activation both repos → B01 + F01 → B02 backend design/negative SQL before F02 UI (the product resend UI stays disabled until the B01+B02 checks and Owner security review) → B03 and B04 in separate parallel PRs after B02 contracts are stable → B05 + F04 staged pairing → B06 + F05 and independent Owner release decision. B04 preparatory work may start after B01 when unrelated to B02, but SQL-backed gate of B02 cannot pass before B02 is implemented. A blocked staging prerequisite stays BLOCKED; do not substitute IIS Express as a silent PASS.
+**Dependency order (P2-02 correction):** docs merged → **B01 crash proof and B04-A protected SQL CI preparation in parallel** → B01 proof + B04-A actual hosted SQL PASS → B02 design and implementation → **B04-B executes new B02 SQL/compatibility/negative tests at exact B02 HEAD before its acceptance/merge** → B03 tooling alongside F02 when protocol is stable → B05/F04 IIS staging → B06/F05 Owner decision. B04 is one task with two checkpoints, DONE only after A+B. If isolated SQL runner is unavailable, B02 executable work/acceptance is BLOCKED; local SQL alone is insufficient. Do not substitute IIS Express for full IIS.
 
 ## 2. B01 — Real process-crash/Commit evidence (WEB5-01)
 
@@ -40,7 +40,7 @@ Make the WEB4 implementation operable under **real host process death, SQL commi
 
 ## 3. B02 — Authoritative terminal-negative operator resolution (WEB5-02)
 
-**Design gate first:** inspect `database/migrations` (actual schema012 DDL), `SqlWebOperationJournal`, `SqlWebOperationReadRepository`, `SqlWebOperationMaintenance`, HTTP controllers, authorization and the frozen WEB4 corpus. Write a reviewed ADR/protocol decision before touching executable code: reuse existing schema12 `CANCELLED` capability if sufficient **or** introduce append-only migration013, exact-new-schema admission and explicit `web5` host mode; never mutate 012 in place. Provide backward-compatibility matrix for `legacy-web11`, `web4`, Desktop exact10, and proposed WEB5 consumers.
+**Design gate first:** inspect `src/MyDmsVn.Server.DbMigrator/Scripts/012_WebOperationJournal.sql`, `DatabaseMigrationRunner.cs`, `SqlWebSchemaCompatibilityChecker.cs`, `SqlWebSchema11CompatibilityChecker.cs`, `WebHostOptions.cs`, `Startup.cs`, `SqlWebOperationJournal`, `SqlWebOperationReadRepository`, `SqlWebOperationMaintenance`, HTTP controllers, authorization and the frozen WEB4 corpus. Write a reviewed ADR/protocol decision before touching executable code: reuse existing schema12 `CANCELLED` capability if sufficient **or** introduce append-only migration013, exact-new-schema admission and explicit `web5` host mode; never mutate 012 in place. Provide backward-compatibility matrix for `legacy-web11`, `web4`, Desktop exact10, and proposed WEB5 consumers.
 
 **Expected terminal model:** `COMMITTED` remains immutable business success; `EXPIRED` is historical success without readable result, NOT a negative; `INDETERMINATE`/absent remains unsafe; `NOT_EXECUTED` is a **new authoritative operator terminal state** backed by durable `CANCELLED/DO_NOT_EXECUTE` tombstone that prevents late first arrival and identical replay. Frozen WEB4 `GET /api/v1/operations/{id}` and 48 corpus vectors must not be silently reinterpreted. If a client needs to read terminal negative, create a versioned additive endpoint/DTO or contract expressly agreed with F02; require authenticated actor, epoch and re-derived fingerprint, current grant, bounded result and no cross-actor disclosure.
 
@@ -52,6 +52,14 @@ Make the WEB4 implementation operable under **real host process death, SQL commi
 5. Agree a versioned F02 read-only response/protocol with cross-repo fixtures: positive original Create/Update detail; Sales Post version, Receipt Post no version; terminal negative only as an **operation decision**, not a fabricated business result. Client may release its protected unknown only after an authenticated, exact, durable negative certificate and safe fresh-baseline policy. Older clients remain safe/fail closed.
 6. Add capability-denied/actor-change/epoch rotation/permission revocation/result expiry/corrupt fingerprint/duplicate header/unknown-key/racing Commit/exception/rollback/restart security and SQL tests. Review maintenance permissions, triggers and tombstones with an independent reviewer.
 
+### B02 safety additions from review (P1-02, P2-01, P2-03)
+
+1. **Protocol/old-client decision first:** ADR must choose **additive** (all six `web4-v1` write/status paths safe for old browser tabs, including new tombstones; prove both old→new and new→old compatibility) OR **strict cutover** (new server-validated protocol/version fence on every mutation/status, failing old requests before journal/business). The database `DeploymentEpoch` identifies the database, **not frontend bundle version**; never rotate it merely for code deployment. Test cached old JS, already-open tabs with active auth, in-flight UNKNOWN, refresh/logout, old-client/new-backend, new-client/old-backend, matched rollback and source/ledger oracle. No mixed client claim without this gate.
+2. **Schema decision:** schema012 already permits `CANCELLED` INSERT but the immutable trigger forbids arbitrary updates/deletes; evaluate INSERT + atomic audit under same lock first. If migration013 is chosen, implement an **explicit exact12→13** migration preflight (current runner only admits exact11/exact10 as old), including exact12 script/object/trigger/fingerprint/privilege validation and writer drain. Test fresh13, exact12→13, explicitly allowed exact11/10 paths, partial/too-new/spoofed/invalid state, crash/rerun/rollback and legacy-Web11/Desktop10 isolation. Never edit frozen012 or assume 013 required.
+3. **Six-command matrix:** for **Sales.Create/Update/Post and Receipt.Create/Update/Post**, execute BOTH writer-first and operator-first same-key lock orders (at least 12 distinct arrangements) using fresh owned SQL connections. Assert COMMITTED or permanently audited CANCELLED, never both; verify exact version/line IDs, business/ledger/valuation/COGS and current permissions. Create/Post examples alone are insufficient. Complete B04-B protected SQL lane on B02 exact candidate before accepting B02.
+
+Record these choices in the B02 ADR and pin new versioned resolution vectors separately from the 48 frozen WEB4 corpus files; lack of a safe choice keeps B02 BLOCKED.
+
 **Exit B02:** B01 proof complete, additive protocol reviewed/pinned, SQL concurrency/rollback/permission/expiry tests pass, terminal-negative durability proven by physical journal and no resulting business write. If design cannot prove safe terminal negative, leave B02 BLOCKED and retain UNKNOWN; never relax the assertion just to satisfy the roadmap.
 
 ## 4. B03 — Operator tooling, audit, retention and restore drill (WEB5-03)
@@ -62,19 +70,21 @@ Make the WEB4 implementation operable under **real host process death, SQL commi
 4. Rehearse on a fresh disposable database: consistent full backup (journal/tombstones + source/ledger + deployment epoch), restore to a different owned instance/database, rotate epoch **before opening writers** when clone/rewind occurs, reprovision restricted principal and verify old clients/writes/status rejected; valid new actor/current epoch succeeds. Normal host restart must NOT rotate epoch. Crash/partial backup/failed rotate leaves admission closed. Verify cleanup and recorded backup artifact disposal.
 5. Publish the operator recovery decision tree: COMMITTED with original result, COMMITTED but result expired, NOT_EXECUTED tombstoned, INDETERMINATE; record who may issue each action, prerequisites, ticket/trace ID, aftercare and helpdesk escalation. Do not document unsupported unlocking as a working procedure.
 
+### B03 positive COMMITTED-result-unavailable reconciliation (P1-01)
+
+Separate **business success** from **client edit/recovery**. When SQL proves COMMITTED but the original result has expired/unavailable bytes, an operator may close a **support case** as `BUSINESS_COMMITTED_RESULT_UNAVAILABLE` only after independently correlating actor/epoch/key/fingerprint, source header+line IDs, Posted/ledger/valuation/stock/COGS, current authority and a durable case audit reference. The case closure does **not** change journal disposition, fabricate the original result/version, unlock the old local intent or authorize Save/Post/replay. A client can remain PROTECTED after business case closure. If Owner-approved, introduce user-consented scoped **local case/draft archival** preserving minimal support correlation and original SQL tombstone; never treat it as an editable settlement. New editing requires a fresh authorized server baseline/version and explicit user intent (Write-without-Read cannot synthesize this).
+
+Include a seven-day original result-window escalation checklist (detection → triage before expiry where feasible → assigned human owner → permanent case evidence); it is **not** a promised SLA. No premature journal compaction for unresolved cases. Test COMMITTED+original result, COMMITTED/EXPIRED/missing result, no Read grant, wrong identity, IDB/storage failure, failed archival and unresolved support escalation. B03 must demonstrate this flow with real operator tools, not docs only.
+
 **Exit B03:** executable commands with help/tests; attended operator rehearsal on test environment, audit proof, independent before/after SQL data checks and clean owned cleanup. A document-only runbook cannot mark this milestone PASS.
 
-## 5. B04 — Isolated SQL integration CI (WEB5-04)
+## 5. B04 — Protected SQL CI, split into B04-A + B04-B (WEB5-04)
 
-Current `.github/workflows/backend-web.yml` is a hosted Windows 2022, net48, locked-build **SQL-free** job and must remain that way. Keep frontend Linux CI secret-free. Build an opt-in, protected, separate SQL lane on an approved isolated Windows worker with explicitly provisioned disposable SQL Server (compatible SQL Server 2017 baseline or documented equivalent), not a production instance or shared test database.
+**B04-A, before B02 runtime (P2-02):** preserve existing `.github/workflows/backend-web.yml` Windows2022/net48 locked, secret-free SQL-free PR gate and frontend Linux CI. Configure **separate protected opt-in SQL runner** on isolated trusted Windows/SQL Server 2017-compatible disposable nonproduction database, never a shared/production DB. No secrets to fork PRs or untrusted scripts/artifacts. Reuse `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` (approved master), existing Security journal/HTTP/status/principal, Inventory, migration owners, sequential execution, actual TRX discovered/executed/passed/failed/skipped reconciliation, nonzero/zero-skip/fail-on-missing-class guards and SID/token-owned teardown. Force a known RED oracle failure then GREEN; quarantine uncertain cleanup. Run it twice against pinned existing WEB4 source and record runner/DB provenance. **B04-A PASS is a precondition for B02 executable work, not B04 completion.**
 
-- Only trusted/manual/protected branch events may receive SQL credentials. Never pass secrets to fork PRs, frontend job, browser output, job summary, cache, public artifacts or untrusted script. Check runner version/toolchain, allowlisted DB connection to `master`, test-only SQL login role and provider capabilities before creating a database.
-- Existing `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` is the only approved test connection entry; never reintroduce `SqlTestHarness`, test-gates manifest, old SQL runner or broad implicit SQL tests.
-- Select exact owners/filters (Security `WebOperationJournalTests`/`WebOperationHttpSqlTests`/`WebOperationReadTests` and principal tests; Inventory `WebOperationCommandTests`; migrations `WebAuthMigrationTests`; new B01/B02 cases). Use real TRX discovery, executed vs pass/fail/skip, zero-required-skip guard and order/sequential run semantics; a job with zero tests is failure.
-- Each fixture owns allocation token, SID/provenance verification and cleanup; drain process tree and outstanding SQL connections. On uncertain teardown, quarantine + report without dropping unrelated database names.
-- Keep SQL-free PR/push gate fast. Require separate protected SQL job at B05/B06 acceptance once stable; on missing protected runner/secret, record BLOCKED/NOT RUN, never PASS. Artifacts publish sanitized counts and hashes only.
+**B04-B, after B02 code and before B02 acceptance:** extend the protected runner with new B5-NEG-08 all-six×two race cases, client-compatibility, exact12→13 migrations if selected, terminal audit/expiry/permission tests. Execute with **the exact B02 candidate SHA**, not inherited B04-A counts, verify independent physical source/journal/ledger oracle, rejected old-tab writes if strict mode, no leaked secrets and complete teardown. Run B04-B using a trusted stacked branch or B02 candidate with BOTH new tests and selectors; selectors must never run/merge before their test owners exist. Require the protected SQL result on the combined candidate tree, verify the merge tree, and never execute untrusted PR code with SQL credentials. B02 cannot be accepted/merged without B04-B PASS. If runner unavailable record B02/B04-B BLOCKED; local SQL green is not hosted SQL CI.
 
-**Exit B04:** one independently repeatable nonproduction SQL lane with demonstrated RED failure on broken oracle, GREEN on real candidate and cleanup including forced failure; no secret exposure; reproducible documented invocation.
+**Exit B04:** both A and B have reproducible hosted evidence on pinned candidates, zero required skips, authenticated runner provenance, deliberate RED/green guard and clean owned resource teardown. Do not restore `SqlTestHarness`, test-gates manifest or broad SQL runner.
 
 ## 6. B05 — Full IIS staging and operational hardening (WEB5-05)
 
@@ -85,13 +95,30 @@ Current `.github/workflows/backend-web.yml` is a hosted Windows 2022, net48, loc
 5. Run B05 paired frontend F04 with published build in actual IIS over trusted TLS and fresh managed test SQL: Chromium/Edge separately, original 6 mutations, cancel/unknown/negative/key collisions, multiple app pool workers if supported, normal restart and process recycle, SQL ledger/valuation oracle, health and teardown. Security/proxy/limiter negative tests must execute against full IIS, not only OWIN TestServer.
 6. Rehearse backup/restore of the staging candidate, downgrade/rollback to a **compatible matched binary/database mode only** (never force downgrade schema12/13 or overwrite production). Preserve concurrent Desktop/schema10 non-compatibility.
 
+**B05 additional gates (P1-02/P2-04):** test actual full IIS with old cached bundle/open tab against new host, new client against old host, in-flight/UNKNOWN and rollback, under the B02 chosen additive or strict version-fence policy. Authenticate/correctly reject per-mutation/status, not only initial context; deployment epoch is not a code-version fence. Establish a representative actor/concurrency and mixed Create/Update/Post/status/refresh workload, measure p50/p95/p99 latency, errors/timeouts, throughput, IIS worker/SQL connection saturation, journal growth/compaction and restart failure effects. Rehearse backup/restore and incident alert/ticket response; record observed RPO/RTO and UNKNOWN queue aging. Propose numeric thresholds **from measurements**, obtain Owner agreement **before staging PASS**; do not invent a default SLA or treat missing measurement as PASS.
+
 **Exit B05:** full IIS staging, test data only, explicit security/SQL/browser/operational checks PASS and no P1/P2; Owner still must separately authorize any customer rollout. If full IIS unavailable, B05 BLOCKED/NOT RUN, not accepted as an inherited WEB2 exception.
 
 ## 7. B06 — Candidate freeze, operator handoff and Owner decision (WEB5-06)
 
 Build a paired frontend/backend release dossier: source heads and tree hashes, immutable build artifacts and dependency hashes, mode/schema/SQL principal, fresh SQL and browser/oracle TRX counts, IIS staging evidence, audit/backup/rotation/limiter controls, privacy/security and IME/accessibility observations, unresolved items, exact rollback/drain/restore script and staffed support path. Recheck on same candidate; re-run affected gate if source/runtime changed after evidence.
 
+**B06 release quality gates (P1-01/P2-04):** dossier must separately list positive COMMITTED-result-unavailable support closure vs terminal NOT_EXECUTED vs client editable recovery, including 7-day escalation/case evidence. Publish a threshold register showing approved target **and measured final-candidate result** for per-command p95/p99, error/timeout, concurrency, journal growth/maintenance, RPO/RTO, alert handling and UNKNOWN backlog age, along with tested old/new client cutover and Owner disposition. Missing or failed thresholds stay NOT RUN/BLOCKED/DEFERRED, never implied production GO.
+
 Decision states must distinguish `IMPLEMENTED`, `VERIFIED NONPRODUCTION`, `STAGING ACCEPTED` and `PRODUCTION GO`. A CI green, merged plan, Owner-accepted exception from WEB2 or archived WEB4 is not production GO. Request an explicit named Owner decision after both B06/F05 evidence packs are reviewed. Archive WEB5 only after disposition; preserve WEB4/WEB1–03 evidence and CEX. No production deployment is authorized by this plan.
+
+## Roadmap review finding closure — documentation only (2026-11-02)
+
+| Review finding | Newly owned requirement | Mandatory acceptance |
+|---|---|---|
+| P1-01 | B03/B06 positive COMMITTED/result-unavailable case closure ≠ edit unlock | B5-OPS-06/07; B5-REL-04 |
+| P1-02 | B02 additive vs strict old-client version fence; B05 IIS mixed-client matrix | B5-COMP-01/02 |
+| P2-01 | B02 schema012→013 path only if needed | B5-MIG-01/02 |
+| P2-02 | B04-A before B02 code; B04-B before B02 acceptance | B5-CI-04/05 |
+| P2-03 | B02 all six commands × both key-lock orders | B5-NEG-08 |
+| P2-04 | B05 measured baseline; B06 Owner numeric targets vs actual | B5-IIS-07/08; B5-REL-05 |
+
+No implementation, data modification, SQL/CI/browser rehearsal or Owner production approval is implied by these docs corrections.
 
 ## 8. Delivery protocol for Codex and PR boundaries
 
