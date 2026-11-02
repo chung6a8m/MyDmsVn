@@ -28,9 +28,19 @@ public sealed class WebOperationCrashProcessTests
         configuration["phase"] = "invalid-test-phase";
         configuration["access"] = "secret-test-marker-never-log";
         var error = await Record.ExceptionAsync(() => WebOperationCrashProcess.StartAsync(configuration));
-        var failures = Assert.IsType<AggregateException>(error);
-        Assert.IsType<InvalidDataException>(failures.InnerExceptions[0]);
-        Assert.Contains("Unexpected CrashHost protocol event", failures.InnerExceptions[0].Message);
+        // The supervisor may drain by cancellation before the child's exit 2 is
+        // observed, or observe that natural failure first. Both retain the exact
+        // protocol error; neither permits an unrelated startup failure to pass.
+        var protocol = error;
+        if (error is AggregateException failures)
+        {
+            Assert.Equal(2, failures.InnerExceptions.Count);
+            protocol = failures.InnerExceptions[0];
+            Assert.IsType<InvalidOperationException>(failures.InnerExceptions[1]);
+            Assert.Equal("CrashHost failed without exposing request or SQL details.", failures.InnerExceptions[1].Message);
+        }
+        Assert.IsType<InvalidDataException>(protocol);
+        Assert.Contains("Unexpected CrashHost protocol event", protocol!.Message);
         Assert.DoesNotContain("secret-test-marker-never-log", error.ToString());
         Assert.DoesNotContain("WEB5-no-SQL-may-open", error.ToString());
         Assert.False(WebOperationCrashProcess.IsPoisoned);
