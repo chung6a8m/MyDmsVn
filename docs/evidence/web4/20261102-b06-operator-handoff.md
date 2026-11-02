@@ -23,7 +23,7 @@ Reviewed the actual `DatabaseMigrationRunner`, `Schema11WebMaintenanceValidator`
 
 ## Verification scope and results
 
-[TEST_POLICY](../../TEST_POLICY.md) and [test commands](../../../tests/README.md) require diff/link/source-reference/status/encoding checks for Markdown-only changes. Verification uses Windows PowerShell, Python UTF-8/path checks and Git; no browser/runtime is started. Actual checks (all exit0):
+[TEST_POLICY](../../TEST_POLICY.md) and [test commands](../../../tests/README.md) require diff/link/source-reference/status/encoding checks for Markdown-only changes. Local documentation verification uses Windows PowerShell, Python UTF-8/path checks and Git; no local browser/runtime is started. Hosted SQL-free CI is recorded separately below. Actual checks (all exit0):
 
 - `git diff --check`: no whitespace errors.
 - `git diff --stat` and focused `git diff -- src/MyDmsVn.Server.HttpHost/README.md docs/plans/20261101-003-web4-reliability-server.md`: inspected migration ownership, candidate selection and preserved historical checkpoints.
@@ -32,13 +32,36 @@ Reviewed the actual `DatabaseMigrationRunner`, `Schema11WebMaintenanceValidator`
 
 Source-reference review matched migration admission, grant delta, seven-day/1MiB expiry, immutable trigger, epoch/key lock ordering, current authority, absent rotation/negative-unlock CLI and explicit maintenance compaction API to the files listed above. No new tool or runnable command is claimed from documentation alone.
 
-**Runtime counts for B06: 0 executed tests.** Build, unit/integration, SQL allocation/migration/provisioning, IIS/IIS Express, browser, epoch rotation, compaction, backup/restore, process-crash/Commit and attended IME/Narrator: **NOT RUN**. Historical B03/B04/B05 passes are linked only, not repeated or relabelled B06 PASS. B4-OPS-01 is documentation coverage; B4-OPS-02 operator rehearsal is not newly verified.
+**Local runtime counts for B06: 0 executed tests.** Local build/unit/integration, SQL allocation/migration/provisioning, IIS/IIS Express, browser, epoch rotation, compaction, backup/restore, process-crash/Commit and attended IME/Narrator: **NOT RUN**. The fresh hosted SQL-free builds/tests below are a separate evidence scope; no live SQL or operator rehearsal ran. Historical B03/B04/B05 passes are linked only, not repeated or relabelled B06 PASS. B4-OPS-01 is documentation coverage; B4-OPS-02 operator rehearsal is not newly verified.
 
 ## Independent review — 2026-11-02
 
-Independent whole-milestone review examined backend `7be9ee3b45ac54bc3c7d642038fc77cf794ea944` and frontend `3823b39aaf6736eb41cd097e0130c0d8a3d31f7c` plus its compatibility anchors. Result: **no actionable P0/P1/P2 or minor findings**. The parent coordinator independently checked the backend candidate: **11 Markdown documents, 49 added local links including 4 anchors, 0 errors**. B06 runtime remains **0 tests executed / NOT RUN**. This review is not Owner acceptance, merge or production approval.
+Independent whole-milestone review examined backend `7be9ee3b45ac54bc3c7d642038fc77cf794ea944` and frontend `3823b39aaf6736eb41cd097e0130c0d8a3d31f7c` plus its compatibility anchors. Result: **no actionable P0/P1/P2 or minor findings**. The parent coordinator independently checked the backend candidate: **11 Markdown documents, 49 added local links including 4 anchors, 0 errors**. B06 local runtime remains **0 tests executed / NOT RUN**; subsequent hosted SQL-free CI is recorded below. This review is not Owner acceptance, merge or production approval.
 
-The follow-up changes only review metadata and the direct frontend user-guide pin; the guide content at the pinned frontend SHA is the reviewed content. Final patch verification passed `git diff --check`, changed-path review and the inline Python check against the baseline: 11 Markdown files, 49 added local links including 4 anchors, 2 external URLs, 0 errors, UTF-8 without BOM/LF. The pinned frontend guide was verified with `git show` from the local frontend Git object; no remote availability is claimed. The follow-up diff changes only three Markdown files; no runtime execution is added.
+The follow-up changes only review metadata and the direct frontend user-guide pin; the guide content at the pinned frontend SHA is the reviewed content. Final patch verification passed `git diff --check`, changed-path review and the inline Python check against the baseline: 11 Markdown files, 49 added local links including 4 anchors, 2 external URLs, 0 errors, UTF-8 without BOM/LF. The pinned frontend guide was verified with `git show` from the local frontend Git object; no remote availability is claimed. The follow-up diff changes only three Markdown files; no local runtime execution is added.
+
+## Hosted CI and paired PR delivery — 2026-11-02
+
+Backend [draft PR #85](https://github.com/chung6a8m/MyDmsVn/pull/85) is paired with frontend [draft PR #22](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/pull/22). [Hosted PR run 41377146596](https://github.com/chung6a8m/MyDmsVn/actions/runs/41377146596), job `125059754182` (`http-host`, Windows2022), **PASS** at PR head `9defa0fa9ae60ae618addece8949b1a46d439fc1`. The log checkout was PR merge ref `45bfe0ee6fa577b4905b510a0f68062c3d1503a0`. The coordinator fetched `refs/pull/85/merge` and verified both merge ref and PR head have tree `1440449c35dd0ddfb6252e71161b7836f59235ba` using `git rev-parse 'FETCH_HEAD^{tree}'` and `git rev-parse '9defa0fa9ae60ae618addece8949b1a46d439fc1^{tree}'`. The coordinator inspected the hosted logs and supplied these exact nonempty-complete execution summaries:
+
+| Hosted net48 suite | Total | Executed | Passed | Failed | Not executed |
+|---|---:|---:|---:|---:|---:|
+| http-host | 506 | 506 | 506 | 0 | 0 |
+| recovery-fixture | 62 | 62 | 62 | 0 | 0 |
+
+The existing [workflow](../../../.github/workflows/backend-web.yml) uses locked restore, Release/net48 builds and the following commands. It explicitly clears `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING`; the Security project invocation selects only the four pure validator classes. No SQL owner, IIS fixture, browser, publish or deployment was executed by this workflow.
+
+```powershell
+dotnet restore tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj --locked-mode
+dotnet build tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj -c Release -f net48 --no-restore
+dotnet test tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj -c Release -f net48 --no-build --no-restore --logger "trx;LogFileName=http-host.trx" --results-directory TestResults/backend-web
+dotnet restore tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj --locked-mode
+dotnet build tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore
+$filter = 'FullyQualifiedName~WebRecoveryPilotResultTests|FullyQualifiedName~WebIntegratedPilotResultTests|FullyQualifiedName~WebReceiptPilotResultTests|FullyQualifiedName~WebFrontendPortBridgeTests'
+dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-build --no-restore --filter $filter --logger "trx;LogFileName=recovery-fixture.trx" --results-directory TestResults/backend-web
+```
+
+These hosted counts belong only to the exact head/ref/run above. This evidence-only follow-up does not claim a later-head CI result or add another test execution. The document was checked locally for whitespace, local links/anchors, UTF-8 without BOM/LF and evidence-only scope. PR delivery and hosted SQL-free PASS do not grant Owner acceptance, merge, B4-OPS-02 rehearsal or production approval.
 
 ## Disposition and retained limits
 
