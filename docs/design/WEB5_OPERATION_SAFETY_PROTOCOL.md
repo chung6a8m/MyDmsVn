@@ -70,6 +70,27 @@ Possible addition only if DDL requires: `013` migration and an explicit `web5`/e
 
 To release a local UNKNOWN after terminal negative, frontend must verify the **committed negative certificate**, current actor+epoch+fingerprint, and same owned immutable local intent. It may then preserve draft raw and request fresh authorized server baseline/rowversion before enabling a **new user-initiated** mutation with **new operation key**. This is never automatic. For irrevocable/expired COMMITTED without original Write result, preserve lock pending separate authoritative reconstruction and approval. Existing same-key resend remains independently gated by B01 crash proof and explicit UX acceptance.
 
+## 4.1 Positive business-commit case closure without editable result (P1-01)
+
+Seven days after an operation finishes, WEB4 status can report `RESULT_EXPIRED` even if physical bytes have not yet been compacted; expired is positive historical business evidence, never a rollback or terminal negative. When COMMITTED source/journal/ledger is independently proven but original Create/Update detail/version is missing, a separately authorized operator may close a SUPPORT CASE as `BUSINESS_COMMITTED_RESULT_UNAVAILABLE` using actor+epoch+operationId+fingerprint, source and Post journal/valuation/COGS, operator/correlation/UTC timestamp and a durable restricted audit trail. **Closing a support case is not settling, deleting, unlocking, retrying or allowing new-key writes for the existing UNKNOWN**. Client remains PROTECTED pending a separately approved local archival/recovery policy.
+
+A future user-consented local archival may retain minimal secure evidence/case ID and hide a protected document from active workspace only after exact actor/epoch/CAS, without deleting authoritative journal/tombstone or fabricating rowversion. A new editable session needs current permission and a fresh server baseline/version; Write-without-Read cannot infer this from an expired result. Otherwise leave protected and escalate. Record escalation before the seven-day window when possible; no fixed support SLA is currently authorized. Test expired/missing result and failed archival separately from NOT_EXECUTED.
+
+## 4.2 Browser contract compatibility versus strict cutover (P1-02)
+
+Choose and document ONE B02 ADR policy:
+
+- **A — additive:** keep old `web4-v1` six write/status contracts semantically safe; a loaded WEB4 client may keep working on the new host despite new terminal-negative capability. Require real old-client/new-host and new-client/old-host tests including delayed original, existing UNKNOWN, current authorization and old status safely failing closed on negative tombstone.
+- **B — strict:** enforce a new authenticated protocol/version fence at the server **on every mutation and protected status** before business logic; old clients/headers cannot fall back to unkeyed or WEB4 semantics. Test cached old JS, open tabs, session refresh, in-flight old command, rollback and fresh new client. Application bundle and DB `DeploymentEpoch` are unrelated; rotate epoch only for database clone/rewind, not routine deploy.
+
+The current backend `WebHostOptions` accepts `legacy-web11` or `web4` and frontend `operationsContext.ts` strictly parses `web4-v1`. They do not independently establish a version cutover fence. Pin separate compatibility vectors; frozen 48 WEB4 corpus blobs are immutable. The actual chosen B02 contract governs F02/F04 behavior, never a hypothetical URL/header in this proposal.
+
+## 4.3 Schema12 source admission and six-command race proof (P2-01/P2-03)
+
+Existing `012_WebOperationJournal.sql` permits `CANCELLED` INSERT but trigger permits only COMMITTED→EXPIRED updates; never update a success row to negative. If safe terminal audit can be added without DDL, prove current schema12 insertion under original lock. If migration013 is required, add explicit exact12→13 preflight and maintenance admission; current `DatabaseMigrationRunner.ValidateWebSchemaStateBeforeMigration` only recognizes exact11/exact10 as old. Validate exact12 objects/history/fingerprint/grants before 013, plus fresh13, admitted 10/11 sources, partial/spoofed/too-new, failed-migration rollback/rerun and unchanged old schema modes.
+
+B5-NEG-08 must exercise all six Sales.Create/Update/Post and Receipt.Create/Update/Post, each in **writer-first and operator-first** fence order (12 arrangements). Verify mutually exclusive COMMITTED and permanent CANCELLED outcomes, transaction-owned audit, original Write version/lines, Sales Post version versus Receipt Post no version, physical ledger/valuation/COGS and absence of unintended effects. Additional crash/revocation cases are separate tests; do not assert test case count just because 12 arrangements were described.
+
 ## 5. Operator command and maintenance safety
 
 Initial CLI commands are proposals to be verified against actual project/DB design, not runnable commands today:
@@ -87,6 +108,12 @@ Tool must never use raw browser token, generic service runtime connection, unche
 ## 6. Release topology, retention and nonclaims
 
 FULL IIS staging requires Windows IIS components (W3SVC/WAS), app pool, ASP.NET/System.Web mapping, TLS and versioned published `dist`; IIS Express evidence from WEB4 is not transferable. Re-test CSP nonce for Dockview/AG Grid, Zod non-JIT, asset routing, cookie/Origin/CSRF, proxy/header spoofing and SQL principal/startup mismatch on the actual staged process. A two-worker topology requires a shared atomic limiter or a documented one-worker bound; an in-memory per-worker limiter is not multi-worker proof. Audit sink ACL, retention/backup/restore and maintenance tooling need **actual rehearsal**, not merely documentation.
+
+## 6.1 Measurable production-readiness thresholds (P2-04)
+
+B05 must exercise a representative measured workload on actual full IIS with concurrent authenticated actors and Sales/Receipt Create/Update/Post, status, refresh and Inventory reads, both steady and restart/limiter/compaction stress. Record per-command p50/p95/p99 latency, timeouts/errors, throughput, worker CPU/RAM, SQL pool/locks/deadlocks, journal growth and maintenance impact. Rehearse consistent backup/restore and incident alert/escalation; measure actual RPO/RTO and unresolved UNKNOWN queue age. Publish exact runner/SQL/IIS configuration, test duration and sample sizes.
+
+**No arbitrary SLA values are preapproved.** B05 submits proposed numeric acceptance targets from baseline and representative risk; B06 obtains an explicit Owner threshold decision and compares each **target versus observed final candidate**. Missing gate/failed target is NOT RUN, BLOCKED or Owner DEFERRED, never green from historical WEB4 or overall averages.
 
 Release decision table:
 
