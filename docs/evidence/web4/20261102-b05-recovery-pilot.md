@@ -95,8 +95,8 @@ After both browser fixtures drained, the coordinator ran the remaining SQL owner
 ```powershell
 dotnet restore tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj --locked-mode
 dotnet test tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj -c Release -f net48 --no-restore --filter FullyQualifiedName~WebOperationCommandTests --logger 'trx;LogFileName=web4-b05-inventory-final.trx' --results-directory TestResults/web4-b05-inventory-final
-dotnet restore tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Migrations.Tests.csproj --locked-mode
-dotnet test tests/MyDmsVn.Server.Migrations.Tests/MyDmsVn.Server.Migrations.Tests.csproj -c Release -f net48 --no-restore --filter FullyQualifiedName~WebAuthMigrationTests --logger 'trx;LogFileName=web4-b05-migrations-final.trx' --results-directory TestResults/web4-b05-migrations-final
+dotnet restore tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj --locked-mode
+dotnet test tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj -c Release -f net48 --no-restore --filter FullyQualifiedName~WebAuthMigrationTests --logger 'trx;LogFileName=web4-b05-migrations-final.trx' --results-directory TestResults/web4-b05-migrations-final
 ```
 
 The distinct focused SQL total is **110 passed (Security86 + Inventory7 + migrations17), 0 failed/skipped**, excluding the two browser wrapper rows. Inventory covers transaction-owned command/replay/concurrency boundaries; migrations cover exact schema/grant/admission boundaries. No cleanup failure was reported.
