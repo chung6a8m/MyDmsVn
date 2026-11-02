@@ -1,6 +1,6 @@
 # WEB4 B06 — operator handoff documentation candidate
 
-Date: 2026-11-02, Asia/Bangkok. **IN_PROGRESS / review-ready documentation candidate; independent review complete, Owner acceptance pending.** Owner selected WEB4-06/F05 and its backend B06 documentation companion. [Owning plan](../../plans/20261101-003-web4-reliability-server.md#7-b06--runbook-handoff-and-closeout-planned) · [operator handoff](../../development/WEB4_OPERATOR_HANDOFF.md). No DONE/archival/merge or production approval is inferred.
+Date: 2026-11-02, Asia/Bangkok. **DONE (bounded); Owner accepted and PR #85 merged 2026-11-02.** Owner selected WEB4-06/F05 and its backend B06 documentation companion. [Owning plan](../../plans/20261101-003-web4-reliability-server.md#7-b06--runbook-handoff-and-closeout-planned) · [operator handoff](../../development/WEB4_OPERATOR_HANDOFF.md). The acceptance section below records explicit Owner authorization, merge and archival; no production approval is inferred.
 
 ## Baseline and scope
 
@@ -63,6 +63,21 @@ dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.In
 
 These hosted counts belong only to the exact head/ref/run above. This evidence-only follow-up does not claim a later-head CI result or add another test execution. The document was checked locally for whitespace, local links/anchors, UTF-8 without BOM/LF and evidence-only scope. PR delivery and hosted SQL-free PASS do not grant Owner acceptance, merge, B4-OPS-02 rehearsal or production approval.
 
-## Disposition and retained limits
+## Candidate disposition before Owner acceptance
 
 Candidate is review-ready after independent review; Owner disposition remains pending. Same-key resend, negative administrative unlock, production operator tooling/audit/retention deployment, backup/restore drill, distributed limiter/proxy policy, full IIS and production release remain unapproved or unverified. B06/F05 completion routing and archive remain conditional on actual Owner acceptance; no earlier WEB1–03 or independent CEX status changes.
+
+## Owner acceptance and merge — 2026-11-02
+
+Owner explicitly accepted the recorded F05/B06 scope and limits, authorized final CI check/review/fixes and merge of frontend PR #22/backend PR #85, then directed evidence update and archival of Roadmap 04. Final independent reviews found no actionable findings. **B06 is DONE (bounded); backend B01–B06 are completed within their recorded scopes.**
+
+| Repository | Reviewed PR head | Merge commit | Matching tree |
+|---|---|---|---|
+| Backend PR #85 | `ebe245631c25aaffdac3b465e2125a1e9fed25ba` | `a3f3db16381a38bdf0b76e8ab36cb55bec02bbd2` | `b0416a0ca9626a2d49681d11f507f86f44f97986` |
+| Frontend PR #22 | `5afc2b75d7fb5fd5839e873eb3272ab4014926b3` | `ea104582a5aa4bcdf0d04999296a30a3c43e450e` | `ff2305ade05a788f2d1488aa6afbf8c7d00a1757` |
+
+Final backend [CI run 41377434786](https://github.com/chung6a8m/MyDmsVn/actions/runs/41377434786), job `125060640972`, passed on the reviewed head above; tested PR merge ref `c635dc7a03aa31d570c32121a1e8de6350db3659` has the same `b0416a0...` tree. Actual hosted SQL-free counts: HttpHost **506/506 passed**, recovery fixture **62/62 passed**, **0 failed/notExecuted**. Commands and scope are the unchanged workflow commands recorded above. The backend archive checkout fetched main and independently verified reviewed-head/actual-merge tree equality with `git rev-parse` before starting closeout.
+
+Final frontend [CI run 41378106326](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/actions/runs/41378106326), job `125062721559`, passed **1218 unit**, **196 Chromium**, **1 artifact** test. Reviewed merge ref `41dd6df93154bfada86578f864128e1272ca0e26` has the same `ff2305...` tree as its reviewed/merged candidate. Frontend execution remains owned by its evidence; these supplied coordinator results do not assert backend SQL, Edge or operator rehearsal.
+
+This closes the accepted documentation handoff and authorizes archiving the execution plan. The operator guide and host runbook remain live technical references. Original B01–B05 and WEB1–03 evidence is unchanged; CEX remains ACTIVE independently. B06 local runtime tests remain **0 / NOT RUN**; no SQL/migration/IIS/browser/rotation/compaction/backup/restore rehearsal is added by closeout. Real process-crash/Commit proof, same-key resend activation, terminal negative unlock, attended IME/Narrator, production audit/backup/retention/distributed-limiter/proxy controls and full IIS/production remain unverified or unapproved. Bounded completion does not waive or pass these limits.
