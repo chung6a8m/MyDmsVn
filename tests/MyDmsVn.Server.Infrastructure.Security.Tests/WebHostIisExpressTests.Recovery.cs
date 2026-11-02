@@ -166,7 +166,7 @@ SELECT COUNT(*) FROM (
     {
         var movements = (await sql.QueryAsync<RecoveryMovement>(@"
 SELECT l.LedgerId,l.DocumentType,l.DocumentId,l.WarehouseId,l.ProductId,l.QuantityChange,v.ValueChange,
-COALESCE(rl.LineNo,sl.LineNo) AS LineNo,rl.UnitCost AS ReceiptUnitCost,sl.PostedUnitCost,sl.CostAmount,sl.UnitPrice,sl.IsGift,sl.LineAmount
+COALESCE(rl.[LineNo],sl.[LineNo]) AS [LineNo],rl.UnitCost AS ReceiptUnitCost,sl.PostedUnitCost,sl.CostAmount,sl.UnitPrice,sl.IsGift,sl.LineAmount
 FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId
 LEFT JOIN dbo.GoodsReceiptLines rl ON l.DocumentType='GoodsReceipt' AND rl.ReceiptId=l.DocumentId AND rl.ReceiptLineId=l.DocumentLineId
 LEFT JOIN dbo.SalesReceiptLines sl ON l.DocumentType='SalesReceipt' AND sl.SaleId=l.DocumentId AND sl.SaleLineId=l.DocumentLineId ORDER BY l.LedgerId;")).ToArray();
