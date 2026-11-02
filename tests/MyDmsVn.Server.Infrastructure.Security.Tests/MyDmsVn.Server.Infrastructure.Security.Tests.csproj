@@ -52,4 +52,13 @@
   <ItemGroup>
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\FrozenWeb11Migration.cs" Link="FrozenWeb11Migration.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MyDmsVn.WebOperation.CrashHost\MyDmsVn.WebOperation.CrashHost.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Target Name="CopyWeb5CrashHost" AfterTargets="Build">
+    <ItemGroup>
+      <Web5CrashHostFiles Include="$(MSBuildThisFileDirectory)..\MyDmsVn.WebOperation.CrashHost\bin\$(Configuration)\net48\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(Web5CrashHostFiles)" DestinationFiles="@(Web5CrashHostFiles->'$(OutDir)CrashHost\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
