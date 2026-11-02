@@ -413,7 +413,7 @@ public sealed partial class WebHostIisExpressTests
             if (recovery != null)
             {
                 await recovery.Stop();
-                await VerifyRecoveryStock(connectionString, JObject.Parse(File.ReadAllText(resultPath)), recovery.Epochs, warehouse, product, receiptProduct, integrated!);
+                await VerifyRecoveryStock(connectionString, runDirectory, JObject.Parse(File.ReadAllText(resultPath)), recovery.Epochs, warehouse, product, receiptProduct, integrated!);
                 return;
             }
             var posted = JArray.Parse(File.ReadAllText(resultPath));

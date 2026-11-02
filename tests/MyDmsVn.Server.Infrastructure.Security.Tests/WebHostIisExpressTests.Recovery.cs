@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -63,30 +64,23 @@ public sealed partial class WebHostIisExpressTests
         }
     }
 
-    private static async Task VerifyRecoveryStock(string connectionString, JObject result, Guid[] epochs,
+    private static async Task VerifyRecoveryStock(string connectionString, string runDirectory, JObject result, Guid[] epochs,
         int warehouse, int product, int receiptProduct, IntegratedCatalog integrated)
     {
         using var sql = new SqlConnection(connectionString);
         await sql.OpenAsync();
+        var environment = await sql.QuerySingleAsync<(string Version, string Level, string Edition)>(
+            "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ProductVersion')),CONVERT(nvarchar(128),SERVERPROPERTY('ProductLevel')),CONVERT(nvarchar(128),SERVERPROPERTY('Edition')); ");
+        File.WriteAllText(Path.Combine(runDirectory, "sql-environment.json"), new JObject
+        {
+            ["productVersion"] = environment.Version, ["productLevel"] = environment.Level, ["edition"] = environment.Edition,
+        }.ToString(), new System.Text.UTF8Encoding(false));
         var rows = (await sql.QueryAsync<RecoveryJournal>(@"
 SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition
 FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId;")).ToArray();
         Assert.NotEmpty(rows);
         Assert.Equal(new[] { 1, 2, 3, 4, 5, 6 }, rows.Select(row => row.OperationKind).Distinct().OrderBy(kind => kind));
-        var journal = new JArray(rows.Select(row =>
-        {
-            Assert.Equal("COMMITTED", row.Disposition);
-            Assert.InRange(row.OperationKind, 1, 6);
-            return new JObject
-            {
-                ["actor"] = row.Actor, ["operationId"] = row.OperationId.ToString("D"),
-                ["operationKind"] = RecoveryKinds[row.OperationKind - 1],
-                ["requestTargetId"] = row.RequestTargetId?.ToString(CultureInfo.InvariantCulture),
-                ["resultDocumentId"] = row.ResultDocumentId.ToString(CultureInfo.InvariantCulture),
-                ["requestFingerprint"] = BitConverter.ToString(row.RequestFingerprint).Replace("-", "").ToLowerInvariant(),
-                ["deploymentEpoch"] = row.DeploymentEpoch.ToString("D"),
-            };
-        }));
+        var journal = new JArray(rows.Select(RecoveryJournalJson));
         VerifyRecoveryResult(result, journal,
             (await sql.QueryAsync<long>("SELECT ReceiptId FROM dbo.GoodsReceipts WHERE Status='Posted';")).ToArray(),
             (await sql.QueryAsync<long>("SELECT SaleId FROM dbo.SalesReceipts WHERE Status='Posted';")).ToArray(), epochs);
@@ -235,6 +229,21 @@ LEFT JOIN dbo.SalesReceiptLines sl ON l.DocumentType='SalesReceipt' AND sl.SaleI
         return value;
     }
     private static InvalidDataException RecoveryInvalid() => new InvalidDataException("Invalid WEB4 recovery pilot result.");
+    internal static JObject RecoveryJournalFromRecord(IDataRecord record) => RecoveryJournalJson(SqlOracleExtensions.Read<RecoveryJournal>(record));
+    private static JObject RecoveryJournalJson(RecoveryJournal row)
+    {
+        Assert.Equal("COMMITTED", row.Disposition);
+        Assert.InRange(row.OperationKind, 1, 6);
+        return new JObject
+        {
+            ["actor"] = row.Actor, ["operationId"] = row.OperationId.ToString("D"),
+            ["operationKind"] = RecoveryKinds[row.OperationKind - 1],
+            ["requestTargetId"] = row.RequestTargetId.HasValue ? new JValue(row.RequestTargetId.Value.ToString(CultureInfo.InvariantCulture)) : JValue.CreateNull(),
+            ["resultDocumentId"] = row.ResultDocumentId.ToString(CultureInfo.InvariantCulture),
+            ["requestFingerprint"] = BitConverter.ToString(row.RequestFingerprint).Replace("-", "").ToLowerInvariant(),
+            ["deploymentEpoch"] = row.DeploymentEpoch.ToString("D"),
+        };
+    }
     private sealed class RecoveryJournal
     {
         public string Actor { get; set; } = "";

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.IO;
+using System.Data;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -24,6 +26,31 @@ public sealed class WebRecoveryPilotResultTests
 
     [Fact]
     public void Committed_draft_create_matches_original_null_target_and_physical_journal() => Verify(Result());
+
+    [Theory]
+    [InlineData(1, "Sales.Create", false)]
+    [InlineData(2, "Sales.Update", true)]
+    [InlineData(3, "Sales.Post", true)]
+    [InlineData(4, "Receipt.Create", false)]
+    [InlineData(5, "Receipt.Update", true)]
+    [InlineData(6, "Receipt.Post", true)]
+    public void SQL_projection_preserves_command_kind_and_JSON_null_or_string_target_before_exact_comparison(int kind, string wireKind, bool target)
+    {
+        using var table = new DataTable();
+        table.Columns.Add("Actor", typeof(string)); table.Columns.Add("OperationId", typeof(Guid));
+        table.Columns.Add("OperationKind", typeof(byte)); table.Columns.Add("RequestTargetId", typeof(long));
+        table.Columns.Add("ResultDocumentId", typeof(long)); table.Columns.Add("RequestFingerprint", typeof(byte[]));
+        table.Columns.Add("DeploymentEpoch", typeof(Guid)); table.Columns.Add("Disposition", typeof(string));
+        table.Rows.Add("integratedEditor", Guid.Parse((string)Operation()["operationId"]!), (byte)kind, target ? (object)1L : DBNull.Value,
+            1L, Enumerable.Repeat((byte)0xaa, 32).ToArray(), Epoch, "COMMITTED");
+        using var record = table.CreateDataReader(); Assert.True(record.Read());
+        var actual = WebHostIisExpressTests.RecoveryJournalFromRecord(record);
+        Assert.Equal(target ? JTokenType.String : JTokenType.Null, actual["requestTargetId"]!.Type);
+        var result = Result();
+        result["operations"]![0]!["operationKind"] = wireKind;
+        if (target) result["operations"]![0]!["requestTargetId"] = "1";
+        Verify(result, new JArray(actual));
+    }
 
     [Fact]
     public void Omitted_committed_operation_is_rejected()
