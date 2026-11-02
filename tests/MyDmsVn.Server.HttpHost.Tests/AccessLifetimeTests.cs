@@ -45,7 +45,7 @@ public sealed class AccessLifetimeTests
     }
 
     [Theory]
-    [InlineData("legacy-web11", false)][InlineData("web4", true)]
+    [InlineData("legacy-web11", false)][InlineData("web4", true)][InlineData("web5", true)]
     public void Explicit_mode_selects_matching_host_admission(string mode, bool enabled)
     {
         WithEnvironment(null, () => Assert.Equal(enabled, WebHostOptions.FromEnvironment().Web4Enabled), mode);

@@ -25,6 +25,7 @@ internal static class WebFrontendPortBridge
 {
     internal const string Origin = "https://web2.mydmsvn.test";
     internal const string CheckoutVariable = "MYDMSVN_WEB4_PORT_FRONTEND_DIRECTORY";
+    internal const string ResolutionCheckoutVariable = "MYDMSVN_WEB5_PORT_FRONTEND_DIRECTORY";
     internal const int MaximumFrameBytes = 1048576;
     private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
     private static readonly TimeSpan Budget = TimeSpan.FromMinutes(4);
@@ -37,15 +38,19 @@ internal static class WebFrontendPortBridge
         public int Restarts { get; set; }
         public int CompletedTests { get; set; }
         public int Requests { get; set; }
+        public int TerminalDecisions { get; set; }
     }
 
-    public static async Task<Observation> RunAsync(HttpScenario scenario, JObject bootstrap)
+    public static async Task<Observation> RunAsync(HttpScenario scenario, JObject bootstrap, Func<JObject, CancellationToken, Task>? resolve = null)
     {
-        var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable(CheckoutVariable)!);
+        var resolution = resolve != null;
+        var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable(resolution ? ResolutionCheckoutVariable : CheckoutVariable)!);
+        var version = resolution ? "web5" : "web4";
+        var config = "vitest." + version + ".integration.config.ts";
         var node = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_NODE")
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe");
         var cli = Path.Combine(checkout, "node_modules", "vitest", "vitest.mjs");
-        foreach (var file in new[] { node, cli, Path.Combine(checkout, "vitest.web4.integration.config.ts"), Path.Combine(checkout, "tests", "integration", "web4-ports.test.ts") })
+        foreach (var file in new[] { node, cli, Path.Combine(checkout, config), Path.Combine(checkout, "tests", "integration", version + "-ports.test.ts") })
             if (!Path.IsPathRooted(file) || !File.Exists(file)) throw new InvalidOperationException("The explicitly selected frontend port test checkout or Node installation is incomplete.");
 
         var name = "mydmsvn-web4-ports-" + Guid.NewGuid().ToString("N");
@@ -59,13 +64,13 @@ internal static class WebFrontendPortBridge
         // Disposing the async pipe also releases pending net48 reads/connects. An active
         // OWIN request is separately awaited below before this method permits SQL disposal.
         using var close = cancellation.Token.Register(() => pipe.Dispose());
-        var start = new ProcessStartInfo(node, "\"" + cli + "\" run --config vitest.web4.integration.config.ts")
+        var start = new ProcessStartInfo(node, "\"" + cli + "\" run --config " + config)
         { WorkingDirectory = checkout, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
         foreach (var variable in start.EnvironmentVariables.Keys.Cast<string>().Where(value => value.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase)).ToArray())
             start.EnvironmentVariables.Remove(variable);
         start.EnvironmentVariables["MYDMSVN_WEB4_PORT_PIPE"] = @"\\.\pipe\" + name;
         var observation = new Observation();
-        var serving = Serve(pipe, scenario, bootstrap, observation, cancellation.Token);
+        var serving = Serve(pipe, scenario, bootstrap, observation, cancellation.Token, resolve);
         var child = GuiOwnedProcess.RunAsync(start, Budget, cancellation.Token);
         Exception? failure = null;
         try
@@ -97,11 +102,11 @@ internal static class WebFrontendPortBridge
         return observation;
     }
 
-    private static async Task Serve(NamedPipeServerStream pipe, HttpScenario scenario, JObject bootstrap, Observation observed, CancellationToken token)
+    private static async Task Serve(NamedPipeServerStream pipe, HttpScenario scenario, JObject bootstrap, Observation observed, CancellationToken token, Func<JObject, CancellationToken, Task>? resolve)
     {
         await pipe.WaitForConnectionAsync(token).ConfigureAwait(false);
         bootstrap["type"] = "bootstrap";
-        bootstrap["protocol"] = "web4-port-bridge-v1";
+        bootstrap["protocol"] = resolve == null ? "web4-port-bridge-v1" : "web5-port-bridge-v1";
         bootstrap["origin"] = Origin;
         await WriteFrame(pipe, bootstrap, token).ConfigureAwait(false);
         for (var expectedId = 1; expectedId <= 200; expectedId++)
@@ -112,7 +117,7 @@ internal static class WebFrontendPortBridge
             var type = (string)frame["type"]!;
             if (type == "http")
             {
-                using var request = CreateRequest(frame);
+                using var request = CreateRequest(frame, resolve != null);
                 observed.Requests++;
                 var path = request.RequestUri!.AbsolutePath;
                 if (request.Method != HttpMethod.Get && (path.StartsWith("/api/v1/sales-receipts", StringComparison.Ordinal) || path.StartsWith("/api/v1/goods-receipts", StringComparison.Ordinal)))
@@ -124,9 +129,20 @@ internal static class WebFrontendPortBridge
                 }
                 var response = await scenario.Send(request).ConfigureAwait(false);
                 if (request.Method == HttpMethod.Get && path.StartsWith("/api/v1/operations/", StringComparison.Ordinal) && !path.EndsWith("/context", StringComparison.Ordinal)) observed.StatusReads++;
+                if (request.Method == HttpMethod.Get && path.StartsWith("/api/v2/operations/", StringComparison.Ordinal) && path.EndsWith("/resolution", StringComparison.Ordinal)) observed.StatusReads++;
                 if (request.Method == HttpMethod.Get && response.Status == 403 && Regex.IsMatch(path, @"\A/api/v1/(sales-receipts|goods-receipts)/[0-9]+\z")) observed.DeniedDocumentReads++;
                 var headers = new JArray(response.Headers.SelectMany(header => header.Value.Select(value => new JArray(header.Key, value))));
                 await WriteFrame(pipe, new JObject { ["id"] = expectedId, ["type"] = type, ["status"] = response.Status, ["headers"] = headers, ["body"] = response.Body }, token).ConfigureAwait(false);
+            }
+            else if (type == "resolve" && resolve != null)
+            {
+                RequireProperties(frame, "id", "type", "operation");
+                if (frame["operation"] is not JObject operation) throw InvalidFrame();
+                // Only the designated backend test fixture has operator authority. This
+                // private pipe action is never routed through production HTTP or browser DI.
+                await resolve(operation, token).ConfigureAwait(false);
+                observed.TerminalDecisions++;
+                await WriteFrame(pipe, new JObject { ["id"] = expectedId, ["type"] = type }, token).ConfigureAwait(false);
             }
             else if (type == "restart")
             {
@@ -148,7 +164,7 @@ internal static class WebFrontendPortBridge
         throw new InvalidDataException("Frontend port bridge request limit exceeded.");
     }
 
-    internal static HttpRequestMessage CreateRequest(JObject frame)
+    internal static HttpRequestMessage CreateRequest(JObject frame, bool resolution = false)
     {
         RequireProperties(frame, "id", "type", "method", "path", "headers", "body");
         if (frame["method"]?.Type != JTokenType.String || frame["path"]?.Type != JTokenType.String || frame["headers"] is not JArray headers ||
@@ -156,7 +172,7 @@ internal static class WebFrontendPortBridge
         var method = (string)frame["method"]!;
         var path = (string)frame["path"]!;
         if ((method != "GET" && method != "POST" && method != "PUT") || path.Length > 2048 ||
-            !path.StartsWith("/api/v1/", StringComparison.Ordinal) || path.Contains("..") || path.IndexOfAny(new[] { '#', '\\', '\r', '\n' }) >= 0 ||
+            !(path.StartsWith("/api/v1/", StringComparison.Ordinal) || resolution && method == "GET" && path.StartsWith("/api/v2/operations/", StringComparison.Ordinal)) || path.Contains("..") || path.IndexOfAny(new[] { '#', '\\', '\r', '\n' }) >= 0 ||
             !Uri.TryCreate(Origin + path, UriKind.Absolute, out var uri) || uri.GetLeftPart(UriPartial.Authority) != Origin || uri.PathAndQuery != path || headers.Count > 32) throw InvalidFrame();
         var request = new HttpRequestMessage(new HttpMethod(method), uri);
         try
@@ -231,5 +247,15 @@ internal sealed class WebFrontendPortSqlFactAttribute : FactAttribute
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)) ||
             string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(WebFrontendPortBridge.CheckoutVariable)))
             Skip = "Actual frontend port integration requires the designated nonproduction SQL connection and an explicit frontend checkout.";
+    }
+}
+
+internal sealed class Web5FrontendPortSqlFactAttribute : FactAttribute
+{
+    public Web5FrontendPortSqlFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)) ||
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(WebFrontendPortBridge.ResolutionCheckoutVariable)))
+            Skip = "Actual WEB5 port integration requires the designated nonproduction SQL connection and an explicit frontend checkout.";
     }
 }

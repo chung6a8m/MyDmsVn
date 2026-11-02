@@ -1,0 +1,163 @@
+name: WEB5 protected SQL B02 candidate
+
+# Explicit Owner opt-in, including before this proposed workflow is merged.
+# Never consume fork/PR workflow code, arbitrary refs, secrets or downloaded artifacts.
+on:
+  push:
+    tags: ['web5-sql-candidate-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web5-sql-candidate
+  cancel-in-progress: false
+
+jobs:
+  sql-candidate:
+    if: >-
+      github.repository_id == '1409766698' && github.actor == 'chung6a8m' &&
+      github.triggering_actor == 'chung6a8m' && github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/web5-sql-candidate-')
+    environment: web5-sql-candidate
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING: ''
+    steps:
+      - name: Set private and sanitized evidence paths
+        run: |
+          "WEB5_STATE=$env:RUNNER_TEMP/web5-sql-state.json" >> $env:GITHUB_ENV
+          "WEB5_RAW=$env:RUNNER_TEMP/web5-sql-raw" >> $env:GITHUB_ENV
+          "WEB5_SAFE=$env:RUNNER_TEMP/web5-sql-safe" >> $env:GITHUB_ENV
+      - name: Checkout reviewed control commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+      - name: Checkout exact reviewed B02 source and tests
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify guards, exact combined candidate and immutable WEB4 corpus
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path $env:WEB5_RAW,$env:WEB5_SAFE | Out-Null
+          if ((git -C candidate rev-parse HEAD) -ne $env:GITHUB_SHA -or $LASTEXITCODE -ne 0) { throw 'Candidate pin mismatch.' }
+          if ((git -C control rev-parse HEAD) -ne $env:GITHUB_SHA -or $LASTEXITCODE -ne 0) { throw 'Control commit mismatch.' }
+          & ./control/.github/scripts/Test-Web5SqlEvidence.ps1
+          if ((git -C candidate rev-parse HEAD:docs/contracts/web4-v1) -ne 'fcab4a1e7505b150a132ce2899002930e9f2a6ee' -or $LASTEXITCODE -ne 0) { throw 'Frozen WEB4 corpus changed.' }
+      - name: Allocate private SID-owned SQL instance
+        shell: powershell
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Initialize -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+      - name: Security original status, terminal authority and operator process death
+        # Expanded B01 process matrices plus B02 cases; individual hang/drain bounds stay fixed.
+        timeout-minutes: 20
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference='Stop'
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          [IO.File]::WriteAllText($env:WEB5_STATE+'.active','Security')
+          $project='tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
+          $filter='(FullyQualifiedName~WebOperationJournalTests.|FullyQualifiedName~WebOperationReadTests.|FullyQualifiedName~WebOperationHttpSqlTests.|FullyQualifiedName~WebPrincipalProvisioningTests.|FullyQualifiedName~WebOperationResolutionTests.|FullyQualifiedName~WebOperationResolutionPrincipalTests.|FullyQualifiedName~WebOperationTerminalCrashTests.)&FullyQualifiedName!~Frontend_ports_recover_six_commands_through_actual_TestServer&FullyQualifiedName!~Frontend_ports_resolve'
+          dotnet restore $project --locked-mode *> "$env:WEB5_RAW/security-restore.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Security locked restore failed; raw output withheld.' }
+          dotnet build $project -c Release -f net48 --no-restore *> "$env:WEB5_RAW/security-build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Security build failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB5_RAW/security-discovery.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Security discovery failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 90s --blame-hang-dump-type none --logger 'trx;LogFileName=security.trx' --results-directory $env:WEB5_RAW *> "$env:WEB5_RAW/security-run.log"
+          $testExit=$LASTEXITCODE
+          Assert-Web5SqlEvidence -TrxPath "$env:WEB5_RAW/security.trx" -DiscoveryPath "$env:WEB5_RAW/security-discovery.log" -RequiredClasses @('WebOperationJournalTests','WebOperationReadTests','WebOperationHttpSqlTests','WebPrincipalProvisioningTests','WebOperationResolutionTests','WebOperationResolutionPrincipalTests','WebOperationTerminalCrashTests') -SummaryPath "$env:WEB5_SAFE/security.json" -Label Security
+          if ($testExit -ne 0) { throw 'Security test process failed.' }
+          Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Security owner did not drain.' }
+      - name: Inventory all six commands in both terminal fence orders
+        timeout-minutes: 10
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference='Stop'
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          [IO.File]::WriteAllText($env:WEB5_STATE+'.active','Inventory')
+          $project='tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj'
+          $filter='FullyQualifiedName~WebOperationCommandTests.|FullyQualifiedName~WebOperationTerminalCommandTests.'
+          dotnet restore $project --locked-mode *> "$env:WEB5_RAW/inventory-restore.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Inventory locked restore failed; raw output withheld.' }
+          dotnet build $project -c Release -f net48 --no-restore *> "$env:WEB5_RAW/inventory-build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Inventory build failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB5_RAW/inventory-discovery.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Inventory discovery failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 90s --blame-hang-dump-type none --logger 'trx;LogFileName=inventory.trx' --results-directory $env:WEB5_RAW *> "$env:WEB5_RAW/inventory-run.log"
+          $testExit=$LASTEXITCODE
+          Assert-Web5SqlEvidence -TrxPath "$env:WEB5_RAW/inventory.trx" -DiscoveryPath "$env:WEB5_RAW/inventory-discovery.log" -RequiredClasses @('WebOperationCommandTests','WebOperationTerminalCommandTests') -SummaryPath "$env:WEB5_SAFE/inventory.json" -Label Inventory
+          $inventory=Get-Content "$env:WEB5_SAFE/inventory.json" -Raw | ConvertFrom-Json
+          if ($inventory.requiredClasses.WebOperationTerminalCommandTests -ne 12) { throw 'All six commands in both fence orders must execute.' }
+          if ($testExit -ne 0) { throw 'Inventory test process failed.' }
+          Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Inventory owner did not drain.' }
+      - name: Migration exact13 upgrade and compatibility matrix
+        timeout-minutes: 10
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference='Stop'
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          [IO.File]::WriteAllText($env:WEB5_STATE+'.active','Migrations')
+          $project='tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj'
+          $filter='FullyQualifiedName~WebAuthMigrationTests.|FullyQualifiedName~WebOperationResolutionMigrationTests.'
+          dotnet restore $project --locked-mode *> "$env:WEB5_RAW/migrations-restore.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Migrations locked restore failed; raw output withheld.' }
+          dotnet build $project -c Release -f net48 --no-restore *> "$env:WEB5_RAW/migrations-build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Migrations build failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB5_RAW/migrations-discovery.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Migrations discovery failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 90s --blame-hang-dump-type none --logger 'trx;LogFileName=migrations.trx' --results-directory $env:WEB5_RAW *> "$env:WEB5_RAW/migrations-run.log"
+          $testExit=$LASTEXITCODE
+          Assert-Web5SqlEvidence -TrxPath "$env:WEB5_RAW/migrations.trx" -DiscoveryPath "$env:WEB5_RAW/migrations-discovery.log" -RequiredClasses @('WebAuthMigrationTests','WebOperationResolutionMigrationTests') -SummaryPath "$env:WEB5_SAFE/migrations.json" -Label Migrations
+          if ($testExit -ne 0) { throw 'Migrations test process failed.' }
+          Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Migration owner did not drain.' }
+      - name: Verify exact candidate source remained unchanged
+        run: |
+          git -C candidate diff --exit-code --quiet
+          if ($LASTEXITCODE -ne 0) { throw 'Reviewed candidate source changed.' }
+      - name: Prove ownership and drain before instance removal
+        if: ${{ always() }}
+        shell: powershell
+        timeout-minutes: 2
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Complete -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+      - name: Require all SQL evidence and clean lifecycle
+        if: ${{ always() }}
+        run: |
+          $instance=Get-Content "$env:WEB5_SAFE/instance.json" -Raw | ConvertFrom-Json
+          if ($instance.phase -ne 'Removed' -or $instance.quarantine -or -not $instance.instanceOwnershipVerified -or $instance.userDatabases -ne 0 -or $instance.activeOwners -ne 0) { throw 'SQL lifecycle was not proven clean.' }
+          if ($instance.controlSha -ne $env:GITHUB_SHA -or $instance.testSourceSha -ne $env:GITHUB_SHA) { throw 'SQL evidence is not bound to this exact candidate.' }
+          foreach ($owner in @('security','inventory','migrations')) {
+            $summary=Get-Content "$env:WEB5_SAFE/$owner.json" -Raw | ConvertFrom-Json
+            if (-not $summary.complete) { throw 'Required owner evidence failed.' }
+          }
+          'All three SQL owners completed with reconciled discovery/TRX and owned cleanup.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Publish sanitized evidence only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web5-sql-candidate-counts
+          path: ${{ env.WEB5_SAFE }}/*.json
+          if-no-files-found: error
+          retention-days: 14

@@ -11,7 +11,7 @@ public static class DatabaseMigratorCommand
         SqlConnectionConfigurationLoader configurationLoader,
         TextWriter output,
         TextWriter error,
-        bool web = false)
+        bool web = false, bool web5 = false)
     {
         if (configurationLoader == null)
         {
@@ -33,7 +33,7 @@ public static class DatabaseMigratorCommand
             var configuration = configurationLoader.Load(
                 SqlConnectionConfigurationPurpose.Migration);
             var runner = new DatabaseMigrationRunner();
-            var result = web ? runner.MigrateWeb(configuration.ConnectionString) : runner.Migrate(configuration.ConnectionString);
+            var result = web5 ? runner.MigrateWeb5(configuration.ConnectionString) : web ? runner.MigrateWeb(configuration.ConnectionString) : runner.Migrate(configuration.ConnectionString);
             if (!result.Successful)
             {
                 error.WriteLine(

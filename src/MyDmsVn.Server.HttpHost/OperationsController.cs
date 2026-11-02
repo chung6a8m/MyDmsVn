@@ -82,7 +82,7 @@ public sealed class OperationsController : ApiController
         return identity;
     }
 
-    private static JObject Envelope(WebOperationStatus status, Guid epoch, Guid key, byte[] fingerprint)
+    internal static JObject Envelope(WebOperationStatus status, Guid epoch, Guid key, byte[] fingerprint)
     {
         var create = status.Kind == WebOperationKind.SalesCreate || status.Kind == WebOperationKind.ReceiptCreate;
         if (status.DeploymentEpoch != epoch || status.OperationId != key || !status.RequestFingerprint.SequenceEqual(fingerprint) ||

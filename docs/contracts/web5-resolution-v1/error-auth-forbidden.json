@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "Auth.Forbidden",
+    "message": "The operation cannot be resolved.",
+    "details": [],
+    "correlationId": "web4-corpus-001"
+  }
+}

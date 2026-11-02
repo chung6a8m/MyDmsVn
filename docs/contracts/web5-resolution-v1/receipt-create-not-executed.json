@@ -1,0 +1,20 @@
+{
+  "data": {
+    "contractVersion": "web5-resolution-v1",
+    "actorUserId": 42,
+    "deploymentEpoch": "11111111-2222-4333-8444-555555555555",
+    "operationId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "operationKind": "Receipt.Create",
+    "method": "POST",
+    "routeScope": "/api/v1/goods-receipts",
+    "requestTargetId": null,
+    "requestFingerprint": "b963f81cae4fe681816b1a7a747d5452f5ce241247382d8dcfadac93b4f2ee89",
+    "state": "NOT_EXECUTED",
+    "outcome": null,
+    "terminal": {
+      "decisionId": "77777777-7777-4777-8777-777777777777",
+      "caseId": "WEB5-CASE-0042",
+      "decidedAtUtc": "2026-11-02T09:10:11.1234567Z"
+    }
+  }
+}

@@ -23,6 +23,11 @@ internal static class Program
             return DatabaseMigratorCommand.Run(new SqlConnectionConfigurationLoader(), Console.Out, Console.Error, web: true);
         }
 
+        if (args.Length == 1 && string.Equals(args[0], "--web5", StringComparison.Ordinal))
+        {
+            return DatabaseMigratorCommand.Run(new SqlConnectionConfigurationLoader(), Console.Out, Console.Error, web5: true);
+        }
+
         if (args.Length == 0)
         {
             return DatabaseMigratorCommand.Run(
@@ -74,7 +79,7 @@ internal static class Program
 
         Console.Error.WriteLine(
             "DbMigrator.InvalidArguments: Unknown command. Use no arguments for desktop schema10, --web for explicit schema12, " +
-            "or use security bootstrap-superuser, recover-superuser or rename-superuser.");
+            "--web5 for explicit schema13, or use security bootstrap-superuser, recover-superuser or rename-superuser.");
         return 2;
     }
 }

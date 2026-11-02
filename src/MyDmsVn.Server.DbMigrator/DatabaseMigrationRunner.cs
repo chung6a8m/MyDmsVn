@@ -23,8 +23,9 @@ public sealed class DatabaseMigrationRunner
     public DatabaseUpgradeResult Migrate(string connectionString) => MigrateCore(connectionString, false);
 
     public DatabaseUpgradeResult MigrateWeb(string connectionString) => MigrateCore(connectionString, true);
+    public DatabaseUpgradeResult MigrateWeb5(string connectionString) => MigrateCore(connectionString, true, true);
 
-    private DatabaseUpgradeResult MigrateCore(string connectionString, bool web)
+    private DatabaseUpgradeResult MigrateCore(string connectionString, bool web, bool web5 = false)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {
@@ -34,7 +35,8 @@ public sealed class DatabaseMigrationRunner
         ValidateTargetDatabase(connectionString);
 
         using var migrationLock = DatabaseMigrationLock.Acquire(connectionString);
-        if (web) ValidateWebSchemaStateBeforeMigration(connectionString, migrationLock.Connection);
+        if (web5) ValidateWeb5SchemaStateBeforeMigration(connectionString, migrationLock.Connection);
+        else if (web) ValidateWebSchemaStateBeforeMigration(connectionString, migrationLock.Connection);
         else ValidateSchemaStateBeforeMigration(connectionString, migrationLock.Connection);
         var connectionManager = new MigrationConnectionManager(
             new SqlConnectionManager(migrationLock.TransferConnectionOwnership), migrationLock.ReleaseSessionLock);
@@ -44,7 +46,7 @@ public sealed class DatabaseMigrationRunner
             .SqlDatabase(connectionManager)
             .WithScriptsEmbeddedInAssembly(
                 assembly,
-                resourceName => resourceName.Contains(".Scripts.") && (web ? SqlWebSchemaCompatibilityChecker.Scripts : SchemaCompatibilityPolicy.CurrentScripts).Any(script => resourceName.EndsWith(".Scripts." + script, StringComparison.Ordinal)))
+                resourceName => resourceName.Contains(".Scripts.") && (web5 ? SqlWeb5SchemaCompatibilityChecker.Scripts : web ? SqlWebSchemaCompatibilityChecker.Scripts : SchemaCompatibilityPolicy.CurrentScripts).Any(script => resourceName.EndsWith(".Scripts." + script, StringComparison.Ordinal)))
             .JournalToSqlTable("dbo", "SchemaVersions")
             .WithTransactionPerScript()
             .LogToNowhere()
@@ -53,10 +55,27 @@ public sealed class DatabaseMigrationRunner
         var result = engine.PerformUpgrade();
         if (web && result.Successful)
         {
-            var verified = new SqlWebSchemaCompatibilityChecker(connectionString).CheckAsync(System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+            var verified = (web5 ? new SqlWeb5SchemaCompatibilityChecker(connectionString).CheckAsync(System.Threading.CancellationToken.None)
+                : new SqlWebSchemaCompatibilityChecker(connectionString).CheckAsync(System.Threading.CancellationToken.None)).GetAwaiter().GetResult();
             if (!verified.IsCompatible) throw new DatabaseMigrationPreflightException("Migration.WebVerificationFailed", verified.SafeMessage);
         }
         return result;
+    }
+
+    private static void ValidateWeb5SchemaStateBeforeMigration(string connectionString, SqlConnection connection)
+    {
+        var state = SqlWeb5SchemaCompatibilityChecker.CheckConnectionAsync(connection, System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+        if (state.IsCompatible) return;
+        if (state.Status == SchemaCompatibilityStatus.Empty)
+        { ValidateSchemaStateBeforeMigration(connectionString, connection); return; }
+        if (state.Status == SchemaCompatibilityStatus.TooOld)
+        {
+            var exact12 = SqlWebSchemaCompatibilityChecker.CheckConnectionAsync(connection, System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+            if (exact12.IsCompatible) { Schema9MaintenanceValidator.Validate(connection); return; }
+            // Existing exact10/11 preflight verifies frozen definitions and requires drained writers.
+            ValidateWebSchemaStateBeforeMigration(connectionString, connection); return;
+        }
+        throw new DatabaseMigrationPreflightException("Migration.Web5" + state.Status, state.SafeMessage);
     }
 
     private static void ValidateWebSchemaStateBeforeMigration(string connectionString, SqlConnection connection)

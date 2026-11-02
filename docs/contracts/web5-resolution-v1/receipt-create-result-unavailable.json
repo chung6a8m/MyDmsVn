@@ -1,0 +1,16 @@
+{
+  "data": {
+    "contractVersion": "web5-resolution-v1",
+    "actorUserId": 42,
+    "deploymentEpoch": "11111111-2222-4333-8444-555555555555",
+    "operationId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "operationKind": "Receipt.Create",
+    "method": "POST",
+    "routeScope": "/api/v1/goods-receipts",
+    "requestTargetId": null,
+    "requestFingerprint": "b963f81cae4fe681816b1a7a747d5452f5ce241247382d8dcfadac93b4f2ee89",
+    "state": "RESULT_UNAVAILABLE",
+    "outcome": null,
+    "terminal": null
+  }
+}

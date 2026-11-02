@@ -51,7 +51,7 @@ internal sealed class ControlChannel
         var method = RequiredString(value, "method");
         var path = RequiredString(value, "path");
         if (!new[] { "none", "before-commit", "commit-window", "after-commit" }.Contains(phase) ||
-            !new[] { "GET", "POST", "PUT" }.Contains(method) || path.StartsWith("/", StringComparison.Ordinal) ||
+            !new[] { "GET", "POST", "PUT", "OPERATOR" }.Contains(method) || path.StartsWith("/", StringComparison.Ordinal) ||
             path.Contains("\\") || path.Contains("..") || path.Contains(":") || path.Contains("#") || path.Length > 4096)
             throw new InvalidDataException();
         if (!(value["headers"] is JObject headerObject) || headerObject.Count > 64) throw new InvalidDataException();
@@ -61,7 +61,8 @@ internal sealed class ControlChannel
             if (!(header.Value is JArray items) || items.Count > 16 || items.Any(item => item.Type != JTokenType.String)) throw new InvalidDataException();
             headers.Add(header.Name, items.Select(item => (string)item!).ToArray());
         }
-        var mutation = phase == "none" ? null : SelectedMutation(method, path, headers);
+        if (method == "OPERATOR" && (path != "operations/terminal" || headers.Count != 0 || value["access"]!.Type != JTokenType.Null || phase == "commit-window")) throw new InvalidDataException();
+        var mutation = phase == "none" || method == "OPERATOR" ? null : SelectedMutation(method, path, headers);
         return new CrashRequest(connectionString, phase, method, path, NullableString(value, "body"), NullableString(value, "access"), headers, mutation);
     }
 

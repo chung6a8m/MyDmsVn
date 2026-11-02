@@ -1,20 +1,22 @@
 ﻿param(
     [Parameter(Mandatory=$true)][ValidateSet('Initialize','Check','Complete')][string]$Action,
     [Parameter(Mandatory=$true)][string]$StatePath,
-    [Parameter(Mandatory=$true)][string]$SummaryPath
+    [Parameter(Mandatory=$true)][string]$SummaryPath,
+    [ValidatePattern('^[0-9a-f]{40}$')][string]$TestSourceSha='fc36c879fdd2d46ee77d136bdb6f9e70f7191b64'
 )
 $ErrorActionPreference='Stop'
 # CI-only instance lifecycle. Test execution remains direct dotnet test in YAML.
 # Database allocation/drop continues to belong to the existing SqlTestDatabase helper.
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows' -or
     $env:GITHUB_REPOSITORY_ID -ne '1409766698') { throw 'This lifecycle is restricted to the designated GitHub-hosted Windows job.' }
+if ($TestSourceSha -ne 'fc36c879fdd2d46ee77d136bdb6f9e70f7191b64' -and $TestSourceSha -ne $env:GITHUB_SHA) { throw 'Only the immutable baseline or exact reviewed control candidate may be tested.' }
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 $sid=$identity.User.Value
 if ($sid -in @('S-1-5-18','S-1-5-19','S-1-5-20')) { throw 'A normal runner user must own the private instance.' }
 function Save-State($value) { [IO.File]::WriteAllText($StatePath, ($value|ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false)) }
 function Write-SafeSummary($value) {
     $safe=[ordered]@{ runId=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; image=$env:ImageVersion; runnerEnvironment=$env:RUNNER_ENVIRONMENT;
-        controlSha=$env:GITHUB_SHA; baselineSha='fc36c879fdd2d46ee77d136bdb6f9e70f7191b64'; phase=$value.phase;
+        controlSha=$env:GITHUB_SHA; baselineSha=if($TestSourceSha -eq 'fc36c879fdd2d46ee77d136bdb6f9e70f7191b64'){$TestSourceSha}else{$null}; testSourceSha=$TestSourceSha; phase=$value.phase;
         engineVersion=$value.engineVersion; edition=$value.edition; compatibility=$value.compatibility; ownerSidSha256=$value.sidHash; instanceOwnershipVerified=$value.verified;
         userDatabases=$value.userDatabases; activeOwners=$value.activeOwners; quarantine=$value.quarantine }
     $json=$safe|ConvertTo-Json -Depth 5 -Compress
