@@ -8,7 +8,7 @@
 |---|---|---|
 | `codex/web5-b01-crash-proof` | Test-only process supervisor, failpoints, real SQL oracle for six commands | In parallel with B04-A; no product resend |
 | `codex/web5-b04a-sql-ci-foundation` | Isolated protected SQL lane, existing owners, intentional RED and owned cleanup | May parallel B01; PASS before B02 runtime |
-| `codex/web5-b02-terminal-negative` | B02 ADR, exact12→13 if necessary, additive vs strict old-client protocol, six-command durable negative and versioned read | B01 AND B04-A proven, B04-B required before merge |
+| `codex/web5-b02-terminal-negative` | B02 ADR, exact12→13 if necessary, additive vs strict **with v1 recovery-only protected status**, six-command durable negative and versioned read | B01 AND B04-A proven, B04-B incl. B5-COMP-03/04 before merge |
 | `codex/web5-b04b-sql-ci-terminal` | New B02 six-command race/migration/compatibility selectors and exact-candidate CI | Pass before B02 acceptance; B04 not DONE until A+B |
 | `codex/web5-b03-operator-tools` | Operator CLI, positive COMMITTED/result unavailable ticket reconciliation, audited retention/rotation/backup rehearsal | B02 and B04-B accepted |
 | `codex/web5-b04-sql-ci` | Protected isolated SQL CI and cleanup/failure guards | Selected SQL owners stable; may overlap B03 |
@@ -27,7 +27,11 @@ Start isolated branch; map existing source/SQL lock-order/fixtures and publish e
 Create meaningful RED behavior/crash evidence before minimal changes when possible.
 Prepare protected SQL CI B04-A before B02 changes; run B04-B on exact B02 candidate before acceptance.
 B02 ADR selects schema12 reuse or explicit exact12->13 path, and additive WEB4-safe old clients
-or strict server-side per-write/status version fence. Prove all six commands x two lock orders.
+or strict server-side per-write/new-status fence WITH legacy v1 recovery-only readback.
+For existing schema-v1 DISPATCHED/UNKNOWN, preserve old actor/epoch/key/fingerprint and
+original COMMITTED result/version after cutover without allowing any old POST/PUT.
+B04-B must test v1 positive, NOT_OBSERVED, expiry, revoked actor, CANCELLED and stale epoch.
+Prove all six commands x two lock orders.
 Do not use a test-only injection seam in published runtime. Preserve authoritative
 operation journal same business transaction, frozen contract, exact mode/schema and grants.
 For operator negative, absence/404/timeout is not rollback proof; only an audited
@@ -41,4 +45,4 @@ independent physical SQL oracle, cleanup, earlier failures and residual NOT RUN.
 Request independent review of P0/P1/P2, open narrow PR to main; do not release production.
 ~~~
 
-**Task PR requirements:** chosen Bxx, dependent Fxx/source pins, changed files and invariants, actual tests run, finite clean-up, sanitized logs, independent review, exact CI head, blocked/unsafe cases, follow-up sequencing. Apply existing repository Markdown/C# encoding policies. No fake SQL master, no global old test runner/test-gates, no broad unguarded SQL tests. Historical WEB4 evidence cannot be reused as current PASS. Documentation-only activation needs links/encoding/diff checks; it runs zero product tests.
+**Task PR requirements:** chosen Bxx, dependent Fxx/source pins, changed files and invariants, actual tests run, finite clean-up, sanitized logs, independent review, exact CI head, blocked/unsafe cases, follow-up sequencing. For strict B02 include independent pre-cutover WEB4 readback proof (B5-COMP-03/04) and explain permitted recovery-only route versus denied old mutation. Apply existing repository Markdown/C# encoding policies. No fake SQL master, no global old test runner/test-gates, no broad unguarded SQL tests. Historical WEB4 evidence cannot be reused as current PASS. Documentation-only activation needs links/encoding/diff checks; it runs zero product tests.
