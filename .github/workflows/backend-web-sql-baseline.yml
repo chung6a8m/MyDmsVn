@@ -74,11 +74,12 @@ jobs:
       - name: Security journal HTTP status and principals
         if: ${{ env.WEB5_RED != 'true' }}
         timeout-minutes: 10
+        working-directory: baseline
         run: |
           $ErrorActionPreference='Stop'
-          . ./control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
           [IO.File]::WriteAllText($env:WEB5_STATE+'.active','Security')
-          $project='baseline/tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
+          $project='tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
           $filter='(FullyQualifiedName~WebOperationJournalTests.|FullyQualifiedName~WebOperationReadTests.|FullyQualifiedName~WebOperationHttpSqlTests.|FullyQualifiedName~WebPrincipalProvisioningTests.)&FullyQualifiedName!~Frontend_ports_recover_six_commands_through_actual_TestServer'
           dotnet restore $project --locked-mode *> "$env:WEB5_RAW/security-restore.log"
           if ($LASTEXITCODE -ne 0) { throw 'Security locked restore failed; raw output withheld.' }
@@ -91,15 +92,16 @@ jobs:
           Assert-Web5SqlEvidence -TrxPath "$env:WEB5_RAW/security.trx" -DiscoveryPath "$env:WEB5_RAW/security-discovery.log" -RequiredClasses @('WebOperationJournalTests','WebOperationReadTests','WebOperationHttpSqlTests','WebPrincipalProvisioningTests') -SummaryPath "$env:WEB5_SAFE/security.json" -Label Security
           if ($testExit -ne 0) { throw 'Security test process failed.' }
           Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
-          powershell -NoProfile -File ./control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
           if ($LASTEXITCODE -ne 0) { throw 'Security owner did not drain.' }
       - name: Inventory six-command SQL oracle
         timeout-minutes: 10
+        working-directory: baseline
         run: |
           $ErrorActionPreference='Stop'
-          . ./control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
           [IO.File]::WriteAllText($env:WEB5_STATE+'.active','Inventory')
-          $project='baseline/tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj'
+          $project='tests/MyDmsVn.Server.Infrastructure.Inventory.Tests/MyDmsVn.Server.Infrastructure.Inventory.Tests.csproj'
           $filter='FullyQualifiedName~WebOperationCommandTests.'
           if ($env:WEB5_RED -eq 'true') { $filter='FullyQualifiedName~WebOperationCommandTests.Web_exact12_all_six_capture_original_results_and_replay_without_dynamic_work_or_Read' }
           dotnet restore $project --locked-mode *> "$env:WEB5_RAW/inventory-restore.log"
@@ -121,16 +123,17 @@ jobs:
           }
           if ($testExit -ne 0) { throw 'Inventory test process failed.' }
           Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
-          powershell -NoProfile -File ./control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
           if ($LASTEXITCODE -ne 0) { throw 'Inventory owner did not drain.' }
       - name: Migration compatibility and grant matrix
         if: ${{ env.WEB5_RED != 'true' }}
         timeout-minutes: 10
+        working-directory: baseline
         run: |
           $ErrorActionPreference='Stop'
-          . ./control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
           [IO.File]::WriteAllText($env:WEB5_STATE+'.active','Migrations')
-          $project='baseline/tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj'
+          $project='tests/MyDmsVn.Server.Infrastructure.Migrations.Tests/MyDmsVn.Server.Infrastructure.Migrations.Tests.csproj'
           $filter='FullyQualifiedName~WebAuthMigrationTests.'
           dotnet restore $project --locked-mode *> "$env:WEB5_RAW/migrations-restore.log"
           if ($LASTEXITCODE -ne 0) { throw 'Migrations locked restore failed; raw output withheld.' }
@@ -143,7 +146,7 @@ jobs:
           Assert-Web5SqlEvidence -TrxPath "$env:WEB5_RAW/migrations.trx" -DiscoveryPath "$env:WEB5_RAW/migrations-discovery.log" -RequiredClasses @('WebAuthMigrationTests') -SummaryPath "$env:WEB5_SAFE/migrations.json" -Label Migrations
           if ($testExit -ne 0) { throw 'Migrations test process failed.' }
           Remove-Item -LiteralPath ($env:WEB5_STATE+'.active')
-          powershell -NoProfile -File ./control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB5_STATE -SummaryPath "$env:WEB5_SAFE/instance.json"
           if ($LASTEXITCODE -ne 0) { throw 'Migration owner did not drain.' }
       - name: Verify unchanged GREEN baseline
         if: ${{ env.WEB5_RED != 'true' }}

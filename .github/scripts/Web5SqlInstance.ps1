@@ -67,7 +67,9 @@ try {
         }
         if (-not $utility) { throw 'The runner image lacks the required LocalDB tool.' }
         $stage='DiscoverVersions'
-        $versions=@(& $utility versions 2>$null);if($LASTEXITCODE -ne 0){throw 'Cannot inspect LocalDB engines.'}
+        $versionOutput=@(& $utility versions 2>$null);if($LASTEXITCODE -ne 0){throw 'Cannot inspect LocalDB engines.'}
+        # The utility prints product labels followed by parenthesized versions.
+        $versions=@([regex]::Matches(($versionOutput -join [Environment]::NewLine),'\b\d+\.\d+(?:\.\d+){0,2}\b') | ForEach-Object Value)
         Write-Output ('Installed LocalDB versions: '+(($versions | Where-Object { $_ -match '^\d+(\.\d+){1,3}$' }) -join ','))
         $engine=@('15.0','16.0')|Where-Object { $candidate=$_; @($versions|Where-Object {$_.Trim() -like ($candidate+'*')}).Count -gt 0 }|Select-Object -First 1
         if (-not $engine) { throw 'No reviewed SQL2019/2022 LocalDB engine is installed.' }
