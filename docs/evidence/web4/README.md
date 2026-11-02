@@ -22,3 +22,7 @@ Existing WEB2/WEB3 evidence remains immutable and candidate-specific. WEB4 sourc
 ## B04 — six keyed mutations and protected context/status
 
 [2026-11-02 B04 evidence](20261102-b04-http-operations.md): DONE (bounded; Owner accepted; PR #83 merged 2026-11-02). The [implementation checklist](../../development/WEB4_B04_IMPLEMENTATION_CHECKLIST.md) tracks source and verification work. Actual commands/counts and independent re-review belong to that record: runtime/test candidate `bd871518fd162927d938babd5535a2ddf91c2ad5` has 604 local passing rows, 0 failed/skipped. Hosted Windows CI at `b225bee` is PASS; Owner accepted and PR #83 merged at `59ca21d16f7839c6d7c553395a367e465591652b` on 2026-11-02. B05 browser pilot and production approval are not claimed.
+
+## WEB4-05 / B05 current work
+
+[Recovery fixture and integrated pilot evidence](20261102-b05-recovery-pilot.md) records the selected B05-A/B05-B stages; preparation is not live acceptance.
