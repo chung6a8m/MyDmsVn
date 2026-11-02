@@ -31,7 +31,9 @@ public sealed class WebOperationJournalTests
         var waiting = s.Track(s.Journal(second).AdmitAsync(op, s.Actor, s.Stop.Token));
         await s.Blocked(second.Sql.ServerProcessId, first.Sql.ServerProcessId);
         first.Tx.Commit();
-        Assert.Equal("original", Encoding.UTF8.GetString((await waiting)!));
+        var replay = (await waiting)!;
+        Assert.Equal(1, replay.ResultDocumentId);
+        Assert.Equal("original", Encoding.UTF8.GetString(replay.ResultBytes));
         second.Tx.Commit();
         Assert.Equal(1, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.Products;"));
         var changed = s.Operation(op.OperationId, new byte[32].Select(_ => (byte)1).ToArray());
@@ -226,7 +228,7 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@op,@epoch,1,1,1,NULL,@hash,1,'COMM
         await Assert.ThrowsAsync<SqlException>(() => s.Observer.ExecuteAsync("DECLARE @n datetime2(7)=SYSUTCDATETIME(); INSERT dbo.WebOperationJournal VALUES(@actor,NEWID(),@epoch,1,1,1,NULL,@hash,1,'COMMITTED',@bytes,@n,@n,DATEADD(day,7,@n));", new { actor = s.Actor, epoch = s.Epoch, hash = new byte[32], bytes = new byte[1048577] }));
     });
 
-    private static async Task Owned(Func<Scenario, Task> body)
+    internal static async Task Owned(Func<Scenario, Task> body)
     {
         var db = await SqlTestDatabase.CreateAsync(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         Scenario? s = null;
@@ -240,7 +242,7 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@op,@epoch,1,1,1,NULL,@hash,1,'COMM
         catch (Exception error) { failure = error; throw; }
         finally { try { if (s == null) await db.DisposeAsync(); else await s.Cleanup(); } catch (Exception cleanup) when (failure != null) { throw new AggregateException(failure, cleanup); } }
     }
-    private sealed class Scenario
+    internal sealed class Scenario
     {
         public SqlTestDatabase Database = null!; public SqlConnection Observer = null!; public int Actor; public int Role; public Guid Epoch; public Guid Session = Guid.NewGuid();
         public CancellationTokenSource Stop = new CancellationTokenSource(TimeSpan.FromSeconds(45));
@@ -321,7 +323,7 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@op,@epoch,1,1,1,NULL,@hash,1,'COMM
             finally { Stop.Dispose(); }
         }
     }
-    private sealed class Context : ISqlExecutionContext, IDisposable
+    internal sealed class Context : ISqlExecutionContext, IDisposable
     {
         public Context(SqlConnection sql)
         {
@@ -335,7 +337,7 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@op,@epoch,1,1,1,NULL,@hash,1,'COMM
             Sql.Dispose();
         }
     }
-    private sealed class ActorAccessor : ICurrentUserAccessor
+    internal sealed class ActorAccessor : ICurrentUserAccessor
     {
         public ActorAccessor(int id)
         {
