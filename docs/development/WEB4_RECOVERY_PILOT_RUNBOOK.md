@@ -1,6 +1,6 @@
 # WEB4-05 — recovery HTTPS/browser fixture
 
-Owner selected frontend WEB4-05/F04 on 2026-11-02 and explicitly authorized this bounded backend test fixture plus fresh nonproduction SQL/IIS Express pilot. The [backend plan](../plans/20261101-003-web4-reliability-server.md#6-b05--focused-sql--integrated-https-browserphysical-oracle-verified-candidate-owner-pending) owns B05; [evidence](../evidence/web4/20261102-b05-recovery-pilot.md) owns executed results. No product runtime, schema, principal grants, machine TLS configuration or production deployment is changed.
+Owner selected frontend WEB4-05/F04 on 2026-11-02 and explicitly authorized this bounded backend test fixture plus fresh nonproduction SQL/IIS Express pilot. The [backend plan](../plans/20261101-003-web4-reliability-server.md#6-b05--focused-sql--integrated-https-browserphysical-oracle-done-bounded-owner-accepted) owns B05; [evidence](../evidence/web4/20261102-b05-recovery-pilot.md) owns executed results. No product runtime, schema, principal grants, machine TLS configuration or production deployment is changed.
 
 ## Selector and ownership
 

@@ -1,6 +1,6 @@
 # WEB4 B05 — recovery fixture and integrated pilot
 
-Date: 2026-11-02, Asia/Bangkok. **VERIFIED CANDIDATE; B05-A fixture and B05-B integrated verification complete, Owner acceptance/merge pending.** Owner selected frontend WEB4-05/F04 and explicitly approved the bounded backend fixture and nonproduction SQL/IIS Express pilot. [Owning plan](../../plans/20261101-003-web4-reliability-server.md) · [Runbook and private interface](../../development/WEB4_RECOVERY_PILOT_RUNBOOK.md).
+Date: 2026-11-02, Asia/Bangkok. **DONE (bounded); Owner accepted the recorded scope/limits and PR #84 merged on 2026-11-02.** Owner selected frontend WEB4-05/F04 and explicitly approved the bounded backend fixture and nonproduction SQL/IIS Express pilot. [Owning plan](../../plans/20261101-003-web4-reliability-server.md) · [Runbook and private interface](../../development/WEB4_RECOVERY_PILOT_RUNBOOK.md).
 
 ## Candidate and scope
 
@@ -45,7 +45,7 @@ The existing `backend-web.yml` only built/ran HttpHost.Tests and could not exerc
 
 Workflow PowerShell syntax inspection passed. The guard was exercised locally against the actual 62-row fixture TRX and rejected a sample with the required recovery class absent; this is configuration validation, not another 62 executed tests.
 
-[Hosted Windows CI run 41372747630](https://github.com/chung6a8m/MyDmsVn/actions/runs/41372747630), job `125046518791` (`http-host`), is **PASS** for [PR #84](https://github.com/chung6a8m/MyDmsVn/pull/84) head `be93fc095e7ecd85bc133f79fc2a3c128c26fb66`. Logs show the actual checkout was synthetic merge `c548a950a2667778222ff6021c8d3d99eb0b962a` into base `ca26a6c91bbbfe21807b9519bd2c4a7974f0e3d9`. Locked restore and Release/net48 builds passed with zero warnings/errors; **506/506 HttpHost rows and 62/62 pure validator rows passed, 0 failed/skipped**. Both nonempty-complete guards and selected-class checks passed. The runner was Windows Server 2022, SDK 8.0.427, Framework release 533509. These are hosted SQL-free results, separate from local SQL/browser gates; final documentation-head CI remains to be recorded after publication.
+[Hosted Windows CI run 41372747630](https://github.com/chung6a8m/MyDmsVn/actions/runs/41372747630), job `125046518791` (`http-host`), is **PASS** for [PR #84](https://github.com/chung6a8m/MyDmsVn/pull/84) head `be93fc095e7ecd85bc133f79fc2a3c128c26fb66`. Logs show the actual checkout was synthetic merge `c548a950a2667778222ff6021c8d3d99eb0b962a` into base `ca26a6c91bbbfe21807b9519bd2c4a7974f0e3d9`. Locked restore and Release/net48 builds passed with zero warnings/errors; **506/506 HttpHost rows and 62/62 pure validator rows passed, 0 failed/skipped**. Both nonempty-complete guards and selected-class checks passed. The runner was Windows Server 2022, SDK 8.0.427, Framework release 533509. These are hosted SQL-free results, separate from local SQL/browser gates; the later final-head CI result is recorded in the acceptance section below.
 
 ## Focused Security SQL verification
 
@@ -103,6 +103,21 @@ The distinct focused SQL total is **110 passed (Security86 + Inventory7 + migrat
 
 ## Disposition and retained limits
 
-B05/F04 is a **VERIFIED CANDIDATE**, with independent review reporting no remaining actionable P1/P2. Backend [PR #84](https://github.com/chung6a8m/MyDmsVn/pull/84) and the paired frontend candidate await final-head hosted CI, Owner acceptance and merge. The earlier hosted run retains its exact source limit; documentation publication does not imply a new CI result. B06/F05 operational closeout remains PLANNED; no roadmap archive or production acceptance is claimed.
+At the verified-candidate checkpoint, independent review reported no remaining actionable P1/P2; the PRs still awaited final-head hosted CI and Owner disposition. The later acceptance below closes B05/F04 within the recorded bounded scope. The earlier hosted run retains its exact source limit; documentation publication does not itself imply a new CI result. B06/F05 operational closeout remains PLANNED; no roadmap archive or production acceptance is claimed.
 
 Same-key resend UI remains disabled; absent status is not rollback proof. OS process-crash/socket loss at Commit, attended Telex/VNI/Narrator, full IIS and production remain NOT RUN/not approved. Lost browser acknowledgements and transactional concurrency above do not establish the separate process-crash/Commit gate. Production source/schema/grants/dependencies and historical WEB1–03 evidence are unchanged.
+
+## Owner acceptance and merge — 2026-11-02
+
+Owner explicitly authorized review, correction of findings if any, merge of both PRs after CI PASS, and bounded WEB4-05 closeout. Fresh independent backend/frontend reviews found no actionable P0/P1/P2. The final reviews retained every recorded limit; no runtime correction or repeated live execution was required.
+
+| Repository | Reviewed PR head | Final PR CI | Merge |
+| --- | --- | --- | --- |
+| Backend [PR #84](https://github.com/chung6a8m/MyDmsVn/pull/84) | `1d5ce74f0babf687423a3912af40a6fa713a690e` | [Run 41373962644](https://github.com/chung6a8m/MyDmsVn/actions/runs/41373962644) **PASS**, 506 HttpHost + 62 pure fixture rows, 0 failed/skipped | [9ef084a61c1dd0e9f59be049fb5fbb51870e9444](https://github.com/chung6a8m/MyDmsVn/commit/9ef084a61c1dd0e9f59be049fb5fbb51870e9444) |
+| Frontend [PR #21](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/pull/21) | `9d9fd84aad5143b03012f8fd82f4c2b23a8cdbef` | [Run 41373656805](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/actions/runs/41373656805) **PASS**, typecheck/build, 1,218 unit + 196 Chromium + 1 production-isolation rows | [f7765f052a66242e978a38daa4c22221ea262411](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/commit/f7765f052a66242e978a38daa4c22221ea262411) |
+
+The backend merge tree exactly equals the reviewed head tree `460a195df00da782030a2f3acd54aaed48417c95`. The frontend merge tree also equals reviewed head tree `50e841c42bb0aaff67187cfea7a303c0253742b1`. [Frontend F04 evidence](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/evidence/web4/20261102-f04-failure-pilot.md) owns browser acceptance and the frontend disposition. These final hosted checks are SQL-free; the local 110 SQL rows and both final real HTTPS/browser/SQL oracle/cleanup runs above remain the authoritative live evidence on unchanged executable sources/assets.
+
+**B05 is DONE (bounded)**, accepted and merged with the paired WEB4-05/F04 milestone. B06/F05 remain PLANNED, Roadmap 04 stays active, and CEX remains independent. Same-key resend remains disabled; OS process-crash/Commit, attended IME/Narrator and full IIS/production remain unverified or unapproved. This acceptance neither archives Roadmap 04 nor grants production release.
+
+The post-merge documentation closeout starts from backend merge `9ef084a61c1dd0e9f59be049fb5fbb51870e9444` on a fresh `codex/web4-05-b05-closeout` branch. It changes routing and the acceptance record only, with local Markdown link/UTF-8/diff checks; no new runtime or SQL test result is claimed for that documentation commit.
