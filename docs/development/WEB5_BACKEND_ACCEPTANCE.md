@@ -2,6 +2,8 @@
 
 **Owner selected 2026-11-02. B04-A/B5-CI-01–04 VERIFIED NONPRODUCTION (bounded); B04-B/B5-CI-05 NOT RUN; B04 incomplete.** [B04-A evidence](../evidence/web5/20261102-b04a-protected-sql-ci.md). Other milestone results are not changed by this checkpoint. Scenario IDs are requirements, **not** runnable test names or evidence. [Owning plan](../plans/20261102-001-web5-operational-safety-backend.md) · [protocol](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md) · [handoff](WEB5_CODEX_HANDOFF.md) · [WEB4 historical evidence](../evidence/web4/README.md).
 
+**ADR applicability:** [ADR0015](../adr/0015-web5-additive-recovery-boundary.md) selects additive compatibility and schema013. Strict-only B5-COMP-03/04 are NOT_APPLICABLE, not PASS/skipped tests; common compatibility, all-six races and B5-MIG-01/02 are mandatory NOT RUN until B02/B04-B actual candidate verification.
+
 ## Evidence levels
 
 | Source | Proves | Does not prove |

@@ -1,5 +1,7 @@
 # Architecture decision records
 
+**WEB5-01 design agreement (2026-11-02):** [ADR0015](0015-web5-additive-recovery-boundary.md) selects additive WEB4 compatibility and append-only013 audit direction, freezes F01 consumer requirements and identifies mandatory B02/B04-B gates. Design-only: no implemented resolution wire, migration, new host mode, unlock or resend. The older proposal/status notes below retain their dated historical context.
+
 
 **New selected proposal (2026-11-01):** [ADR 0014 — WEB4 transaction-owned journal + durable drafts](0014-web4-durable-operations.md) is a proposed design direction only; implementation and current-schema/CI/SQL acceptance are NOT RUN. B01 source review finalizes transaction/schema detail. [Roadmap owner](../plans/20261101-003-web4-reliability-server.md). Existing ADR 0013 is historical WEB3 bounded completion; CEX remains separately ACTIVE.
 
@@ -8,6 +10,7 @@ Current decisions and explicit owner instructions supersede older examples. Impl
 
 | ADR | Decision | Current status |
 |---|---|---|
+| [0015](0015-web5-additive-recovery-boundary.md) | Additive WEB4 recovery compatibility, separate terminal audit and F01 consumer agreement | Design selected/reviewed for WEB5-01; B02 runtime/B04-B NOT RUN |
 | [0001](0001-local-and-remote-adapters.md) | Local v1 and HTTP share contracts/handlers | Accepted; thin HTTP host implemented in bounded WEB2 pilot, further WEB3 scope defined by 0013 |
 | [0002](0002-explicit-unit-of-work.md) | Explicit connection/transaction ownership and UoW | Accepted; library-independent principle preserved by L2DB |
 | [0003](0003-compatibility-and-legacy-passwords.md) | Runtime/package history and legacy PasswordSalt | Password compatibility binding; runtime refined by 0008, DAL by 0009 |
