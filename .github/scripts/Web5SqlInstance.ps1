@@ -15,7 +15,7 @@ function Save-State($value) { [IO.File]::WriteAllText($StatePath, ($value|Conver
 function Write-SafeSummary($value) {
     $safe=[ordered]@{ runId=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; image=$env:ImageVersion; runnerEnvironment=$env:RUNNER_ENVIRONMENT;
         controlSha=$env:GITHUB_SHA; baselineSha='fc36c879fdd2d46ee77d136bdb6f9e70f7191b64'; phase=$value.phase;
-        engineVersion=$value.engineVersion; edition=$value.edition; compatibility=140; ownerSidSha256=$value.sidHash; instanceOwnershipVerified=$value.verified;
+        engineVersion=$value.engineVersion; edition=$value.edition; compatibility=$value.compatibility; ownerSidSha256=$value.sidHash; instanceOwnershipVerified=$value.verified;
         userDatabases=$value.userDatabases; activeOwners=$value.activeOwners; quarantine=$value.quarantine }
     $json=$safe|ConvertTo-Json -Depth 5 -Compress
     [IO.File]::WriteAllText($SummaryPath,$json+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
@@ -25,8 +25,8 @@ function Open-OwnedConnection($state) {
     if ($state.sid -ne $sid -or $state.runId -ne $env:GITHUB_RUN_ID -or $state.attempt -ne $env:GITHUB_RUN_ATTEMPT -or
         $state.name -notmatch '^Web5_[0-9]+_[0-9]+_[a-f0-9]{12}$' -or $state.controlSha -ne $env:GITHUB_SHA) { throw 'Instance ownership context mismatch.' }
     $builder=New-Object System.Data.SqlClient.SqlConnectionStringBuilder
-    $builder.DataSource='(localdb)\'+$state.name; $builder.InitialCatalog='master'; $builder.IntegratedSecurity=$true
-    $builder.Pooling=$false; $builder.ConnectTimeout=5; $builder.ConnectRetryCount=0; $builder.Encrypt=$false
+    $builder['Data Source']='(localdb)\'+$state.name; $builder['Initial Catalog']='master'; $builder['Integrated Security']=$true
+    $builder['Pooling']=$false; $builder['Connect Timeout']=5; $builder['ConnectRetryCount']=0; $builder['Encrypt']=$false
     $connection=New-Object System.Data.SqlClient.SqlConnection($builder.ConnectionString)
     try { $connection.Open(); return $connection } catch { $connection.Dispose(); throw }
 }
@@ -76,7 +76,7 @@ try {
         $stage='AllocateState'
         $state=[pscustomobject]@{ name=('Web5_'+$env:GITHUB_RUN_ID+'_'+$env:GITHUB_RUN_ATTEMPT+'_'+[guid]::NewGuid().ToString('N').Substring(0,12));
             sid=$sid; runId=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; controlSha=$env:GITHUB_SHA; token=[guid]::NewGuid().ToString('D');
-            sidHash=([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($sid))).Replace('-','').ToLowerInvariant()); utility=$utility; server='';masterCreated='';engineVersion='';edition='';phase='Allocating';verified=$false;quarantine=$false;userDatabases=-1;activeOwners=-1 }
+            sidHash=([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($sid))).Replace('-','').ToLowerInvariant()); utility=$utility; server='';masterCreated='';engineVersion='';edition='';compatibility=$null;phase='Allocating';verified=$false;quarantine=$false;userDatabases=-1;activeOwners=-1 }
         Save-State $state
         $stage='CreateInstance'
         $null=& $utility create $state.name $engine 2>&1;if($LASTEXITCODE -ne 0){throw 'Owned instance creation failed.'}
@@ -98,7 +98,7 @@ try {
             $stage='VerifyInitializedInstance'
             Verify-Identity $connection $state; Verify-Quiescence $connection $state
             if ([int](Query-Scalar $connection "SELECT compatibility_level FROM sys.databases WHERE name=N'model';") -ne 140){throw 'Model compatibility is not140.'}
-            $state.verified=$true;$state.phase='Ready';Save-State $state
+            $state.compatibility=140;$state.verified=$true;$state.phase='Ready';Save-State $state
             # The value identifies only this private ephemeral instance; never accept a supplied SQL endpoint.
             Write-Output ('::add-mask::'+$connection.ConnectionString)
             [IO.File]::AppendAllText($env:GITHUB_ENV,'MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING='+$connection.ConnectionString+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
