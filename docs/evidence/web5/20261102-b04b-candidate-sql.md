@@ -1,8 +1,8 @@
 # WEB5 B04-B — Exact B02 candidate SQL verification
 
-**2026-11-02: LOCAL VERIFICATION PASS; hosted candidate NOT RUN.** Owner explicitly authorized B02 and B04-B while selecting completion of frontend WEB5-02/03. Backend base `3aed45a5116f8d45ce7bfe061dc7f996b125a05b`; [B02 evidence](20261102-b02-terminal-resolution.md), [candidate lane runbook](../../development/WEB5_SQL_CANDIDATE.md), [owning plan](../../plans/20261102-001-web5-operational-safety-backend.md#5-b04--protected-sql-ci-split-into-b04-a--b04-b-web5-04).
+**2026-11-02: DONE / VERIFIED NONPRODUCTION (bounded); B04 A+B DONE (bounded).** Owner explicitly authorized B02 and B04-B while selecting completion of frontend WEB5-02/03. Backend base `3aed45a5116f8d45ce7bfe061dc7f996b125a05b`; verified source `2d72700294227ef69f1a7a61a2969a6bfe2c58be`, [PR #91](https://github.com/chung6a8m/MyDmsVn/pull/91). [B02 evidence](20261102-b02-terminal-resolution.md), [candidate lane runbook](../../development/WEB5_SQL_CANDIDATE.md), [owning plan](../../plans/20261102-001-web5-operational-safety-backend.md#5-b04--protected-sql-ci-split-into-b04-a--b04-b-web5-04).
 
-The existing B04-A protected baseline and its RED/two-GREEN proofs remain unchanged. This task adds a separate exact-candidate lane, not a rerun of the frozen 103-case source. Runtime and tests are reviewed together; no source/merge, staging or production acceptance is inferred from this preparation.
+The existing B04-A protected baseline and its RED/two-GREEN proofs remain unchanged. This task adds a separate exact-candidate lane, not a rerun of the frozen 103-case source. Runtime and tests were reviewed together and the exact source candidate passed hosted SQL. Staging/production approval and final-head CI/merge disposition remain separate.
 
 ## Reviewed controls
 
@@ -43,6 +43,24 @@ These failures produced no production-code fix or hidden retry/skip. Their raw l
 
 ### Hosted exact candidate
 
-Pending fresh protected tag at the reviewed committed source, followed by job/artifact provenance and all-owner/cleanup verification. B02/B04-B cannot be accepted from local green alone. The PR must record final head and SQL-free CI separately from the protected SQL tag run.
+Protected source-candidate verification completed successfully on 2026-11-02. Local green was not substituted for this gate.
+
+| Provenance | Observed result |
+|---|---|
+| Source/control/test SHA | `2d72700294227ef69f1a7a61a2969a6bfe2c58be`, identical in run metadata and sanitized lifecycle artifact |
+| Protected tag | `web5-sql-candidate-20261102-2d72700-1` |
+| Run / job / attempt | [41432523016](https://github.com/chung6a8m/MyDmsVn/actions/runs/41432523016) / `125234350638` / `1`, completed SUCCESS |
+| Trigger and trust | push; actor and triggering actor `chung6a8m`; repository/head repository ID `1409766698`; expected candidate workflow and tag-only environment |
+| Timing (UTC) | created `2026-11-02T10:54:33Z`, final updated `2026-11-02T11:09:17Z` |
+| Hosted runtime | GitHub-hosted Windows image `20261026.347.1`; SQL `15.0.4382.1`, Express Edition (64-bit), compatibility140 |
+| Sanitized artifact | `web5-sql-candidate-counts`, ID `13135152598`, 1379-byte ZIP; created `2026-11-02T11:09:10Z`, expires `2026-11-16T11:09:09Z` |
+| Download SHA256 / API digest | both `b0aed684d532047b2c19385adf5c03a0d73b443995193d3187bbdb98864f9598` |
+| Final ownership/lifecycle | `instanceOwnershipVerified=true`, `phase=Removed`, `userDatabases=0`, `activeOwners=0`, `quarantine=false` |
+
+The independently inspected ZIP contained only `instance.json`, `security.json`, `inventory.json`, `migrations.json`. Each owner had `complete=true` and discovered = unique cases = total = executed = passed: Security116, Inventory19, Migrations32, total **167/167**, zero failed/skipped. Required classes match the local table above, including twelve real terminal fence rows and two operator process-death cases. The immutable WEB4 corpus guard, source-unchanged check, owned drain/removal and final evidence gate all succeeded. Only sanitized JSON artifact and bounded job/run metadata were retrieved; no raw hosted logs or credentials were downloaded.
+
+Source-candidate SQL-free [PR run 41432529946](https://github.com/chung6a8m/MyDmsVn/actions/runs/41432529946) and [push run 41432518701](https://github.com/chung6a8m/MyDmsVn/actions/runs/41432518701) also completed SUCCESS. This record pins the already verified source proof. Documentation closeout does not rewrite that pin or claim its own future commit has run: the PR records final HEAD and its protected/SQL-free CI separately before merge. No self-referential CI pin is required in this evidence file.
+
+The separate actual frontend-port local bridge is recorded in [B02 evidence](20261102-b02-terminal-resolution.md#verification): one .NET wrapper and one Vitest case PASS, with owned disposal. It is not counted in this 167-case lane, is not native browser SQL evidence, and does not complete paired frontend final-candidate acceptance.
 
 Strict-only B5-COMP-03/04 are NOT_APPLICABLE under ADR0015; B5-MIG-01/02 apply. Full B03 CLI/backup rehearsal, B05 full IIS, frontend native browser and production acceptance remain separate. Browser same-key resend remains disabled.

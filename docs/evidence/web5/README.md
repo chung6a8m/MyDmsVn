@@ -1,6 +1,6 @@
 # WEB5 backend evidence
 
-**2026-11-02: B01 DONE (bounded), merged PR #88; B02 IMPLEMENTED / LOCAL VERIFICATION PASS; B04-A VERIFIED NONPRODUCTION (bounded); B04-B LOCAL VERIFICATION PASS / HOSTED PENDING (NOT RUN); B04 incomplete.** [B04-A evidence](20261102-b04a-protected-sql-ci.md) records actual protected RED +two103-case GREEN SQL runs and owned cleanup. Other task results are separately owned; B01 evidence is integrated through [PR #88](https://github.com/chung6a8m/MyDmsVn/pull/88), merge `b320c10acc0ddb2e7cf4b87c153bdf51f25c4bf0`. [B02 implementation/local proof](20261102-b02-terminal-resolution.md) and [B04-B local candidate proof](20261102-b04b-candidate-sql.md) record current results. Protected hosted B04-B and B02 acceptance remain pending. B03 CLI/rehearsal and B05/F04 full IIS remain NOT RUN; no production approval. The following activation/review notes are historical docs-only records, not current task status.
+**2026-11-02: B01 DONE (bounded), merged PR #88; B02 DONE / VERIFIED NONPRODUCTION (bounded); B04-A VERIFIED NONPRODUCTION (bounded); B04-B DONE / VERIFIED NONPRODUCTION (bounded); B04 A+B DONE (bounded).** [B04-A evidence](20261102-b04a-protected-sql-ci.md) records actual protected RED +two103-case GREEN SQL runs and owned cleanup. Other task results are separately owned; B01 evidence is integrated through [PR #88](https://github.com/chung6a8m/MyDmsVn/pull/88), merge `b320c10acc0ddb2e7cf4b87c153bdf51f25c4bf0`. [B02 bounded verification](20261102-b02-terminal-resolution.md) and [B04-B hosted candidate proof](20261102-b04b-candidate-sql.md) record current results. Protected hosted run `41432523016` verified 167/167 at exact source `2d72700294227ef69f1a7a61a2969a6bfe2c58be`; final-head CI/merge disposition is recorded separately in PR #91. B03 CLI/rehearsal and B05/F04 full IIS remain NOT RUN; no production approval. The following activation/review notes are historical docs-only records, not current task status.
 
 **WEB5 roadmap review amendments (docs-only, 2026-11-02):** six review findings (P1-01/P1-02 and P2-01–04) addressed in the owning plan, protocol, acceptance and Codex handoff. New gates B5-NEG-08, B5-COMP-01/02, B5-MIG-01/02 conditional, B5-CI-04/05, B5-OPS-06/07, B5-IIS-07/08 and B5-REL-04/05 are all **PLANNED / NOT RUN**. No WEB5 runtime/SQL/CI/attended evidence is claimed.
 
@@ -11,9 +11,9 @@
 | Owner | Current state | Evidence |
 |---|---|---|
 | B01 process-death/Commit | DONE (bounded), merged PR #88 | [Actual proof](20261102-b01-crash-commit.md) |
-| B02 terminal negative | IMPLEMENTED / LOCAL VERIFICATION PASS; acceptance pending hosted B04-B | [B02 candidate](20261102-b02-terminal-resolution.md); [contract](../../contracts/web5-resolution-v1/README.md) |
+| B02 terminal negative | DONE / VERIFIED NONPRODUCTION (bounded); exact-candidate local and hosted proof | [B02 candidate](20261102-b02-terminal-resolution.md); [contract](../../contracts/web5-resolution-v1/README.md) |
 | B03 operator tooling/rehearsal | PLANNED | `YYYYMMDD-b03-operator-drill.md` |
-| B04 SQL CI | A VERIFIED bounded; B LOCAL PASS / HOSTED PENDING (NOT RUN); task incomplete | [B04-A baseline](20261102-b04a-protected-sql-ci.md); [B04-B candidate](20261102-b04b-candidate-sql.md) |
+| B04 SQL CI | A+B DONE / VERIFIED NONPRODUCTION (bounded); B hosted 167/167 PASS | [B04-A baseline](20261102-b04a-protected-sql-ci.md); [B04-B candidate](20261102-b04b-candidate-sql.md) |
 | B05 full IIS and SQL/browser | PLANNED | `YYYYMMDD-b05-full-iis-staging.md` |
 | B06 release dossier | PLANNED | `YYYYMMDD-b06-release-decision.md` |
 
