@@ -10,8 +10,9 @@
 | `codex/web5-b04a-sql-ci-foundation` | Isolated protected SQL lane, existing owners, intentional RED and owned cleanup | May parallel B01; PASS before B02 runtime |
 | `codex/web5-b02-terminal-negative` | B02 ADR, exact12→13 if necessary, additive vs strict **with v1 recovery-only protected status**, six-command durable negative and versioned read | B01 AND B04-A proven, B04-B incl. B5-COMP-03/04 before merge |
 | `codex/web5-b04b-sql-ci-terminal` | New B02 six-command race/migration/compatibility selectors and exact-candidate CI | Pass before B02 acceptance; B04 not DONE until A+B |
+
+**B04-A and B04-B are two checkpoints of the single owning task B04, not a third standalone `codex/web5-b04-sql-ci` execution PR.** B04-B must run new B02 tests on the exact combined trusted candidate before accepting the B02 PR.
 | `codex/web5-b03-operator-tools` | Operator CLI, positive COMMITTED/result unavailable ticket reconciliation, audited retention/rotation/backup rehearsal | B02 and B04-B accepted |
-| `codex/web5-b04-sql-ci` | Protected isolated SQL CI and cleanup/failure guards | Selected SQL owners stable; may overlap B03 |
 | `codex/web5-b05-full-iis` | Real IIS, old/new cached-tab matrix, limiter/audit/proxy, p95/p99+RPO/RTO baseline, Web F04 pilot | B01–B04 (including B04-A/B) PASS |
 | `codex/web5-b06-release-handoff` | Positive/negative case closure and numeric threshold-vs-measured Owner decision dossier | Paired B05/F04 |
 
