@@ -1,0 +1,15 @@
+{
+  "label": "Inventory",
+  "discovered": 1,
+  "uniqueCases": 1,
+  "total": 1,
+  "executed": 1,
+  "passed": 0,
+  "failed": 1,
+  "skipped": 0,
+  "requiredClasses": {
+    "WebOperationCommandTests": 1
+  },
+  "oracleRedObserved": true,
+  "complete": false
+}

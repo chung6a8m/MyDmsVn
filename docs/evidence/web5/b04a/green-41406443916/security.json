@@ -1,0 +1,18 @@
+{
+  "label": "Security",
+  "discovered": 79,
+  "uniqueCases": 79,
+  "total": 79,
+  "executed": 79,
+  "passed": 79,
+  "failed": 0,
+  "skipped": 0,
+  "requiredClasses": {
+    "WebOperationReadTests": 24,
+    "WebOperationJournalTests": 22,
+    "WebPrincipalProvisioningTests": 16,
+    "WebOperationHttpSqlTests": 17
+  },
+  "oracleRedObserved": false,
+  "complete": true
+}

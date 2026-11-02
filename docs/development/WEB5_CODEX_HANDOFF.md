@@ -1,13 +1,13 @@
 # Codex handoff — WEB5 backend
 
-**Selected 2026-11-02; B01–B06 PLANNED / NOT RUN.** Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [plan selector](../plans/README.md), [owning plan](../plans/20261102-001-web5-operational-safety-backend.md), [safety design](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [acceptance](WEB5_BACKEND_ACCEPTANCE.md), [TEST_POLICY](../TEST_POLICY.md), [WEB4 archived reference](WEB4_OPERATOR_HANDOFF.md), actual tests/lockfiles and latest `main`.
+**Selected 2026-11-02; B04-A VERIFIED NONPRODUCTION (bounded); B04-B PLANNED / NOT RUN; B04 incomplete.** [B04-A evidence](../evidence/web5/20261102-b04a-protected-sql-ci.md) · [SQL runbook](WEB5_SQL_CI_BASELINE.md). Other milestones require their own candidate evidence. Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [plan selector](../plans/README.md), [owning plan](../plans/20261102-001-web5-operational-safety-backend.md), [safety design](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [acceptance](WEB5_BACKEND_ACCEPTANCE.md), [TEST_POLICY](../TEST_POLICY.md), [WEB4 archived reference](WEB4_OPERATOR_HANDOFF.md), actual tests/lockfiles and latest `main`.
 
 ## Task order and independent PRs
 
 | Branch suggestion | Deliver only | Dependencies |
 |---|---|---|
 | `codex/web5-b01-crash-proof` | Test-only process supervisor, failpoints, real SQL oracle for six commands | In parallel with B04-A; no product resend |
-| `codex/web5-b04a-sql-ci-foundation` | Isolated protected SQL lane, existing owners, intentional RED and owned cleanup | May parallel B01; PASS before B02 runtime |
+| `codex/web5-b04a-sql-ci-foundation` | Isolated protected SQL lane, existing owners, intentional RED and owned cleanup | VERIFIED bounded: RED +2x103SQL PASS; see evidence; B01 proof remains independent |
 | `codex/web5-b02-terminal-negative` | B02 ADR, optional exact12→13, additive vs strict v1 recovery-only status, original operation Write/Post permission, six-command negative and versioned read | B01+B04-A proven; B04-B applicable gates (strict B5-COMP-03/04 only) before merge |
 | `codex/web5-b04b-sql-ci-terminal` | New B02 six-command race/migration/compatibility selectors and exact-candidate CI | Pass before B02 acceptance; B04 not DONE until A+B |
 | `codex/web5-b03-operator-tools` | Operator CLI, positive COMMITTED/result unavailable ticket reconciliation, audited retention/rotation/backup rehearsal | B02 and B04-B accepted |
