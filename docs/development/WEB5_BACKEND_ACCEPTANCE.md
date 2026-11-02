@@ -1,6 +1,6 @@
 # WEB5 backend acceptance matrix — operational safety and delivery
 
-**Owner selected 2026-11-02. All B01–B06 PLANNED / NOT RUN.** Scenario IDs are requirements, **not** runnable test names or evidence. [Owning plan](../plans/20261102-001-web5-operational-safety-backend.md) · [protocol](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md) · [handoff](WEB5_CODEX_HANDOFF.md) · [WEB4 historical evidence](../evidence/web4/README.md).
+**Owner selected 2026-11-02. B01 IMPLEMENTED / VERIFIED NONPRODUCTION (bounded); Owner acceptance/merge pending. B02–B06 PLANNED / NOT RUN.** Scenario IDs are requirements, **not** runnable test names or evidence. [Owning plan](../plans/20261102-001-web5-operational-safety-backend.md) · [protocol](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md) · [handoff](WEB5_CODEX_HANDOFF.md) · [WEB4 historical evidence](../evidence/web4/README.md).
 
 ## Evidence levels
 

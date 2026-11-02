@@ -1,6 +1,6 @@
 # Codex handoff — WEB5 backend
 
-**Selected 2026-11-02; B01–B06 PLANNED / NOT RUN.** Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [plan selector](../plans/README.md), [owning plan](../plans/20261102-001-web5-operational-safety-backend.md), [safety design](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [acceptance](WEB5_BACKEND_ACCEPTANCE.md), [TEST_POLICY](../TEST_POLICY.md), [WEB4 archived reference](WEB4_OPERATOR_HANDOFF.md), actual tests/lockfiles and latest `main`.
+**Selected 2026-11-02; B01 IMPLEMENTED / VERIFIED NONPRODUCTION (bounded); Owner acceptance/merge pending. B02–B06 PLANNED / NOT RUN.** Read [AGENTS](../../AGENTS.md), [AI_CONTEXT](../../AI_CONTEXT.md), [plan selector](../plans/README.md), [owning plan](../plans/20261102-001-web5-operational-safety-backend.md), [safety design](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [acceptance](WEB5_BACKEND_ACCEPTANCE.md), [TEST_POLICY](../TEST_POLICY.md), [WEB4 archived reference](WEB4_OPERATOR_HANDOFF.md), actual tests/lockfiles and latest `main`.
 
 ## Task order and independent PRs
 
