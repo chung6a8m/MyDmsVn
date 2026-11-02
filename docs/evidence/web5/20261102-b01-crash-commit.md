@@ -9,7 +9,8 @@
 - Windows build `26300.9711`, Framework runtime release `534296`, SDK `8.0.427`, Release/net48; SQL Server Developer Edition (64-bit) `14.0.2140.2`.
 - The explicitly configured `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` was validated as effective `master`, with no attachment/user-instance options. Its value and credentials were never published. The shared helper created fresh disposable schema12 databases, with actual instance/database ID/creation time/random ownership-token validation on teardown and `Pooling=false`.
 - The child uses the actual OWIN `Web2Pipeline`, Application handlers and SQL repositories. Runtime calls execute as provisioned restricted `WebHttpProbe`; the separate administrative connection only arranges and independently observes test state. This is a test-process HTTP pipeline, not full IIS or a network/TLS deployment.
-- Child Release EXE SHA256: `a94083765c86cac544925e401b10bea8ab681595a0af3f78d442b920526b9d89`; the copy launched from Security.Tests has the same hash.
+- Child Release EXE used by the final SQL matrix SHA256: `a94083765c86cac544925e401b10bea8ab681595a0af3f78d442b920526b9d89`; the copy launched from Security.Tests had the same hash at that SQL run.
+- The later SQL-free assertion rerun rebuilt the same child source with generated informational version `1.0.0+9d96be71aa697ce241e9cf2b484a95f56a21d9c5`; that local control-run EXE SHA256 is `68595b7dd6ba930e4b807a28db781a619bcc96b453e70133497178e40ef349b5`. Git revision metadata changes binary hashes across builds; these two observed hashes are not claimed interchangeable artifacts.
 - Production `src/`, existing dependency pins, migrations and the 48 frozen `web4-v1` blobs are unchanged. Corpus tree: `fcab4a1e7505b150a132ce2899002930e9f2a6ee`, preserving canonical source `1c603c6ac57e59a3f7b4bc6ca976b2d531c079aa`. Desktop exact10, legacy-web11/exact11 and web4/exact12 remain separate; CEX is unchanged.
 
 ## Implementation and observed scope
