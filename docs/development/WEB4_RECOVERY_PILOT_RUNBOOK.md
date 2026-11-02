@@ -78,3 +78,5 @@ dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.In
 ```
 
 Repeat with `edge` and a new result path; each invocation owns a fresh DB. Missing inputs skip the opt-in row and are NOT RUN, never PASS. SQL-free validators use `FullyQualifiedName~WebRecoveryPilotResultTests`; existing result/framing regressions remain separate selectors. Record actual browser counts separately from the single .NET wrapper row, source/artifact hashes, browser/runtime versions, failed attempts and cleanup. Full IIS, attended IME/Narrator, real process death at Commit and product same-key resend remain outside this fixture's evidence.
+
+The fixture writes `sql-environment.json` beside its sanitized browser output using the already owned SQL connection. It contains only ProductVersion, ProductLevel and Edition, with no server/database name or connection material. Hosted `backend-web.yml` runs only the four SQL-free validator classes with required TRX/class guards; it does not run this live selector.

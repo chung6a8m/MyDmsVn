@@ -23,6 +23,7 @@ jobs:
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
       DOTNET_NOLOGO: "1"
+      MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING: ""
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -50,33 +51,57 @@ jobs:
         run: |
           dotnet build tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj -c Release -f net48 --no-restore
           if ($LASTEXITCODE -ne 0) { throw 'Release/net48 build failed.' }
-      # Only this SQL-free OWIN TestServer/fake project; no SQL/GUI/IIS fixture,
-      # database credentials, publish, deployment or submodule checkout.
+      # SQL-free OWIN TestServer/fake project; no database credentials,
+      # publish, deployment or submodule checkout.
       - name: Run HTTP host tests
         run: |
           dotnet test tests/MyDmsVn.Server.HttpHost.Tests/MyDmsVn.Server.HttpHost.Tests.csproj -c Release -f net48 --no-build --no-restore --logger "trx;LogFileName=http-host.trx" --results-directory TestResults/backend-web
           if ($LASTEXITCODE -ne 0) { throw 'HTTP host tests failed.' }
+      - name: Restore locked recovery fixture test graph
+        run: |
+          dotnet restore tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj --locked-mode
+          if ($LASTEXITCODE -ne 0) { throw 'Recovery fixture locked restore failed.' }
+      - name: Build recovery fixture tests
+        run: |
+          dotnet build tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Recovery fixture Release/net48 build failed.' }
+      # Explicit pure validators only. Never run the containing SQL owner broadly
+      # or the opt-in IIS/Playwright selectors on this hosted secret-free runner.
+      - name: Run SQL-free recovery result and control validators
+        run: |
+          $filter = 'FullyQualifiedName~WebRecoveryPilotResultTests|FullyQualifiedName~WebIntegratedPilotResultTests|FullyQualifiedName~WebReceiptPilotResultTests|FullyQualifiedName~WebFrontendPortBridgeTests'
+          dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-build --no-restore --filter $filter --logger "trx;LogFileName=recovery-fixture.trx" --results-directory TestResults/backend-web
+          if ($LASTEXITCODE -ne 0) { throw 'SQL-free recovery fixture tests failed.' }
       - name: Verify nonempty complete test execution
         if: ${{ always() }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $path = 'TestResults/backend-web/http-host.trx'
-          if (-not (Test-Path -LiteralPath $path)) { throw 'Required TRX missing.' }
-          [xml]$trx = Get-Content -LiteralPath $path -Raw
-          $counts = $trx.TestRun.ResultSummary.Counters
-          $results = @($trx.TestRun.Results.UnitTestResult)
-          $total = [int]$counts.total
-          $executed = [int]$counts.executed
-          $passed = [int]$counts.passed
-          # Upload only counts, never raw test output, TRX, tokens or exceptions.
-          $summary = "HttpHost/net48: total=$total executed=$executed passed=$passed failed=$($counts.failed) notExecuted=$($counts.notExecuted)"
-          Write-Host $summary
-          $summary | Set-Content -LiteralPath TestResults/backend-web/summary.txt -Encoding utf8
-          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          if ($total -le 0 -or $executed -ne $total -or $passed -ne $total -or [int]$counts.failed -ne 0 -or [int]$counts.notExecuted -ne 0 -or
-              $results.Count -ne $total -or @($results | Where-Object outcome -ne 'Passed').Count -ne 0 -or
-              $trx.TestRun.ResultSummary.outcome -ne 'Completed') {
-            throw 'Required tests were absent, skipped, failed or aborted.'
+          foreach ($suite in @('http-host', 'recovery-fixture')) {
+            $path = "TestResults/backend-web/$suite.trx"
+            if (-not (Test-Path -LiteralPath $path)) { throw "Required $suite TRX missing." }
+            [xml]$trx = Get-Content -LiteralPath $path -Raw
+            $counts = $trx.TestRun.ResultSummary.Counters
+            $results = @($trx.TestRun.Results.UnitTestResult)
+            $total = [int]$counts.total
+            $executed = [int]$counts.executed
+            $passed = [int]$counts.passed
+            # Upload only counts, never raw test output, TRX, tokens or exceptions.
+            $summary = "$suite/net48: total=$total executed=$executed passed=$passed failed=$($counts.failed) notExecuted=$($counts.notExecuted)"
+            Write-Host $summary
+            $summary | Out-File -FilePath TestResults/backend-web/summary.txt -Append -Encoding utf8
+            $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            if ($total -le 0 -or $executed -ne $total -or $passed -ne $total -or [int]$counts.failed -ne 0 -or [int]$counts.notExecuted -ne 0 -or
+                $results.Count -ne $total -or @($results | Where-Object outcome -ne 'Passed').Count -ne 0 -or
+                $trx.TestRun.ResultSummary.outcome -ne 'Completed') {
+              throw "Required $suite tests were absent, skipped, failed or aborted."
+            }
+            if ($suite -eq 'recovery-fixture') {
+              foreach ($class in @('WebRecoveryPilotResultTests', 'WebIntegratedPilotResultTests', 'WebReceiptPilotResultTests', 'WebFrontendPortBridgeTests')) {
+                if (@($results | Where-Object { $_.testName -like "*.$class.*" }).Count -le 0) {
+                  throw "Required SQL-free validator class $class was not executed."
+                }
+              }
+            }
           }
       - name: Upload count summary
         if: ${{ always() }}
