@@ -8,7 +8,7 @@
 |---|---|---|
 | `codex/web5-b01-crash-proof` | Test-only process supervisor, failpoints, real SQL oracle for six commands | In parallel with B04-A; no product resend |
 | `codex/web5-b04a-sql-ci-foundation` | Isolated protected SQL lane, existing owners, intentional RED and owned cleanup | May parallel B01; PASS before B02 runtime |
-| `codex/web5-b02-terminal-negative` | B02 ADR, exact12→13 if necessary, additive vs strict **with v1 recovery-only protected status**, six-command durable negative and versioned read | B01 AND B04-A proven, B04-B incl. B5-COMP-03/04 before merge |
+| `codex/web5-b02-terminal-negative` | B02 ADR, optional exact12→13, additive vs strict v1 recovery-only status, original operation Write/Post permission, six-command negative and versioned read | B01+B04-A proven; B04-B applicable gates (strict B5-COMP-03/04 only) before merge |
 | `codex/web5-b04b-sql-ci-terminal` | New B02 six-command race/migration/compatibility selectors and exact-candidate CI | Pass before B02 acceptance; B04 not DONE until A+B |
 | `codex/web5-b03-operator-tools` | Operator CLI, positive COMMITTED/result unavailable ticket reconciliation, audited retention/rotation/backup rehearsal | B02 and B04-B accepted |
 | `codex/web5-b05-full-iis` | Real IIS, old/new cached-tab matrix, limiter/audit/proxy, p95/p99+RPO/RTO baseline, Web F04 pilot | B01–B04 (including B04-A/B) PASS |
@@ -31,7 +31,7 @@ B02 ADR selects schema12 reuse or explicit exact12->13 path, and additive WEB4-s
 or strict server-side per-write/new-status fence WITH legacy v1 recovery-only readback.
 For existing schema-v1 DISPATCHED/UNKNOWN, preserve old actor/epoch/key/fingerprint and
 original COMMITTED result/version after cutover without allowing any old POST/PUT.
-B04-B must test v1 positive, NOT_OBSERVED, expiry, revoked actor, CANCELLED and stale epoch.
+B04-B tests common B5-COMP-01/02 under either ADR; strict-only B5-COMP-03/04 test v1 positive with Read denied but original Write/Post granted, NOT_OBSERVED, expiry, revoked original Write/Post, CANCELLED, stale epoch and Sales Post version/Receipt Post no version. In additive, strict-only B5-COMP-03/04 are NOT_APPLICABLE with evidence, not PASS or skipped mandatory tests.
 Prove all six commands x two lock orders.
 Do not use a test-only injection seam in published runtime. Preserve authoritative
 operation journal same business transaction, frozen contract, exact mode/schema and grants.
@@ -46,4 +46,4 @@ independent physical SQL oracle, cleanup, earlier failures and residual NOT RUN.
 Request independent review of P0/P1/P2, open narrow PR to main; do not release production.
 ~~~
 
-**Task PR requirements:** chosen Bxx, dependent Fxx/source pins, changed files and invariants, actual tests run, finite clean-up, sanitized logs, independent review, exact CI head, blocked/unsafe cases, follow-up sequencing. For strict B02 include independent pre-cutover WEB4 readback proof (B5-COMP-03/04) and explain permitted recovery-only route versus denied old mutation. Apply existing repository Markdown/C# encoding policies. No fake SQL master, no global old test runner/test-gates, no broad unguarded SQL tests. Historical WEB4 evidence cannot be reused as current PASS. Documentation-only activation needs links/encoding/diff checks; it runs zero product tests.
+**Task PR requirements:** chosen Bxx, dependent Fxx/source pins, changed files and invariants, actual tests run, finite clean-up, sanitized logs, independent review, exact CI head, blocked/unsafe cases, follow-up sequencing. For strict B02 include independent pre-cutover WEB4 readback proof (B5-COMP-03/04) and explain permitted recovery-only route versus denied old mutation. For additive B02 report strict-only B5-COMP-03/04 as `NOT_APPLICABLE`, while common B5-COMP-01/02 and current Write/Post-auth positive/negative proof remain mandatory. Apply existing repository Markdown/C# encoding policies. No fake SQL master, no global old test runner/test-gates, no broad unguarded SQL tests. Historical WEB4 evidence cannot be reused as current PASS. Documentation-only activation needs links/encoding/diff checks; it runs zero product tests.
