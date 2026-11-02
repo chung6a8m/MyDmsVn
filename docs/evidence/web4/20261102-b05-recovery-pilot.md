@@ -25,6 +25,20 @@ The coordinator's first Chromium live invocation used the initial10-check fixtur
 
 A preparation rebuild overlapped that owned live invocation and failed with `MSB3027/MSB3021` because its testhost held the Security test DLL. It executed0 tests and did not replace the active DLL. The agents stopped rebuilding until the live process drained. The following serialized `b05-fixture-ready2` build/run succeeded as recorded above. The source now requires12 completion IDs, including same-key concurrency and live cross-tab; final integrated reruns remain separate evidence.
 
+## Focused Security SQL verification
+
+The coordinator then ran the existing focused Security owner sequentially on the designated nonproduction master connection, completing at08:16 local time. Actual TRX `TestResults/web4-b05-sql-security/web4-b05-sql-security.trx` reports **86 discovered/executed, 86 passed, 0 failed/skipped**, duration6m43s, Release/net48, `--no-restore --no-build`. The opt-in frontend TestServer bridge was explicitly excluded because this milestone uses the separate real browser fixture; it is not a skipped mandatory row.
+
+```powershell
+dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --no-build --filter '(FullyQualifiedName~WebOperationReadTests|FullyQualifiedName~WebOperationJournalTests|FullyQualifiedName~WebOperationHttpSqlTests|FullyQualifiedName~WebAuthHttpSqlTests|FullyQualifiedName~WebPrincipalProvisioningTests)&FullyQualifiedName!~Frontend_ports_recover' --logger 'trx;LogFileName=web4-b05-sql-security.trx' --results-directory TestResults/web4-b05-sql-security
+```
+
+These source-owned SQL cases cover same-key serialization and all-six HTTP replay, original authorized outcomes, status/epoch/fingerprint/current authority, tombstones, journal rollback, auth rotation and restricted principal provisioning. They do not establish OS process death at Commit. All resources are owned by the existing fixtures; no cleanup failure was reported.
+
+The86 rows comprise journal22, protected read24, HTTP operations17, auth7 and principal provisioning16. Environment rechecked without SQL access: Windows`10.0.26300.0`, .NET SDK`8.0.427`, Framework`4.8.10008`/Release`534296`, IIS Express`10.0.26013.1000`, VSTest`17.11.1` x64. The designated SQL environment's last captured version is SQL Server`14.0.2140.2` RTM Developer Edition64 in [WEB3 evidence](../web3/20261101-b04-b05-integrated-pilot.md#3-prepared-production-artifact-and-environment); no new server-version query was performed or inferred from this run.
+
+The coordinator's independent source review reported no remaining P1/P2 after corrections to browser coverage and sanitized failure diagnostics. This is source review, not final acceptance. B05 remains IN PROGRESS; paired final Chromium/Edge and focused Inventory/migration confirmations remain pending.
+
 ## Pending gates and limits
 
 Required fresh independent Chromium/Edge IIS Express HTTPS/SQL runs, source/artifact hashes, independent oracle/cleanup, focused SQL owners, hosted CI and final review are PENDING. No B05/F04 acceptance or merge is claimed. Same-key resend stays disabled; absent status is not rollback proof. Process-crash/Commit, attended Telex/VNI/Narrator, full IIS and production remain NOT RUN/not approved. Historical evidence is unchanged.
