@@ -155,7 +155,8 @@ public sealed class PipelineTests
     }
 
     [Theory]
-    [InlineData("http", 400)][InlineData("host", 400)][InlineData("forwarded", 400)]
+    [InlineData("http", 400)][InlineData("host", 400)][InlineData("forwarded-proto", 400)]
+    [InlineData("forwarded-rfc", 400)][InlineData("forwarded-for", 400)]
     [InlineData("origin", 403)][InlineData("body", 413)][InlineData("chunked-body", 413)]
     [InlineData("missing-origin", 403)][InlineData("duplicate-origin", 403)][InlineData("fetch-site", 403)]
     public async Task Transport_guards_reject_before_authentication(string defect, int status)
@@ -164,7 +165,9 @@ public sealed class PipelineTests
         using var request = fixture.Request("probe/actor", fixture.Token());
         if (defect == "http") request.RequestUri = new Uri("http://web2.mydmsvn.test/api/v1/probe/actor");
         if (defect == "host") request.RequestUri = new Uri("https://untrusted.invalid/api/v1/probe/actor");
-        if (defect == "forwarded") request.Headers.Add("X-Forwarded-Proto", "https");
+        if (defect == "forwarded-proto") request.Headers.Add("X-Forwarded-Proto", "https");
+        if (defect == "forwarded-rfc") request.Headers.Add("Forwarded", "for=127.0.0.1;proto=https;host=web2.mydmsvn.test");
+        if (defect == "forwarded-for") request.Headers.Add("X-Forwarded-For", "127.0.0.1");
         if (defect == "origin") request.Headers.Add("Origin", "https://evil.invalid");
         if (defect == "duplicate-origin") request.Headers.TryAddWithoutValidation("Origin", new[] { HostFixture.Origin, HostFixture.Origin });
         if (defect == "missing-origin" || defect == "fetch-site") request.Method = HttpMethod.Post;
