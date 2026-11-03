@@ -603,6 +603,14 @@
       "mydmsvn.sharedkernel": {
         "type": "Project"
       },
+      "mydmsvn.weboperation.operator": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.SqlClient": "[7.0.2, )",
+          "MyDmsVn.Server.Application": "[1.0.0, )",
+          "MyDmsVn.Server.Infrastructure": "[1.0.0, )"
+        }
+      },
       "BCrypt.Net-Next": {
         "type": "CentralTransitive",
         "requested": "[4.2.0, )",
