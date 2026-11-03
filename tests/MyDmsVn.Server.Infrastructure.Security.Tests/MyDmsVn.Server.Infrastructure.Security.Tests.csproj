@@ -10,6 +10,7 @@
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="System.Management" />
     <PackageReference Include="Respawn" />
     <PackageReference Include="Microsoft.Owin.Testing" VersionOverride="[4.2.3]" />
     <PackageReference Include="dbup-sqlserver" />

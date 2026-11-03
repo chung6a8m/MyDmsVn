@@ -34,6 +34,10 @@ public sealed partial class WebHostIisExpressTests
     [WebHostSqlFact, Trait("Category", "WebHostIntegration")]
     public Task Published_SystemWeb_host_warms_up_with_restricted_schema11_and_serves_safe_HTTP() => Run(false);
 
+    [WebHostSqlFact, Trait("Category", "Web5OwnedPublishedHost")]
+    public Task Published_WEB5_host_is_admitted_before_HTTP_and_absent_before_SQL_cleanup() =>
+        Run(false, web5Pilot: true, admissionOnly: true);
+
     [WebBrowserSqlFact, Trait("Category", "WebBrowserIntegration")]
     public Task Published_React_browser_uses_real_HTTPS_SQL_and_atomic_stock() => Run(true);
 
@@ -55,7 +59,8 @@ public sealed partial class WebHostIisExpressTests
     [WebAttendedSqlFact, Trait("Category", "WebAttendedFixture")]
     public Task WEB5_attended_local_fixture() => Run(true, integratedPilot: true, web5Pilot: true, attended: true);
 
-    private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false, bool web5Pilot = false, bool attended = false, bool originalFirstPilot = false)
+    private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false,
+        bool web5Pilot = false, bool attended = false, bool originalFirstPilot = false, bool admissionOnly = false)
     {
         GuiTestSafety.ThrowIfPoisoned();
         if (browser && !attended) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
@@ -75,6 +80,7 @@ public sealed partial class WebHostIisExpressTests
         var database = await SqlTestDatabase.CreateAsync(admin);
         var login = new OwnedLogin(admin);
         Process? process = null;
+        Web5IisExpressIdentity? hostIdentity = null;
         var failures = new List<Exception>();
         var drained = true;
         int customer = 0, warehouse = 0, employee = 0, product = 0, receiptProduct = 0;
@@ -130,6 +136,9 @@ public sealed partial class WebHostIisExpressTests
             process.OutputDataReceived += (_, _) => { }; process.ErrorDataReceived += (_, _) => { };
             Assert.True(process.Start()); drained = false;
             process.BeginOutputReadLine(); process.BeginErrorReadLine();
+            hostIdentity = Web5IisExpressHostAdmission.Capture(process, configuration, "Web2Smoke", new Uri("https://localhost:44321/"));
+            await Web5IisExpressHostAdmission.WaitForAdmissionAsync(
+                hostIdentity, process, TimeSpan.FromSeconds(45), CancellationToken.None);
             Reply? health = null;
             var deadline = DateTime.UtcNow.AddSeconds(45);
             while (DateTime.UtcNow < deadline && !process.HasExited)
@@ -144,7 +153,9 @@ public sealed partial class WebHostIisExpressTests
             Assert.Contains("application/json", health.ContentType);
             Assert.Equal("{\"data\":{\"status\":\"ok\"}}", health.Body);
             Assert.Equal("iis-smoke", health.Correlation);
-            if (browser)
+            if (admissionOnly)
+                Assert.True(web5Pilot && !browser, "Admission-only packaged proof is restricted to the SQL-backed WEB5 host.");
+            else if (browser)
             {
                 foreach (var type in new[] { (Extension: "*.js", Mime: "text/javascript"), (Extension: "*.css", Mime: "text/css"), (Extension: "*.woff2", Mime: "font/woff2") })
                 {
@@ -248,10 +259,11 @@ public sealed partial class WebHostIisExpressTests
                 Assert.Equal(WithoutNonce(root.Body), WithoutNonce(fallback.Body));
                 Assert.Contains("text/html", fallback.ContentType);
                 Assert.Equal(404, (await Request("https://localhost:44321/missing.js", thumbprint!)).Status);
-                Assert.Equal(400, (await Request("http://localhost:18081/api/v1/health", thumbprint!)).Status);
+                Assert.Equal(400, (await Request("http://localhost:18081/api/v1/health", thumbprint!, insecureRejectionProbe: true)).Status);
                 var crossOrigin = await Request("https://localhost:44321/api/v1/health", thumbprint!, origin: "https://outside.invalid");
                 Assert.Equal(403, crossOrigin.Status);
             }
+            await Web5IisExpressHostAdmission.VerifyAsync(hostIdentity, CancellationToken.None);
         }
         catch (Exception error) { failures.Add(error); }
         finally
@@ -270,6 +282,10 @@ public sealed partial class WebHostIisExpressTests
                         if (!process.WaitForExit(10000)) process.Kill();
                         if (!process.WaitForExit(10000)) throw new InvalidOperationException("Owned IIS Express worker did not drain; retain SQL resources.");
                     }
+                    if (hostIdentity == null)
+                        throw new InvalidOperationException("Owned IIS Express identity was not captured; retain SQL resources.");
+                    await Web5IisExpressHostAdmission.WaitForAbsenceAsync(
+                        hostIdentity, TimeSpan.FromSeconds(20), CancellationToken.None);
                     drained = true;
                 }
                 catch (Exception error) { failures.Add(error); }
@@ -619,12 +635,14 @@ public sealed partial class WebHostIisExpressTests
         var path = Path.Combine(runDirectory, "applicationhost.config"); xml.Save(path); return path;
     }
     private static async Task<Reply> Request(string url, string thumbprint, string? authorization = null, string? origin = null,
-        string method = "GET", string? body = null, string? cookie = null, bool csrf = false)
+        string method = "GET", string? body = null, string? cookie = null, bool csrf = false, bool insecureRejectionProbe = false)
     {
-        var request = (HttpWebRequest)WebRequest.Create(url);
+        var uri = new Uri(url);
+        var request = insecureRejectionProbe
+            ? Web5IisExpressHostAdmission.CreateDirectHttpRejectionRequest(uri)
+            : Web5IisExpressHostAdmission.CreateDirectRequest(uri);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         using var abort = timeout.Token.Register(request.Abort);
-        request.AllowAutoRedirect = false; request.Timeout = 10000; request.ReadWriteTimeout = 10000; request.KeepAlive = false;
         request.Method = method;
         request.Headers["X-Correlation-ID"] = "iis-smoke";
         if (authorization != null) request.Headers["Authorization"] = authorization;

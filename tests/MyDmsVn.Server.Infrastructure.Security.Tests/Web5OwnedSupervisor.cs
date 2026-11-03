@@ -11,6 +11,8 @@ internal interface IWeb5OwnedResources
 {
     Task Allocate(CancellationToken token);
     Task Start(CancellationToken token);
+    Task<bool> VerifyHost(CancellationToken token);
+    Task Admit(CancellationToken token);
     Task StopAdmission(CancellationToken token);
     Task Drain(CancellationToken token);
     Task<bool> VerifyOwnershipAndQuiescence(CancellationToken token);
@@ -37,7 +39,9 @@ internal sealed class Web5OwnedSupervisor
         Enter(Web5SupervisorState.New);
         try
         {
-            await Run(_resources.Allocate); await Run(_resources.Start); State = Web5SupervisorState.Running;
+            await Run(_resources.Allocate); await Run(_resources.Start);
+            if (!await Run(_resources.VerifyHost)) throw new InvalidDataException("Owned host identity is uncertain.");
+            await Run(_resources.Admit); State = Web5SupervisorState.Running;
         }
         catch (Exception failure) { await Quarantine(failure); throw; }
         finally { Volatile.Write(ref _busy, 0); }
