@@ -22,17 +22,17 @@ public sealed partial class WebHostIisExpressTests
 
     // A private driver result is an assertion input, not an SQL oracle. Validate every
     // identity before querying the physical source/ledger and recomputing valuation.
-    internal static void VerifyRecoveryResult(JObject result, JArray journal, long[] receipts, long[] sales, Guid[] epochs)
+    internal static void VerifyRecoveryResult(JObject result, JArray journal, long[] receipts, long[] sales, Guid[] epochs, bool web5Pilot = false)
     {
         RecoveryProperties(result, "version", "mode", "posted", "operations", "checks");
         if (result["version"]?.Type != JTokenType.Integer || (int)result["version"]! != 1 ||
-            (string?)result["mode"] != "web4-recovery" || result["posted"] is not JArray posted ||
+            (string?)result["mode"] != (web5Pilot ? "web5-recovery" : "web4-recovery") || result["posted"] is not JArray posted ||
             result["operations"] is not JArray operations || operations.Count == 0 || result["checks"] is not JArray checks || checks.Count == 0)
             throw RecoveryInvalid();
         var checkIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var check in checks)
             if (check.Type != JTokenType.String || !checkIds.Add((string)check!)) throw RecoveryInvalid();
-        if (!checkIds.SetEquals(RecoveryChecks)) throw new InvalidDataException("Recovery browser completion set is incomplete or unknown.");
+        if (!checkIds.SetEquals(web5Pilot ? RecoveryChecks.Concat(new[] { "web5-v2-committed-sales", "web5-v2-committed-receipt", "web5-negative-late-sales-create" }) : RecoveryChecks)) throw new InvalidDataException("Recovery browser completion set is incomplete or unknown.");
         VerifyPilotResultIdentities(posted, receipts, sales, integrated: true);
         var actual = new Dictionary<string, JObject>(StringComparer.Ordinal);
         foreach (var item in operations)
@@ -64,8 +64,25 @@ public sealed partial class WebHostIisExpressTests
         }
     }
 
+    internal static void ValidateWeb5BrowserCount(JObject summary)
+    {
+        RecoveryProperties(summary, "version", "discovered", "passed", "failed", "skipped", "interrupted", "retries");
+        foreach (var name in new[] { "version", "discovered", "passed", "failed", "skipped", "interrupted", "retries" })
+            if (summary[name]?.Type != JTokenType.Integer) throw new InvalidDataException("Invalid browser count.");
+        if ((long)summary["version"]! != 1 || (long)summary["discovered"]! != 14 || (long)summary["passed"]! != 14 ||
+            new[] { "failed", "skipped", "interrupted", "retries" }.Any(name => (long)summary[name]! != 0))
+            throw new InvalidDataException("Incomplete WEB5 browser run.");
+    }
+
+    internal static void ValidateRecoveryDispositions(System.Collections.Generic.IEnumerable<string> dispositions, bool web5Pilot)
+    {
+        var values = dispositions.ToArray();
+        if (values.Any(value => value != "COMMITTED" && value != "CANCELLED") || values.Count(value => value == "CANCELLED") != (web5Pilot ? 1 : 0))
+            throw new InvalidDataException("Unexpected recovery journal disposition.");
+    }
+
     private static async Task VerifyRecoveryStock(string connectionString, string runDirectory, JObject result, Guid[] epochs,
-        int warehouse, int product, int receiptProduct, IntegratedCatalog integrated)
+        int warehouse, int product, int receiptProduct, IntegratedCatalog integrated, bool web5Pilot)
     {
         using var sql = new SqlConnection(connectionString);
         await sql.OpenAsync();
@@ -80,10 +97,16 @@ SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.Res
 FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId;")).ToArray();
         Assert.NotEmpty(rows);
         Assert.Equal(new[] { 1, 2, 3, 4, 5, 6 }, rows.Select(row => row.OperationKind).Distinct().OrderBy(kind => kind));
+        ValidateRecoveryDispositions(rows.Select(row => row.Disposition), web5Pilot);
+        var cancelled = rows.Where(row => row.Disposition == "CANCELLED").ToArray();
+        Assert.Equal(web5Pilot ? 1 : 0, cancelled.Length);
+        if (web5Pilot)
+            Assert.Equal(1, await sql.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal j JOIN dbo.WebOperationTerminalAudit a ON a.ActorUserId=j.ActorUserId AND a.OperationId=j.OperationId JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.Disposition='CANCELLED' AND j.OperationKind=1 AND j.RequestTargetId IS NULL AND j.ResultDocumentId IS NULL AND u.Username=N'integratedEditor';"));
+        rows = rows.Where(row => row.Disposition == "COMMITTED").ToArray();
         var journal = new JArray(rows.Select(RecoveryJournalJson));
         VerifyRecoveryResult(result, journal,
             (await sql.QueryAsync<long>("SELECT ReceiptId FROM dbo.GoodsReceipts WHERE Status='Posted';")).ToArray(),
-            (await sql.QueryAsync<long>("SELECT SaleId FROM dbo.SalesReceipts WHERE Status='Posted';")).ToArray(), epochs);
+            (await sql.QueryAsync<long>("SELECT SaleId FROM dbo.SalesReceipts WHERE Status='Posted';")).ToArray(), epochs, web5Pilot);
         // Every source, including an unposted draft, must have exactly one Create.
         foreach (var receipt in new[] { false, true })
         {
@@ -97,10 +120,10 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId;")).To
 SELECT COUNT(*) FROM dbo.WebOperationJournal j
 LEFT JOIN dbo.SalesReceipts s ON j.OperationKind BETWEEN 1 AND 3 AND s.SaleId=j.ResultDocumentId
 LEFT JOIN dbo.GoodsReceipts r ON j.OperationKind BETWEEN 4 AND 6 AND r.ReceiptId=j.ResultDocumentId
-WHERE (j.OperationKind BETWEEN 1 AND 3 AND s.SaleId IS NULL) OR (j.OperationKind BETWEEN 4 AND 6 AND r.ReceiptId IS NULL)
+WHERE j.Disposition='COMMITTED' AND ((j.OperationKind BETWEEN 1 AND 3 AND s.SaleId IS NULL) OR (j.OperationKind BETWEEN 4 AND 6 AND r.ReceiptId IS NULL)
 OR (j.OperationKind=1 AND s.CreatedByUserId<>j.ActorUserId) OR (j.OperationKind=4 AND r.CreatedByUserId<>j.ActorUserId)
 OR (j.OperationKind=3 AND (s.Status<>'Posted' OR s.PostedByUserId<>j.ActorUserId))
-OR (j.OperationKind=6 AND (r.Status<>'Posted' OR r.PostedByUserId<>j.ActorUserId));"));
+OR (j.OperationKind=6 AND (r.Status<>'Posted' OR r.PostedByUserId<>j.ActorUserId)));"));
         // Each Posted document has exactly one committed Post operation.
         foreach (var kind in new[] { 3, 6 })
         {

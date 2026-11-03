@@ -24,8 +24,13 @@ internal sealed class WebRecoveryPilotControl
     private readonly List<Guid> _epochs = new List<Guid>();
     private Task _serving = Task.CompletedTask;
     private bool _stopped;
-    private WebRecoveryPilotControl(string connectionString) { _connectionString = connectionString; }
+    private bool _negativeRecorded;
+    private bool _negativeVerified;
+    private readonly bool _web5;
+    private string? _negativeSnapshot;
+    private WebRecoveryPilotControl(string connectionString, bool web5) { _connectionString = connectionString; _web5 = web5; }
     public Guid[] Epochs => _epochs.ToArray();
+    public bool NegativeVerified => _negativeVerified;
     public string Redact(string output) => output.Replace(_token, "<redacted>");
     public JObject Manifest => new JObject
     {
@@ -33,9 +38,9 @@ internal sealed class WebRecoveryPilotControl
         ["controlPipe"] = @"\\.\pipe\" + _name, ["controlToken"] = _token,
     };
 
-    public static async Task<WebRecoveryPilotControl> Start(string connectionString)
+    public static async Task<WebRecoveryPilotControl> Start(string connectionString, bool web5 = false)
     {
-        var control = new WebRecoveryPilotControl(connectionString);
+        var control = new WebRecoveryPilotControl(connectionString, web5);
         using (var sql = new SqlConnection(connectionString))
             control._epochs.Add(await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;"));
         control._serving = control.Serve();
@@ -78,6 +83,19 @@ internal sealed class WebRecoveryPilotControl
                     _epochs.Add(next);
                     reply["deploymentEpoch"] = next.ToString("D");
                 }
+                else if (action == "resolveNegative")
+                {
+                    if (!_web5 || _negativeRecorded) throw new InvalidDataException("Negative fixture permits one decision.");
+                    _negativeSnapshot = await Web5NegativePilot.Snapshot(_connectionString);
+                    await Web5NegativePilot.Record(_connectionString, (JObject)frame["operation"]!, _stop.Token);
+                    _negativeRecorded = true;
+                }
+                else if (action == "verifyNegative")
+                {
+                    if (!_web5 || !_negativeRecorded || _negativeVerified || _negativeSnapshot != await Web5NegativePilot.Snapshot(_connectionString))
+                        throw new InvalidDataException("Late original changed physical state.");
+                    _negativeVerified = true;
+                }
                 else
                 {
                     var changed = await sql.ExecuteAsync(new SqlTestCommand(
@@ -95,11 +113,12 @@ internal sealed class WebRecoveryPilotControl
     internal static string Validate(JObject frame, string token)
     {
         var action = frame["action"]?.Type == JTokenType.String ? (string)frame["action"]! : "";
-        var keys = action == "setWritePermission" ? new[] { "id", "token", "action", "granted" } : new[] { "id", "token", "action" };
+        var keys = action == "setWritePermission" ? new[] { "id", "token", "action", "granted" } : action == "resolveNegative" ? new[] { "id", "token", "action", "operation" } : new[] { "id", "token", "action" };
         if (!frame.Properties().Select(p => p.Name).OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(keys.OrderBy(x => x, StringComparer.Ordinal)) ||
             frame["id"]?.Type != JTokenType.Integer || (long)frame["id"]! <= 0 ||
             frame["token"]?.Type != JTokenType.String || (string)frame["token"]! != token ||
-            (action != "rotateEpoch" && action != "setWritePermission") ||
+            (action != "rotateEpoch" && action != "setWritePermission" && action != "resolveNegative" && action != "verifyNegative") ||
+            (action == "resolveNegative" && frame["operation"] is not JObject) ||
             (action == "setWritePermission" && frame["granted"]?.Type != JTokenType.Boolean))
             throw new InvalidDataException("Invalid recovery fixture control request.");
         return action;

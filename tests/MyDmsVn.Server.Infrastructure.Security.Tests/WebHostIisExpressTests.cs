@@ -46,10 +46,16 @@ public sealed partial class WebHostIisExpressTests
     [WebBrowserSqlFact, Trait("Category", "WebBrowserIntegration")]
     public Task Published_React_WEB4_recovery_preserves_journal_and_physical_stock() => Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true);
 
-    private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false)
+    [WebBrowserSqlFact, Trait("Category", "WebBrowserIntegration")]
+    public Task Published_React_WEB5_compatible_recovery_preserves_journal_and_physical_stock() => Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true, web5Pilot: true);
+
+    [WebAttendedSqlFact, Trait("Category", "WebAttendedFixture")]
+    public Task WEB5_attended_local_fixture() => Run(true, integratedPilot: true, web5Pilot: true, attended: true);
+
+    private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false, bool web5Pilot = false, bool attended = false)
     {
         GuiTestSafety.ThrowIfPoisoned();
-        if (browser) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
+        if (browser && !attended) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
         var published = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY");
         var thumbprint = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_TLS_THUMBPRINT");
         Assert.False(string.IsNullOrWhiteSpace(published));
@@ -58,6 +64,10 @@ public sealed partial class WebHostIisExpressTests
         var executable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "IIS Express", "iisexpress.exe");
         Assert.True(File.Exists(executable));
         Assert.DoesNotContain(IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners(), endpoint => endpoint.Port == 44321 || endpoint.Port == 18081);
+        var attendedDirectory = attended ? Environment.GetEnvironmentVariable("MYDMSVN_WEB_ATTENDED_DIRECTORY") : null;
+        if (attended && (string.IsNullOrWhiteSpace(attendedDirectory) || !Path.IsPathRooted(attendedDirectory) || !Directory.Exists(attendedDirectory)))
+            throw new InvalidOperationException("Provide a private existing absolute attended parent directory.");
+        var attendedPassword = attended ? "Pilot!" + Guid.NewGuid().ToString("N") : null;
         var admin = Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!;
         var database = await SqlTestDatabase.CreateAsync(admin);
         var login = new OwnedLogin(admin);
@@ -68,7 +78,7 @@ public sealed partial class WebHostIisExpressTests
         IntegratedCatalog? integrated = null;
         try
         {
-            var migration = recoveryPilot ? new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString) : FrozenWeb11Migration.Install(database.ConnectionString);
+            var migration = web5Pilot ? new DatabaseMigrationRunner().MigrateWeb5(database.ConnectionString) : recoveryPilot ? new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString) : FrozenWeb11Migration.Install(database.ConnectionString);
             Assert.True(migration.Successful, "Fresh web migration must succeed.");
             await login.CreateAsync();
             using (var connection = new SqlConnection(database.ConnectionString))
@@ -79,19 +89,19 @@ public sealed partial class WebHostIisExpressTests
                     .Replace("$(WebRuntimeUser)", login.Name).Replace("$(MigrationUser)", "WebSmokeMigration"));
                 await connection.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',@hash,N'',N'BCrypt'); " +
                     "INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';",
-                    new { hash = new BcryptPasswordHasher().Hash("IisSmoke_test-only-password_2026!") });
+                    new { hash = new BcryptPasswordHasher().Hash(attended ? "Unused!" + Guid.NewGuid().ToString("N") : "IisSmoke_test-only-password_2026!") });
                 customer = await connection.QuerySingleAsync<int>("INSERT dbo.Customers(Code,Name) OUTPUT INSERTED.CustomerId VALUES(N'PILOT-C',N'Pilot Customer');");
                 warehouse = await connection.QuerySingleAsync<int>("INSERT dbo.Warehouses(Code,Name) OUTPUT INSERTED.WarehouseId VALUES(N'PILOT-W',N'Pilot Warehouse');");
                 employee = await connection.QuerySingleAsync<int>("INSERT dbo.Employees(Code,Name) OUTPUT INSERTED.EmployeeId VALUES(N'PILOT-E',N'Pilot Employee');");
                 product = await connection.QuerySingleAsync<int>("INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'PILOT-P',N'Pilot Product',N'EA');");
                 await connection.ExecuteAsync("INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@warehouse,@product,@quantity,@value);", new { warehouse, product, quantity = browser ? 1000 : 20, value = browser ? 15000 : 300 });
-                if (browser) await SeedBrowserActors(connection);
+                if (browser && !attended) await SeedBrowserActors(connection);
                 if (receiptPilot)
                 {
                     receiptProduct = await connection.QuerySingleAsync<int>("INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'WEB3-RP',N'Web3 Receipt Product',N'EA');");
                     await SeedReceiptActors(connection);
                 }
-                if (integratedPilot) integrated = await SeedIntegratedActorsAndCatalog(connection);
+                if (integratedPilot) integrated = await SeedIntegratedActorsAndCatalog(connection, attendedPassword);
             }
             var runDirectory = Path.Combine(Path.GetDirectoryName(published!)!, "iis-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(runDirectory);
@@ -106,7 +116,7 @@ public sealed partial class WebHostIisExpressTests
             foreach (string name in start.EnvironmentVariables.Keys) if (name.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase)) inherited.Add(name);
             foreach (var name in inherited) start.EnvironmentVariables.Remove(name);
             start.EnvironmentVariables["MYDMSVN_WEB_ORIGIN"] = "https://localhost:44321";
-            start.EnvironmentVariables["MYDMSVN_WEB_OPERATION_MODE"] = recoveryPilot ? "web4" : "legacy-web11";
+            start.EnvironmentVariables["MYDMSVN_WEB_OPERATION_MODE"] = web5Pilot ? "web5" : recoveryPilot ? "web4" : "legacy-web11";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_ISSUER"] = "https://localhost:44321";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_AUDIENCE"] = "web-smoke";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_ACTIVE_KID"] = "smoke";
@@ -144,7 +154,10 @@ public sealed partial class WebHostIisExpressTests
                 foreach (var deniedPath in new[] { "/assets/missing.js", "/Web.config", "/bin/MyDmsVn.Server.HttpHost.dll" })
                     Assert.Equal(404, (await Request("https://localhost:44321" + deniedPath, thumbprint!)).Status);
                 Assert.Equal(401, (await Request("https://localhost:44321/api/v1/missing", thumbprint!)).Status);
-                await RunBrowser(database.ConnectionString, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated, recoveryPilot);
+                if (attended)
+                    await Web5AttendedLease.Wait(process, attendedDirectory!, attendedPassword!, TimeSpan.FromMinutes(30), CancellationToken.None);
+                else
+                    await RunBrowser(database.ConnectionString, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated, recoveryPilot, web5Pilot);
             }
             else
             {
@@ -263,8 +276,22 @@ public sealed partial class WebHostIisExpressTests
             {
                 var loginDrained = false;
                 try { await login.CleanupAsync(); loginDrained = true; } catch (Exception error) { failures.Add(error); }
-                if (loginDrained) try { await database.DisposeAsync(); } catch (Exception error) { failures.Add(error); }
+                if (loginDrained)
+                {
+                    try
+                    {
+                        await database.DisposeAsync();
+                        using var verification = new SqlConnection(new SqlConnectionStringBuilder(admin) { InitialCatalog = "master", Pooling = false }.ConnectionString);
+                        await verification.OpenAsync();
+                        var remaining = await verification.QuerySingleAsync<int>("SELECT (CASE WHEN DB_ID(@database) IS NULL THEN 0 ELSE 1 END) + (CASE WHEN SUSER_ID(@login) IS NULL THEN 0 ELSE 1 END);", new { database = database.DatabaseName, login = login.Name });
+                        if (remaining != 0) throw new InvalidOperationException("Owned fixture resources remain after cleanup.");
+                        Console.WriteLine("WEB5_OWNED_SQL_CLEANUP verified=1 remaining=0");
+                    }
+                    catch (Exception error) { failures.Add(error); }
+                }
             }
+            else if (failures.Count == 0)
+                failures.Add(new InvalidOperationException("Fixture cleanup was not admitted; resources retained."));
         }
         if (failures.Count > 0) throw new AggregateException("Packaged host scenario or owned cleanup failed.", failures);
     }
@@ -302,6 +329,15 @@ public sealed partial class WebHostIisExpressTests
             foreach (var variable in new[] { SqlTestDatabase.ConnectionStringEnvironmentVariable, "MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY", "MYDMSVN_WEB_TEST_TLS_THUMBPRINT" })
                 if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(variable)))
                     Skip = "Packaged IIS Express SQL test requires explicit publish, TLS pin and nonproduction SQL configuration.";
+        }
+    }
+    private sealed class WebAttendedSqlFactAttribute : WebHostSqlFactAttribute
+    {
+        public WebAttendedSqlFactAttribute()
+        {
+            if (Environment.GetEnvironmentVariable("MYDMSVN_WEB_ATTENDED_ENABLE") != "1" ||
+                string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MYDMSVN_WEB_ATTENDED_DIRECTORY")))
+                Skip = "Attended fixture requires explicit opt-in and a private parent directory.";
         }
     }
     private sealed class WebBrowserSqlFactAttribute : WebHostSqlFactAttribute
@@ -343,7 +379,7 @@ public sealed partial class WebHostIisExpressTests
         }
     }
 
-    private static async Task RunBrowser(string connectionString, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot)
+    private static async Task RunBrowser(string connectionString, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot, bool web5Pilot)
     {
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
         var node = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_NODE") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe");
@@ -374,8 +410,9 @@ public sealed partial class WebHostIisExpressTests
         if (recoveryPilot)
         {
             Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web4-recovery-live.spec.ts")));
-            recovery = await WebRecoveryPilotControl.Start(connectionString);
-            manifestJson["mode"] = "web4-recovery";
+            if (web5Pilot) Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web5-resolution-live.spec.ts")));
+            recovery = await WebRecoveryPilotControl.Start(connectionString, web5Pilot);
+            manifestJson["mode"] = web5Pilot ? "web5-recovery" : "web4-recovery";
             manifestJson["recovery"] = recovery.Manifest;
         }
         Exception? browserFailure = null;
@@ -413,7 +450,16 @@ public sealed partial class WebHostIisExpressTests
             if (recovery != null)
             {
                 await recovery.Stop();
-                await VerifyRecoveryStock(connectionString, runDirectory, JObject.Parse(File.ReadAllText(resultPath)), recovery.Epochs, warehouse, product, receiptProduct, integrated!);
+                if (web5Pilot)
+                {
+                    Assert.True(recovery.NegativeVerified);
+                    var countPath = Path.Combine(runDirectory, "browser-count.json");
+                    if (!File.Exists(countPath) || new FileInfo(countPath).Length > 1024) throw new InvalidDataException("Missing or oversized browser count.");
+                    var count = JObject.Parse(File.ReadAllText(countPath), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+                    ValidateWeb5BrowserCount(count);
+                    Console.WriteLine("WEB5_BROWSER_COUNT " + count.ToString(Formatting.None));
+                }
+                await VerifyRecoveryStock(connectionString, runDirectory, JObject.Parse(File.ReadAllText(resultPath)), recovery.Epochs, warehouse, product, receiptProduct, integrated!, web5Pilot);
                 return;
             }
             var posted = JArray.Parse(File.ReadAllText(resultPath));

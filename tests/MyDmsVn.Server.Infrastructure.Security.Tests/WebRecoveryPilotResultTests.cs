@@ -27,6 +27,23 @@ public sealed class WebRecoveryPilotResultTests
     [Fact]
     public void Committed_draft_create_matches_original_null_target_and_physical_journal() => Verify(Result());
 
+    [Fact]
+    public void Web5_requires_its_mode_and_both_completion_markers()
+    {
+        var result = Result();
+        void VerifyWeb5() => WebHostIisExpressTests.VerifyRecoveryResult(result, new JArray(Operation()), Array.Empty<long>(), Array.Empty<long>(), new[] { Epoch }, true);
+        Assert.Throws<InvalidDataException>(VerifyWeb5);
+        result["mode"] = "web5-recovery";
+        Assert.Throws<InvalidDataException>(VerifyWeb5);
+        ((JArray)result["checks"]!).Add("web5-v2-committed-sales");
+        Assert.Throws<InvalidDataException>(VerifyWeb5);
+        ((JArray)result["checks"]!).Add("web5-v2-committed-receipt");
+        Assert.Throws<InvalidDataException>(VerifyWeb5);
+        ((JArray)result["checks"]!).Add("web5-negative-late-sales-create");
+        VerifyWeb5();
+        Assert.Throws<InvalidDataException>(() => Verify(result));
+    }
+
     [Theory]
     [InlineData(1, "Sales.Create", false)]
     [InlineData(2, "Sales.Update", true)]
@@ -108,6 +125,81 @@ public sealed class WebRecoveryPilotResultTests
         Assert.Throws<InvalidDataException>(() => WebHostIisExpressTests.VerifyRecoveryResult(Result(), new JArray(Operation()), Array.Empty<long>(), new long[] { 1 }, new[] { Epoch }));
         var result = Result(); result["credentials"] = "not-permitted";
         Assert.Throws<InvalidDataException>(() => Verify(result));
+    }
+
+    [Fact]
+    public void Web5_browser_count_requires_exact_nonzero_success_and_no_extra_fields()
+    {
+        var summary = JObject.Parse("{\"version\":1,\"discovered\":14,\"passed\":14,\"failed\":0,\"skipped\":0,\"interrupted\":0,\"retries\":0}");
+        WebHostIisExpressTests.ValidateWeb5BrowserCount(summary);
+        summary["skipped"] = 1;
+        Assert.Throws<InvalidDataException>(() => WebHostIisExpressTests.ValidateWeb5BrowserCount(summary));
+        summary["skipped"] = 0; summary["secret"] = "x";
+        Assert.Throws<InvalidDataException>(() => WebHostIisExpressTests.ValidateWeb5BrowserCount(summary));
+    }
+
+    [Fact]
+    public void Recovery_dispositions_allow_only_the_expected_web5_negative()
+    {
+        WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED", "CANCELLED" }, true);
+        WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED" }, false);
+        Assert.Throws<InvalidDataException>(() => WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED", "CANCELLED" }, false));
+        Assert.Throws<InvalidDataException>(() => WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED", "EXPIRED" }, true));
+        Assert.Throws<InvalidDataException>(() => WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED" }, true));
+    }
+
+    [Fact]
+    public void Negative_control_rejects_missing_operation_and_wrong_actor()
+    {
+        var frame = new JObject { ["id"] = 1, ["token"] = "token", ["action"] = "resolveNegative" };
+        Assert.Throws<InvalidDataException>(() => WebRecoveryPilotControl.Validate(frame, "token"));
+        frame["operation"] = new JObject { ["actorKey"] = "other" };
+        Assert.Throws<InvalidDataException>(() => Web5NegativePilot.Validate((JObject)frame["operation"]!, 1, Epoch));
+    }
+
+    [Fact]
+    public void Negative_identity_recomputes_fingerprint_and_fences_actor_epoch_and_route()
+    {
+        var body = new JObject { ["note"] = "fixture" };
+        var intent = new WebOperationHttpSqlTests.Intent("Sales.Create", body, null, Guid.Parse("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"));
+        var frozen = new JObject { ["schemaVersion"] = 1, ["actorKey"] = "1", ["deploymentEpoch"] = Epoch.ToString("D"),
+            ["operationId"] = intent.Key.ToString("D"), ["requestFingerprint"] = intent.Fingerprint,
+            ["request"] = new JObject { ["operationKind"] = "Sales.Create", ["method"] = "POST", ["routeScope"] = "/api/v1/sales-receipts", ["requestTargetId"] = null, ["body"] = body } };
+        Web5NegativePilot.Validate(frozen, 1, Epoch);
+        Assert.Throws<InvalidDataException>(() => Web5NegativePilot.Validate(frozen, 2, Epoch));
+        Assert.Throws<InvalidDataException>(() => Web5NegativePilot.Validate(frozen, 1, Guid.NewGuid()));
+        frozen["request"]!["body"]!["note"] = "changed";
+        Assert.Throws<InvalidDataException>(() => Web5NegativePilot.Validate(frozen, 1, Epoch));
+        frozen["request"]!["routeScope"] = "/api/v1/goods-receipts";
+        Assert.Throws<InvalidDataException>(() => Web5NegativePilot.Validate(frozen, 1, Epoch));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Attended_lease_times_out_and_deletes_private_credentials()
+    {
+        var parent = Path.Combine(Path.GetTempPath(), "mydmsvn-attended-test-" + Guid.NewGuid().ToString("N"));
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        var acl = new System.Security.AccessControl.DirectorySecurity();
+        acl.SetAccessRuleProtection(true, false); acl.SetOwner(identity.User!);
+        acl.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(identity.User!, System.Security.AccessControl.FileSystemRights.FullControl,
+            System.Security.AccessControl.InheritanceFlags.ContainerInherit | System.Security.AccessControl.InheritanceFlags.ObjectInherit,
+            System.Security.AccessControl.PropagationFlags.None, System.Security.AccessControl.AccessControlType.Allow));
+        Directory.CreateDirectory(parent, acl);
+        try
+        {
+            using var process = System.Diagnostics.Process.GetCurrentProcess();
+            await Assert.ThrowsAsync<TimeoutException>(() => Web5AttendedLease.Wait(process, parent, "ephemeral", TimeSpan.FromMilliseconds(1), System.Threading.CancellationToken.None));
+            Assert.Empty(Directory.GetFileSystemEntries(parent));
+        }
+        finally { Directory.Delete(parent); }
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Attended_lease_refuses_insecure_parent_and_invalid_budget()
+    {
+        using var process = System.Diagnostics.Process.GetCurrentProcess();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Web5AttendedLease.Wait(process, Path.GetTempPath(), "ephemeral", TimeSpan.FromMinutes(1), System.Threading.CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => Web5AttendedLease.Wait(process, Path.GetTempPath(), "ephemeral", TimeSpan.FromMinutes(31), System.Threading.CancellationToken.None));
     }
 
     [Theory]

@@ -22,7 +22,7 @@ public sealed partial class WebHostIisExpressTests
         public int Product { get; set; }
     }
 
-    private static async Task<IntegratedCatalog> SeedIntegratedActorsAndCatalog(SqlConnection connection)
+    private static async Task<IntegratedCatalog> SeedIntegratedActorsAndCatalog(SqlConnection connection, string? password = null)
     {
         var catalog = new IntegratedCatalog
         {
@@ -31,7 +31,7 @@ public sealed partial class WebHostIisExpressTests
             Product = await connection.QuerySingleAsync<int>("INSERT dbo.Products(Code,Name,Unit) OUTPUT INSERTED.ProductId VALUES(N'WEB3-IP',N'Web3 Integrated Product',N'EA');"),
         };
         // These pools start empty; their complete history is created through real HTTP.
-        var hash = new BcryptPasswordHasher().Hash(BrowserPassword);
+        var hash = new BcryptPasswordHasher().Hash(password ?? BrowserPassword);
         foreach (var name in new[] { "integratedEditor", "balanceReader", "cardReader" })
         {
             var id = await connection.QuerySingleAsync<int>("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(@name,@normalized,@name,N'Local',@hash,N'',N'BCrypt');", new { name, normalized = name.ToUpperInvariant(), hash });
