@@ -124,6 +124,8 @@ public sealed class RecordNotExecutedOptions : IOperatorTargetOptions
         if (!Sha256.IsMatch(values["--fingerprint"])) return Fail("Operator.InvalidArguments: invalid SHA-256 fingerprint.", out options, out error);
         if (!Guid.TryParseExact(values["--decision"], "D", out var decision) || !IsVersion4(decision))
             return Fail("Operator.InvalidArguments: invalid decision ID.", out options, out error);
+        if (decision == operation)
+            return Fail("Operator.InvalidArguments: original operation and decision IDs must be distinct.", out options, out error);
         if (!Case.IsMatch(values["--case"])) return Fail("Operator.InvalidArguments: invalid case identity.", out options, out error);
         if (!Reason.IsMatch(values["--reason"])) return Fail("Operator.InvalidArguments: invalid reason code.", out options, out error);
         if (!Evidence.IsMatch(values["--evidence"])) return Fail("Operator.InvalidArguments: invalid evidence identity.", out options, out error);

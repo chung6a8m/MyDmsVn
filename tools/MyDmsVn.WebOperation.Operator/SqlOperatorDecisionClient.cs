@@ -35,8 +35,8 @@ public sealed class SqlOperatorDecisionClient : IOperatorDecisionClient
         using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
         {
             var context = new DecisionContext(connection, transaction);
-            var operation = new WebOperationContext(options.OperationId, options.DeploymentEpoch, options.DecisionId,
-                options.Kind, options.RequestTargetId, options.FingerprintBytes(), UnusedCodec.Instance);
+            var operation = new WebOperationTerminalIdentity(options.OperationId, options.DeploymentEpoch,
+                options.Kind, options.RequestTargetId, options.FingerprintBytes());
             try
             {
                 await new SqlWebOperationResolutionMaintenance(context).RecordNotExecutedAsync(operation, options.ActorUserId,
@@ -112,12 +112,5 @@ public sealed class SqlOperatorDecisionClient : IOperatorDecisionClient
         public DecisionContext(SqlConnection connection, SqlTransaction transaction) { Connection = connection; Transaction = transaction; }
         public IDbConnection Connection { get; }
         public IDbTransaction? Transaction { get; }
-    }
-
-    private sealed class UnusedCodec : IWebOperationResultCodec
-    {
-        public static readonly UnusedCodec Instance = new UnusedCodec();
-        public byte[] Encode<T>(WebOperationKind kind, T originalResult) => throw new NotSupportedException();
-        public T Decode<T>(WebOperationKind kind, byte[] bytes) => throw new NotSupportedException();
     }
 }

@@ -63,6 +63,16 @@ public sealed class WebOperationOperatorDecisionTests
         }
     }
 
+    [Fact]
+    public void Decision_id_equal_to_original_operation_id_is_rejected_before_SQL()
+    {
+        var args = Replace(DryRun(), "--decision", Operation);
+
+        Assert.False(RecordNotExecutedOptions.TryParse(args, out var options, out var error));
+        Assert.Null(options);
+        Assert.Contains("distinct", error!, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [MemberData(nameof(InvalidArguments))]
     public void Invalid_or_ambiguous_decision_arguments_fail_before_sql(string[] args)
@@ -205,8 +215,10 @@ public sealed class WebOperationOperatorDecisionTests
             var completed = await client.ExecuteAsync(executeOptions, s.Stop.Token);
 
             Assert.Equal(1, await s.Observer.QuerySingleAsync<int>(
-                "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE ActorUserId=@actor AND OperationId=@operation AND Disposition='CANCELLED';",
-                new { actor = s.Actor, operation = operation.OperationId }));
+                "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE ActorUserId=@actor AND OperationId=@operation AND DeploymentEpoch=@epoch " +
+                "AND OperationKind=@kind AND RequestTargetId IS NULL AND RequestFingerprint=@hash AND Disposition='CANCELLED';",
+                new { actor = s.Actor, operation = operation.OperationId, epoch = operation.DeploymentEpoch,
+                    kind = (byte)operation.Kind, hash = operation.Fingerprint }));
             Assert.Equal(1, await s.Observer.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM dbo.WebOperationTerminalAudit WHERE ActorUserId=@actor AND OperationId=@operation AND DecisionId=@decision AND CaseId='CASE-42' AND ReasonCode='ORIGINAL_NOT_EXECUTED' AND EvidenceReference='case://CASE-42/evidence-1' AND OperatorDatabaseUser='Web6DecisionOperator';",
                 new { actor = s.Actor, operation = operation.OperationId, decision = executeOptions.DecisionId }));
