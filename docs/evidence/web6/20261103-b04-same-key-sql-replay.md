@@ -1,6 +1,6 @@
 # WEB6 B04 evidence — six-command same-key SQL replay
 
-**Date:** 2026-11-03 (Asia/Bangkok). **State:** IMPLEMENTED / LOCAL VERIFIED NONPRODUCTION; PROTECTED SQL CI BLOCKED / NOT RUN. Manual resend remains OFF; no eligibility endpoint or frontend behavior was added. Owner review and protected environment execution are pending.
+**Date:** 2026-11-03 (Asia/Bangkok). **State:** B04 DONE (BOUNDED) / OWNER ACCEPTED / SQL-VERIFIED NONPRODUCTION. Manual resend remains OFF; no eligibility endpoint or frontend behavior was added. B6-RPL-05 policy/contract decisions remain PARTIAL and production remains NO-GO.
 
 ## Candidate and environment
 
@@ -8,6 +8,7 @@
 - Tested implementation commit: `1ab750189f65030c32a1054aeae6c7918b54c421` on `codex/web6-b04-same-key-proof`.
 - Review-fix workflow/register commit: `ffccfda76313c275dcad98cd2453bde1ea0a1476`; this adds no runtime/test behavior.
 - Round-2 exact13 isolation and workflow commit: `d7e354e093015516982d4605353da6d44085a54d`; five historical WEB4 methods remain on their unchanged schema12 path, while five distinct WEB6 wrappers select schema13/web5.
+- Reconciled protected-SQL-tested source/evidence baseline: `2b776b320202a9133c2ce7b329871fb043392831`, after bounded B02a PR #101 merged into `main`.
 - Native Windows, net48, .NET SDK `8.0.427`, VSTest `17.11.1`, Microsoft.Data.SqlClient `7.0.2`.
 - SQL Server `14.0.2140.2`, Developer Edition (64-bit), engine edition 3. Fresh owned disposable databases were migrated to exact schema13; source/compatibility fingerprint `D0A86EA0CACAB3D68F1188A1166227DFA5DE452572D1719CD55A3FA3C16F02C9`.
 - Changed runtime source: none. Changed test owners: `Web6SameKeyReplayTests.cs` and additive wrappers/fixture guards in `WebOperationCrashSqlTests.cs`. Every owned WEB6 fixture independently checks migration 013, the schema13 compatibility checker and definition fingerprint, a nonempty deployment epoch, and HTTP context `web5-resolution-v1` with resend still disabled before its matrix body starts. The implementation plan is under `docs/superpowers/plans/`.
@@ -41,13 +42,15 @@ The independent, non-pooled SQL oracle runs only after child/process drain and b
 | HTTP/SQL identity, permission/session, epoch/fingerprint, expired/unavailable/terminal/404 and no-auto-retry boundaries — `TestResults/web6-b04-round2-boundaries/b04-round2-boundaries.trx` | 15 | 15 | 15 | 0 | 0 | PASS in 1m35s |
 | SQL-free v1/v2 endpoint, legacy-mode and frozen error boundaries — `TestResults/web6-b04-round2-http/b04-round2-http.trx` | 31 | 31 | 31 | 0 | 0 | PASS in 3s |
 
-The obsolete mixed-schema aggregate of 103 is not reused. Discovery and actual TRX execution are reported per selector above. The Security test assembly and CrashHost were rebuilt in Release/net48 before execution; the HttpHost boundary project was also built in Release/net48. No `--list-tests` result is counted as execution. All SQL owners ran sequentially; a post-run process census found zero matching testhost, CrashHost, Operator or DbMigrator processes. Full solution build, IIS/IIS Express, browser, frontend and protected hosted CI were NOT RUN for this test-only PR.
+The obsolete mixed-schema aggregate of 103 is not reused. Discovery and actual TRX execution are reported per selector above. The Security test assembly and CrashHost were rebuilt in Release/net48 before execution; the HttpHost boundary project was also built in Release/net48. No `--list-tests` result is counted as execution. All SQL owners ran sequentially; a post-run process census found zero matching testhost, CrashHost, Operator or DbMigrator processes. At this local regression checkpoint, full solution build, IIS/IIS Express, browser and frontend were NOT RUN; the later protected hosted SQL result is recorded separately below.
 
 ## Protected exact-candidate SQL CI handoff
 
 `.github/workflows/backend-web6-b04-sql-candidate.yml` is a dedicated Owner-tag-triggered Windows/net48 workflow. It reuses the protected `web5-sql-candidate` environment, exact-SHA dual checkout, frozen WEB4 corpus check, evidence-guard self-test, private SID-owned LocalDB lifecycle and sanitized artifacts. Its filter names exactly the five WEB6 wrappers plus three existing WEB6 methods; actual TRX names must exactly match that allowlist and reconcile to 8 executed / 8 passed / 0 failed / 0 skipped / 0 retry. Each method runs its embedded six-command independent SQL oracle and fixture-level exact13/web5 guard. The per-method hang bound is 180 seconds because the slowest measured six-command exact13 matrix took 1m38s; the job remains bounded at 25 minutes. The job refuses completion unless the exact candidate SHA remained unchanged and the owned instance reports verified ownership, zero user databases/active owners, graceful removal and no quarantine.
 
-**BLOCKED — PROTECTED SQL CI NOT RUN.** Only Owner `chung6a8m` may create and push a `web6-b04-sql-candidate-*` tag pointing at the final reviewed PR HEAD and approve the protected environment. Prerequisites are the pushed final candidate SHA, GitHub-hosted Windows 2022 with reviewed SQL 2019/2022 LocalDB, protected environment approval and no concurrent candidate job. After final review, the Owner command is `git tag web6-b04-sql-candidate-20261103-<short-sha>-1 <exact-final-pr-head>` followed by `git push origin refs/tags/web6-b04-sql-candidate-20261103-<short-sha>-1`. The run URL, exact SHA, image/SQL version, sanitized artifact digest/counts and lifecycle result must be added before B6-RPL-02 or B04 overall can close. Existing SQL-free `Backend Web checks` are not a substitute.
+**PROTECTED SQL CI PASS / OWNER ACCEPTED.** Owner authorized the exact-head tag and protected environment on 2026-11-03. [Run `41643581370`](https://github.com/chung6a8m/MyDmsVn/actions/runs/41643581370) attempt 1 passed on exact reconciled SHA `2b776b320202a9133c2ce7b329871fb043392831`. The protected environment retained its WEB5 tag policy and added the reviewed WEB6 B02a/B04 tag families; no protected rule was removed.
+
+Sanitized artifact `web6-b04-sql-candidate-counts` has GitHub digest `sha256:0436b425956c07de96cfab5b483b48076d71d76152a79817f09baa9351fb9718`. Its evidence records discovered/unique/total/executed/passed `8/8/8/8/8`, failed/skipped/retry `0/0/0`, exact class count 8 and the exact allowlisted five WEB6 wrappers plus three existing WEB6 method names. Lifecycle reports run/attempt `41643581370/1`, image `20261026.347.1`, SQL `15.0.4382.1` Express, compatibility 140, matching `controlSha`/`testSourceSha`, phase `Removed`, verified SID ownership, zero user databases, zero active owners and no quarantine. All exact-source, real SQL/process matrices, source-integrity, drain/removal, evidence guard and sanitized-upload steps passed. Existing SQL-free `Backend Web checks` are supporting evidence, not the SQL substitute.
 
 ## Failed development runs and resource disposition
 
@@ -60,12 +63,12 @@ Six newly allocated development fixtures are fail-closed **QUARANTINED**: the pr
 | Gate | State | Evidence |
 |---|---|---|
 | B6-RPL-01 | VERIFIED NONPRODUCTION | Six retained-result replay paths preserve bytes/version/line IDs and one effect |
-| B6-RPL-02 | LOCAL VERIFIED / PROTECTED CI BLOCKED | Six before/near/after death and both original/resend ordering matrices, real processes and independent SQL oracle pass locally; exact-candidate protected SQL CI is NOT RUN, so this gate and B04 overall are incomplete |
+| B6-RPL-02 | OWNER ACCEPTED / VERIFIED NONPRODUCTION | Six before/near/after death and both original/resend ordering matrices, real processes and independent SQL oracle pass locally and on the exact-head protected SQL candidate with owned cleanup |
 | B6-RPL-03 | VERIFIED NONPRODUCTION | Six operator-first and original-first terminal races under exact epoch/actor/key/fingerprint fence |
 | B6-RPL-04 | VERIFIED NONPRODUCTION | Actor/session/grant/epoch/body/target/kind/fingerprint, expired/unavailable, lock/cancel/availability and old-mode/capability cases fail closed |
 | B6-RPL-05 | PARTIAL / OWNER DECISION PENDING | Server dispatch/no-auto-retry and 404 observation boundaries verified; proposed `web6-resend-eligibility-v1`, authoritative age source, seven-day ceiling and consent/claim policy remain unapproved and unimplemented |
 
-Round-2 self-check: no known P0/P1/P2 source defect remains. Two acceptance/operational blockers remain explicit: protected exact-candidate SQL CI is NOT RUN, and six WEB6 quarantined development allocations require a separate exact-identity Owner disposition. This PR grants no tag/environment approval or cleanup authority. B04 is not DONE and does not authorize F02, production or manual resend.
+Round-2 final review findings: P0 0, P1 0, P2 0. Owner accepted the bounded exact-head SQL proof. Six WEB6 quarantined development allocations still require a separate exact-identity Owner disposition; this acceptance grants no cleanup authority. B6-RPL-05 remains PARTIAL because the additive eligibility contract, authoritative age source and product consent/claim decisions are not implemented or approved. B04 completion does not authorize F02, staging, production or manual resend.
 
 ## F02 handoff
 
