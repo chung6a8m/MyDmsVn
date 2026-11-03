@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Operations;
+using MyDmsVn.Server.Infrastructure.Operations;
+using MyDmsVn.Testing.Sql;
 using MyDmsVn.WebOperation.Operator;
 using Xunit;
 
@@ -139,6 +144,97 @@ public sealed class WebOperationOperatorInspectTests
         Assert.Equal((int)OperatorExitCode.Timeout, timeoutExit);
     }
 
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Restricted_operator_inspects_all_states_without_changing_SQL() => WebOperationResolutionScenario.Owned(async s =>
+    {
+        await s.Observer.ExecuteAsync("CREATE USER Web6CliOperator WITHOUT LOGIN; ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER Web6CliOperator;");
+        var committed = s.Operation(hash: Enumerable.Repeat((byte)1, 32).ToArray());
+        var expired = s.Operation(hash: Enumerable.Repeat((byte)2, 32).ToArray());
+        var cancelled = s.Operation(hash: Enumerable.Repeat((byte)3, 32).ToArray());
+        var missing = s.Operation(hash: Enumerable.Repeat((byte)4, 32).ToArray());
+        await s.Observer.ExecuteAsync(@"DECLARE @n datetime2(7)=SYSUTCDATETIME();
+INSERT dbo.WebOperationJournal VALUES(@actor,@committed,@epoch,1,1,1,NULL,@committedHash,41,'COMMITTED',@bytes,@n,@n,DATEADD(day,7,@n));
+SET @n=DATEADD(day,-8,SYSUTCDATETIME());
+INSERT dbo.WebOperationJournal VALUES(@actor,@expired,@epoch,1,1,1,NULL,@expiredHash,42,'COMMITTED',@bytes,@n,@n,DATEADD(day,7,@n));",
+            new { actor = s.Actor, committed = committed.OperationId, expired = expired.OperationId, epoch = s.Epoch,
+                committedHash = committed.Fingerprint, expiredHash = expired.Fingerprint, bytes = Encoding.UTF8.GetBytes("{\"data\":{}}") });
+        var terminal = await s.Transaction();
+        await WebOperationResolutionScenario.Record(s, terminal, cancelled);
+        terminal.Tx.Commit();
+        var before = await SqlSnapshot(s.Observer);
+        var factory = new ImpersonatingConnectionFactory(s.Database.ConnectionString, "Web6CliOperator");
+        foreach (var item in new[]
+        {
+            (Operation: committed, Status: "COMMITTED", Exit: 0),
+            (Operation: expired, Status: "EXPIRED", Exit: 0),
+            (Operation: cancelled, Status: "CANCELLED", Exit: 0),
+            (Operation: missing, Status: "INDETERMINATE", Exit: 4)
+        })
+        {
+            var stdout = new StringWriter();
+            var exit = await OperatorInspectApplication.RunAsync(Arguments(s, item.Operation),
+                _ => new SqlOperatorInspectionClient(factory), stdout, new StringWriter(), s.Stop.Token);
+            Assert.Equal(item.Exit, exit);
+            Assert.Contains("status=" + item.Status, stdout.ToString());
+        }
+        Assert.Equal(before, await SqlSnapshot(s.Observer));
+    });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task SQL_target_and_authority_fail_closed_without_disclosure() => WebOperationResolutionScenario.Owned(async s =>
+    {
+        await s.Observer.ExecuteAsync(@"CREATE USER Web6CliOperator WITHOUT LOGIN;
+ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER Web6CliOperator;
+CREATE USER Web6CliRuntime WITHOUT LOGIN;");
+        var operation = s.Operation(hash: Enumerable.Repeat((byte)5, 32).ToArray());
+        await s.Observer.ExecuteAsync("DECLARE @n datetime2(7)=SYSUTCDATETIME(); INSERT dbo.WebOperationJournal VALUES(@actor,@id,@epoch,1,1,1,NULL,@hash,41,'COMMITTED',@bytes,@n,@n,DATEADD(day,7,@n));",
+            new { actor = s.Actor, id = operation.OperationId, epoch = s.Epoch, hash = operation.Fingerprint, bytes = Encoding.UTF8.GetBytes("{\"data\":{}}") });
+        var before = await SqlSnapshot(s.Observer);
+
+        Assert.Equal((int)OperatorExitCode.EnvironmentFailure, await RunSql(Arguments(s, operation, database: "AnotherOwnedDatabase"),
+            new OperatorSqlConnectionFactory(s.Database.ConnectionString)));
+        Assert.Equal((int)OperatorExitCode.Denied, await RunSql(Arguments(s, operation),
+            new ImpersonatingConnectionFactory(s.Database.ConnectionString, "Web6CliRuntime")));
+        Assert.Equal((int)OperatorExitCode.Denied, await RunSql(Arguments(s, operation, epoch: Guid.NewGuid()),
+            new ImpersonatingConnectionFactory(s.Database.ConnectionString, "Web6CliOperator")));
+        Assert.Equal((int)OperatorExitCode.Denied, await RunSql(Arguments(s, operation, fingerprint: new byte[32]),
+            new ImpersonatingConnectionFactory(s.Database.ConnectionString, "Web6CliOperator")));
+        Assert.Equal((int)OperatorExitCode.Indeterminate, await RunSql(Arguments(s, operation, actor: s.Actor + 100),
+            new ImpersonatingConnectionFactory(s.Database.ConnectionString, "Web6CliOperator")));
+        Assert.Equal(before, await SqlSnapshot(s.Observer));
+    });
+
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
+    public Task SQL_lock_timeout_is_bounded_and_read_only() => WebOperationResolutionScenario.Owned(async s =>
+    {
+        await s.Observer.ExecuteAsync("CREATE USER Web6CliOperator WITHOUT LOGIN; ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER Web6CliOperator;");
+        var operation = s.Operation(hash: Enumerable.Repeat((byte)6, 32).ToArray());
+        var before = await SqlSnapshot(s.Observer);
+        var holder = await s.Transaction();
+        var resource = "MyDmsVn.WebOperation:" + s.Actor + ":" + operation.OperationId.ToString("N");
+        Assert.True(await holder.Sql.QuerySingleAsync<int>(new SqlTestCommand(
+            "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=@resource,@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=0; SELECT @r;",
+            new { resource }, transaction: holder.Tx, cancellationToken: s.Stop.Token)) >= 0);
+        var args = Arguments(s, operation, timeoutSeconds: 1);
+        var exit = await RunSql(args, new ImpersonatingConnectionFactory(s.Database.ConnectionString, "Web6CliOperator"));
+        Assert.Equal((int)OperatorExitCode.Timeout, exit);
+        holder.Tx.Rollback();
+        Assert.Equal(before, await SqlSnapshot(s.Observer));
+    });
+
+    [Fact]
+    public async Task Unavailable_SQL_endpoint_returns_environment_failure_without_secret_output()
+    {
+        var args = Valid();
+        var connection = "Data Source=127.0.0.1,1;Initial Catalog=MyDmsVn_Test_Operator;Integrated Security=True;Encrypt=False;Pooling=False;Connect Timeout=1";
+        var stdout = new StringWriter(); var stderr = new StringWriter();
+        var exit = await OperatorInspectApplication.RunAsync(args,
+            _ => new SqlOperatorInspectionClient(new OperatorSqlConnectionFactory(connection)), stdout, stderr, CancellationToken.None);
+        Assert.Equal((int)OperatorExitCode.EnvironmentFailure, exit);
+        Assert.Equal(string.Empty, stdout.ToString());
+        Assert.DoesNotContain("Data Source", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
     public static IEnumerable<object[]> InvalidArguments()
     {
         yield return new object[] { Array.Empty<string>() };
@@ -192,6 +288,54 @@ public sealed class WebOperationOperatorInspectTests
         Guid.Parse(Epoch), 42, Guid.Parse(Operation),
         disposition == "INDETERMINATE" ? (WebOperationKind?)null : WebOperationKind.SalesCreate,
         null, disposition, disposition == "COMMITTED", disposition == "COMMITTED", disposition == "COMMITTED", null);
+
+    private static string[] Arguments(WebOperationJournalTests.Scenario s, WebOperationContext operation,
+        string? database = null, Guid? epoch = null, int? actor = null, byte[]? fingerprint = null, int timeoutSeconds = 15) => new[]
+    {
+        "inspect", "--environment", "owned-test", "--database", database ?? s.Database.DatabaseName,
+        "--epoch", (epoch ?? s.Epoch).ToString("D"), "--actor", (actor ?? s.Actor).ToString(),
+        "--operation", operation.OperationId.ToString("D"), "--fingerprint", Hex(fingerprint ?? operation.Fingerprint),
+        "--timeout-seconds", timeoutSeconds.ToString()
+    };
+
+    private static string Hex(byte[] bytes) => string.Concat(bytes.Select(value => value.ToString("x2")));
+
+    private static async Task<int> RunSql(string[] args, IOperatorSqlConnectionFactory factory) =>
+        await OperatorInspectApplication.RunAsync(args, _ => new SqlOperatorInspectionClient(factory),
+            new StringWriter(), new StringWriter(), CancellationToken.None);
+
+    private static async Task<string> SqlSnapshot(SqlConnection sql)
+    {
+        var values = new List<string>();
+        foreach (var source in new[]
+        {
+            "WebOperationJournal ORDER BY ActorUserId,OperationId", "WebOperationTerminalAudit ORDER BY ActorUserId,OperationId",
+            "SalesReceipts ORDER BY SaleId", "SalesReceiptLines ORDER BY SaleLineId", "GoodsReceipts ORDER BY ReceiptId",
+            "GoodsReceiptLines ORDER BY ReceiptLineId", "StockBalances ORDER BY WarehouseId,ProductId",
+            "StockLedger ORDER BY LedgerId", "StockValuationEntries ORDER BY LedgerId"
+        }) values.Add(await sql.QuerySingleAsync<string>("SELECT COALESCE((SELECT * FROM dbo." + source + " FOR JSON PATH,INCLUDE_NULL_VALUES),N'[]');"));
+        return string.Join("|", values);
+    }
+
+    private sealed class ImpersonatingConnectionFactory : IOperatorSqlConnectionFactory
+    {
+        private readonly string _connectionString;
+        private readonly string _databaseUser;
+        public ImpersonatingConnectionFactory(string connectionString, string databaseUser)
+        {
+            _connectionString = connectionString;
+            _databaseUser = databaseUser;
+        }
+        public async Task<SqlConnection> OpenAsync(InspectOptions options, CancellationToken cancellationToken)
+        {
+            var connection = new SqlConnection(new SqlConnectionStringBuilder(_connectionString) { Pooling = false }.ConnectionString);
+            await connection.OpenAsync(cancellationToken);
+            using var command = connection.CreateCommand();
+            command.CommandText = "EXECUTE AS USER=N'" + _databaseUser + "';";
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            return connection;
+        }
+    }
 
     private sealed class FakeClient : IOperatorInspectionClient
     {
