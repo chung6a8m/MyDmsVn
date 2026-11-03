@@ -5,14 +5,14 @@
 ## Candidate and design
 
 - Base: backend `fe790b14f0e1c2247fbe3f5a1fc519f293d63d5b` (merged B01 PR #99); paired frontend reference `92afef7c9090605a172ffc351d1e641d9df12100`.
-- Tested implementation commit: `3f8d4ef054ea43eaf281d80b06cf33c730677d57` on `codex/web6-b02-operator-inspect`.
+- Review-fix implementation commit: `62f1b390956db72330156edcbdbca097c3b304d0` on `codex/web6-b02-operator-inspect` (documentation follows in a separate commit).
 - Native Windows/net48, .NET SDK `8.0.427`, VSTest `17.11.1`, Microsoft.Data.SqlClient `7.0.2`; SQL Server `14.0.2140.2` Developer Edition (64-bit), engine edition 3.
 - Fresh owned tests used exact schema13 and fingerprint `D0A86EA0CACAB3D68F1188A1166227DFA5DE452572D1719CD55A3FA3C16F02C9`.
 - New console owner: `tools/MyDmsVn.WebOperation.Operator`. It references Application and Infrastructure only, not HttpHost, controllers or runtime DI. It adds no migration, grant or HTTP endpoint.
 
-The executable accepts only `inspect --environment --database --epoch --actor --operation --fingerprint [--timeout-seconds]`. It validates an exact GUIDv4 operation, non-empty epoch, canonical positive actor and SHA-256; rejects system databases, attach/user-instance connections, target mismatch and ambiguous/duplicate options; disables pooling; checks both configured `Initial Catalog` and `DB_NAME()`; and has bounded open/command cancellation.
+The executable accepts only `inspect --environment --database --epoch --actor --operation --fingerprint [--timeout-seconds]`. It validates an exact GUIDv4 operation, non-empty epoch, canonical positive actor and SHA-256; rejects system databases, attach/user-instance connections, target mismatch and ambiguous/duplicate options; disables pooling; checks both configured `Initial Catalog` and `DB_NAME()`; and has bounded open/command cancellation. The public timeout is now 1–25 seconds, so the invocation deadline precedes the shared Infrastructure read command's 30-second timeout; raw SQL timeout `-2` is also mapped to exit 6. Caller cancellation remains exit 130, while environment or rollback/disposal failure remains exit 5.
 
-Inspection reuses `SqlWebOperationResolutionMaintenance.InspectAsync` inside an explicit read-committed transaction and always rolls back. The dedicated connection must already use the restricted schema13 operator principal. The tool cannot call `RecordNotExecutedAsync`, cannot create a claim/case, and never prints the connection string, credential, token, cookie, fingerprint or result/business bytes.
+Inspection reuses `SqlWebOperationResolutionMaintenance.InspectAsync` inside an explicit read-committed transaction and rolls back on success/error; cancellation closes the non-pooled connection. Before inspection the CLI checks the exact configured effective database user and original login, operator-role membership, absence of extra database roles/direct grants (apart from normal `CONNECT`), and absence of `db_owner`, database/server `CONTROL`, sysadmin or any other fixed server role. Unknown/ambiguous membership fails closed. The tool cannot call `RecordNotExecutedAsync`, cannot create a claim/case, and never prints the connection string, credential, token, cookie, fingerprint or result/business bytes. `environmentLabel` is accompanied by `environmentLabelSource=operator-supplied` and is not claimed as authoritative identity.
 
 ## Verification
 
@@ -20,13 +20,13 @@ Solution-level locked restore was attempted and stopped because three WinFormsKi
 
 | Gate/artifact | Executed | Pass | Fail | Skip | Result |
 |---|---:|---:|---:|---:|---|
-| CLI parser/output/exit/SQL integration — `TestResults/web6-b02a-final/b02a-operator-inspect-final.trx` | 34 | 34 | 0 | 0 | PASS |
-| Existing resolution regression — `TestResults/web6-b02a-resolution-regression-final/b02a-resolution-regression-final.trx` | 24 | 24 | 0 | 0 | PASS |
-| **Test total** | **58** | **58** | **0** | **0** | **PASS** |
+| Review-fixed CLI parser/output/exit/SQL integration and executable smoke — `TestResults/web6-b02a-review-final/b02a-operator-inspect-review.trx` | 39 | 39 | 0 | 0 | PASS |
+| Existing resolution regression — `TestResults/web6-b02a-resolution-review/b02a-resolution-regression-review.trx` | 24 | 24 | 0 | 0 | PASS |
+| **Independent final test total** | **63** | **63** | **0** | **0** | **PASS** |
 
-Release build of the CLI passed with 0 warnings/0 errors. Direct executable probes passed: `--help` exit 0 and incomplete `inspect` exit 2. Project-reference inspection showed only Application and Infrastructure.
+Release/net48 build of the CLI at the review-fix implementation commit passed with 0 warnings/0 errors. The 39-case run includes an out-of-process Release executable using a generated, fresh SQL login on a fresh owned schema13 database: restricted COMMITTED inspection exits 0; missing operator role, an extra `db_datareader` role and `db_owner` exit 3; wrong target exits 5; stdout/stderr are bounded and secret/payload-free. The exact owned login SID/server identity and zero active sessions were checked before `DROP LOGIN`. A first RED smoke exposed an invalid assumption that every minimal fixture contains the runtime role; the final test instead proves generic extra-role rejection and its owned allocation/login cleaned normally.
 
-The SQL cases use fresh owned fixtures and prove restricted-operator COMMITTED, EXPIRED, CANCELLED and missing-row INDETERMINATE; runtime-principal denial; exact database/epoch/actor/fingerprint handling; application-lock timeout; unavailable SQL; cancellation; and bounded secret-free output. Before/after snapshots cover journal, terminal audit, Sales/Goods Receipt sources, balances, ledger and valuation and are byte-equal after inspection. All successful fixtures completed their normal owned cleanup; no B02a quarantine was created. Full solution build, IIS, browser and protected hosted CI were NOT RUN.
+The SQL cases use fresh owned fixtures and prove restricted-operator COMMITTED, EXPIRED, CANCELLED and missing-row INDETERMINATE; missing/elevated principal denial; exact database/epoch/actor/fingerprint handling; a real application-lock timeout; deterministic real SQL command timeout `-2`; cancellation before and during inspection; unavailable SQL; cleanup-failure mapping; and bounded secret-free output. The public value 26 is rejected, covering the deliberate under-30 upper bound without a 60-second test. Before/after snapshots cover journal, terminal audit, Sales/Goods Receipt sources, balances, ledger and valuation and are byte-equal after inspection/error/timeout. All final fixtures completed their normal owned cleanup; no B02a quarantine was created. Full solution build, IIS, browser and protected hosted CI were NOT RUN.
 
 ## Acceptance and review
 
