@@ -6,7 +6,7 @@
 
 | Task | Planned evidence | Status |
 |---|---|---|
-| B01 | Exact source/contract/risk/expiry eligibility decision and Owner scope | PLANNED |
+| B01 | [Exact source/contract/risk/expiry eligibility checkpoint](20261103-b01-source-safety-policy.md) and Owner scope | READY FOR OWNER TECHNICAL REVIEW; runtime NOT CHANGED |
 | B02a/B02b | Read-only CLI, typed terminal command, SQL operator/authority/race audit evidence | PLANNED |
 | B03 | Compaction/retention/positive-case/backup-restore/epoch drill, independent SQL oracle | PLANNED |
 | B04 | Six commands × same-key/terminal/OS-death, proof of original result and one effect | PLANNED |
