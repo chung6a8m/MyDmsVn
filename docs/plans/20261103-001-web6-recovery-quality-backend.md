@@ -1,0 +1,132 @@
+# Roadmap 06 — Recovery Completion & Production-like Quality (backend)
+
+**Owner selection: 2026-11-03. Status: SELECTED / PLANNED / DOCUMENTATION ONLY.** The Owner explicitly selected controlled, user-confirmed manual same-key resend, continued prohibition on automatic HTTP mutation retry, completion of WEB5 B03 operator recovery, and extension of WEB5 B05 acceptance against one pinned frontend/backend candidate. This is a new implementation queue, **not** reopening or completing archived WEB5. Neither selecting this roadmap nor merging its documentation enables resend, an operator destructive command, deployment, staging acceptance or production GO.
+
+**Baseline:** backend `main@3d4d79c595262569195c69d099a9124a24466b38` (WEB5 bounded closeout PR #97), frontend `main@a46acb1357d52f2a0551f7676592fc2cb8be50bd` (PR #31). [Archived WEB5 backend](../archive/20261103-web5-bounded-closeout/README.md) · [WEB5 final status](../evidence/web5/20261103-web5-roadmap-closeout.md) · [WEB5 original plan](../archive/20261103-web5-bounded-closeout/plans/20261102-001-web5-operational-safety-backend.md) · [companion WEB6 frontend](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261103-001-web6-recovery-quality-web.md).
+
+**Read first:** [WEB6 safety design](../design/WEB6_RECOVERY_OPERATION_PROTOCOL.md), [backend acceptance matrix](../development/WEB6_BACKEND_ACCEPTANCE.md), [Codex handoff](../development/WEB6_CODEX_HANDOFF.md), [candidate runbook](../development/WEB6_CANDIDATE_RUNBOOK.md), [evidence routing](../evidence/web6/README.md), [WEB5 operation safety protocol](../design/WEB5_OPERATION_SAFETY_PROTOCOL.md), [ADR0015](../adr/0015-web5-additive-recovery-boundary.md), [test policy](../TEST_POLICY.md). Current executable work is WEB6 B01–B06 **only after individual scoped task selection**; CEX-A01–A05 remains an independent active WinForms workstream.
+
+## 0. Goals, source checkpoint and non-negotiables
+
+1. Complete a **usable, audited, bounded operator workflow** for SQL operation inspection, decision and maintenance, not just handwritten SQL or a read-only runbook.
+2. Prove that a **human-confirmed, single-attempt resend of the same original immutable operation** can be safely admitted by the existing SQL journal for six Sales/Receipt Create, Update, Post commands, under actual concurrent writer/operator races. F02/F03 own client implementation; this backend does not authorize UI enablement by itself.
+3. Build a **pinned, repeatable pair** of published net48/System.Web backend + built React assets, SQL schema13 and restricted principals. Test IIS Express with positive **HTTP.sys request-queue/worker ownership admission** from merged PR #95, physical SQL oracle, Chromium/Edge, compatibility/cutover, workload, recovery and audit. Use **only owned disposable nonproduction** resources.
+4. Raise engineering quality toward production while retaining **STAGING NOT ACCEPTED / PRODUCTION NO-GO / DEFERRED** until a separate, explicit release decision. Preserve full IIS and unfinished Narrator steps as `OWNER_ACCEPTED_EXCEPTION / NOT RUN` in the bounded IIS Express scope, not PASS. Reverse-proxy deployment tests are `NOT_APPLICABLE` for direct same-origin topology only; rejection of forged forwarded headers is applicable.
+5. Keep legacy WEB4 v1 contracts and 48 frozen blobs, additive `web5-resolution-v1` 40 files, schema13 and exact13/`web5`, Desktop exact10, legacy-Web exact11 and Web4 exact12 mode boundaries. Never make a `web4` host accept schema13 or infer binary downgrade from an unchanged deployment epoch.
+6. No automatic Write/Post retry; no silent new operation GUID; no server-side "retry queue"; no runtime HTTP admin endpoint; no runtime SQL operator grants; no generic 404/timeout-derived rollback or NOT_EXECUTED; no fake versions, no broad SQL elevation. Same-key resend is feature-gated and OFF until approved. Refresh-token GET recovery is a separate operation, never automatic mutation replay.
+7. **Historical quarantine remains untouched.** Two earlier SQL databases/private manifests cannot be adopted or deleted by prefix, count=0 or a new fixture's cleanup. The three retained probe directories remain outside any new cleanup. Require original creation identity, ownership, quiescence and human cleanup authority for any future investigation; nothing in WEB6 grants that authority.
+8. Preserve server SQL inventory/source/StockBalance/StockCard/valued ledger/COGS invariants, Sale duplicate products/gifts and Receipt uniqueness, transaction-owned journal+business result, actor/session/permission/epoch/key fingerprint, and no additional cross-tenant/multitenant scope.
+
+**What exists:** `SqlWebOperationJournal.AdmitAsync` already fences and either replays COMMITTED bytes for matching actor/key/fingerprint or fails on unavailable/expired/conflicting keys; `013_WebOperationTerminalResolution.sql` provides atomic CANCELLED + matched operator audit, `SqlWebOperationResolutionMaintenance` offers separate operator inspection and terminal recording, `SqlWebOperationMaintenance.CompactAsync` retains EXPIRED tombstones, and PR #95 supplies owned IIS Express host admission. Existing tests establish bounded proof; they are not fresh WEB6 PASS.
+
+**What does not exist:** production operator CLI, audited attended runbook/rehearsal, explicit resend UX/admission with durable cross-tab single dispatch, representative measured workload, current paired cutover, service-level recovery/RPO/RTO, independently accepted limiter/audit retention, or B06 final release dossier. These are WEB6 work, not exceptions automatically waived by laptop restrictions.
+
+## 1. Ownership and order
+
+| Step | Backend owner | Frontend owner | Entry/dependency | Delivery |
+|---|---|---|---|---|
+| WEB6-01 | **B01** source/contract and threat gate | **F01** frozen request and UX source gate | Main/archived WEB5 evidence | Contract and risk/eligibility matrix, no runtime |
+| WEB6-02 | **B02** separate operator CLI: inspect, preview, verified negative command | F01 reviews support wording | B01; exact schema13 SQL fixture/operator role | Read-only CLI PR then explicit destructive-command PR |
+| WEB6-03 | **B03** audited compaction, retention, epoch/restore and support reconciliation | **F02** persist manual resend claim | B01 + B04 primary SQL eligibility; B02 for full operator workflow | Separate backend and frontend PRs |
+| WEB6-04 | **B04** live same-key resend/fence and security evidence | **F03** user-confirmed resend UI and native browser proof | B01 baseline; F02 admission can begin only after B04 proof | Six-command race matrix, no automatic retry |
+| WEB6-05 | **B05** one-candidate host/cutover/workload/operational pilot | **F04** paired real-browser/SQL acceptance | B02/B03/B04 + F02/F03 merged, current source pinned | Nonproduction admission/measurements |
+| WEB6-06 | **B06** dossier/Owner decision and closeout | **F05** support handoff and frontend candidate record | B05/F04 evidence; known deferred register | Explicit bounded/GO-NO-GO decision, no implied production |
+
+B02 read-only CLI and B04 SQL-only resend proofs can proceed in parallel after B01, but **F02's enabled resend path is downstream of B04 SQL proof**. The bounded B03 rehearsal may be independent of F02 implementation. Integration is pair-locked; never cite a passing old compiled host as proof for changed runtime bits.
+
+## 2. B01 — Source and policy contract (WEB6-01)
+
+**Deliverables:** code-level map with actual method/line refs and risk register for `SqlWebOperationJournal`, `SqlWebOperationResolutionMaintenance`, `SqlWebOperationMaintenance`, `OperationsController`, `OperationResolutionController`, six immutable write paths, and frontend `frozenWriteRequest`/`web4MutationRuntime`/IDB transaction. Freeze original WEB4 corpus hashes, WEB5 corpus hashes, exact schema fingerprint, mode and SQL principal rules. Record candidate baseline refs, CI and executable test inventory.
+
+**Eligibility decision for manual same-key resend:**
+- **Potentially allowed only by fresh, explicit user consent in a currently authenticated actor/epoch/grant context**, with valid persisted original immutable ID/request/fingerprint and an unresolved `DISPATCHED/UNKNOWN` intent. The action **may actually execute** the original business command if it never committed; UI must say so and require a reviewed original payload.
+- Under the current seven-day result-retention regime, require an explicit conservative eligibility window based on a trusted server clock/retention result or a reviewed bounded policy. **Do not trust the browser clock** as sole authority, and do not assume retention beyond the recorded seven days. If the current existing status API cannot supply trustworthy eligibility, design a **separately versioned, read-only eligibility admission** (never modify frozen v1 responses/WEB5 corpus) with its own reviewed proof; default BLOCKED until implemented. Even a "permitted" read cannot reserve the write across a race: journal fence remains final authority.
+- `COMMITTED` with original result: GET+settle; `COMMITTED/RESULT_EXPIRED/RESULT_UNAVAILABLE`: keep protected, operator case only; `CANCELLED/NOT_EXECUTED`: never resend old key, require separate NEW intent/fresh baseline and consent; wrong actor/epoch/permission, invalid fingerprint, wrong schema/mode, disabled server capability, invalid/missing original, oversized/stale/corrupt IDB: DENY.
+- `NOT_OBSERVED`/404/timeout is **not** proof of no commit and does **not independently grant resend**. Recheck current context and admission before consent; transaction-owned actor/key fence and SQL oracle must prove the race safety.
+- Read-only status/check-result may be retried with safe bounded backoff. Automatic mutation retransmission after timeout, 401/refresh, reload, service worker, tab restore, timer or retry library is prohibited.
+
+**Exit:** documented state transition/trace and explicitly accepted bounded eligibility policy, proposed versioned contract only if required, threat review P0/P1=0; source contract and tests identified. No B01 PR may turn on the UI flag.
+
+## 3. B02 — Separate operator CLI and durable decision flow (WEB6-02)
+
+Implement a **separate executable operator CLI**, preferably a small `net48` console project under `tools/` or established tooling path (inspect existing solution organization before selecting exact path). Use current `SqlWebOperationResolutionMaintenance.InspectAsync` and `RecordNotExecutedAsync`; reuse `deployment/sql/Provision-MyDmsVnWebOperationOperator.sql`, migrator and existing UoW/SQL helpers where appropriate, but **do not register operator services in HTTP runtime DI**.
+
+**Required commands (exact names may be adapted with documented help):** `inspect --epoch --actor --operation --fingerprint` (read-only); `record-not-executed --dry-run --epoch --actor --operation --kind --target --fingerprint --case --reason --evidence --decision` (simulation/validation only); `record-not-executed --execute ... --confirm <typed exact composite>` (explicit bounded transaction+commit). Use independent, least-privileged operator SQL identity, not the web runtime login. Decision ID is a new GUIDv4 for the audit **only**, not an HTTP operation key. No implicit case creation, no journal injection by web user, no administrative unlock, no dynamic SQL identifier from arbitrary input.
+
+**Mandatory behavior:** validate all exact GUIDv4, decimal ID, SHA-256, allowed case metadata and bounded strings; require separate explicit environment/target identity, no connect-to-master as an operator shortcut, one operation/transaction, bounded timeout/cancellation, fail closed on stale epoch/permission/active writer/lock contention/duplicate/mismatch, never claim success before SQL Commit. On transaction uncertainty report `UNKNOWN/ESCALATE`; re-inspect with the original exact identity under correct rights. Commands have documented finite exit codes for completed/dry-run/denied/indeterminate/environment and **secret-free** STDOUT/STDERR. Dry-run must not mutate any table nor acquire a fake authority.
+
+**Audit:** immutable matched terminal SQL audit remains canonical. Additional action/correlation records must distinguish operator attempt, transaction commit and readback-after-commit, with no raw payload/JWT/connection secret. Define ACL, retention, and signed/sanitized evidence root. Tests: runtime principal denied, operator limited EXECUTE, invalid/duplicate actor/key/fingerprint, writer-first and operator-first, failed transaction, cancelled process/timeout, absent remains INDETERMINATE until valid operator decision. Destructive commands on an owned test DB only and require the task's explicit Owner approval; Codex must stop if local policy blocks.
+
+**Exit:** executable help, deterministic testable results, protected SQL tests and attended simulated operator run; capability is not an operator production release.
+
+## 4. B03 — Maintenance, recovery, audit and restoration (WEB6-03)
+
+Extend CLI with independent `compact-preview`/`compact-execute` (exact actor/operation/epoch, result expiry only) through `SqlWebOperationMaintenance.CompactAsync`. **Current source explicitly requires database-level `CONTROL` inside `CompactAsync`; the B02 restricted operator role has no such grant.** B03 must select an explicit *separate* short-lived privileged maintenance identity for an owned test database with Owner-approved scope, or introduce a reviewed narrow stored procedure/permission model under a separately versioned SQL migration. Never elevate web runtime or the ordinary B02 operator role merely to pass compaction. Preserve immutable actor/key/fingerprint/epoch tombstones; never bulk DELETE operation journal or original terminal audit. Seven days is **original-result retention**, not an automatic deletion or SLA. Manual retention/compaction is acceptable; automatic scheduler is out-of-scope unless independently selected.
+
+Implement a **positive-case operator reconciliation** for `COMMITTED/RESULT_UNAVAILABLE`: read exact SQL journal and independently verify source header/lines, Posted, inventory stock/ledger/value/COGS and actor/epoch/fingerprint. The support conclusion `BUSINESS_COMMITTED_RESULT_UNAVAILABLE` can close a human case only; it **must not** synthesize client result/version/line IDs, mark client SETTLED or unlock for new writes. Do not publish a fake support-ticket integration; if no ticket system is installed, record a structured sanitized case file in private owned storage with honest "manual case" semantics.
+
+**Audit+retention policy:** define durable attempt/outcome event fields, retention and ACL, failure behavior, backup of evidence, log redaction, actor accountability and operator identity. Ensure in-SQL transaction durable record for state mutation and separate post-commit external audit; a failed external listener must not silently claim persisted business success. Cover protected file destination or Windows Event Log where feasible, with explicit Owner approval for OS mutation. Do not log SQL credentials, JWT/cookies, raw draft, original result bytes or business payload.
+
+**Backup/restore rehearsal:** owned disposable schema13 SQL database only; full backup including journal/tombstones/ledger/epoch; restore into *different verified owned* database, before writer admission rotate epoch **only on clone/rewind** (not normal IIS restart), reprovision runtime/operator SQL identities, verify old epoch+writer/status rejected, new actor current epoch accepted, no mutation before admission. Failed backup/restore/rotate leaves admission closed and cleanup quarantined if exact ownership cannot be proven. Distinguish SQL backup/restore elapsed time from application **RPO/RTO**: RPO/RTO requires service-level failure detection, recover, fresh SQL oracle and resumed request acceptance.
+
+**Exit:** six-case operator decision tree, one attended dry-run/execute positive and negative rehearsal with independent SQL oracle, recovery fail-closed testing, bounded logs, trusted cleanup; mark any OS-dependent gate NOT RUN, never fake a full IIS PASS.
+
+## 5. B04 — SQL replay proof and readiness for frontend resend (WEB6-04)
+
+This milestone proves the **existing HTTP mutation path**, not an unreviewed new privileged "resend" endpoint. Expand SQL concurrency/integration tests on `SqlWebOperationJournal`, `WebOperationCrashSqlTests`, `WebOperationResolutionTests`, `WebOperationHttpSqlTests.Web5Resolution` and `WebHostIisExpressTests.Recovery`. Use one original immutable operation ID, method, route, target, fingerprint/body and original actor/epoch.
+
+For **all six commands**, test: before-dispatch/pre-Commit kill, kill near Commit, after-Commit lost HTTP response, original-first vs resend-first, simultaneous 2+ resend contenders, operator-first terminal CANCELLED vs delayed original/resend, original-first writer vs operator waiting, genuine COMMITTED bytes and versions/line IDs, result-expired / COMMITTED-result unavailable, fingerprint mismatch, wrong actor/session/grant/epoch, lock timeout and SQL availability loss. Verify physical journal, source documents, stock/ledger/valuation/COGS and **exactly one business effect**, never just HTTP status. Confirm retained Create/Update/Post specific result mapping (Receipt Post has no version). For a valid same-key replay after COMMITTED, assert byte-/semantic-identical original result and no second writes; for no original row, allow execution only under approved manual consent test oracle; no tombstone resurrection.
+
+Audit the HTTP transport/server code for middleware retries, redirect, 401/refresh, replay after Web recycle and double-dispatch; mutations must be **at-most-one client transmission per explicit consent** while DB idempotency guarantees **at-most-one committed business effect**. Any proposed versioned eligibility endpoint must be additive and must not mutate WEB4 v1 or WEB5 resolution corpus.
+
+**Exit:** protected Windows/net48 SQL CI with nonzero discovery, real OS-death/fence proof, locally owned IIS Express/SQL tests where permitted, no unresolved P0/P1, provenance TRX/counts/hash and independent cleanup. Without B04 PASS, frontend can implement gated code but cannot enable manual resend even in a pilot.
+
+## 6. B05 — One-candidate production-like integration and operational hardening (WEB6-05)
+
+Use [candidate runbook](../development/WEB6_CANDIDATE_RUNBOOK.md). Freeze exact backend head and **published binaries**, frontend head and **compiled dist**, lockfiles, JSON contracts, SQL schema13 fingerprint, `web5` mode, separate runtime/operator principals, process/config/TLS origin and hash manifest. PR #95's `VerifyHost → Admit` must execute **before any HTTPS scenario**, with exclusive queue/worker route precedence proof, and process/queue absence **before owned SQL cleanup**. No PID4, foreign listener, proxy, localhost health alone or netsh parser fallback as proof. Reverify on process restart/cutover.
+
+Candidate test matrix: six original commands, all B02 terminal-negative and same-key cases, actual Chromium and Edge on published asset pair, API JWT/refresh/cookie/CSRF/Origin/CSP/direct forwarded-header spoof, restricted grants, auth limiter per-worker single-worker claim and evidence of single worker; multiworker claim is forbidden without shared atomic limiter+two-worker test. Validate audit destination/ACL/retention with bounded probes and deliberate sink outage; clarify fail-closed auth/critical-audit policy.
+
+**Cutover:** old opened/cached WEB4 bundle → new compatible web5 host, new frontend → old exact12 host, reload with DISPATCHED/UNKNOWN, logout/revoked grant/stale epoch, interrupted request, matched compatible rollback. ADR0015 additive; strict-only gates N/A, not PASS. Never downgrade schema13 by swapping old binary against the same DB, never change DB epoch just for code deploy. Keep old client writes appropriately admitted/rejected per actual contract and verified per-request authority.
+
+**Measurement:** known actor mix, bounded duration, ≥1,000 successful+failed observations per critical operation class if practical for a meaningful p99 sample; separate a low-volume smoke from a statistically useful load. Capture per-kind p50/p95/p99, errors/timeouts, throughput, journal growth, SQL locks/deadlocks/pool, IIS Express worker CPU/RAM and restarts; record missing sample-size as NOT MEASURED, not PASS. Candidate-specific application backup/restore and service RPO/RTO, alert/ticket/UNKNOWN-age drill, resilience to audit/limiter failures. Propose thresholds **from measurements**; Owner signs targets before any staging or production GO claim. Do not fabricate a numeric SLA or compare localhost pilot throughput directly to a production host.
+
+**Exit:** one pinned-pair evidence matrix with independent physical SQL oracle, exact source+artifact hashes, test case counts, known failures, cleanup and quarantine dispositions. Bounded nonproduction VERIFIED may be valid despite full IIS/Narrator exceptions, but **full staging/production readiness remains NO-GO** until their separate gates and Owner decision.
+
+## 7. B06 — Readiness dossier, explicit decision and handoff (WEB6-06)
+
+Combine B02/B03 operator CLI support/retention/restore evidence, B04 same-key regression, F02/F03 manual UI and cross-tab evidence, B05/F04 paired workloads/cutover, exact CI statuses and an explicit target-vs-actual table. Each result must be tied to **source SHA, tested merged source tree, build hash, test runner, environment, principal/mode/schema, date, discovery/executed/pass/fail/skip, observed oracle and residual risk**. Incomplete or fail-closed cases stay NOT RUN/BLOCKED/FAIL. Do not average unrelated CI tests or promote a past artifact to current-head evidence.
+
+Owner decision layers must be separate: (a) `IMPLEMENTED`, (b) `VERIFIED NONPRODUCTION`, (c) `MANUAL RESEND NONPRODUCTION ENABLED` if explicitly accepted, (d) `STAGING ACCEPTED` and (e) `PRODUCTION GO`. No default approval for (c)-(e). Full IIS, unperformed Narrator, old quarantines and external-resource restrictions remain explicit. A future full IIS/VM can be used for the distinct release gate without rewriting these source tests.
+
+Archive **WEB6 only** after a new named Owner disposition; do not edit WEB5 frozen plan/evidence and do not mark independently active CEX complete.
+
+## 8. Small PR and checkpoint policy
+
+| Order / suggested branch | Source files and scope | Mandatory gate |
+|---|---|---|
+| B01 `codex/web6-b01-source-policy` | docs/design, contract vector inventory, no runtime | Owner accept eligibility/risk matrix |
+| B02a `codex/web6-b02-operator-inspect` | isolated operator console help/read-only inspect + SQL tests | runtime operator denial, no DML, SQL CI |
+| B02b `codex/web6-b02-operator-decision` | bounded dry-run/execute terminal command, audit tests | operator-first/writer-first + rollback |
+| B03 `codex/web6-b03-maintenance-rehearsal` | controlled compaction, case reconciliation, restore/epoch drill | independent SQL oracle and fail-closed cleanup |
+| B04 `codex/web6-b04-same-key-proof` | SQL/HTTP crash/race gate, optional additive read-only admission | all six kinds, no double business effect |
+| B05a `codex/web6-b05-operations` | audit/limiter, leak/negative hardening and tests | Windows/SQL-free + live owned evidence |
+| B05b `codex/web6-b05-paired-candidate` | paired IIS Express/SQL/browser workload/cutover and metrics | exact hashes, no foreign or quarantined resources |
+| B06 `codex/web6-b06-readiness` | docs/evidence/Owner release dossier | no synthetic PASS or automatic product enable |
+
+Every PR: source and test baseline; scoped RED→GREEN and focused full gates; independent review P0/P1/P2; Windows/native tests where needed; applicable GitHub Actions exact-head PASS (SQL protected runner separately); negative/permission/privacy checks; explicit stale tests and Owner-decision follow-up. Never mix product changes with historical docs archive. **Do not run destructive commands on shared SQL/IIS resources.** Check `docs/TEST_POLICY.md` and `docs/plans/README.md` before action.
+
+## 9. Closure and retained backlog
+
+Record existing accepted constraints rather than accumulating repeated debt: full IIS W3SVC/WAS and remaining attended Narrator NOT RUN, trusted reverse-proxy topology N/A only on direct host, two historical SQL allocations quarantined, no Docker Desktop/Windows VM required for B01–B04, and CI/runner rights require explicit grants. An environment limitation is **not** a substitute for code/SQL safety gates that can execute on the existing test machine.
+
+**Initial checklist** (no item is implied done by this document):
+
+- [ ] B01 source/eligibility/risk freeze.
+- [ ] B02a read-only operator CLI.
+- [ ] B02b guarded operator decision/SQL audit.
+- [ ] B03 retention/compaction/support/restore drill.
+- [ ] B04 six-command same-key crash/fence/negative SQL proof.
+- [ ] F02/F03 gated consent/durable dispatch/UI/browser proof in frontend repository.
+- [ ] B05/F04 pinned-pair IIS Express/SQL/Chromium/Edge/cutover/workload/recovery evidence.
+- [ ] B06/F05 final readiness dossier and Owner disposition.

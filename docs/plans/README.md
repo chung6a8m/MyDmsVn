@@ -1,5 +1,14 @@
 # Execution-plan index
 
+## Selected Roadmap 06 — Recovery Completion & Production-like Quality (2026-11-03)
+
+**Owner-selected; PLANNED / DOCS ONLY.** The Owner selected implementation of explicit **human-confirmed, one-shot same-key resend** (the same original immutable GUID/body/route, not a new intent), continued **NO AUTOMATIC HTTP MUTATION RETRY**, a usable separate B03/operator SQL CLI/rehearsal and a **pinned paired** frontend/backend IIS Express/SQL/Chromium+Edge candidate with cutover, workload, audit/limiter and service-recovery evidence. **Manual resend remains DISABLED until B04 SQL proof + F02/F03 browser/IDB proof + explicit pilot acceptance. Production remains NO-GO.** No new runtime, test or SQL changes are made by roadmap selection.
+
+[Backend WEB6 owning plan](20261103-001-web6-recovery-quality-backend.md) · [safety/eligibility design](../design/WEB6_RECOVERY_OPERATION_PROTOCOL.md) · [backend acceptance](../development/WEB6_BACKEND_ACCEPTANCE.md) · [Codex handoff](../development/WEB6_CODEX_HANDOFF.md) · [one-candidate runbook](../development/WEB6_CANDIDATE_RUNBOOK.md) · [evidence index](../evidence/web6/README.md) · [React WEB6 companion](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261103-001-web6-recovery-quality-web.md).
+
+B01 source/contract gate; B02 operator inspection/typed negative command; B03 retention/compaction/positive-case/backup/restore/epoch drill; B04 six-command same-key SQL process/transaction proof; B05 pinned candidate IIS Express/SQL/Browser/cutover/load/recovery; B06 Owner decision/closeout. All B01–B06 **PLANNED** until evidence/individual PR selection. CEX-A01–A05 remains independently **ACTIVE**, untouched. WEB5 below remains **ARCHIVED / BOUNDED** with historical quarantine, full IIS/Narrator NOT RUN and production NO-GO. No Docker Desktop/VM install is a prerequisite for B01–B04.
+
+
 ## Archived Roadmap 05 — Operational Safety & Production Readiness (2026-11-03)
 
 **OWNER-DIRECTED EXECUTION CLOSEOUT: CLOSED / ARCHIVED — BOUNDED IMPLEMENTATION; PRODUCTION READINESS DEFERRED / NO-GO.** This closes the WEB5 *work queue*, **not** all B01–B06 requirements or production release. [Archive decision](../archive/20261103-web5-bounded-closeout/README.md) · [frozen backend plan](../archive/20261103-web5-bounded-closeout/plans/20261102-001-web5-operational-safety-backend.md) · [former section anchors](20261102-001-web5-operational-safety-backend.md) · [closeout evidence](../evidence/web5/20261103-web5-roadmap-closeout.md) · [React companion archive](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/archive/20261103-web5-bounded-closeout/README.md).
