@@ -114,6 +114,8 @@ internal static class Web5HttpServiceState
                     NormalizeRegisteredUrl(value);
                     urls.Add(value);
                 }
+                if (index + 1 < groupEnd && lines[index + 1].StartsWith("                ", StringComparison.Ordinal))
+                    throw new InvalidDataException("HTTP registered URL count is inconsistent.");
                 var session = RequireSingle(lines, groupStart, groupEnd, "        Server session ID: ");
                 if (string.IsNullOrWhiteSpace(session)) throw new InvalidDataException("HTTP URL group session identity is invalid.");
                 groups.Add(new Web5HttpUrlGroup(groupActive, groupQueueName, urls));

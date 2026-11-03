@@ -164,6 +164,13 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
     }
 
     [Fact]
+    public void Registered_URL_count_smaller_than_present_entries_is_rejected()
+    {
+        Assert.Throws<InvalidDataException>(() => Web5HttpServiceState.Parse(
+            Owned.Replace("Number of registered URLs: 2", "Number of registered URLs: 1")));
+    }
+
+    [Fact]
     public void Oversized_snapshot_is_rejected_before_parsing()
     {
         Assert.Throws<InvalidDataException>(() => Web5HttpServiceState.Parse(new string('x', 1024 * 1024 + 1)));
