@@ -8,5 +8,7 @@ public enum OperatorExitCode
     Indeterminate = 4,
     EnvironmentFailure = 5,
     Timeout = 6,
+    Preview = 7,
+    Unknown = 8,
     Cancelled = 130
 }

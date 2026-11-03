@@ -8,9 +8,12 @@ internal static class Program
     private static int Main(string[] args)
     {
         OperatorProcessDeadline? hardDeadline = null;
-        if (InspectOptions.TryParse(args, out var deadlineOptions, out _) && !deadlineOptions!.HelpRequested)
+        var inspectParsed = InspectOptions.TryParse(args, out var inspectOptions, out _) && !inspectOptions!.HelpRequested;
+        var decisionParsed = RecordNotExecutedOptions.TryParse(args, out var decisionOptions, out _) && !decisionOptions!.HelpRequested;
+        var timeoutSeconds = inspectParsed ? inspectOptions!.TimeoutSeconds : decisionParsed ? decisionOptions!.TimeoutSeconds : 0;
+        if (timeoutSeconds > 0)
         {
-            hardDeadline = new OperatorProcessDeadline(TimeSpan.FromSeconds(deadlineOptions.TimeoutSeconds), () =>
+            hardDeadline = new OperatorProcessDeadline(TimeSpan.FromSeconds(timeoutSeconds), () =>
             {
                 try { Console.Error.WriteLine("Operator.Timeout: the process deadline expired; SQL outcome is unknown."); }
                 finally { Environment.Exit((int)OperatorExitCode.Timeout); }
@@ -25,6 +28,10 @@ internal static class Program
         Console.CancelKeyPress += handler;
         try
         {
+            if (args.Length > 0 && args[0] == "record-not-executed")
+                return OperatorDecisionApplication.RunAsync(args,
+                    _ => throw new InvalidOperationException("The guarded SQL decision client is not available."),
+                    Console.Out, Console.Error, stop.Token).GetAwaiter().GetResult();
             return OperatorInspectApplication.RunAsync(args,
                 _ => new SqlOperatorInspectionClient(new OperatorSqlConnectionFactory(
                     Environment.GetEnvironmentVariable(OperatorInspectApplication.ConnectionStringEnvironmentVariable),
