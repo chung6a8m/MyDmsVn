@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Testing.Sql;
+using MyDmsVn.Desktop.Tests;
 using Newtonsoft.Json.Linq;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -29,10 +30,17 @@ internal sealed class WebRecoveryPilotControl
     private Web5NegativePilot.Identity? _pendingNegative;
     private readonly bool _web5;
     private string? _negativeSnapshot;
+    private SqlTestDatabase? _database;
+    private Web5OriginalRaceManifest? _raceManifest;
+    private readonly Web5NegativeSequence _raceSequence = new Web5NegativeSequence();
+    private readonly List<(Guid Key, Web5OriginalFirstRace Race)> _races = new List<(Guid, Web5OriginalFirstRace)>();
+    private Guid? _pendingRace;
     private WebRecoveryPilotControl(string connectionString, bool web5) { _connectionString = connectionString; _web5 = web5; }
     public Guid[] Epochs => _epochs.ToArray();
     public bool NegativeVerified => _negativeSequence.Complete && _negativeIdentities.Count == 6;
     public Web5NegativePilot.Identity[] NegativeIdentities => _negativeIdentities.ToArray();
+    public bool OriginalFirstVerified => _raceSequence.Complete && _races.Count == 6;
+    public Guid[] OriginalFirstKeys => _races.Select(entry => entry.Key).ToArray();
     public string Redact(string output) => output.Replace(_token, "<redacted>");
     public JObject Manifest => new JObject
     {
@@ -49,17 +57,42 @@ internal sealed class WebRecoveryPilotControl
         return control;
     }
 
-    public async Task Stop()
+    public static async Task<WebRecoveryPilotControl> StartOriginalFirst(SqlTestDatabase database, string parent)
     {
-        if (!_stopped) { _stopped = true; _stop.Cancel(); }
-        await _serving.ConfigureAwait(false); // Drain all administrative work before SQL teardown.
+        var control = new WebRecoveryPilotControl(database.ConnectionString, true);
+        control._database = database;
+        control._raceManifest = Web5OriginalRaceManifest.Create(parent);
+        using (var sql = new SqlConnection(database.ConnectionString))
+            control._epochs.Add(await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;"));
+        control._serving = control.Serve();
+        return control;
+    }
+
+    public async Task Stop(bool browserDrained = true)
+    {
+        if (_stopped) return;
+        _stopped = true; _stop.Cancel();
+        var failures = new List<Exception>();
+        try { await _serving.ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+        if (_raceManifest != null)
+        {
+            var cleanup = Enumerable.Reverse(_races).Select(entry => (Func<Task>)(async () =>
+            {
+                try { Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.CleanupStarted); using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)); await entry.Race.CleanupAfterBrowserDrain(timeout.Token); _raceManifest.MarkClean(entry.Key); Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.CleanupCompleted); }
+                catch { Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.CleanupFailed); throw; }
+            }));
+            var cleanupFailures = await Web5OriginalFirstCleanup.Run(browserDrained, GuiTestSafety.IsPoisoned, cleanup, _raceManifest.Complete);
+            if (cleanupFailures.Count != 0) GuiTestSafety.Poison(new AggregateException("Original-first fixture quarantined.", cleanupFailures));
+            failures.AddRange(cleanupFailures);
+        }
+        if (failures.Count != 0) throw new AggregateException("Recovery fixture drain failed.", failures);
     }
 
     private async Task Serve()
     {
         try
         {
-            for (var count = 0; count < 32 && !_stop.IsCancellationRequested; count++)
+            for (var count = 0; count < (_raceManifest == null ? 32 : 64) && !_stop.IsCancellationRequested; count++)
             {
                 using var identity = WindowsIdentity.GetCurrent();
                 var security = new PipeSecurity();
@@ -105,6 +138,27 @@ internal sealed class WebRecoveryPilotControl
                     await Web5NegativePilot.VerifyDurable(sql, _pendingNegative, _stop.Token);
                     _negativeSequence.Verify(id); _negativeIdentities.Add(_pendingNegative); _pendingNegative = null; _negativeSnapshot = null;
                 }
+                else if (action == "armOriginal")
+                {
+                    Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ArmStarted);
+                    if (_database == null || _raceManifest == null || _pendingRace.HasValue) throw new InvalidDataException("Original-first fixture not available.");
+                    var frozen = (JObject)frame["operation"]!;
+                    var actor = await sql.QuerySingleAsync<int>(new SqlTestCommand("SELECT UserId FROM dbo.Users WHERE Username=N'integratedEditor';", cancellationToken: _stop.Token));
+                    var epoch = await sql.QuerySingleAsync<Guid>(new SqlTestCommand("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;", cancellationToken: _stop.Token));
+                    var intent = Web5NegativePilot.Validate(frozen, actor, epoch);
+                    _raceSequence.Begin(intent.Key, intent.Kind);
+                    var race = await Web5OriginalFirstRace.Arm(_database, frozen, _raceManifest.Record, _stop.Token);
+                    _races.Add((intent.Key, race)); _pendingRace = intent.Key;
+                    Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ArmCompleted);
+                }
+                else if (action == "waitOriginal" || action == "releaseOriginal")
+                {
+                    var id = Guid.ParseExact((string)frame["operationId"]!, "D");
+                    if (!_pendingRace.HasValue || _pendingRace.Value != id || _races.Count == 0) throw new InvalidDataException("Original-first operation mismatch.");
+                    var race = _races[_races.Count - 1].Race;
+                    if (action == "waitOriginal") { Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.WaitStarted); await race.ObserveWriterAndOperator(id, _stop.Token); Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.WaitCompleted); }
+                    else { Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ReleaseStarted); await race.Release(id, _stop.Token); _raceSequence.Verify(id); _pendingRace = null; Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ReleaseCompleted); }
+                }
                 else
                 {
                     var changed = await sql.ExecuteAsync(new SqlTestCommand(
@@ -113,22 +167,26 @@ internal sealed class WebRecoveryPilotControl
                     if (changed != 1) throw new InvalidDataException("Recovery fixture permission owner missing.");
                 }
                 await WebFrontendPortBridge.WriteFrame(pipe, reply, _stop.Token).ConfigureAwait(false);
+                if (action == "armOriginal") Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ArmReplySent);
+                else if (action == "waitOriginal") Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.WaitReplySent);
+                else if (action == "releaseOriginal") Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ReleaseReplySent);
             }
             if (!_stop.IsCancellationRequested) throw new InvalidDataException("Recovery fixture control request budget exceeded.");
         }
         catch (Exception error) when (_stop.IsCancellationRequested && (error is OperationCanceledException || error is ObjectDisposedException || error is IOException)) { }
+        catch { if (_raceManifest != null) Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ControlFailed); throw; }
     }
 
     internal static string Validate(JObject frame, string token)
     {
         var action = frame["action"]?.Type == JTokenType.String ? (string)frame["action"]! : "";
-        var keys = action == "setWritePermission" ? new[] { "id", "token", "action", "granted" } : action == "resolveNegative" ? new[] { "id", "token", "action", "operation" } : action == "verifyNegative" ? new[] { "id", "token", "action", "operationId" } : new[] { "id", "token", "action" };
+        var keys = action == "setWritePermission" ? new[] { "id", "token", "action", "granted" } : action == "resolveNegative" || action == "armOriginal" ? new[] { "id", "token", "action", "operation" } : action == "verifyNegative" || action == "waitOriginal" || action == "releaseOriginal" ? new[] { "id", "token", "action", "operationId" } : new[] { "id", "token", "action" };
         if (!frame.Properties().Select(p => p.Name).OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(keys.OrderBy(x => x, StringComparer.Ordinal)) ||
             frame["id"]?.Type != JTokenType.Integer || (long)frame["id"]! <= 0 ||
             frame["token"]?.Type != JTokenType.String || (string)frame["token"]! != token ||
-            (action != "rotateEpoch" && action != "setWritePermission" && action != "resolveNegative" && action != "verifyNegative") ||
-            (action == "resolveNegative" && frame["operation"] is not JObject) ||
-            (action == "verifyNegative" && (frame["operationId"]?.Type != JTokenType.String || !Guid.TryParseExact((string?)frame["operationId"], "D", out var operationId) || operationId.ToString("D") != (string?)frame["operationId"])) ||
+            (action != "rotateEpoch" && action != "setWritePermission" && action != "resolveNegative" && action != "verifyNegative" && action != "armOriginal" && action != "waitOriginal" && action != "releaseOriginal") ||
+            ((action == "resolveNegative" || action == "armOriginal") && frame["operation"] is not JObject) ||
+            ((action == "verifyNegative" || action == "waitOriginal" || action == "releaseOriginal") && (frame["operationId"]?.Type != JTokenType.String || !Guid.TryParseExact((string?)frame["operationId"], "D", out var operationId) || operationId.ToString("D") != (string?)frame["operationId"])) ||
             (action == "setWritePermission" && frame["granted"]?.Type != JTokenType.Boolean))
             throw new InvalidDataException("Invalid recovery fixture control request.");
         return action;

@@ -22,7 +22,7 @@ public sealed partial class WebHostIisExpressTests
 
     // A private driver result is an assertion input, not an SQL oracle. Validate every
     // identity before querying the physical source/ledger and recomputing valuation.
-    internal static void VerifyRecoveryResult(JObject result, JArray journal, long[] receipts, long[] sales, Guid[] epochs, bool web5Pilot = false)
+    internal static void VerifyRecoveryResult(JObject result, JArray journal, long[] receipts, long[] sales, Guid[] epochs, bool web5Pilot = false, bool originalFirstPilot = false)
     {
         RecoveryProperties(result, "version", "mode", "posted", "operations", "checks");
         if (result["version"]?.Type != JTokenType.Integer || (int)result["version"]! != 1 ||
@@ -32,7 +32,9 @@ public sealed partial class WebHostIisExpressTests
         var checkIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var check in checks)
             if (check.Type != JTokenType.String || !checkIds.Add((string)check!)) throw RecoveryInvalid();
-        if (!checkIds.SetEquals(web5Pilot ? RecoveryChecks.Concat(new[] { "web5-v2-committed-sales", "web5-v2-committed-receipt", "web5-negative-late-sales-create", "web5-negative-late-sales-update", "web5-negative-late-sales-post", "web5-negative-late-receipt-create", "web5-negative-late-receipt-update", "web5-negative-late-receipt-post" }) : RecoveryChecks)) throw new InvalidDataException("Recovery browser completion set is incomplete or unknown.");
+        var requiredChecks = web5Pilot ? RecoveryChecks.Concat(new[] { "web5-v2-committed-sales", "web5-v2-committed-receipt", "web5-negative-late-sales-create", "web5-negative-late-sales-update", "web5-negative-late-sales-post", "web5-negative-late-receipt-create", "web5-negative-late-receipt-update", "web5-negative-late-receipt-post" }) : RecoveryChecks;
+        if (originalFirstPilot) requiredChecks = requiredChecks.Concat(new[] { "web5-original-first-sales-create", "web5-original-first-sales-update", "web5-original-first-sales-post", "web5-original-first-receipt-create", "web5-original-first-receipt-update", "web5-original-first-receipt-post" });
+        if (!checkIds.SetEquals(requiredChecks)) throw new InvalidDataException("Recovery browser completion set is incomplete or unknown.");
         VerifyPilotResultIdentities(posted, receipts, sales, integrated: true);
         var actual = new Dictionary<string, JObject>(StringComparer.Ordinal);
         foreach (var item in operations)
@@ -82,7 +84,7 @@ public sealed partial class WebHostIisExpressTests
     }
 
     private static async Task VerifyRecoveryStock(string connectionString, string runDirectory, JObject result, Guid[] epochs,
-        int warehouse, int product, int receiptProduct, IntegratedCatalog integrated, bool web5Pilot, Web5NegativePilot.Identity[] negativeIdentities)
+        int warehouse, int product, int receiptProduct, IntegratedCatalog integrated, bool web5Pilot, Web5NegativePilot.Identity[] negativeIdentities, bool originalFirstPilot, Guid[] originalFirstKeys)
     {
         using var sql = new SqlConnection(connectionString);
         await sql.OpenAsync();
@@ -116,10 +118,19 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId;")).To
         }
         else Assert.Empty(negativeIdentities);
         rows = rows.Where(row => row.Disposition == "COMMITTED").ToArray();
+        if (originalFirstPilot)
+        {
+            Assert.Equal(6, originalFirstKeys.Distinct().Count());
+            var raceRows = rows.Where(row => originalFirstKeys.Contains(row.OperationId)).ToArray();
+            Assert.Equal(6, raceRows.Length);
+            Assert.All(raceRows, row => Assert.Equal("integratedEditor", row.Actor));
+            Assert.Equal(new[] { 1, 2, 3, 4, 5, 6 }, raceRows.Select(row => row.OperationKind).OrderBy(kind => kind));
+        }
+        else Assert.Empty(originalFirstKeys);
         var journal = new JArray(rows.Select(RecoveryJournalJson));
         VerifyRecoveryResult(result, journal,
             (await sql.QueryAsync<long>("SELECT ReceiptId FROM dbo.GoodsReceipts WHERE Status='Posted';")).ToArray(),
-            (await sql.QueryAsync<long>("SELECT SaleId FROM dbo.SalesReceipts WHERE Status='Posted';")).ToArray(), epochs, web5Pilot);
+            (await sql.QueryAsync<long>("SELECT SaleId FROM dbo.SalesReceipts WHERE Status='Posted';")).ToArray(), epochs, web5Pilot, originalFirstPilot);
         // Every source, including an unposted draft, must have exactly one Create.
         foreach (var receipt in new[] { false, true })
         {

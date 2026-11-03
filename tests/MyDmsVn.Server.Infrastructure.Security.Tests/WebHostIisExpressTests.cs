@@ -49,10 +49,13 @@ public sealed partial class WebHostIisExpressTests
     [WebBrowserSqlFact, Trait("Category", "WebBrowserIntegration")]
     public Task Published_React_WEB5_compatible_recovery_preserves_journal_and_physical_stock() => Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true, web5Pilot: true);
 
+    [WebOriginalFirstSqlFact, Trait("Category", "WebBrowserIntegration")]
+    public Task Published_React_WEB5_original_first_fence_races() => Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true, web5Pilot: true, originalFirstPilot: true);
+
     [WebAttendedSqlFact, Trait("Category", "WebAttendedFixture")]
     public Task WEB5_attended_local_fixture() => Run(true, integratedPilot: true, web5Pilot: true, attended: true);
 
-    private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false, bool web5Pilot = false, bool attended = false)
+    private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false, bool web5Pilot = false, bool attended = false, bool originalFirstPilot = false)
     {
         GuiTestSafety.ThrowIfPoisoned();
         if (browser && !attended) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
@@ -157,7 +160,7 @@ public sealed partial class WebHostIisExpressTests
                 if (attended)
                     await Web5AttendedLease.Wait(process, attendedDirectory!, attendedPassword!, TimeSpan.FromMinutes(30), CancellationToken.None);
                 else
-                    await RunBrowser(database.ConnectionString, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated, recoveryPilot, web5Pilot);
+                    await RunBrowser(database, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated, recoveryPilot, web5Pilot, originalFirstPilot);
             }
             else
             {
@@ -348,6 +351,16 @@ public sealed partial class WebHostIisExpressTests
                 Skip = "Real browser pilot requires an explicit frontend checkout with built artifacts and Playwright.";
         }
     }
+    private sealed class WebOriginalFirstSqlFactAttribute : WebHostSqlFactAttribute
+    {
+        public WebOriginalFirstSqlFactAttribute()
+        {
+            if (Environment.GetEnvironmentVariable("MYDMSVN_WEB5_ORIGINAL_FIRST") != "1" ||
+                string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MYDMSVN_WEB5_RACE_PARENT_DIRECTORY")) ||
+                string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")))
+                Skip = "Original-first fixture requires explicit opt-in, private parent directory and browser checkout.";
+        }
+    }
 
     private const string BrowserPassword = "BrowserPilot_test-only-password_2026!";
     private static async Task SeedBrowserActors(SqlConnection connection)
@@ -379,8 +392,9 @@ public sealed partial class WebHostIisExpressTests
         }
     }
 
-    private static async Task RunBrowser(string connectionString, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot, bool web5Pilot)
+    private static async Task RunBrowser(SqlTestDatabase database, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot, bool web5Pilot, bool originalFirstPilot)
     {
+        var connectionString = database.ConnectionString;
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
         var node = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_NODE") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe");
         var cli = Path.Combine(checkout, "node_modules", "@playwright", "test", "cli.js");
@@ -411,11 +425,13 @@ public sealed partial class WebHostIisExpressTests
         {
             Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web4-recovery-live.spec.ts")));
             if (web5Pilot) Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web5-resolution-live.spec.ts")));
-            recovery = await WebRecoveryPilotControl.Start(connectionString, web5Pilot);
+            recovery = originalFirstPilot ? await WebRecoveryPilotControl.StartOriginalFirst(database, Environment.GetEnvironmentVariable("MYDMSVN_WEB5_RACE_PARENT_DIRECTORY")!) : await WebRecoveryPilotControl.Start(connectionString, web5Pilot);
             manifestJson["mode"] = web5Pilot ? "web5-recovery" : "web4-recovery";
             manifestJson["recovery"] = recovery.Manifest;
+            if (originalFirstPilot) manifestJson["recovery"]!["originalFirst"] = true;
         }
         Exception? browserFailure = null;
+        var browserDrained = true;
         try
         {
             File.WriteAllText(manifestPath, manifestJson.ToString(Formatting.None), new UTF8Encoding(false));
@@ -439,9 +455,10 @@ public sealed partial class WebHostIisExpressTests
             // The real browser keeps ordinary platform TLS verification; neither ignores errors.
             start.EnvironmentVariables["NODE_EXTRA_CA_CERTS"] = certificatePath;
             GuiProcessResult result;
-            try { result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5)); }
+            try { browserDrained = false; result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5)); browserDrained = true; }
             catch (GuiProcessException error)
             {
+                browserDrained = error.CleanupVerified;
                 File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(recovery?.Redact(error.StandardOutput + error.StandardError) ?? error.StandardOutput + error.StandardError), new UTF8Encoding(false));
                 throw new InvalidOperationException("Browser process failed; cleanup verified=" + error.CleanupVerified + ". Inspect the sanitized local browser-output.log.");
             }
@@ -449,17 +466,18 @@ public sealed partial class WebHostIisExpressTests
             Assert.True(result.ExitCode == 0, "Browser pilot failed; inspect the local browser-output.log (redact before sharing).");
             if (recovery != null)
             {
-                await recovery.Stop();
+                await recovery.Stop(browserDrained);
                 if (web5Pilot)
                 {
                     Assert.True(recovery.NegativeVerified);
+                    if (originalFirstPilot) Assert.True(recovery.OriginalFirstVerified);
                     var countPath = Path.Combine(runDirectory, "browser-count.json");
                     if (!File.Exists(countPath) || new FileInfo(countPath).Length > 1024) throw new InvalidDataException("Missing or oversized browser count.");
                     var count = JObject.Parse(File.ReadAllText(countPath), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
                     ValidateWeb5BrowserCount(count);
                     Console.WriteLine("WEB5_BROWSER_COUNT " + count.ToString(Formatting.None));
                 }
-                await VerifyRecoveryStock(connectionString, runDirectory, JObject.Parse(File.ReadAllText(resultPath)), recovery.Epochs, warehouse, product, receiptProduct, integrated!, web5Pilot, recovery.NegativeIdentities);
+                await VerifyRecoveryStock(connectionString, runDirectory, JObject.Parse(File.ReadAllText(resultPath)), recovery.Epochs, warehouse, product, receiptProduct, integrated!, web5Pilot, recovery.NegativeIdentities, originalFirstPilot, recovery.OriginalFirstKeys);
                 return;
             }
             var posted = JArray.Parse(File.ReadAllText(resultPath));
@@ -503,7 +521,7 @@ public sealed partial class WebHostIisExpressTests
         catch (Exception error) { browserFailure = error; throw; }
         finally
         {
-            try { if (recovery != null) await recovery.Stop(); }
+            try { if (recovery != null) await recovery.Stop(browserDrained); }
             catch (Exception cleanup) when (browserFailure != null) { throw new AggregateException("Browser scenario and recovery control drain failed.", browserFailure, cleanup); }
             finally { File.Delete(manifestPath); File.Delete(certificatePath); }
         }

@@ -44,6 +44,19 @@ public sealed class WebRecoveryPilotResultTests
         Assert.Throws<InvalidDataException>(() => Verify(result));
     }
 
+    [Fact]
+    public void Original_first_requires_all_six_distinct_markers_only_in_opted_in_run()
+    {
+        var result = Result(); result["mode"] = "web5-recovery";
+        var checks = (JArray)result["checks"]!;
+        foreach (var name in new[] { "web5-v2-committed-sales", "web5-v2-committed-receipt", "web5-negative-late-sales-create", "web5-negative-late-sales-update", "web5-negative-late-sales-post", "web5-negative-late-receipt-create", "web5-negative-late-receipt-update", "web5-negative-late-receipt-post" }) checks.Add(name);
+        void VerifyOriginal() => WebHostIisExpressTests.VerifyRecoveryResult(result, new JArray(Operation()), Array.Empty<long>(), Array.Empty<long>(), new[] { Epoch }, true, true);
+        foreach (var name in new[] { "web5-original-first-sales-create", "web5-original-first-sales-update", "web5-original-first-sales-post", "web5-original-first-receipt-create", "web5-original-first-receipt-update", "web5-original-first-receipt-post" })
+        { Assert.Throws<InvalidDataException>(VerifyOriginal); checks.Add(name); }
+        VerifyOriginal();
+        Assert.Throws<InvalidDataException>(() => WebHostIisExpressTests.VerifyRecoveryResult(result, new JArray(Operation()), Array.Empty<long>(), Array.Empty<long>(), new[] { Epoch }, true));
+    }
+
     [Theory]
     [InlineData(1, "Sales.Create", false)]
     [InlineData(2, "Sales.Update", true)]

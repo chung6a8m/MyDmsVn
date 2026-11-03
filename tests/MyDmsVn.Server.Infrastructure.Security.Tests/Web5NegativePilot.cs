@@ -75,20 +75,7 @@ internal static class Web5NegativePilot
         var epoch = await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;");
         var intent = Validate(frozen, actor, epoch);
         var target = intent.Target == null ? (long?)null : long.Parse(intent.Target, CultureInfo.InvariantCulture);
-        if (target.HasValue)
-        {
-            var versionText = (string?)intent.Body["expectedVersion"];
-            byte[] version;
-            try { version = Convert.FromBase64String(versionText ?? ""); }
-            catch (FormatException) { throw new InvalidDataException("Invalid negative baseline version."); }
-            if (version.Length != 8 || Convert.ToBase64String(version) != versionText) throw new InvalidDataException("Invalid negative baseline version.");
-            var sales = intent.Kind.StartsWith("Sales.", StringComparison.Ordinal);
-            var baselineSql = sales
-                ? "SELECT COUNT(*) FROM dbo.SalesReceipts d JOIN dbo.WebOperationJournal j ON j.ActorUserId=@actor AND j.OperationKind=1 AND j.ResultDocumentId=d.SaleId AND j.Disposition='COMMITTED' WHERE d.SaleId=@target AND d.CreatedByUserId=@actor AND d.Status='Draft' AND d.RowVersion=@version;"
-                : "SELECT COUNT(*) FROM dbo.GoodsReceipts d JOIN dbo.WebOperationJournal j ON j.ActorUserId=@actor AND j.OperationKind=4 AND j.ResultDocumentId=d.ReceiptId AND j.Disposition='COMMITTED' WHERE d.ReceiptId=@target AND d.CreatedByUserId=@actor AND d.Status='Draft' AND d.RowVersion=@version;";
-            if (await sql.QuerySingleAsync<int>(new SqlTestCommand(baselineSql, new { actor, target, version }, cancellationToken: token)) != 1)
-                throw new InvalidDataException("Negative fixture baseline is not the actor's current committed draft.");
-        }
+        await ValidateBaseline(sql, intent, actor, token);
         var kind = (WebOperationKind)Enum.Parse(typeof(WebOperationKind), intent.Kind.Replace(".", ""));
         var decision = Guid.NewGuid();
         var session = await sql.QuerySingleAsync<Guid>("SELECT TOP(1) SessionId FROM dbo.WebAuthSessions WHERE UserId=@actor AND RevokedAtUtc IS NULL ORDER BY CreatedAtUtc DESC;", new { actor });
@@ -104,6 +91,24 @@ internal static class Web5NegativePilot
         var identity = new Identity { Actor = actor, Epoch = epoch, Key = intent.Key, Kind = kind, Target = target, Fingerprint = hash, Decision = decision };
         await VerifyDurable(sql, identity, token);
         return identity;
+    }
+    internal static async Task ValidateBaseline(SqlConnection sql, WebOperationHttpSqlTests.Intent intent, int actor, CancellationToken token)
+    {
+        var target = intent.Target == null ? (long?)null : long.Parse(intent.Target, CultureInfo.InvariantCulture);
+        if (target.HasValue)
+        {
+            var versionText = (string?)intent.Body["expectedVersion"];
+            byte[] version;
+            try { version = Convert.FromBase64String(versionText ?? ""); }
+            catch (FormatException) { throw new InvalidDataException("Invalid negative baseline version."); }
+            if (version.Length != 8 || Convert.ToBase64String(version) != versionText) throw new InvalidDataException("Invalid negative baseline version.");
+            var sales = intent.Kind.StartsWith("Sales.", StringComparison.Ordinal);
+            var baselineSql = sales
+                ? "SELECT COUNT(*) FROM dbo.SalesReceipts d JOIN dbo.WebOperationJournal j ON j.ActorUserId=@actor AND j.OperationKind=1 AND j.ResultDocumentId=d.SaleId AND j.Disposition='COMMITTED' WHERE d.SaleId=@target AND d.CreatedByUserId=@actor AND d.Status='Draft' AND d.RowVersion=@version;"
+                : "SELECT COUNT(*) FROM dbo.GoodsReceipts d JOIN dbo.WebOperationJournal j ON j.ActorUserId=@actor AND j.OperationKind=4 AND j.ResultDocumentId=d.ReceiptId AND j.Disposition='COMMITTED' WHERE d.ReceiptId=@target AND d.CreatedByUserId=@actor AND d.Status='Draft' AND d.RowVersion=@version;";
+            if (await sql.QuerySingleAsync<int>(new SqlTestCommand(baselineSql, new { actor, target, version }, cancellationToken: token)) != 1)
+                throw new InvalidDataException("Negative fixture baseline is not the actor's current committed draft.");
+        }
     }
     internal static async Task VerifyDurable(SqlConnection sql, Identity identity, CancellationToken token)
     {
