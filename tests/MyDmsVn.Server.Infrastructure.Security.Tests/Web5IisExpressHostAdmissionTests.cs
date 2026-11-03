@@ -162,6 +162,22 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
         Web5IisExpressHostAdmission.ValidateAbsent(identity, null, foreign);
     }
 
+    [Theory]
+    [InlineData("HTTPS://+:44321/")]
+    [InlineData("HTTPS://LOCALHOST:44321/API/")]
+    public void Absence_rejects_foreign_active_registration_that_can_capture_owned_paths(string registeredUrl)
+    {
+        using var fixture = new IdentityFixture();
+        var identity = fixture.Capture();
+        var foreign = QueueSnapshot
+            .Replace("IISExpressAppPool{11111111-1111-1111-1111-111111111111}", "DefaultAppPool")
+            .Replace("ID: 18404", "ID: 19000")
+            .Replace("HTTPS://LOCALHOST:44321/", registeredUrl);
+
+        Assert.Throws<InvalidDataException>(() =>
+            Web5IisExpressHostAdmission.ValidateAbsent(identity, null, foreign));
+    }
+
     [Fact]
     public void Absence_accepts_valid_empty_request_queue_snapshot()
     {

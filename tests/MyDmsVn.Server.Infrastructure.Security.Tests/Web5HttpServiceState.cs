@@ -131,7 +131,8 @@ internal static class Web5HttpServiceState
         if (origin == null || !origin.IsAbsoluteUri || origin.Scheme != Uri.UriSchemeHttps || origin.AbsolutePath != "/" ||
             !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment) || ownedProcessId <= 0)
             throw new ArgumentException("Owned HTTP queue identity is invalid.");
-        var matches = queues.SelectMany(queue => queue.UrlGroups
+        var snapshot = queues.ToArray();
+        var matches = snapshot.SelectMany(queue => queue.UrlGroups
             .Where(group => group.Active && string.Equals(group.QueueName, queue.Name, StringComparison.Ordinal) &&
                 group.RegisteredUrls.Any(url => MatchesOrigin(url, origin)))
             .Select(group => queue)).ToArray();
@@ -140,7 +141,23 @@ internal static class Web5HttpServiceState
         if (!match.Active || match.AttachedProcessCount != 1 || match.ControllerProcessId != ownedProcessId ||
             match.ProcessIds.Count != 1 || match.ProcessIds[0] != ownedProcessId)
             throw new InvalidDataException("HTTP request queue is not exclusively attached to the owned worker.");
+        if (HasActiveRegistrationThatCanCapture(snapshot, origin, match))
+            throw new InvalidDataException("A foreign HTTP registration can capture the owned origin.");
         return match;
+    }
+
+    internal static bool HasActiveRegistrationThatCanCapture(IEnumerable<Web5HttpRequestQueue> queues, Uri origin,
+        Web5HttpRequestQueue? allowedQueue = null)
+    {
+        if (queues == null) throw new ArgumentNullException(nameof(queues));
+        if (origin == null || !origin.IsAbsoluteUri || origin.Scheme != Uri.UriSchemeHttps || origin.AbsolutePath != "/" ||
+            !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment))
+            throw new ArgumentException("Owned HTTP origin is invalid.", nameof(origin));
+        return queues.Where(queue => queue.Active && !ReferenceEquals(queue, allowedQueue))
+            .SelectMany(queue => queue.UrlGroups.Where(group => group.Active &&
+                string.Equals(group.QueueName, queue.Name, StringComparison.Ordinal)))
+            .SelectMany(group => group.RegisteredUrls)
+            .Any(url => CanCaptureOrigin(url, origin));
     }
 
     internal static async Task<string> ReadAsync(TimeSpan budget, CancellationToken token)
@@ -205,6 +222,16 @@ internal static class Web5HttpServiceState
 
     internal static bool MatchesOrigin(string registeredUrl, Uri origin) =>
         NormalizeRegisteredUrl(registeredUrl) == NormalizeOrigin(origin);
+
+    private static bool CanCaptureOrigin(string registeredUrl, Uri origin)
+    {
+        var normalized = NormalizeRegisteredUrl(registeredUrl);
+        var host = origin.HostNameType == UriHostNameType.IPv6 ? "[" + origin.Host + "]" : origin.Host;
+        var authoritySuffix = ":" + origin.Port.ToString(CultureInfo.InvariantCulture) + "/";
+        var scheme = origin.Scheme.ToUpperInvariant() + "://";
+        return normalized.StartsWith(scheme + "+" + authoritySuffix, StringComparison.Ordinal) ||
+            normalized.StartsWith(scheme + host.ToUpperInvariant() + authoritySuffix, StringComparison.Ordinal);
+    }
 
     private static string NormalizeOrigin(Uri uri) => uri.GetComponents(
         UriComponents.SchemeAndServer | UriComponents.Path, UriFormat.SafeUnescaped).TrimEnd('/').ToUpperInvariant() + "/";

@@ -174,8 +174,8 @@ internal static class Web5IisExpressHostAdmission
     {
         if (identity == null) throw new ArgumentNullException(nameof(identity));
         if (observation != null) throw new InvalidDataException("Owned IIS Express process absence was not proven.");
-        if (Web5HttpServiceState.Parse(serviceState).Any(queue =>
-            queue.RegisteredUrls.Any(url => Web5HttpServiceState.MatchesOrigin(url, identity.Origin))))
+        if (Web5HttpServiceState.HasActiveRegistrationThatCanCapture(
+            Web5HttpServiceState.Parse(serviceState), identity.Origin))
             throw new InvalidDataException("Owned IIS Express request queue absence was not proven.");
     }
 

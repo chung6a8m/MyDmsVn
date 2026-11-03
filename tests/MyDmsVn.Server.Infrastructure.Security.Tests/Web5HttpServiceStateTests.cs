@@ -129,6 +129,23 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
         Assert.StartsWith("IISExpressAppPool", queue.Name);
     }
 
+    [Theory]
+    [InlineData("HTTPS://+:44321/")]
+    [InlineData("HTTPS://LOCALHOST:44321/API/")]
+    public void Foreign_active_registration_that_can_capture_owned_paths_is_rejected(string registeredUrl)
+    {
+        var foreign = Owned
+            .Replace("IISExpressAppPool{11111111-1111-1111-1111-111111111111}", "DefaultAppPool")
+            .Replace("ID: 18404", "ID: 19000")
+            .Replace("HTTPS://LOCALHOST:44321/", registeredUrl)
+            .Replace("                HTTP://LOCALHOST:18081/\n", string.Empty)
+            .Replace("Number of registered URLs: 2", "Number of registered URLs: 1");
+        var queues = Web5HttpServiceState.Parse(foreign + Owned);
+
+        Assert.Throws<InvalidDataException>(() =>
+            Web5HttpServiceState.RequireOwnedQueue(queues, new Uri("https://localhost:44321/"), 18404));
+    }
+
     [Fact]
     public void Empty_valid_request_queue_snapshot_is_absent_but_never_admitted()
     {
