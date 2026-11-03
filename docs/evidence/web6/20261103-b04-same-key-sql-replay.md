@@ -7,9 +7,10 @@
 - Base: backend `fe790b14f0e1c2247fbe3f5a1fc519f293d63d5b` (merged B01 PR #99); paired frontend read-only reference `92afef7c9090605a172ffc351d1e641d9df12100` (merged F01 PR #33).
 - Tested implementation commit: `1ab750189f65030c32a1054aeae6c7918b54c421` on `codex/web6-b04-same-key-proof`.
 - Review-fix workflow/register commit: `ffccfda76313c275dcad98cd2453bde1ea0a1476`; this adds no runtime/test behavior.
+- Round-2 exact13 isolation and workflow commit: `d7e354e093015516982d4605353da6d44085a54d`; five historical WEB4 methods remain on their unchanged schema12 path, while five distinct WEB6 wrappers select schema13/web5.
 - Native Windows, net48, .NET SDK `8.0.427`, VSTest `17.11.1`, Microsoft.Data.SqlClient `7.0.2`.
 - SQL Server `14.0.2140.2`, Developer Edition (64-bit), engine edition 3. Fresh owned disposable databases were migrated to exact schema13; source/compatibility fingerprint `D0A86EA0CACAB3D68F1188A1166227DFA5DE452572D1719CD55A3FA3C16F02C9`.
-- Changed runtime source: none. Changed test owners: `Web6SameKeyReplayTests.cs` and the existing crash fixture's explicit schema13 mode switch in `WebOperationCrashSqlTests.cs`. The implementation plan is under `docs/superpowers/plans/`.
+- Changed runtime source: none. Changed test owners: `Web6SameKeyReplayTests.cs` and additive wrappers/fixture guards in `WebOperationCrashSqlTests.cs`. Every owned WEB6 fixture independently checks migration 013, the schema13 compatibility checker and definition fingerprint, a nonempty deployment epoch, and HTTP context `web5-resolution-v1` with resend still disabled before its matrix body starts. The implementation plan is under `docs/superpowers/plans/`.
 
 The solution-level locked restore was attempted and failed before package work because three WinFormsKit vendor project files are not materialized in this worktree. Locked restores for the affected Security Tests and HttpHost Tests project graphs both passed. No vendor/submodule state was changed.
 
@@ -30,21 +31,21 @@ All eight process/SQL matrices executed on the exact candidate, each over Sales 
 
 The independent, non-pooled SQL oracle runs only after child/process drain and bounded epoch/key-fence quiescence. It checks exact actor/key/epoch/kind/target/fingerprint and one COMMITTED journal row; retained result bytes; header, ordered line IDs and row version; Receipt Post's intentional no-version response; posted state; stock balances; stock ledger; moving-average valuation; COGS; Sales duplicate product/gift lines; Goods Receipt line uniqueness; and an unaffected second warehouse. Replay snapshots prove no second source, sequence, stock, ledger, valuation or COGS effect.
 
-## Review regression record
+## Round-2 regression record
 
-| Selector/artifact | Executed | Pass | Fail | Skip | Result |
-|---|---:|---:|---:|---:|---|
-| Exact eight B04 process/SQL matrices — `TestResults/web6-b04-review-eight/b04-review-eight-matrices.trx` | 8 | 8 | 0 | 0 | PASS in 9m49s; 48 command scenarios |
-| HTTP/SQL identity, terminal, unavailable, 404 and no-auto-retry boundaries — `TestResults/web6-b04-review-boundaries/b04-review-boundaries.trx` | 15 | 15 | 0 | 0 | PASS in 1m46s |
-| `WebOperationJournalTests|WebOperationResolutionTests|WebOperationCrashProcessTests` — `TestResults/web6-b04-review-core/b04-review-core.trx` | 49 | 49 | 0 | 0 | PASS in 3m08s |
-| SQL-free v1/v2 endpoint, legacy-mode and frozen error boundaries — `TestResults/web6-b04-review-http/b04-review-http.trx` | 31 | 31 | 0 | 0 | PASS in 5s |
-| **Successful review total** | **103** | **103** | **0** | **0** | **PASS** |
+| Selector/artifact | Discovered | Executed | Pass | Fail | Skip | Result |
+|---|---:|---:|---:|---:|---:|---|
+| Exact eight WEB6 exact13/web5 matrices — `TestResults/web6-b04-round2-eight-final/b04-round2-eight-final.trx` | 8 | 8 | 8 | 0 | 0 | PASS in 9m45s; 48 command scenarios; TRX names are the five WEB6 wrappers plus the three existing WEB6 methods |
+| Five historical WEB4 schema12 matrices — `TestResults/web6-b04-round2-web4-history/b04-round2-web4-history.trx` | 5 | 5 | 5 | 0 | 0 | PASS in 6m05s; 30 historical command scenarios |
+| Journal/resolution/process regression — `TestResults/web6-b04-round2-core/b04-round2-core.trx` | 49 | 49 | 49 | 0 | 0 | PASS in 3m08s |
+| HTTP/SQL identity, permission/session, epoch/fingerprint, expired/unavailable/terminal/404 and no-auto-retry boundaries — `TestResults/web6-b04-round2-boundaries/b04-round2-boundaries.trx` | 15 | 15 | 15 | 0 | 0 | PASS in 1m35s |
+| SQL-free v1/v2 endpoint, legacy-mode and frozen error boundaries — `TestResults/web6-b04-round2-http/b04-round2-http.trx` | 31 | 31 | 31 | 0 | 0 | PASS in 3s |
 
-The Security test assembly and CrashHost were rebuilt in Release/net48 before execution; the HttpHost boundary project was also built in Release/net48. No `--list-tests` result is counted. The eight-matrix selector independently discovered exactly the eight required methods before the run. All SQL owners ran sequentially; a post-run process census found zero matching testhost, CrashHost or DbMigrator processes. Full solution build, IIS/IIS Express, browser, frontend and protected hosted CI were NOT RUN for this test-only PR.
+The obsolete mixed-schema aggregate of 103 is not reused. Discovery and actual TRX execution are reported per selector above. The Security test assembly and CrashHost were rebuilt in Release/net48 before execution; the HttpHost boundary project was also built in Release/net48. No `--list-tests` result is counted as execution. All SQL owners ran sequentially; a post-run process census found zero matching testhost, CrashHost, Operator or DbMigrator processes. Full solution build, IIS/IIS Express, browser, frontend and protected hosted CI were NOT RUN for this test-only PR.
 
 ## Protected exact-candidate SQL CI handoff
 
-`.github/workflows/backend-web6-b04-sql-candidate.yml` is a dedicated Owner-tag-triggered Windows/net48 workflow. It reuses the protected `web5-sql-candidate` environment, exact-SHA dual checkout, frozen WEB4 corpus check, evidence-guard self-test, private SID-owned LocalDB lifecycle and sanitized artifacts. Its filter names exactly the eight B04 methods; discovery and TRX must reconcile to 8 executed / 8 passed / 0 failed / 0 skipped / 0 retry. Each method runs its embedded six-command independent SQL oracle. The job refuses completion unless the exact candidate SHA remained unchanged and the owned instance reports verified ownership, zero user databases/active owners, graceful removal and no quarantine.
+`.github/workflows/backend-web6-b04-sql-candidate.yml` is a dedicated Owner-tag-triggered Windows/net48 workflow. It reuses the protected `web5-sql-candidate` environment, exact-SHA dual checkout, frozen WEB4 corpus check, evidence-guard self-test, private SID-owned LocalDB lifecycle and sanitized artifacts. Its filter names exactly the five WEB6 wrappers plus three existing WEB6 methods; actual TRX names must exactly match that allowlist and reconcile to 8 executed / 8 passed / 0 failed / 0 skipped / 0 retry. Each method runs its embedded six-command independent SQL oracle and fixture-level exact13/web5 guard. The per-method hang bound is 180 seconds because the slowest measured six-command exact13 matrix took 1m38s; the job remains bounded at 25 minutes. The job refuses completion unless the exact candidate SHA remained unchanged and the owned instance reports verified ownership, zero user databases/active owners, graceful removal and no quarantine.
 
 **BLOCKED — PROTECTED SQL CI NOT RUN.** Only Owner `chung6a8m` may create and push a `web6-b04-sql-candidate-*` tag pointing at the final reviewed PR HEAD and approve the protected environment. Prerequisites are the pushed final candidate SHA, GitHub-hosted Windows 2022 with reviewed SQL 2019/2022 LocalDB, protected environment approval and no concurrent candidate job. After final review, the Owner command is `git tag web6-b04-sql-candidate-20261103-<short-sha>-1 <exact-final-pr-head>` followed by `git push origin refs/tags/web6-b04-sql-candidate-20261103-<short-sha>-1`. The run URL, exact SHA, image/SQL version, sanitized artifact digest/counts and lifecycle result must be added before B6-RPL-02 or B04 overall can close. Existing SQL-free `Backend Web checks` are not a substitute.
 
@@ -52,7 +53,7 @@ The Security test assembly and CrashHost were rebuilt in Release/net48 before ex
 
 RED/GREEN work found two fixture issues rather than a production defect: operator races initially used schema12, and the in-process operator observer passed a SQL session ID to a helper expecting an OS process ID. The final tests explicitly use schema13, observe the operator SQL session, use a dedicated MARS connection to drain the expected XACT_ABORT conflict, and dispose it before quiescence.
 
-Five newly allocated development fixtures were fail-closed **QUARANTINED** after cleanup/quiescence could not be proved: four while diagnosing the operator-client transaction lifecycle and one when an eight-matrix run was mistakenly overlapped with another SQL test process. They were not inspected, adopted or deleted by prefix; their private identities are not published here. A combined run from that overlap recorded 2 pass/6 fail, with five fail-fast results after the first quarantine, and is not acceptance evidence. Every final/review successful matrix independently reported child drain, SQL quiescence/fence proof and owned database removal. The two historical WEB5 quarantines were never queried or changed. The [sanitized quarantine register](20261103-b04-quarantine-register.md) separates both historical WEB5, five WEB6 development and successful-fixture dispositions; exact identities remain private and require a separate Owner/operator decision.
+Six newly allocated development fixtures are fail-closed **QUARANTINED**: the prior four operator-client lifecycle allocations, the prior overlapped-run allocation, and one Round-2 allocation whose testhost was killed by the former 90-second blame-hang bound before fixture cleanup could report. The Round-2 process census was clean, but that is not database ownership/quiescence proof; the allocation was not queried, adopted or deleted. An earlier guard-development run also failed 8/8 because it read `Data.Epoch` before arrangement; all eight fixtures in that run explicitly reported normal owned cleanup, so it created no quarantine and is not acceptance evidence. Every final successful matrix independently reported child drain, SQL quiescence/fence proof and owned database removal. The two historical WEB5 quarantines and the prior five WEB6 quarantines were never queried or changed. The [sanitized quarantine register](20261103-b04-quarantine-register.md) records both historical WEB5, six WEB6 development and successful-fixture dispositions; exact identities remain private and require a separate Owner/operator decision.
 
 ## Acceptance and review
 
@@ -64,7 +65,7 @@ Five newly allocated development fixtures were fail-closed **QUARANTINED** after
 | B6-RPL-04 | VERIFIED NONPRODUCTION | Actor/session/grant/epoch/body/target/kind/fingerprint, expired/unavailable, lock/cancel/availability and old-mode/capability cases fail closed |
 | B6-RPL-05 | PARTIAL / OWNER DECISION PENDING | Server dispatch/no-auto-retry and 404 observation boundaries verified; proposed `web6-resend-eligibility-v1`, authoritative age source, seven-day ceiling and consent/claim policy remain unapproved and unimplemented |
 
-Review-fix self-check: no known P0/P1/P2 source defect remains. Two acceptance/operational blockers remain explicit: protected exact-candidate SQL CI is NOT RUN, and five new quarantined development allocations require a separate exact-identity Owner disposition. This PR grants no tag/environment approval or cleanup authority. B04 is not DONE and does not authorize F02, production or manual resend.
+Round-2 self-check: no known P0/P1/P2 source defect remains. Two acceptance/operational blockers remain explicit: protected exact-candidate SQL CI is NOT RUN, and six WEB6 quarantined development allocations require a separate exact-identity Owner disposition. This PR grants no tag/environment approval or cleanup authority. B04 is not DONE and does not authorize F02, production or manual resend.
 
 ## F02 handoff
 

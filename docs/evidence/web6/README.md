@@ -9,7 +9,7 @@
 | B01 | [Exact source/contract/risk/expiry eligibility checkpoint](20261103-b01-source-safety-policy.md) and Owner scope | PR #99 MERGED; source-policy checkpoint present; Owner policy decisions still pending; runtime NOT CHANGED |
 | B02a/B02b | B02a read-only CLI is carried by independent PR #101; B02b typed terminal command/races remain pending | PR #101 PENDING with local nonproduction evidence there; B02b NOT IMPLEMENTED |
 | B03 | Compaction/retention/positive-case/backup-restore/epoch drill, independent SQL oracle | PLANNED |
-| B04 | [Six-command same-key/terminal/OS-death SQL proof](20261103-b04-same-key-sql-replay.md) and [quarantine register](20261103-b04-quarantine-register.md) | PR #100 PENDING; 103/103 local PASS; B6-RPL-02 protected exact-candidate SQL CI BLOCKED / NOT RUN; B6-RPL-05 PARTIAL / OWNER DECISION PENDING; resend OFF |
+| B04 | [Six-command same-key/terminal/OS-death SQL proof](20261103-b04-same-key-sql-replay.md) and [quarantine register](20261103-b04-quarantine-register.md) | PR #100 PENDING; Round-2 local proof separates 8 WEB6 exact13 matrices from 5 unchanged WEB4 schema12 matrices; B6-RPL-02 protected exact-candidate SQL CI BLOCKED / NOT RUN; B6-RPL-05 PARTIAL / OWNER DECISION PENDING; resend OFF |
 | B05a/B05b | Actual audit/limiter, owned IIS Express paired candidate, old/new cutover, load and service recovery | PLANNED |
 | B06 | Exact frontend/backend paired release manifest, target-vs-actual and named Owner disposition | PLANNED |
 
