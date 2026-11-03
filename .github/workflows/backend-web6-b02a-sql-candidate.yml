@@ -1,0 +1,141 @@
+name: WEB6 protected SQL B02a candidate
+
+# Explicit Owner opt-in. The tag must point at the exact reviewed PR HEAD.
+# Never consume fork/PR workflow code, arbitrary refs, secrets or downloaded artifacts.
+on:
+  push:
+    tags: ['web6-b02a-sql-candidate-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web6-b02a-sql-candidate
+  cancel-in-progress: false
+
+jobs:
+  b02a-sql-candidate:
+    if: >-
+      github.repository_id == '1409766698' && github.actor == 'chung6a8m' &&
+      github.triggering_actor == 'chung6a8m' && github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/web6-b02a-sql-candidate-')
+    environment: web5-sql-candidate
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING: ''
+    steps:
+      - name: Set private and sanitized evidence paths
+        run: |
+          "WEB6_STATE=$env:RUNNER_TEMP/web6-b02a-sql-state.json" >> $env:GITHUB_ENV
+          "WEB6_RAW=$env:RUNNER_TEMP/web6-b02a-sql-raw" >> $env:GITHUB_ENV
+          "WEB6_SAFE=$env:RUNNER_TEMP/web6-b02a-sql-safe" >> $env:GITHUB_ENV
+      - name: Checkout exact reviewed control commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+      - name: Checkout exact reviewed B02a source and tests
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify exact candidate and evidence guard
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path $env:WEB6_RAW,$env:WEB6_SAFE | Out-Null
+          if ((git -C candidate rev-parse HEAD) -ne $env:GITHUB_SHA -or $LASTEXITCODE -ne 0) { throw 'Candidate pin mismatch.' }
+          if ((git -C control rev-parse HEAD) -ne $env:GITHUB_SHA -or $LASTEXITCODE -ne 0) { throw 'Control commit mismatch.' }
+          & ./control/.github/scripts/Test-Web5SqlEvidence.ps1
+          if ((git -C candidate rev-parse HEAD:docs/contracts/web4-v1) -ne 'fcab4a1e7505b150a132ce2899002930e9f2a6ee' -or $LASTEXITCODE -ne 0) { throw 'Frozen WEB4 corpus changed.' }
+      - name: Allocate private SID-owned SQL instance
+        shell: powershell
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Initialize -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+      - name: Require hosted LocalDB SQL-login capability
+        run: |
+          $ErrorActionPreference='Stop'
+          $connection=New-Object System.Data.SqlClient.SqlConnection($env:MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING)
+          try {
+            $connection.Open()
+            $command=$connection.CreateCommand()
+            $command.CommandTimeout=3
+            $command.CommandText="SELECT CONVERT(int,SERVERPROPERTY('IsLocalDB')),CONVERT(int,SERVERPROPERTY('IsIntegratedSecurityOnly'));"
+            $reader=$command.ExecuteReader()
+            if (-not $reader.Read() -or $reader.GetInt32(0) -ne 1 -or $reader.GetInt32(1) -ne 0) { throw 'The owned LocalDB instance cannot exercise SQL-authenticated operator login tests.' }
+            $reader.Close()
+            [IO.File]::WriteAllText("$env:WEB6_SAFE/capability.json",'{"localDb":true,"sqlAuthenticationEnabled":true}'+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+          } finally { $connection.Dispose() }
+      - name: Run exact B02a CLI and SQL integration class
+        timeout-minutes: 12
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference='Stop'
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          [IO.File]::WriteAllText($env:WEB6_STATE+'.active','B02a')
+          $project='tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
+          $class='MyDmsVn.Server.Infrastructure.IntegrationTests.WebOperationOperatorInspectTests'
+          $filter='FullyQualifiedName~'+$class
+          dotnet restore $project --locked-mode *> "$env:WEB6_RAW/b02a-restore.log"
+          if ($LASTEXITCODE -ne 0) { throw 'B02a locked restore failed; raw output withheld.' }
+          dotnet build $project -c Release -f net48 --no-restore *> "$env:WEB6_RAW/b02a-build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'B02a Release/net48 build failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB6_RAW/b02a-discovery.log"
+          if ($LASTEXITCODE -ne 0) { throw 'B02a discovery failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 60s --blame-hang-dump-type none --logger 'trx;LogFileName=b02a.trx' --results-directory $env:WEB6_RAW *> "$env:WEB6_RAW/b02a-run.log"
+          $testExit=$LASTEXITCODE
+          Assert-Web5SqlEvidence -TrxPath "$env:WEB6_RAW/b02a.trx" -DiscoveryPath "$env:WEB6_RAW/b02a-discovery.log" -RequiredClasses @('WebOperationOperatorInspectTests') -SummaryPath "$env:WEB6_SAFE/b02a.json" -Label B02a
+          $summary=Get-Content "$env:WEB6_SAFE/b02a.json" -Raw | ConvertFrom-Json
+          [xml]$trx=Get-Content "$env:WEB6_RAW/b02a.trx" -Raw
+          $actual=@($trx.TestRun.Results.UnitTestResult | ForEach-Object { [string]$_.testName })
+          $smoke=$class+'.Release_executable_uses_a_real_restricted_login_and_never_changes_SQL'
+          if ($summary.total -ne 40 -or $summary.executed -ne 40 -or $summary.passed -ne 40 -or $summary.failed -ne 0 -or $summary.skipped -ne 0 -or $summary.requiredClasses.WebOperationOperatorInspectTests -ne 40) { throw 'Exactly 40 B02a cases must execute and pass.' }
+          if (@($actual | Where-Object { -not $_.StartsWith($class+'.',[StringComparison]::Ordinal) }).Count -ne 0) { throw 'The actual TRX contains a test outside the exact B02a class.' }
+          if (@($actual | Where-Object { $_ -eq $smoke }).Count -ne 1) { throw 'The actual TRX lacks the exact Release CLI SQL-login smoke.' }
+          $summary | Add-Member -NotePropertyName retry -NotePropertyValue 0
+          $summary | Add-Member -NotePropertyName executableSmoke -NotePropertyValue $smoke
+          [IO.File]::WriteAllText("$env:WEB6_SAFE/b02a.json",($summary | ConvertTo-Json -Depth 5 -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+          if ($testExit -ne 0) { throw 'B02a test process failed.' }
+          Remove-Item -LiteralPath ($env:WEB6_STATE+'.active')
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'B02a SQL/login/process owners did not drain.' }
+      - name: Verify exact candidate source remained unchanged
+        run: |
+          git -C candidate diff --exit-code --quiet
+          if ($LASTEXITCODE -ne 0) { throw 'Reviewed candidate source changed.' }
+      - name: Prove ownership and drain before instance removal
+        if: ${{ always() }}
+        shell: powershell
+        timeout-minutes: 2
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Complete -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+      - name: Require exact B02a evidence and clean lifecycle
+        if: ${{ always() }}
+        run: |
+          $instance=Get-Content "$env:WEB6_SAFE/instance.json" -Raw | ConvertFrom-Json
+          $b02a=Get-Content "$env:WEB6_SAFE/b02a.json" -Raw | ConvertFrom-Json
+          $capability=Get-Content "$env:WEB6_SAFE/capability.json" -Raw | ConvertFrom-Json
+          if ($instance.phase -ne 'Removed' -or $instance.quarantine -or -not $instance.instanceOwnershipVerified -or $instance.userDatabases -ne 0 -or $instance.activeOwners -ne 0) { throw 'SQL lifecycle was not proven clean.' }
+          if ($instance.controlSha -ne $env:GITHUB_SHA -or $instance.testSourceSha -ne $env:GITHUB_SHA) { throw 'SQL evidence is not bound to this exact candidate.' }
+          if (-not $capability.localDb -or -not $capability.sqlAuthenticationEnabled) { throw 'Hosted SQL-login capability was not proved.' }
+          if (-not $b02a.complete -or $b02a.total -ne 40 -or $b02a.passed -ne 40 -or $b02a.failed -ne 0 -or $b02a.skipped -ne 0 -or $b02a.retry -ne 0) { throw 'Exact B02a evidence is incomplete.' }
+          'B02a: 40/40 exact cases passed, including actual Release EXE with restricted SQL login; read-only snapshots and owned cleanup passed.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Publish sanitized evidence only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web6-b02a-sql-candidate-counts
+          path: ${{ env.WEB6_SAFE }}/*.json
+          if-no-files-found: error
+          retention-days: 14
