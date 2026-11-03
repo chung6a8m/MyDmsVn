@@ -7,7 +7,7 @@
 | Task | Planned evidence | Status |
 |---|---|---|
 | B01 | [Exact source/contract/risk/expiry eligibility checkpoint](20261103-b01-source-safety-policy.md) and Owner scope | READY FOR OWNER TECHNICAL REVIEW; runtime NOT CHANGED |
-| B02a/B02b | Read-only CLI, typed terminal command, SQL operator/authority/race audit evidence | PLANNED |
+| B02a/B02b | [B02a isolated read-only operator CLI](20261103-b02a-read-only-operator-cli.md); B02b typed terminal command/races remain pending | B02a IMPLEMENTED / VERIFIED NONPRODUCTION for B6-OPS-01/02; B02b NOT IMPLEMENTED |
 | B03 | Compaction/retention/positive-case/backup-restore/epoch drill, independent SQL oracle | PLANNED |
 | B04 | Six commands × same-key/terminal/OS-death, proof of original result and one effect | PLANNED |
 | B05a/B05b | Actual audit/limiter, owned IIS Express paired candidate, old/new cutover, load and service recovery | PLANNED |
