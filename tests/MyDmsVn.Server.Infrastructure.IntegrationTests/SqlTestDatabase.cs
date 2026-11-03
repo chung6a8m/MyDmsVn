@@ -71,12 +71,19 @@ internal sealed class SqlTestDatabase : IDisposable
         Action<string> afterCreate) =>
         CreateCoreAsync(adminConnectionString, cancellationToken, connectionFactory, afterCreate, guiAllocation: false);
 
+    // Supervisor records the exact intended allocation before any SQL side effect.
+    internal static Task<SqlTestDatabase> CreateForSupervisorAsync(string adminConnectionString, Action<string> beforeCreate, CancellationToken cancellationToken = default)
+    {
+        if (beforeCreate is null) throw new ArgumentNullException(nameof(beforeCreate));
+        return CreateCoreAsync(adminConnectionString, cancellationToken, value => new SqlConnection(value), _ => { }, guiAllocation: false, beforeCreate: beforeCreate);
+    }
+
     private static async Task<SqlTestDatabase> CreateCoreAsync(
         string adminConnectionString,
         CancellationToken cancellationToken,
         Func<string, SqlConnection> connectionFactory,
         Action<string> afterCreate,
-        bool guiAllocation)
+        bool guiAllocation, Action<string>? beforeCreate = null)
     {
         var normalizedConnectionString = NormalizeAdminConnectionString(adminConnectionString);
         if (connectionFactory is null)
@@ -95,6 +102,7 @@ internal sealed class SqlTestDatabase : IDisposable
         var token = timeout.Token;
         var databaseName = guiAllocation ? SqlTestDatabaseName.CreateGui() : SqlTestDatabaseName.Create();
         EnsureName(databaseName, guiAllocation);
+        beforeCreate?.Invoke(databaseName);
         var ownershipToken = Guid.NewGuid().ToString("N");
         SqlTestDatabase? database = null;
         var createAttempted = false;
@@ -201,7 +209,12 @@ internal sealed class SqlTestDatabase : IDisposable
 
     public void Dispose() => DisposeAsync().GetAwaiter().GetResult();
 
-    public async Task DisposeAsync()
+    public Task DisposeAsync() => DisposeCoreAsync(requireQuiescence: false);
+
+    // Supervisor-only: never disconnect a late session or roll back its work.
+    internal Task DisposeIfQuiescentAsync() => DisposeCoreAsync(requireQuiescence: true);
+
+    private async Task DisposeCoreAsync(bool requireQuiescence)
     {
         var previousState = Interlocked.CompareExchange(ref _disposeState, 1, 0);
         if (previousState == 2)
@@ -250,10 +263,18 @@ internal sealed class SqlTestDatabase : IDisposable
                     $"Refusing cleanup of '{DatabaseName}': the database ownership marker has changed or is missing.");
             }
 
-            using var drop = CreateCommand(
-                connection,
-                $"ALTER DATABASE [{DatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; " +
-                $"DROP DATABASE [{DatabaseName}];");
+            if (requireQuiescence)
+            {
+                using var check = CreateCommand(connection,
+                    "SELECT (SELECT COUNT(*) FROM sys.dm_exec_sessions WHERE database_id=DB_ID(@name)) + " +
+                    "(SELECT COUNT(*) FROM sys.dm_tran_locks WHERE resource_database_id=DB_ID(@name));");
+                check.Parameters.Add("@name", SqlDbType.NVarChar, 128).Value = DatabaseName;
+                if (Convert.ToInt32(await check.ExecuteScalarAsync(token).ConfigureAwait(false)) != 0)
+                    throw new InvalidOperationException("Refusing cleanup: owned SQL sessions or locks remain.");
+            }
+            using var drop = CreateCommand(connection, requireQuiescence
+                ? $"DROP DATABASE [{DatabaseName}];"
+                : $"ALTER DATABASE [{DatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{DatabaseName}];");
             await drop.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             Volatile.Write(ref _disposeState, 2);
         }

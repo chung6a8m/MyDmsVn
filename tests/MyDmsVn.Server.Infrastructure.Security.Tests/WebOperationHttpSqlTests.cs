@@ -492,7 +492,7 @@ FROM dbo.WebOperationJournal WHERE ActorUserId=@actor AND OperationId=@original;
     }
     private static byte[] HashBytes(string hex) => Enumerable.Range(0, 32).Select(index => byte.Parse(hex.Substring(index * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture)).ToArray();
 
-    private sealed class Intent
+    internal sealed class Intent
     {
         public Intent(string kind, JObject body, string? target = null, Guid? key = null)
         {
