@@ -432,7 +432,7 @@ COMMIT;";
         }
     }
 
-    private async Task OwnedCrash(Func<CrashScope, Task> body)
+    private async Task OwnedCrash(Func<CrashScope, Task> body, bool web5 = false)
     {
         Assert.False(WebOperationCrashProcess.IsPoisoned, "An earlier child cleanup was uncertain; no further database is admitted.");
         var database = await SqlTestDatabase.CreateAsync(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
@@ -441,8 +441,10 @@ COMMIT;";
         Exception? failure = null;
         try
         {
-            Assert.True(new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString).Successful);
-            http = await HttpScenario.Create(database.ConnectionString, web4Enabled: true);
+            Assert.True((web5
+                ? new DatabaseMigrationRunner().MigrateWeb5(database.ConnectionString)
+                : new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString)).Successful);
+            http = await HttpScenario.Create(database.ConnectionString, web4Enabled: true, web5Enabled: web5);
             scope.Data = await Data.Seed(http);
             await body(scope);
         }
