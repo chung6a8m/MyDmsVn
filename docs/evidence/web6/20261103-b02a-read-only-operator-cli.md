@@ -1,12 +1,13 @@
 # WEB6 B02a evidence — isolated read-only operator CLI
 
-**Date:** 2026-11-03 (Asia/Bangkok). **State:** IMPLEMENTED / LOCAL VERIFIED NONPRODUCTION for B02a only; PROTECTED SQL CI PENDING / NOT RUN. B02b destructive terminal commands and races remain pending; manual resend remains OFF.
+**Date:** 2026-11-03 (Asia/Bangkok). **State:** B02a DONE (BOUNDED) / OWNER ACCEPTED / SQL-VERIFIED NONPRODUCTION; PR #101 MERGED. B02b destructive terminal commands and races remain pending; manual resend remains OFF.
 
 ## Candidate and design
 
 - Base: backend `fe790b14f0e1c2247fbe3f5a1fc519f293d63d5b` (merged B01 PR #99); paired frontend reference `92afef7c9090605a172ffc351d1e641d9df12100`.
 - Final review-fix implementation commits: `13a108a0e5ae51284c33ea0e73eeacffb223b05b` plus exact effective-permission follow-up `3bdcde8eb7bbc1ad7c072b2e43e7a8bfa5b01432` on `codex/web6-b02-operator-inspect`.
 - Round-2 protected SQL workflow commit: `b014da6473becae0df837373edb9cb5c7b0d84c7`; no CLI/runtime source changed.
+- Owner-accepted exact tested PR HEAD: `63961515ca58b03eaf7caf77ce1ffdf8465a9b92`; merge commit `732f799a1ae9fed6054b1ab1d3924f3eada5f002`.
 - Native Windows/net48, .NET SDK `8.0.427`, VSTest `17.11.1`, Microsoft.Data.SqlClient `7.0.2`; SQL Server `14.0.2140.2` Developer Edition (64-bit), engine edition 3.
 - Fresh owned tests used exact schema13 and fingerprint `D0A86EA0CACAB3D68F1188A1166227DFA5DE452572D1719CD55A3FA3C16F02C9`.
 - New console owner: `tools/MyDmsVn.WebOperation.Operator`. It references Application and Infrastructure only, not HttpHost, controllers or runtime DI. It adds no migration, grant or HTTP endpoint.
@@ -35,18 +36,20 @@ The SQL cases use fresh owned fixtures and prove restricted-operator COMMITTED, 
 
 The current [GitHub `windows-2022` image inventory](https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md) lists the Visual Studio LocalDB runtime. [Microsoft's LocalDB documentation](https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/sql-server-express-localdb?view=sql-server-ver16) describes it as a local Windows SQL Server Express engine and describes SQL-authenticated logins for shared instances. An isolated local SQL Server 2019 LocalDB probe additionally observed `IsLocalDB=1`, `IsIntegratedSecurityOnly=0`, successfully created and connected with a SQL login, then stopped and deleted only its random owned instance. This local probe establishes feasibility, not hosted-run acceptance. The workflow therefore independently fails closed unless the allocated hosted instance reports LocalDB plus SQL authentication enabled, and the real executable smoke must still pass.
 
-**PROTECTED SQL CI PENDING / NOT RUN.** No tag or protected-environment approval was created. Only Owner `chung6a8m` may push `web6-b02a-sql-candidate-*` at the final reviewed PR HEAD and approve the environment. The run URL, exact SHA, runner image/SQL version, sanitized artifact digest/counts and lifecycle result are required before the Roadmap SQL-CI portion of B6-OPS-01/02 can close. The two ordinary SQL-free checks do not substitute for this gate.
+**PROTECTED SQL CI PASS / OWNER ACCEPTED.** Owner authorized the exact-head tag and protected environment on 2026-11-03. [Run `41642775592`](https://github.com/chung6a8m/MyDmsVn/actions/runs/41642775592) attempt 2 passed on exact SHA `63961515ca58b03eaf7caf77ce1ffdf8465a9b92`. Attempt 1 is retained as a pre-run environment tag-policy failure with no runner/steps/artifact; the existing environment retained its WEB5 tag rule and added exact WEB6 B02a/B04 tag families before attempt 2 reran the unchanged tag/SHA.
+
+Sanitized artifact `web6-b02a-sql-candidate-counts` has GitHub digest `sha256:4aec8fb2e99abfd2429fea81620c5015812c20bf1ed97291088d1b9d04e3fe0a`. Its evidence records: discovered/unique/total/executed/passed `40/40/40/40/40`, failed/skipped/retry `0/0/0`, exact `WebOperationOperatorInspectTests` count 40 and the exact Release executable SQL-login smoke. Hosted capability reports LocalDB and SQL authentication enabled. Lifecycle reports run/attempt `41642775592/2`, image `20261026.347.1`, SQL `15.0.4382.1` Express, compatibility 140, matching `controlSha`/`testSourceSha`, phase `Removed`, verified SID ownership, zero user databases, zero active owners and no quarantine. All exact-source, real SQL/CLI, drain/removal, evidence guard and sanitized-upload steps passed. The two ordinary SQL-free checks also passed, but are not used as the SQL substitute.
 
 ## Acceptance and review
 
 | Gate | State | Evidence |
 |---|---|---|
-| B6-OPS-01 | LOCAL VERIFIED NONPRODUCTION / PROTECTED SQL CI PENDING | Separate net48 CLI; help/exit/build; explicit exact DB; restricted operator path; no HttpHost/DI/admin controller; exact-candidate protected workflow prepared but NOT RUN |
-| B6-OPS-02 | LOCAL VERIFIED NONPRODUCTION / PROTECTED SQL CI PENDING | Read-only COMMITTED/EXPIRED/CANCELLED/INDETERMINATE, no result bytes, wrong identity/authority fail closed, missing row never becomes NOT_EXECUTED; protected actual-EXE SQL-login proof NOT RUN |
+| B6-OPS-01 | OWNER ACCEPTED / VERIFIED NONPRODUCTION | Separate net48 CLI; help/exit/build; explicit exact DB; restricted operator path; no HttpHost/DI/admin controller; exact-head protected SQL run and owned cleanup PASS |
+| B6-OPS-02 | OWNER ACCEPTED / VERIFIED NONPRODUCTION | Read-only COMMITTED/EXPIRED/CANCELLED/INDETERMINATE, no result bytes, wrong identity/authority fail closed, missing row never becomes NOT_EXECUTED; protected actual-EXE restricted SQL-login smoke PASS |
 | B6-OPS-03 | PENDING B02b / NOT IMPLEMENTED | No `record-not-executed` command, dry-run or execute path exists in this PR |
 | B6-OPS-04 | PENDING B02b / NOT IMPLEMENTED | B02a covers read lock timeout/authority/read-only oracle only; destructive decision races and failure audit remain future scope |
 
-Round-2 self-review findings: P0 0, P1 0, P2 0 in B02a source scope. Protected SQL CI and Owner acceptance are pending. This PR does not complete all of B02, elevate runtime SQL, enable resend, or claim production readiness.
+Round-2 final review findings: P0 0, P1 0, P2 0 in B02a source scope. Owner accepted and merged the exact protected-SQL-tested B02a candidate. This does not complete all of B02, elevate runtime SQL, enable resend, accept staging or claim production readiness.
 
 ## Usage and F02 relevance
 

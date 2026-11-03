@@ -1,0 +1,134 @@
+name: WEB6 protected SQL B04 candidate
+
+# Explicit Owner opt-in. Never consume fork/PR workflow code, arbitrary refs,
+# secrets or downloaded artifacts. The tag must point at the exact reviewed PR HEAD.
+on:
+  push:
+    tags: ['web6-b04-sql-candidate-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web6-b04-sql-candidate
+  cancel-in-progress: false
+
+jobs:
+  b04-sql-candidate:
+    if: >-
+      github.repository_id == '1409766698' && github.actor == 'chung6a8m' &&
+      github.triggering_actor == 'chung6a8m' && github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/web6-b04-sql-candidate-')
+    environment: web5-sql-candidate
+    runs-on: windows-2022
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING: ''
+    steps:
+      - name: Set private and sanitized evidence paths
+        run: |
+          "WEB6_STATE=$env:RUNNER_TEMP/web6-b04-sql-state.json" >> $env:GITHUB_ENV
+          "WEB6_RAW=$env:RUNNER_TEMP/web6-b04-sql-raw" >> $env:GITHUB_ENV
+          "WEB6_SAFE=$env:RUNNER_TEMP/web6-b04-sql-safe" >> $env:GITHUB_ENV
+      - name: Checkout exact reviewed control commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+      - name: Checkout exact reviewed B04 source and tests
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify exact candidate and evidence guard
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path $env:WEB6_RAW,$env:WEB6_SAFE | Out-Null
+          if ((git -C candidate rev-parse HEAD) -ne $env:GITHUB_SHA -or $LASTEXITCODE -ne 0) { throw 'Candidate pin mismatch.' }
+          if ((git -C control rev-parse HEAD) -ne $env:GITHUB_SHA -or $LASTEXITCODE -ne 0) { throw 'Control commit mismatch.' }
+          & ./control/.github/scripts/Test-Web5SqlEvidence.ps1
+          if ((git -C candidate rev-parse HEAD:docs/contracts/web4-v1) -ne 'fcab4a1e7505b150a132ce2899002930e9f2a6ee' -or $LASTEXITCODE -ne 0) { throw 'Frozen WEB4 corpus changed.' }
+      - name: Allocate private SID-owned SQL instance
+        shell: powershell
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Initialize -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+      - name: Run all eight six-command B04 SQL and process matrices
+        timeout-minutes: 25
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference='Stop'
+          . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          [IO.File]::WriteAllText($env:WEB6_STATE+'.active','B04')
+          $project='tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
+          $class='MyDmsVn.Server.Infrastructure.IntegrationTests.WebOperationHttpSqlTests.'
+          $methods=@(
+            'Web6_external_process_death_before_commit_rolls_back_all_six_commands_on_exact13',
+            'Web6_external_process_death_racing_commit_classifies_all_six_from_fresh_exact13_SQL',
+            'Web6_external_process_death_after_commit_recovers_all_six_original_results_on_exact13',
+            'Web6_independent_same_key_worker_waits_for_delayed_original_then_replays_all_six_on_exact13',
+            'Web6_independent_same_key_worker_waits_for_killed_original_then_executes_all_six_on_exact13',
+            'Resend_first_and_two_delayed_same_key_workers_converge_for_all_six_commands',
+            'Operator_first_cancelled_blocks_delayed_original_and_resend_for_all_six_commands',
+            'Original_first_commit_remains_authoritative_over_waiting_operator_for_all_six_commands'
+          )
+          $filter=($methods | ForEach-Object { 'FullyQualifiedName='+$class+$_ }) -join '|'
+          dotnet restore $project --locked-mode *> "$env:WEB6_RAW/b04-restore.log"
+          if ($LASTEXITCODE -ne 0) { throw 'B04 locked restore failed; raw output withheld.' }
+          dotnet build $project -c Release -f net48 --no-restore *> "$env:WEB6_RAW/b04-build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'B04 build failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB6_RAW/b04-discovery.log"
+          if ($LASTEXITCODE -ne 0) { throw 'B04 discovery failed; raw output withheld.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 180s --blame-hang-dump-type none --logger 'trx;LogFileName=b04.trx' --results-directory $env:WEB6_RAW *> "$env:WEB6_RAW/b04-run.log"
+          $testExit=$LASTEXITCODE
+          Assert-Web5SqlEvidence -TrxPath "$env:WEB6_RAW/b04.trx" -DiscoveryPath "$env:WEB6_RAW/b04-discovery.log" -RequiredClasses @('WebOperationHttpSqlTests') -SummaryPath "$env:WEB6_SAFE/b04.json" -Label B04
+          $summary=Get-Content "$env:WEB6_SAFE/b04.json" -Raw | ConvertFrom-Json
+          if ($summary.total -ne 8 -or $summary.executed -ne 8 -or $summary.passed -ne 8 -or $summary.failed -ne 0 -or $summary.skipped -ne 0 -or $summary.requiredClasses.WebOperationHttpSqlTests -ne 8) { throw 'All eight exact B04 matrices must execute and pass.' }
+          [xml]$trx=Get-Content "$env:WEB6_RAW/b04.trx" -Raw
+          $expected=@($methods | ForEach-Object { $class+$_ } | Sort-Object)
+          $actual=@($trx.TestRun.Results.UnitTestResult | ForEach-Object { [string]$_.testName } | Sort-Object)
+          if ($actual.Count -ne 8 -or (Compare-Object $expected $actual)) { throw 'The actual TRX does not contain exactly the eight reviewed WEB6 matrix names.' }
+          $summary | Add-Member -NotePropertyName retry -NotePropertyValue 0
+          $summary | Add-Member -NotePropertyName methods -NotePropertyValue $actual
+          [IO.File]::WriteAllText("$env:WEB6_SAFE/b04.json",($summary | ConvertTo-Json -Depth 5 -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+          if ($testExit -ne 0) { throw 'B04 test process failed.' }
+          Remove-Item -LiteralPath ($env:WEB6_STATE+'.active')
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'B04 SQL/process owners did not drain.' }
+      - name: Verify exact candidate source remained unchanged
+        run: |
+          git -C candidate diff --exit-code --quiet
+          if ($LASTEXITCODE -ne 0) { throw 'Reviewed candidate source changed.' }
+      - name: Prove ownership and drain before instance removal
+        if: ${{ always() }}
+        shell: powershell
+        timeout-minutes: 2
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Complete -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+      - name: Require exact B04 evidence and clean lifecycle
+        if: ${{ always() }}
+        run: |
+          $instance=Get-Content "$env:WEB6_SAFE/instance.json" -Raw | ConvertFrom-Json
+          $b04=Get-Content "$env:WEB6_SAFE/b04.json" -Raw | ConvertFrom-Json
+          if ($instance.phase -ne 'Removed' -or $instance.quarantine -or -not $instance.instanceOwnershipVerified -or $instance.userDatabases -ne 0 -or $instance.activeOwners -ne 0) { throw 'SQL lifecycle was not proven clean.' }
+          if ($instance.controlSha -ne $env:GITHUB_SHA -or $instance.testSourceSha -ne $env:GITHUB_SHA) { throw 'SQL evidence is not bound to this exact candidate.' }
+          if (-not $b04.complete -or $b04.total -ne 8 -or $b04.passed -ne 8 -or $b04.failed -ne 0 -or $b04.skipped -ne 0 -or $b04.retry -ne 0) { throw 'Exact B04 evidence is incomplete.' }
+          'Eight B04 matrices (48 six-command scenarios) passed with reconciled discovery/TRX and owned cleanup.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Publish sanitized evidence only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web6-b04-sql-candidate-counts
+          path: ${{ env.WEB6_SAFE }}/*.json
+          if-no-files-found: error
+          retention-days: 14

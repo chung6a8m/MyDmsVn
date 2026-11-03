@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
+using MyDmsVn.Server.Infrastructure.Operations;
 using MyDmsVn.Testing.Sql;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -35,7 +36,16 @@ public sealed partial class WebOperationHttpSqlTests
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task External_process_death_after_commit_recovers_all_six_original_results() => CrashMatrix("after-commit");
 
-    private async Task CrashMatrix(string phase)
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Web6_external_process_death_before_commit_rolls_back_all_six_commands_on_exact13() => CrashMatrix("before-commit", web5: true);
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Web6_external_process_death_racing_commit_classifies_all_six_from_fresh_exact13_SQL() => CrashMatrix("commit-window", web5: true);
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Web6_external_process_death_after_commit_recovers_all_six_original_results_on_exact13() => CrashMatrix("after-commit", web5: true);
+
+    private async Task CrashMatrix(string phase, bool web5 = false)
     {
         foreach (var kind in CrashKinds)
             await OwnedCrash(async scope =>
@@ -75,7 +85,7 @@ public sealed partial class WebOperationHttpSqlTests
                 }
                 await VerifyCrashCommitted(oracle, scope.Data, arranged);
                 await RecoverAndReplayCrash(scope, arranged);
-            });
+            }, web5);
     }
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
@@ -84,7 +94,13 @@ public sealed partial class WebOperationHttpSqlTests
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Independent_same_key_worker_waits_for_killed_original_then_executes_all_six() => DelayedCrashMatrix(killOriginal: true);
 
-    private async Task DelayedCrashMatrix(bool killOriginal)
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Web6_independent_same_key_worker_waits_for_delayed_original_then_replays_all_six_on_exact13() => DelayedCrashMatrix(killOriginal: false, web5: true);
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Web6_independent_same_key_worker_waits_for_killed_original_then_executes_all_six_on_exact13() => DelayedCrashMatrix(killOriginal: true, web5: true);
+
+    private async Task DelayedCrashMatrix(bool killOriginal, bool web5 = false)
     {
         foreach (var kind in CrashKinds)
             await OwnedCrash(async scope =>
@@ -118,7 +134,7 @@ public sealed partial class WebOperationHttpSqlTests
                 await VerifyCrashCommitted(oracle, scope.Data, arranged);
                 await RecoverAndReplayCrash(scope, arranged);
                 _crashOutput.WriteLine("WEB5 fence: {0}; original {1}; SQL waiter observed; one committed effect; children drained", kind, killOriginal ? "killed" : "released");
-            });
+            }, web5);
     }
 
     private static async Task WaitForCrashFence(SqlConnection observer, int holder, int contenderPid)
@@ -432,7 +448,7 @@ COMMIT;";
         }
     }
 
-    private async Task OwnedCrash(Func<CrashScope, Task> body)
+    private async Task OwnedCrash(Func<CrashScope, Task> body, bool web5 = false)
     {
         Assert.False(WebOperationCrashProcess.IsPoisoned, "An earlier child cleanup was uncertain; no further database is admitted.");
         var database = await SqlTestDatabase.CreateAsync(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
@@ -441,9 +457,12 @@ COMMIT;";
         Exception? failure = null;
         try
         {
-            Assert.True(new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString).Successful);
-            http = await HttpScenario.Create(database.ConnectionString, web4Enabled: true);
+            Assert.True((web5
+                ? new DatabaseMigrationRunner().MigrateWeb5(database.ConnectionString)
+                : new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString)).Successful);
+            http = await HttpScenario.Create(database.ConnectionString, web4Enabled: true, web5Enabled: web5);
             scope.Data = await Data.Seed(http);
+            if (web5) await VerifyWeb6FixtureCompatibility(scope);
             await body(scope);
         }
         catch (Exception error) { failure = error; }
@@ -485,5 +504,32 @@ COMMIT;";
         }
         if (failure != null) cleanup.Insert(0, failure);
         if (cleanup.Count != 0) throw new AggregateException("Crash fixture failed or cleanup was incomplete.", cleanup);
+    }
+
+    private static async Task VerifyWeb6FixtureCompatibility(CrashScope scope)
+    {
+        Guid deploymentEpoch;
+        using (var connection = await CrashOracle(scope.ConnectionString))
+        {
+            var compatibility = await SqlWeb5SchemaCompatibilityChecker.CheckConnectionAsync(connection, CancellationToken.None);
+            Assert.True(compatibility.IsCompatible, compatibility.SafeMessage);
+            Assert.Equal(SqlSchemaDefinitionFingerprint.Schema13,
+                await SqlSchemaDefinitionFingerprint.ReadAsync(connection, CancellationToken.None));
+            Assert.Equal(SqlWeb5SchemaCompatibilityChecker.Scripts.Count,
+                await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.SchemaVersions;"));
+            Assert.Equal("013_WebOperationTerminalResolution.sql",
+                await connection.QuerySingleAsync<string>("SELECT TOP(1) CASE WHEN CHARINDEX('.Scripts.',ScriptName)>0 THEN SUBSTRING(ScriptName,CHARINDEX('.Scripts.',ScriptName)+9,4000) ELSE LTRIM(RTRIM(ScriptName)) END FROM dbo.SchemaVersions ORDER BY Id DESC;"));
+            deploymentEpoch = await connection.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;");
+            Assert.NotEqual(Guid.Empty, deploymentEpoch);
+        }
+
+        var access = (await scope.Data.Http.Login("alice")).Access;
+        using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get,
+            WebFrontendPortBridge.Origin + "/api/v2/operations/context");
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + access);
+        var context = Success(await scope.Data.Http.Send(request));
+        Assert.Equal("web5-resolution-v1", (string?)context["contractVersion"]);
+        Assert.Equal(deploymentEpoch.ToString("D"), (string?)context["deploymentEpoch"]);
+        Assert.False((bool)context["sameKeyResendEnabled"]!);
     }
 }
