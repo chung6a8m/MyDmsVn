@@ -459,7 +459,7 @@ public sealed partial class WebHostIisExpressTests
                     ValidateWeb5BrowserCount(count);
                     Console.WriteLine("WEB5_BROWSER_COUNT " + count.ToString(Formatting.None));
                 }
-                await VerifyRecoveryStock(connectionString, runDirectory, JObject.Parse(File.ReadAllText(resultPath)), recovery.Epochs, warehouse, product, receiptProduct, integrated!, web5Pilot);
+                await VerifyRecoveryStock(connectionString, runDirectory, JObject.Parse(File.ReadAllText(resultPath)), recovery.Epochs, warehouse, product, receiptProduct, integrated!, web5Pilot, recovery.NegativeIdentities);
                 return;
             }
             var posted = JArray.Parse(File.ReadAllText(resultPath));

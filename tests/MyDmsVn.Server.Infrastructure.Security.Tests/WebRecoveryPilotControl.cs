@@ -24,13 +24,15 @@ internal sealed class WebRecoveryPilotControl
     private readonly List<Guid> _epochs = new List<Guid>();
     private Task _serving = Task.CompletedTask;
     private bool _stopped;
-    private bool _negativeRecorded;
-    private bool _negativeVerified;
+    private readonly Web5NegativeSequence _negativeSequence = new Web5NegativeSequence();
+    private readonly List<Web5NegativePilot.Identity> _negativeIdentities = new List<Web5NegativePilot.Identity>();
+    private Web5NegativePilot.Identity? _pendingNegative;
     private readonly bool _web5;
     private string? _negativeSnapshot;
     private WebRecoveryPilotControl(string connectionString, bool web5) { _connectionString = connectionString; _web5 = web5; }
     public Guid[] Epochs => _epochs.ToArray();
-    public bool NegativeVerified => _negativeVerified;
+    public bool NegativeVerified => _negativeSequence.Complete && _negativeIdentities.Count == 6;
+    public Web5NegativePilot.Identity[] NegativeIdentities => _negativeIdentities.ToArray();
     public string Redact(string output) => output.Replace(_token, "<redacted>");
     public JObject Manifest => new JObject
     {
@@ -85,16 +87,23 @@ internal sealed class WebRecoveryPilotControl
                 }
                 else if (action == "resolveNegative")
                 {
-                    if (!_web5 || _negativeRecorded) throw new InvalidDataException("Negative fixture permits one decision.");
+                    if (!_web5) throw new InvalidDataException("Negative fixture requires WEB5.");
+                    var frozen = (JObject)frame["operation"]!;
+                    var actor = await sql.QuerySingleAsync<int>(new SqlTestCommand("SELECT UserId FROM dbo.Users WHERE Username=N'integratedEditor';", cancellationToken: _stop.Token));
+                    var epoch = await sql.QuerySingleAsync<Guid>(new SqlTestCommand("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;", cancellationToken: _stop.Token));
+                    var intent = Web5NegativePilot.Validate(frozen, actor, epoch);
+                    _negativeSequence.Begin(intent.Key, intent.Kind);
                     _negativeSnapshot = await Web5NegativePilot.Snapshot(_connectionString);
-                    await Web5NegativePilot.Record(_connectionString, (JObject)frame["operation"]!, _stop.Token);
-                    _negativeRecorded = true;
+                    _pendingNegative = await Web5NegativePilot.Record(_connectionString, frozen, _stop.Token);
                 }
                 else if (action == "verifyNegative")
                 {
-                    if (!_web5 || !_negativeRecorded || _negativeVerified || _negativeSnapshot != await Web5NegativePilot.Snapshot(_connectionString))
-                        throw new InvalidDataException("Late original changed physical state.");
-                    _negativeVerified = true;
+                    var id = Guid.ParseExact((string)frame["operationId"]!, "D");
+                    if (!_web5 || _pendingNegative == null || _pendingNegative.Key != id || _negativeSnapshot == null ||
+                        _negativeSnapshot != await Web5NegativePilot.Snapshot(_connectionString))
+                        throw new InvalidDataException("Late original changed physical state or operation identity.");
+                    await Web5NegativePilot.VerifyDurable(sql, _pendingNegative, _stop.Token);
+                    _negativeSequence.Verify(id); _negativeIdentities.Add(_pendingNegative); _pendingNegative = null; _negativeSnapshot = null;
                 }
                 else
                 {
@@ -113,12 +122,13 @@ internal sealed class WebRecoveryPilotControl
     internal static string Validate(JObject frame, string token)
     {
         var action = frame["action"]?.Type == JTokenType.String ? (string)frame["action"]! : "";
-        var keys = action == "setWritePermission" ? new[] { "id", "token", "action", "granted" } : action == "resolveNegative" ? new[] { "id", "token", "action", "operation" } : new[] { "id", "token", "action" };
+        var keys = action == "setWritePermission" ? new[] { "id", "token", "action", "granted" } : action == "resolveNegative" ? new[] { "id", "token", "action", "operation" } : action == "verifyNegative" ? new[] { "id", "token", "action", "operationId" } : new[] { "id", "token", "action" };
         if (!frame.Properties().Select(p => p.Name).OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(keys.OrderBy(x => x, StringComparer.Ordinal)) ||
             frame["id"]?.Type != JTokenType.Integer || (long)frame["id"]! <= 0 ||
             frame["token"]?.Type != JTokenType.String || (string)frame["token"]! != token ||
             (action != "rotateEpoch" && action != "setWritePermission" && action != "resolveNegative" && action != "verifyNegative") ||
             (action == "resolveNegative" && frame["operation"] is not JObject) ||
+            (action == "verifyNegative" && (frame["operationId"]?.Type != JTokenType.String || !Guid.TryParseExact((string?)frame["operationId"], "D", out var operationId) || operationId.ToString("D") != (string?)frame["operationId"])) ||
             (action == "setWritePermission" && frame["granted"]?.Type != JTokenType.Boolean))
             throw new InvalidDataException("Invalid recovery fixture control request.");
         return action;

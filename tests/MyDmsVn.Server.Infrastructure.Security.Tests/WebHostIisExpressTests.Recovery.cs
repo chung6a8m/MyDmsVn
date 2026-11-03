@@ -32,7 +32,7 @@ public sealed partial class WebHostIisExpressTests
         var checkIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var check in checks)
             if (check.Type != JTokenType.String || !checkIds.Add((string)check!)) throw RecoveryInvalid();
-        if (!checkIds.SetEquals(web5Pilot ? RecoveryChecks.Concat(new[] { "web5-v2-committed-sales", "web5-v2-committed-receipt", "web5-negative-late-sales-create" }) : RecoveryChecks)) throw new InvalidDataException("Recovery browser completion set is incomplete or unknown.");
+        if (!checkIds.SetEquals(web5Pilot ? RecoveryChecks.Concat(new[] { "web5-v2-committed-sales", "web5-v2-committed-receipt", "web5-negative-late-sales-create", "web5-negative-late-sales-update", "web5-negative-late-sales-post", "web5-negative-late-receipt-create", "web5-negative-late-receipt-update", "web5-negative-late-receipt-post" }) : RecoveryChecks)) throw new InvalidDataException("Recovery browser completion set is incomplete or unknown.");
         VerifyPilotResultIdentities(posted, receipts, sales, integrated: true);
         var actual = new Dictionary<string, JObject>(StringComparer.Ordinal);
         foreach (var item in operations)
@@ -77,12 +77,12 @@ public sealed partial class WebHostIisExpressTests
     internal static void ValidateRecoveryDispositions(System.Collections.Generic.IEnumerable<string> dispositions, bool web5Pilot)
     {
         var values = dispositions.ToArray();
-        if (values.Any(value => value != "COMMITTED" && value != "CANCELLED") || values.Count(value => value == "CANCELLED") != (web5Pilot ? 1 : 0))
+        if (values.Any(value => value != "COMMITTED" && value != "CANCELLED") || values.Count(value => value == "CANCELLED") != (web5Pilot ? 6 : 0))
             throw new InvalidDataException("Unexpected recovery journal disposition.");
     }
 
     private static async Task VerifyRecoveryStock(string connectionString, string runDirectory, JObject result, Guid[] epochs,
-        int warehouse, int product, int receiptProduct, IntegratedCatalog integrated, bool web5Pilot)
+        int warehouse, int product, int receiptProduct, IntegratedCatalog integrated, bool web5Pilot, Web5NegativePilot.Identity[] negativeIdentities)
     {
         using var sql = new SqlConnection(connectionString);
         await sql.OpenAsync();
@@ -99,9 +99,22 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId;")).To
         Assert.Equal(new[] { 1, 2, 3, 4, 5, 6 }, rows.Select(row => row.OperationKind).Distinct().OrderBy(kind => kind));
         ValidateRecoveryDispositions(rows.Select(row => row.Disposition), web5Pilot);
         var cancelled = rows.Where(row => row.Disposition == "CANCELLED").ToArray();
-        Assert.Equal(web5Pilot ? 1 : 0, cancelled.Length);
+        Assert.Equal(web5Pilot ? 6 : 0, cancelled.Length);
         if (web5Pilot)
-            Assert.Equal(1, await sql.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal j JOIN dbo.WebOperationTerminalAudit a ON a.ActorUserId=j.ActorUserId AND a.OperationId=j.OperationId JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.Disposition='CANCELLED' AND j.OperationKind=1 AND j.RequestTargetId IS NULL AND j.ResultDocumentId IS NULL AND u.Username=N'integratedEditor';"));
+        {
+            Assert.Equal(6, negativeIdentities.Length);
+            Assert.Equal(new[] { 1, 2, 3, 4, 5, 6 }, negativeIdentities.Select(item => (int)item.Kind).OrderBy(kind => kind));
+            Assert.Equal(6, negativeIdentities.Select(item => item.Key).Distinct().Count());
+            foreach (var identity in negativeIdentities)
+            {
+                var row = Assert.Single(cancelled, item => item.OperationId == identity.Key);
+                Assert.Equal("integratedEditor", row.Actor); Assert.Equal((int)identity.Kind, row.OperationKind);
+                Assert.Equal(identity.Target, row.RequestTargetId); Assert.Equal(identity.Epoch, row.DeploymentEpoch);
+                Assert.Equal(identity.Fingerprint, row.RequestFingerprint);
+                await Web5NegativePilot.VerifyDurable(sql, identity, System.Threading.CancellationToken.None);
+            }
+        }
+        else Assert.Empty(negativeIdentities);
         rows = rows.Where(row => row.Disposition == "COMMITTED").ToArray();
         var journal = new JArray(rows.Select(RecoveryJournalJson));
         VerifyRecoveryResult(result, journal,

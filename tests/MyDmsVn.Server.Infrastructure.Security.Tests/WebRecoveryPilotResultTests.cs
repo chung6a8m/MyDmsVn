@@ -39,7 +39,7 @@ public sealed class WebRecoveryPilotResultTests
         Assert.Throws<InvalidDataException>(VerifyWeb5);
         ((JArray)result["checks"]!).Add("web5-v2-committed-receipt");
         Assert.Throws<InvalidDataException>(VerifyWeb5);
-        ((JArray)result["checks"]!).Add("web5-negative-late-sales-create");
+        foreach (var name in new[] { "web5-negative-late-sales-create", "web5-negative-late-sales-update", "web5-negative-late-sales-post", "web5-negative-late-receipt-create", "web5-negative-late-receipt-update", "web5-negative-late-receipt-post" }) ((JArray)result["checks"]!).Add(name);
         VerifyWeb5();
         Assert.Throws<InvalidDataException>(() => Verify(result));
     }
@@ -141,7 +141,7 @@ public sealed class WebRecoveryPilotResultTests
     [Fact]
     public void Recovery_dispositions_allow_only_the_expected_web5_negative()
     {
-        WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED", "CANCELLED" }, true);
+        WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED", "CANCELLED", "CANCELLED", "CANCELLED", "CANCELLED", "CANCELLED", "CANCELLED" }, true);
         WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED" }, false);
         Assert.Throws<InvalidDataException>(() => WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED", "CANCELLED" }, false));
         Assert.Throws<InvalidDataException>(() => WebHostIisExpressTests.ValidateRecoveryDispositions(new[] { "COMMITTED", "EXPIRED" }, true));
@@ -158,6 +158,19 @@ public sealed class WebRecoveryPilotResultTests
     }
 
     [Fact]
+    public void Negative_verification_requires_one_exact_canonical_operation_id()
+    {
+        var frame = new JObject { ["id"] = 1, ["token"] = "token", ["action"] = "verifyNegative" };
+        Assert.Throws<InvalidDataException>(() => WebRecoveryPilotControl.Validate(frame, "token"));
+        var key = Guid.NewGuid().ToString("D"); frame["operationId"] = key;
+        Assert.Equal("verifyNegative", WebRecoveryPilotControl.Validate(frame, "token"));
+        frame["operationId"] = key.ToUpperInvariant();
+        Assert.Throws<InvalidDataException>(() => WebRecoveryPilotControl.Validate(frame, "token"));
+        frame["operationId"] = key; frame["extra"] = 1;
+        Assert.Throws<InvalidDataException>(() => WebRecoveryPilotControl.Validate(frame, "token"));
+    }
+
+    [Fact]
     public void Negative_identity_recomputes_fingerprint_and_fences_actor_epoch_and_route()
     {
         var body = new JObject { ["note"] = "fixture" };
@@ -171,6 +184,24 @@ public sealed class WebRecoveryPilotResultTests
         frozen["request"]!["body"]!["note"] = "changed";
         Assert.Throws<InvalidDataException>(() => Web5NegativePilot.Validate(frozen, 1, Epoch));
         frozen["request"]!["routeScope"] = "/api/v1/goods-receipts";
+        Assert.Throws<InvalidDataException>(() => Web5NegativePilot.Validate(frozen, 1, Epoch));
+    }
+
+    [Theory]
+    [InlineData("sales-create")][InlineData("sales-update")][InlineData("sales-post")]
+    [InlineData("receipt-create")][InlineData("receipt-update")][InlineData("receipt-post")]
+    public void Negative_control_accepts_only_exact_corpus_six_command_identities(string stem)
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root != null && !File.Exists(Path.Combine(root.FullName, "docs", "contracts", "web4-v1", stem + "-intent.json"))) root = root.Parent;
+        Assert.NotNull(root); var corpus = Path.Combine(root!.FullName, "docs", "contracts", "web4-v1");
+        var request = JObject.Parse(File.ReadAllText(Path.Combine(corpus, stem + "-intent.json")));
+        var status = JObject.Parse(File.ReadAllText(Path.Combine(corpus, stem + "-status.json")));
+        var frozen = new JObject { ["schemaVersion"] = 1, ["actorKey"] = "1", ["deploymentEpoch"] = Epoch.ToString("D"), ["operationId"] = Guid.NewGuid().ToString("D"),
+            ["requestFingerprint"] = status["data"]!["requestFingerprint"]!.DeepClone(), ["request"] = request };
+        var intent = Web5NegativePilot.Validate(frozen, 1, Epoch);
+        Assert.Equal((string?)request["operationKind"], intent.Kind);
+        frozen["request"]!["method"] = "DELETE";
         Assert.Throws<InvalidDataException>(() => Web5NegativePilot.Validate(frozen, 1, Epoch));
     }
 
