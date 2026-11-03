@@ -98,7 +98,7 @@ jobs:
           $testExit=$LASTEXITCODE
           Assert-Web5SqlEvidence -TrxPath "$env:WEB6_RAW/decision.trx" -DiscoveryPath "$env:WEB6_RAW/decision-discovery.log" -RequiredClasses @('WebOperationOperatorDecisionTests') -SummaryPath "$env:WEB6_SAFE/decision.json" -Label B02bDecision
           $summary=Get-Content "$env:WEB6_SAFE/decision.json" -Raw | ConvertFrom-Json
-          if ($summary.total -ne 50 -or $summary.executed -ne 50 -or $summary.passed -ne 50 -or $summary.failed -ne 0 -or $summary.skipped -ne 0 -or $summary.requiredClasses.WebOperationOperatorDecisionTests -ne 50) { throw 'Exactly 50 decision cases must pass.' }
+          if ($summary.total -ne 51 -or $summary.executed -ne 51 -or $summary.passed -ne 51 -or $summary.failed -ne 0 -or $summary.skipped -ne 0 -or $summary.requiredClasses.WebOperationOperatorDecisionTests -ne 51) { throw 'Exactly 51 decision cases must pass.' }
           $summary | Add-Member -NotePropertyName retry -NotePropertyValue 0; [IO.File]::WriteAllText("$env:WEB6_SAFE/decision.json",($summary|ConvertTo-Json -Depth 5 -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
           if ($testExit -ne 0) { throw 'Decision test process failed.' }
       - name: Run exact inherited B02a inspect regression
@@ -174,7 +174,7 @@ jobs:
           if ($instance.phase -ne 'Removed' -or $instance.quarantine -or -not $instance.instanceOwnershipVerified -or $instance.userDatabases -ne 0 -or $instance.activeOwners -ne 0) { throw 'SQL lifecycle was not proven clean.' }
           if ($instance.controlSha -ne $env:GITHUB_SHA -or $instance.testSourceSha -ne $env:GITHUB_SHA) { throw 'Evidence SHA mismatch.' }
           if ($decision.retry -ne 0 -or $inspect.retry -ne 0 -or $resolution.retry -ne 0 -or $races.retry -ne 0) { throw 'Retries are forbidden.' }
-          'B02b: decision 50/50; inherited inspect 40/40; resolution/crash 26/26; races 2/2; zero fail/skip/retry; owned cleanup required.' >> $env:GITHUB_STEP_SUMMARY
+          'B02b: decision 51/51; inherited inspect 40/40; resolution/crash 26/26; races 2/2; zero fail/skip/retry; owned cleanup required.' >> $env:GITHUB_STEP_SUMMARY
       - name: Publish sanitized evidence only
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
