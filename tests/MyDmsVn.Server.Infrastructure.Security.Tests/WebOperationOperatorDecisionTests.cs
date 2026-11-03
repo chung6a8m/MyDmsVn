@@ -240,6 +240,19 @@ public sealed class WebOperationOperatorDecisionTests
     }
 
     [Fact]
+    public async Task Cancellation_after_mutation_returns_but_before_commit_rolls_back_and_never_commits()
+    {
+        using var cancelled = new CancellationTokenSource();
+        var rollback = 0; var commits = 0;
+        await Assert.ThrowsAsync<OperationCanceledException>(() => OperatorDecisionCommitBoundary.RunAsync(
+            _ => { cancelled.Cancel(); return Task.CompletedTask; }, () => commits++, () => rollback++, () => { },
+            () => { }, () => { }, cancelled.Token));
+
+        Assert.Equal(0, commits);
+        Assert.Equal(1, rollback);
+    }
+
+    [Fact]
     public async Task Unknown_commit_outcome_is_never_reexecuted_or_reinspected()
     {
         var inspections = 0; var transactions = 0;

@@ -49,6 +49,7 @@ internal static class OperatorDecisionCommitBoundary
         try
         {
             await mutate(cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (Exception exception)
         {
