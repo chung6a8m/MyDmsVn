@@ -72,9 +72,17 @@ public sealed class SqlOperatorDecisionClient : IOperatorDecisionClient
         var rollbackStarted = false;
         try
         {
-            var result = await new SqlWebOperationResolutionMaintenance(new DecisionContext(connection, transaction))
-                .InspectAsync(options.DeploymentEpoch, options.ActorUserId, options.OperationId,
-                    options.FingerprintBytes(), cancellationToken).ConfigureAwait(false);
+            WebOperationInspection result;
+            try
+            {
+                result = await new SqlWebOperationResolutionMaintenance(new DecisionContext(connection, transaction))
+                    .InspectAsync(options.DeploymentEpoch, options.ActorUserId, options.OperationId,
+                        options.FingerprintBytes(), cancellationToken).ConfigureAwait(false);
+            }
+            catch (WebOperationException exception) when (exception.Code == "Operation.Unavailable" && cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException("The bounded SQL decision inspection was cancelled.", exception, cancellationToken);
+            }
             rollbackStarted = true;
             transaction.Rollback();
             return result;

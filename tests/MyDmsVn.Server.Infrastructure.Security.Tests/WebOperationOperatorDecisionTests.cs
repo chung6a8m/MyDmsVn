@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -245,6 +246,106 @@ CREATE USER Web6DecisionDenied WITHOUT LOGIN;");
             Assert.Equal(before, await SqlSnapshot(s.Observer));
         });
 
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Guarded_execute_records_exactly_one_terminal_pair_for_all_six_kinds_without_business_effect() =>
+        WebOperationResolutionScenario.Owned(async s =>
+        {
+            await s.Observer.ExecuteAsync("CREATE USER Web6DecisionOperator WITHOUT LOGIN; ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER Web6DecisionOperator;");
+            var client = new SqlOperatorDecisionClient(new ImpersonatingDecisionConnectionFactory(s.Database.ConnectionString, "Web6DecisionOperator"));
+            foreach (WebOperationKind kind in Enum.GetValues(typeof(WebOperationKind)))
+            {
+                var operation = WebOperationResolutionScenario.Operation(s, kind);
+                var options = Parse(ExecuteArguments(s, operation, Guid.NewGuid()));
+                var result = await client.ExecuteAsync(options, s.Stop.Token);
+                Assert.Equal(OperatorDecisionOutcome.Completed, result.Outcome);
+                Assert.Equal(kind, result.Inspection!.Kind);
+                Assert.Equal(operation.RequestTargetId, result.Inspection.RequestTargetId);
+                await Assert.ThrowsAsync<WebOperationException>(() => client.ExecuteAsync(options, s.Stop.Token));
+            }
+            Assert.Equal(6, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE Disposition='CANCELLED';"));
+            Assert.Equal(6, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationTerminalAudit;"));
+            Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.SalesReceipts;"));
+            Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
+            Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockBalances;"));
+            Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger;"));
+            Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockValuationEntries;"));
+        });
+
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
+    public Task Fence_timeout_and_cancellation_leave_no_terminal_pair() => WebOperationResolutionScenario.Owned(async s =>
+    {
+        await s.Observer.ExecuteAsync("CREATE USER Web6DecisionOperator WITHOUT LOGIN; ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER Web6DecisionOperator;");
+        var client = new SqlOperatorDecisionClient(new ImpersonatingDecisionConnectionFactory(s.Database.ConnectionString, "Web6DecisionOperator"));
+
+        var timeoutOperation = WebOperationResolutionScenario.Operation(s);
+        var timeoutHolder = await s.Transaction();
+        await HoldFence(timeoutHolder, s.Actor, timeoutOperation.OperationId, s.Stop.Token);
+        var timeout = await Assert.ThrowsAsync<WebOperationException>(() => client.ExecuteAsync(
+            Parse(ExecuteArguments(s, timeoutOperation, Guid.NewGuid())), s.Stop.Token));
+        Assert.Equal("Operation.FenceUnavailable", timeout.Code);
+        timeoutHolder.Tx.Rollback();
+
+        var cancelledOperation = WebOperationResolutionScenario.Operation(s);
+        var cancelledHolder = await s.Transaction();
+        await HoldFence(cancelledHolder, s.Actor, cancelledOperation.OperationId, s.Stop.Token);
+        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => client.ExecuteAsync(
+            Parse(ExecuteArguments(s, cancelledOperation, Guid.NewGuid())), cancel.Token));
+        cancelledHolder.Tx.Rollback();
+
+        Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal;"));
+        Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationTerminalAudit;"));
+    });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Release_executable_uses_restricted_login_for_preview_confirmation_execute_and_overgrant_denial() =>
+        WebOperationResolutionScenario.Owned(async s =>
+        {
+            var executable = Path.Combine(AppContext.BaseDirectory, "MyDmsVn.WebOperation.Operator.exe");
+            Assert.True(File.Exists(executable));
+            var login = new DecisionOwnedLogin(s.Database.ConnectionString);
+            Exception? failure = null;
+            try
+            {
+                await login.CreateAsync();
+                await s.Observer.ExecuteAsync("CREATE USER [" + login.Name + "] FOR LOGIN [" + login.Name + "]; ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER [" + login.Name + "]; ");
+                var operation = WebOperationResolutionScenario.Operation(s);
+                var decision = Guid.NewGuid();
+                var dryArgs = DryRunArguments(s, operation, decision);
+                var before = await SqlSnapshot(s.Observer);
+
+                var preview = await RunExecutable(executable, dryArgs, login.ConnectionString(s.Database.DatabaseName), login.Name);
+                Assert.Equal((int)OperatorExitCode.Preview, preview.ExitCode);
+                Assert.Contains("notProofOfNotExecuted=true", preview.Stdout);
+                Assert.Equal(before, await SqlSnapshot(s.Observer));
+
+                var wrong = ExecuteArguments(s, operation, decision);
+                wrong = Replace(wrong, "--confirm", "wrong");
+                Assert.Equal((int)OperatorExitCode.InvalidArguments,
+                    (await RunExecutable(executable, wrong, login.ConnectionString(s.Database.DatabaseName), login.Name)).ExitCode);
+                Assert.Equal(before, await SqlSnapshot(s.Observer));
+
+                var executed = await RunExecutable(executable, ExecuteArguments(s, operation, decision),
+                    login.ConnectionString(s.Database.DatabaseName), login.Name);
+                Assert.Equal((int)OperatorExitCode.Completed, executed.ExitCode);
+                Assert.Contains("status=CANCELLED", executed.Stdout);
+                Assert.True(login.IsSecretFree(executed.Stdout + executed.Stderr));
+
+                await s.Observer.ExecuteAsync("ALTER ROLE db_datareader ADD MEMBER [" + login.Name + "]; ");
+                var deniedOperation = WebOperationResolutionScenario.Operation(s);
+                Assert.Equal((int)OperatorExitCode.Denied,
+                    (await RunExecutable(executable, DryRunArguments(s, deniedOperation, Guid.NewGuid()),
+                        login.ConnectionString(s.Database.DatabaseName), login.Name)).ExitCode);
+                await s.Observer.ExecuteAsync("ALTER ROLE db_datareader DROP MEMBER [" + login.Name + "]; ");
+            }
+            catch (Exception error) { failure = error; throw; }
+            finally
+            {
+                try { await login.CleanupAsync(); }
+                catch (Exception cleanup) when (failure != null) { throw new AggregateException(failure, cleanup); }
+            }
+        });
+
     public static IEnumerable<object[]> InvalidArguments()
     {
         yield return new object[] { new[] { "record-not-executed" } };
@@ -300,7 +401,8 @@ CREATE USER Web6DecisionDenied WITHOUT LOGIN;");
         return options!;
     }
 
-    private static string[] DryRunArguments(WebOperationJournalTests.Scenario s, WebOperationContext operation, string? database = null)
+    private static string[] DryRunArguments(WebOperationJournalTests.Scenario s, WebOperationContext operation,
+        Guid? decision = null, string? database = null)
     {
         var args = DryRun();
         args = Replace(args, "--database", database ?? s.Database.DatabaseName);
@@ -309,13 +411,15 @@ CREATE USER Web6DecisionDenied WITHOUT LOGIN;");
         args = Replace(args, "--operation", operation.OperationId.ToString("D"));
         args = Replace(args, "--kind", ((byte)operation.Kind).ToString());
         args = Replace(args, "--target", operation.RequestTargetId?.ToString() ?? "NONE");
-        return Replace(args, "--fingerprint", Hex(operation.Fingerprint));
+        args = Replace(args, "--fingerprint", Hex(operation.Fingerprint));
+        return Replace(args, "--decision", (decision ?? Guid.Parse(Decision)).ToString("D"));
     }
 
-    private static string[] ExecuteArguments(WebOperationJournalTests.Scenario s, WebOperationContext operation)
+    private static string[] ExecuteArguments(WebOperationJournalTests.Scenario s, WebOperationContext operation, Guid? decision = null)
     {
-        var dry = Parse(DryRunArguments(s, operation));
-        return Append(DryRunArguments(s, operation).WithReplaced("--dry-run", "--execute"), "--confirm", dry.ConfirmationText);
+        var dryArgs = DryRunArguments(s, operation, decision);
+        var dry = Parse(dryArgs);
+        return Append(dryArgs.WithReplaced("--dry-run", "--execute"), "--confirm", dry.ConfirmationText);
     }
 
     private static string Hex(byte[] bytes) => BitConverter.ToString(bytes).Replace("-", string.Empty).ToLowerInvariant();
@@ -332,6 +436,36 @@ CREATE USER Web6DecisionDenied WITHOUT LOGIN;");
         }) values.Add(await sql.QuerySingleAsync<string>("SELECT COALESCE((SELECT * FROM dbo." + source + " FOR JSON PATH,INCLUDE_NULL_VALUES),N'[]');"));
         return string.Join("|", values);
     }
+
+    private static async Task HoldFence(WebOperationJournalTests.Context holder, int actor, Guid operation, CancellationToken token)
+    {
+        var resource = "MyDmsVn.WebOperation:" + actor + ":" + operation.ToString("N");
+        Assert.True(await holder.Sql.QuerySingleAsync<int>(new SqlTestCommand(
+            "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=@resource,@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=0; SELECT @r;",
+            new { resource }, transaction: holder.Tx, cancellationToken: token)) >= 0);
+    }
+
+    private static async Task<DecisionExecutableResult> RunExecutable(string executable, string[] arguments,
+        string connectionString, string identity)
+    {
+        var start = new ProcessStartInfo(executable, string.Join(" ", Array.ConvertAll(arguments, Quote)))
+        {
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
+        };
+        start.EnvironmentVariables[OperatorInspectApplication.ConnectionStringEnvironmentVariable] = connectionString;
+        start.EnvironmentVariables[OperatorInspectApplication.DatabaseUserEnvironmentVariable] = identity;
+        start.EnvironmentVariables[OperatorInspectApplication.LoginEnvironmentVariable] = identity;
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Operator process did not start.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(30000))
+        {
+            process.Kill(); process.WaitForExit(); throw new TimeoutException("Operator process did not exit.");
+        }
+        return new DecisionExecutableResult(process.ExitCode, await stdout, await stderr);
+    }
+
+    private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
 
     private static string[] WithKindAndTarget(string[] source, string kind, string target) =>
         Replace(Replace(source, "--kind", kind), "--target", target);
@@ -410,6 +544,59 @@ CREATE USER Web6DecisionDenied WITHOUT LOGIN;");
             command.CommandText = "EXECUTE AS USER=N'" + _databaseUser + "';";
             await command.ExecuteNonQueryAsync(cancellationToken);
             return connection;
+        }
+    }
+
+    private sealed class DecisionExecutableResult
+    {
+        public DecisionExecutableResult(int exitCode, string stdout, string stderr) { ExitCode = exitCode; Stdout = stdout; Stderr = stderr; }
+        public int ExitCode { get; }
+        public string Stdout { get; }
+        public string Stderr { get; }
+    }
+
+    private sealed class DecisionOwnedLogin
+    {
+        private readonly string _admin;
+        private readonly byte[] _sid = Guid.NewGuid().ToByteArray();
+        private readonly string _password = "Web6!" + Guid.NewGuid().ToString("N");
+        private string? _serverIdentity;
+        private bool _creationAttempted;
+        public DecisionOwnedLogin(string admin) { _admin = admin; }
+        public string Name { get; } = "WEB6_Decision_" + Guid.NewGuid().ToString("N");
+        public string ConnectionString(string database) => new SqlConnectionStringBuilder(_admin)
+        {
+            InitialCatalog = database, IntegratedSecurity = false, Authentication = SqlAuthenticationMethod.NotSpecified,
+            UserID = Name, Password = _password, Pooling = false
+        }.ConnectionString;
+        public bool IsSecretFree(string output) => output.IndexOf(_password, StringComparison.Ordinal) < 0;
+        public async Task CreateAsync()
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var connection = new SqlConnection(_admin); await connection.OpenAsync(timeout.Token);
+            using var command = connection.CreateCommand(); command.CommandTimeout = 30;
+            command.CommandText = "SELECT CONVERT(nvarchar(256),SERVERPROPERTY(N'ServerName'));";
+            _serverIdentity = (string)await command.ExecuteScalarAsync(timeout.Token);
+            if (string.IsNullOrWhiteSpace(_serverIdentity)) throw new InvalidOperationException("Test login instance identity is missing.");
+            command.CommandText = "CREATE LOGIN [" + Name + "] WITH PASSWORD=N'" + _password + "', SID=0x" +
+                BitConverter.ToString(_sid).Replace("-", string.Empty) + ", CHECK_POLICY=OFF;";
+            _creationAttempted = true; await command.ExecuteNonQueryAsync(timeout.Token);
+        }
+        public async Task CleanupAsync()
+        {
+            if (!_creationAttempted) return;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var connection = new SqlConnection(_admin); await connection.OpenAsync(timeout.Token);
+            using var command = connection.CreateCommand(); command.CommandTimeout = 30;
+            command.CommandText = "SELECT CONVERT(nvarchar(256),SERVERPROPERTY(N'ServerName'));";
+            if (!string.Equals(_serverIdentity, (string)await command.ExecuteScalarAsync(timeout.Token), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Test login instance changed; retain the exact owned login.");
+            command.Parameters.AddWithValue("@name", Name); command.Parameters.AddWithValue("@sid", _sid);
+            command.CommandText = "IF EXISTS(SELECT 1 FROM sys.server_principals WHERE name=@name) BEGIN " +
+                "IF NOT EXISTS(SELECT 1 FROM sys.server_principals WHERE name=@name AND sid=@sid AND type='S') THROW 51998,'Test login identity changed.',1; " +
+                "IF EXISTS(SELECT 1 FROM sys.dm_exec_sessions WHERE original_security_id=@sid OR security_id=@sid) THROW 51998,'Owned login sessions have not drained.',1; " +
+                "DROP LOGIN [" + Name + "]; END;";
+            await command.ExecuteNonQueryAsync(timeout.Token);
         }
     }
 }
