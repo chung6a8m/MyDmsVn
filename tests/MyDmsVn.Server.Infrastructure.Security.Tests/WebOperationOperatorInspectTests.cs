@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -94,7 +95,8 @@ public sealed class WebOperationOperatorInspectTests
         var exit = await OperatorInspectApplication.RunAsync(Valid(), _ => new FakeClient(result), stdout, stderr, CancellationToken.None);
         Assert.Equal(expectedExit, exit);
         Assert.Contains("status=" + disposition, stdout.ToString());
-        Assert.Contains("environment=owned-test", stdout.ToString());
+        Assert.Contains("environmentLabel=owned-test", stdout.ToString());
+        Assert.Contains("environmentLabelSource=operator-supplied", stdout.ToString());
         Assert.Contains("database=MyDmsVn_Test_Operator", stdout.ToString());
         Assert.DoesNotContain(Fingerprint, stdout.ToString(), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("private-payload", stdout.ToString(), StringComparison.OrdinalIgnoreCase);
@@ -118,7 +120,7 @@ public sealed class WebOperationOperatorInspectTests
     }
 
     [Fact]
-    public async Task Unexpected_environment_failure_does_not_echo_exception_or_secrets()
+    public async Task Failed_rollback_or_disposal_is_an_environment_failure_without_secret_output()
     {
         var stderr = new StringWriter();
         var exit = await OperatorInspectApplication.RunAsync(Valid(),
@@ -143,6 +145,26 @@ public sealed class WebOperationOperatorInspectTests
             new StringWriter(), new StringWriter(), CancellationToken.None);
         Assert.Equal((int)OperatorExitCode.Timeout, timeoutExit);
     }
+
+    [Fact]
+    public async Task Explicit_timeout_exception_is_reported_as_timeout()
+    {
+        var exit = await OperatorInspectApplication.RunAsync(Valid(),
+            _ => new FakeClient(new TimeoutException("private SQL timeout")),
+            new StringWriter(), new StringWriter(), CancellationToken.None);
+        Assert.Equal((int)OperatorExitCode.Timeout, exit);
+    }
+
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
+    public Task Actual_SQL_command_timeout_minus_two_maps_to_timeout_without_DML() => WebOperationResolutionScenario.Owned(async s =>
+    {
+        var operation = s.Operation(hash: Enumerable.Repeat((byte)9, 32).ToArray());
+        var before = await SqlSnapshot(s.Observer);
+        var exit = await OperatorInspectApplication.RunAsync(Arguments(s, operation, timeoutSeconds: 5),
+            _ => new RawSqlTimeoutClient(s.Database.ConnectionString), new StringWriter(), new StringWriter(), s.Stop.Token);
+        Assert.Equal((int)OperatorExitCode.Timeout, exit);
+        Assert.Equal(before, await SqlSnapshot(s.Observer));
+    });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Restricted_operator_inspects_all_states_without_changing_SQL() => WebOperationResolutionScenario.Owned(async s =>
@@ -192,7 +214,7 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
         var before = await SqlSnapshot(s.Observer);
 
         Assert.Equal((int)OperatorExitCode.EnvironmentFailure, await RunSql(Arguments(s, operation, database: "AnotherOwnedDatabase"),
-            new OperatorSqlConnectionFactory(s.Database.ConnectionString)));
+            new OperatorSqlConnectionFactory(s.Database.ConnectionString, "unused", "unused")));
         Assert.Equal((int)OperatorExitCode.Denied, await RunSql(Arguments(s, operation),
             new ImpersonatingConnectionFactory(s.Database.ConnectionString, "Web6CliRuntime")));
         Assert.Equal((int)OperatorExitCode.Denied, await RunSql(Arguments(s, operation, epoch: Guid.NewGuid()),
@@ -201,6 +223,19 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
             new ImpersonatingConnectionFactory(s.Database.ConnectionString, "Web6CliOperator")));
         Assert.Equal((int)OperatorExitCode.Indeterminate, await RunSql(Arguments(s, operation, actor: s.Actor + 100),
             new ImpersonatingConnectionFactory(s.Database.ConnectionString, "Web6CliOperator")));
+        Assert.Equal(before, await SqlSnapshot(s.Observer));
+    });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Matching_but_elevated_SQL_principal_is_denied_before_inspection() => WebOperationResolutionScenario.Owned(async s =>
+    {
+        var user = await s.Observer.QuerySingleAsync<string>("SELECT USER_NAME();");
+        var login = await s.Observer.QuerySingleAsync<string>("SELECT ORIGINAL_LOGIN();");
+        var operation = s.Operation(hash: Enumerable.Repeat((byte)7, 32).ToArray());
+        var before = await SqlSnapshot(s.Observer);
+        var exit = await RunSql(Arguments(s, operation),
+            new OperatorSqlConnectionFactory(s.Database.ConnectionString, user, login));
+        Assert.Equal((int)OperatorExitCode.Denied, exit);
         Assert.Equal(before, await SqlSnapshot(s.Observer));
     });
 
@@ -229,11 +264,64 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
         var connection = "Data Source=127.0.0.1,1;Initial Catalog=MyDmsVn_Test_Operator;Integrated Security=True;Encrypt=False;Pooling=False;Connect Timeout=1";
         var stdout = new StringWriter(); var stderr = new StringWriter();
         var exit = await OperatorInspectApplication.RunAsync(args,
-            _ => new SqlOperatorInspectionClient(new OperatorSqlConnectionFactory(connection)), stdout, stderr, CancellationToken.None);
+            _ => new SqlOperatorInspectionClient(new OperatorSqlConnectionFactory(connection, "Web6CliOperator", "Web6CliOperator")), stdout, stderr, CancellationToken.None);
         Assert.Equal((int)OperatorExitCode.EnvironmentFailure, exit);
         Assert.Equal(string.Empty, stdout.ToString());
         Assert.DoesNotContain("Data Source", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
     }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Release_executable_uses_a_real_restricted_login_and_never_changes_SQL() => WebOperationResolutionScenario.Owned(async s =>
+    {
+        var executable = Path.Combine(AppContext.BaseDirectory, "MyDmsVn.WebOperation.Operator.exe");
+        Assert.True(File.Exists(executable), "The referenced Release CLI executable must be present in the test output.");
+        var login = new OwnedOperatorLogin(s.Database.ConnectionString);
+        Exception? failure = null;
+        try
+        {
+            await login.CreateAsync();
+            await s.Observer.ExecuteAsync("CREATE USER [" + login.Name + "] FOR LOGIN [" + login.Name + "]; " +
+                "ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER [" + login.Name + "]; ");
+            var operation = s.Operation(hash: Enumerable.Repeat((byte)8, 32).ToArray());
+            await s.Observer.ExecuteAsync("DECLARE @n datetime2(7)=SYSUTCDATETIME(); INSERT dbo.WebOperationJournal VALUES(@actor,@id,@epoch,1,1,1,NULL,@hash,41,'COMMITTED',@bytes,@n,@n,DATEADD(day,7,@n));",
+                new { actor = s.Actor, id = operation.OperationId, epoch = s.Epoch, hash = operation.Fingerprint,
+                    bytes = Encoding.UTF8.GetBytes("{\"data\":{\"secret\":\"private-payload\"}}") });
+            var before = await SqlSnapshot(s.Observer);
+            var arguments = Arguments(s, operation, timeoutSeconds: 5);
+
+            var allowed = await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name);
+            Assert.Equal((int)OperatorExitCode.Completed, allowed.ExitCode);
+            Assert.Contains("status=COMMITTED", allowed.Stdout);
+            Assert.Contains("environmentLabelSource=operator-supplied", allowed.Stdout);
+            Assert.True(login.IsSecretFree(allowed.Stdout + allowed.Stderr));
+            Assert.DoesNotContain("private-payload", allowed.Stdout + allowed.Stderr, StringComparison.OrdinalIgnoreCase);
+
+            await s.Observer.ExecuteAsync("ALTER ROLE MyDmsVnWebOperationOperatorRole DROP MEMBER [" + login.Name + "]; ");
+            Assert.Equal((int)OperatorExitCode.Denied,
+                (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
+
+            await s.Observer.ExecuteAsync("ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER [" + login.Name + "]; " +
+                "ALTER ROLE db_datareader ADD MEMBER [" + login.Name + "]; ");
+            Assert.Equal((int)OperatorExitCode.Denied,
+                (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
+            await s.Observer.ExecuteAsync("ALTER ROLE db_datareader DROP MEMBER [" + login.Name + "]; " +
+                "ALTER ROLE db_owner ADD MEMBER [" + login.Name + "]; ");
+            Assert.Equal((int)OperatorExitCode.Denied,
+                (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
+            await s.Observer.ExecuteAsync("ALTER ROLE db_owner DROP MEMBER [" + login.Name + "]; ");
+
+            Assert.Equal((int)OperatorExitCode.EnvironmentFailure,
+                (await RunExecutable(executable, Replace(arguments, "--database", "AnotherOwnedDatabase"),
+                    login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
+            Assert.Equal(before, await SqlSnapshot(s.Observer));
+        }
+        catch (Exception error) { failure = error; throw; }
+        finally
+        {
+            try { await login.CleanupAsync(); }
+            catch (Exception cleanup) when (failure != null) { throw new AggregateException(failure, cleanup); }
+        }
+    });
 
     public static IEnumerable<object[]> InvalidArguments()
     {
@@ -248,6 +336,7 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
         yield return new object[] { Replace("--environment", "unsafe value") };
         yield return new object[] { Replace("--database", "master") };
         yield return new object[] { Replace("--timeout-seconds", "0") };
+        yield return new object[] { Replace("--timeout-seconds", "26") };
         yield return new object[] { Replace("--timeout-seconds", "61") };
         yield return new object[] { Append(Valid(), "--actor", "42") };
         yield return new object[] { Append(Valid(), "--unknown", "value") };
@@ -263,7 +352,12 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
 
     private static string[] Replace(string name, string value)
     {
-        var args = Valid();
+        return Replace(Valid(), name, value);
+    }
+
+    private static string[] Replace(string[] source, string name, string value)
+    {
+        var args = (string[])source.Clone();
         args[Array.IndexOf(args, name) + 1] = value;
         return args;
     }
@@ -317,6 +411,99 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
         return string.Join("|", values);
     }
 
+    private static async Task<ExecutableResult> RunExecutable(string executable, string[] arguments, string connectionString,
+        string expectedDatabaseUser, string expectedLogin)
+    {
+        var start = new ProcessStartInfo(executable, string.Join(" ", arguments.Select(Quote)))
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        start.EnvironmentVariables[OperatorInspectApplication.ConnectionStringEnvironmentVariable] = connectionString;
+        start.EnvironmentVariables[OperatorInspectApplication.DatabaseUserEnvironmentVariable] = expectedDatabaseUser;
+        start.EnvironmentVariables[OperatorInspectApplication.LoginEnvironmentVariable] = expectedLogin;
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Operator process did not start.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(15000))
+        {
+            process.Kill();
+            process.WaitForExit();
+            throw new TimeoutException("Operator process did not exit within the owned timeout.");
+        }
+        return new ExecutableResult(process.ExitCode, await stdout, await stderr);
+    }
+
+    private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
+
+    private sealed class ExecutableResult
+    {
+        public ExecutableResult(int exitCode, string stdout, string stderr)
+        {
+            ExitCode = exitCode; Stdout = stdout; Stderr = stderr;
+        }
+        public int ExitCode { get; }
+        public string Stdout { get; }
+        public string Stderr { get; }
+    }
+
+    private sealed class OwnedOperatorLogin
+    {
+        private readonly string _admin;
+        private readonly byte[] _sid = Guid.NewGuid().ToByteArray();
+        private readonly string _password = "Web6!" + Guid.NewGuid().ToString("N");
+        private string? _serverIdentity;
+        private bool _creationAttempted;
+        public OwnedOperatorLogin(string admin) { _admin = admin; }
+        public string Name { get; } = "WEB6_Cli_" + Guid.NewGuid().ToString("N");
+        public string ConnectionString(string database) => new SqlConnectionStringBuilder(_admin)
+        {
+            InitialCatalog = database,
+            IntegratedSecurity = false,
+            Authentication = SqlAuthenticationMethod.NotSpecified,
+            UserID = Name,
+            Password = _password,
+            Pooling = false,
+        }.ConnectionString;
+        public bool IsSecretFree(string output) => output.IndexOf(_password, StringComparison.Ordinal) < 0;
+        public async Task CreateAsync()
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var connection = new SqlConnection(_admin);
+            await connection.OpenAsync(timeout.Token);
+            using var command = connection.CreateCommand();
+            command.CommandTimeout = 30;
+            command.CommandText = "SELECT CONVERT(nvarchar(256),SERVERPROPERTY(N'ServerName'));";
+            _serverIdentity = (string)await command.ExecuteScalarAsync(timeout.Token);
+            if (string.IsNullOrWhiteSpace(_serverIdentity)) throw new InvalidOperationException("Test login instance identity is missing.");
+            command.CommandText = "CREATE LOGIN [" + Name + "] WITH PASSWORD=N'" + _password + "', SID=0x" +
+                BitConverter.ToString(_sid).Replace("-", string.Empty) + ", CHECK_POLICY=OFF;";
+            _creationAttempted = true;
+            await command.ExecuteNonQueryAsync(timeout.Token);
+        }
+        public async Task CleanupAsync()
+        {
+            if (!_creationAttempted) return;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var connection = new SqlConnection(_admin);
+            await connection.OpenAsync(timeout.Token);
+            using var command = connection.CreateCommand();
+            command.CommandTimeout = 30;
+            command.CommandText = "SELECT CONVERT(nvarchar(256),SERVERPROPERTY(N'ServerName'));";
+            if (!string.Equals(_serverIdentity, (string)await command.ExecuteScalarAsync(timeout.Token), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Test login instance changed; retain the exact owned login.");
+            command.Parameters.AddWithValue("@name", Name);
+            command.Parameters.AddWithValue("@sid", _sid);
+            command.CommandText = "IF EXISTS(SELECT 1 FROM sys.server_principals WHERE name=@name) BEGIN " +
+                "IF NOT EXISTS(SELECT 1 FROM sys.server_principals WHERE name=@name AND sid=@sid AND type='S') THROW 51998,'Test login identity changed.',1; " +
+                "IF EXISTS(SELECT 1 FROM sys.dm_exec_sessions WHERE original_security_id=@sid OR security_id=@sid) THROW 51998,'Owned login sessions have not drained.',1; " +
+                "DROP LOGIN [" + Name + "]; END;";
+            await command.ExecuteNonQueryAsync(timeout.Token);
+        }
+    }
+
     private sealed class ImpersonatingConnectionFactory : IOperatorSqlConnectionFactory
     {
         private readonly string _connectionString;
@@ -350,6 +537,22 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
             if (_waitForCancellation) await Task.Delay(Timeout.Infinite, cancellationToken);
             if (_error != null) throw _error;
             return _result!;
+        }
+    }
+
+    private sealed class RawSqlTimeoutClient : IOperatorInspectionClient
+    {
+        private readonly string _connectionString;
+        public RawSqlTimeoutClient(string connectionString) { _connectionString = connectionString; }
+        public async Task<WebOperationInspection> InspectAsync(InspectOptions options, CancellationToken cancellationToken)
+        {
+            using var connection = new SqlConnection(new SqlConnectionStringBuilder(_connectionString) { Pooling = false }.ConnectionString);
+            await connection.OpenAsync(cancellationToken);
+            using var command = connection.CreateCommand();
+            command.CommandTimeout = 1;
+            command.CommandText = "WAITFOR DELAY '00:00:03'; SELECT 1;";
+            await command.ExecuteScalarAsync(cancellationToken);
+            throw new InvalidOperationException("The deterministic SQL command timeout did not occur.");
         }
     }
 }

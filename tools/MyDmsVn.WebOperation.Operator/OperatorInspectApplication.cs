@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Operations;
 
 namespace MyDmsVn.WebOperation.Operator;
@@ -10,7 +11,9 @@ namespace MyDmsVn.WebOperation.Operator;
 public static class OperatorInspectApplication
 {
     public const string ConnectionStringEnvironmentVariable = "MYDMSVN_WEB_OPERATION_OPERATOR_CONNECTION_STRING";
-    public const string Usage = "Usage: inspect --environment <label> --database <name> --epoch <guid> --actor <id> --operation <guid-v4> --fingerprint <sha256> [--timeout-seconds <1..60>]";
+    public const string DatabaseUserEnvironmentVariable = "MYDMSVN_WEB_OPERATION_OPERATOR_DATABASE_USER";
+    public const string LoginEnvironmentVariable = "MYDMSVN_WEB_OPERATION_OPERATOR_LOGIN";
+    public const string Usage = "Usage: inspect --environment <label> --database <name> --epoch <guid> --actor <id> --operation <guid-v4> --fingerprint <sha256> [--timeout-seconds <1..25>]";
 
     public static async Task<int> RunAsync(string[] args, Func<InspectOptions, IOperatorInspectionClient> clientFactory,
         TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken)
@@ -28,6 +31,7 @@ public static class OperatorInspectApplication
         {
             stdout.WriteLine(Usage);
             stdout.WriteLine("Connection source: " + ConnectionStringEnvironmentVariable + " (never printed). Inspect is read-only.");
+            stdout.WriteLine("Expected restricted identity: " + DatabaseUserEnvironmentVariable + " and " + LoginEnvironmentVariable + ".");
             return (int)OperatorExitCode.Completed;
         }
 
@@ -55,6 +59,16 @@ public static class OperatorInspectApplication
             stderr.WriteLine("Operator.Timeout: inspection did not complete within the bounded timeout; outcome is unknown.");
             return (int)OperatorExitCode.Timeout;
         }
+        catch (TimeoutException)
+        {
+            stderr.WriteLine("Operator.Timeout: inspection did not complete within the bounded timeout; outcome is unknown.");
+            return (int)OperatorExitCode.Timeout;
+        }
+        catch (SqlException exception) when (exception.Number == -2)
+        {
+            stderr.WriteLine("Operator.Timeout: inspection did not complete within the bounded timeout; outcome is unknown.");
+            return (int)OperatorExitCode.Timeout;
+        }
         catch (WebOperationException exception) when (exception.Code == "Auth.Forbidden" ||
             exception.Code == "Deployment.EpochMismatch" || exception.Code == "Idempotency.FingerprintMismatch")
         {
@@ -71,7 +85,8 @@ public static class OperatorInspectApplication
     private static void WriteInspection(TextWriter output, InspectOptions options, WebOperationInspection inspection)
     {
         output.WriteLine("status=" + inspection.Disposition);
-        output.WriteLine("environment=" + options.EnvironmentName);
+        output.WriteLine("environmentLabel=" + options.EnvironmentName);
+        output.WriteLine("environmentLabelSource=operator-supplied");
         output.WriteLine("database=" + options.DatabaseName);
         output.WriteLine("epoch=" + inspection.DeploymentEpoch.ToString("D"));
         output.WriteLine("actor=" + inspection.ActorUserId.ToString(CultureInfo.InvariantCulture));

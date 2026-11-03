@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -84,9 +84,9 @@ public sealed class InspectOptions
             return Fail("Operator.InvalidArguments: invalid SHA-256 fingerprint.", out options, out error);
         var timeout = 15;
         if (values.TryGetValue("--timeout-seconds", out var timeoutText) &&
-            (!int.TryParse(timeoutText, NumberStyles.None, CultureInfo.InvariantCulture, out timeout) || timeout < 1 || timeout > 60 ||
+            (!int.TryParse(timeoutText, NumberStyles.None, CultureInfo.InvariantCulture, out timeout) || timeout < 1 || timeout > 25 ||
              timeout.ToString(CultureInfo.InvariantCulture) != timeoutText))
-            return Fail("Operator.InvalidArguments: timeout must be 1 through 60 seconds.", out options, out error);
+            return Fail("Operator.InvalidArguments: timeout must be 1 through 25 seconds.", out options, out error);
 
         options = new InspectOptions(false, values["--environment"], values["--database"], epoch, actor, operation,
             values["--fingerprint"].ToLowerInvariant(), timeout);

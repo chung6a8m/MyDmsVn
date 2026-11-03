@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 
 namespace MyDmsVn.WebOperation.Operator;
@@ -18,7 +18,9 @@ internal static class Program
         {
             return OperatorInspectApplication.RunAsync(args,
                 _ => new SqlOperatorInspectionClient(new OperatorSqlConnectionFactory(
-                    Environment.GetEnvironmentVariable(OperatorInspectApplication.ConnectionStringEnvironmentVariable))),
+                    Environment.GetEnvironmentVariable(OperatorInspectApplication.ConnectionStringEnvironmentVariable),
+                    Environment.GetEnvironmentVariable(OperatorInspectApplication.DatabaseUserEnvironmentVariable),
+                    Environment.GetEnvironmentVariable(OperatorInspectApplication.LoginEnvironmentVariable))),
                 Console.Out, Console.Error, stop.Token).GetAwaiter().GetResult();
         }
         finally
