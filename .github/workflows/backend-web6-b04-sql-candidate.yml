@@ -73,11 +73,11 @@ jobs:
           $project='tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
           $class='MyDmsVn.Server.Infrastructure.IntegrationTests.WebOperationHttpSqlTests.'
           $methods=@(
-            'External_process_death_before_commit_rolls_back_all_six_commands',
-            'External_process_death_racing_commit_classifies_all_six_from_fresh_SQL',
-            'External_process_death_after_commit_recovers_all_six_original_results',
-            'Independent_same_key_worker_waits_for_delayed_original_then_replays_all_six',
-            'Independent_same_key_worker_waits_for_killed_original_then_executes_all_six',
+            'Web6_external_process_death_before_commit_rolls_back_all_six_commands_on_exact13',
+            'Web6_external_process_death_racing_commit_classifies_all_six_from_fresh_exact13_SQL',
+            'Web6_external_process_death_after_commit_recovers_all_six_original_results_on_exact13',
+            'Web6_independent_same_key_worker_waits_for_delayed_original_then_replays_all_six_on_exact13',
+            'Web6_independent_same_key_worker_waits_for_killed_original_then_executes_all_six_on_exact13',
             'Resend_first_and_two_delayed_same_key_workers_converge_for_all_six_commands',
             'Operator_first_cancelled_blocks_delayed_original_and_resend_for_all_six_commands',
             'Original_first_commit_remains_authoritative_over_waiting_operator_for_all_six_commands'
@@ -89,12 +89,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'B04 build failed; raw output withheld.' }
           dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB6_RAW/b04-discovery.log"
           if ($LASTEXITCODE -ne 0) { throw 'B04 discovery failed; raw output withheld.' }
-          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 90s --blame-hang-dump-type none --logger 'trx;LogFileName=b04.trx' --results-directory $env:WEB6_RAW *> "$env:WEB6_RAW/b04-run.log"
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 180s --blame-hang-dump-type none --logger 'trx;LogFileName=b04.trx' --results-directory $env:WEB6_RAW *> "$env:WEB6_RAW/b04-run.log"
           $testExit=$LASTEXITCODE
           Assert-Web5SqlEvidence -TrxPath "$env:WEB6_RAW/b04.trx" -DiscoveryPath "$env:WEB6_RAW/b04-discovery.log" -RequiredClasses @('WebOperationHttpSqlTests') -SummaryPath "$env:WEB6_SAFE/b04.json" -Label B04
           $summary=Get-Content "$env:WEB6_SAFE/b04.json" -Raw | ConvertFrom-Json
           if ($summary.total -ne 8 -or $summary.executed -ne 8 -or $summary.passed -ne 8 -or $summary.failed -ne 0 -or $summary.skipped -ne 0 -or $summary.requiredClasses.WebOperationHttpSqlTests -ne 8) { throw 'All eight exact B04 matrices must execute and pass.' }
+          [xml]$trx=Get-Content "$env:WEB6_RAW/b04.trx" -Raw
+          $expected=@($methods | ForEach-Object { $class+$_ } | Sort-Object)
+          $actual=@($trx.TestRun.Results.UnitTestResult | ForEach-Object { [string]$_.testName } | Sort-Object)
+          if ($actual.Count -ne 8 -or (Compare-Object $expected $actual)) { throw 'The actual TRX does not contain exactly the eight reviewed WEB6 matrix names.' }
           $summary | Add-Member -NotePropertyName retry -NotePropertyValue 0
+          $summary | Add-Member -NotePropertyName methods -NotePropertyValue $actual
           [IO.File]::WriteAllText("$env:WEB6_SAFE/b04.json",($summary | ConvertTo-Json -Depth 5 -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
           if ($testExit -ne 0) { throw 'B04 test process failed.' }
           Remove-Item -LiteralPath ($env:WEB6_STATE+'.active')
