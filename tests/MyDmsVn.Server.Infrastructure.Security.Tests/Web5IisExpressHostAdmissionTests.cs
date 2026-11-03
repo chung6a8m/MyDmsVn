@@ -61,6 +61,27 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
     }
 
     [Fact]
+    public void Fixture_handle_start_identity_must_match_WMI_observation()
+    {
+        using var fixture = new IdentityFixture();
+        var observation = fixture.Observation();
+        Web5IisExpressHostAdmission.ValidateOwnedHandleIdentity(18404, observation.StartTimeUtc, observation);
+        Assert.Throws<InvalidDataException>(() => Web5IisExpressHostAdmission.ValidateOwnedHandleIdentity(
+            18404, observation.StartTimeUtc.AddTicks(10), observation));
+        Assert.Throws<InvalidDataException>(() => Web5IisExpressHostAdmission.ValidateOwnedHandleIdentity(
+            19000, observation.StartTimeUtc, observation));
+    }
+
+    [Fact]
+    public void Capture_process_overload_rejects_a_live_non_IIS_process_handle()
+    {
+        using var fixture = new IdentityFixture();
+        using var current = Process.GetCurrentProcess();
+        Assert.Throws<InvalidDataException>(() => Web5IisExpressHostAdmission.Capture(
+            current, fixture.ConfigurationPath, "Web5Owned", new Uri("https://localhost:44321/")));
+    }
+
+    [Fact]
     public void Changed_config_is_rejected_after_capture()
     {
         using var fixture = new IdentityFixture();
@@ -96,6 +117,26 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
         Assert.Null(request.Proxy);
         Assert.False(request.AllowAutoRedirect);
         Assert.Equal(10000, request.Timeout);
+    }
+
+    [Fact]
+    public void Exact_direct_HTTP_rejection_probe_disables_proxy_and_redirects()
+    {
+        var request = Web5IisExpressHostAdmission.CreateDirectHttpRejectionRequest(
+            new Uri("http://localhost:18081/api/v1/health"));
+        Assert.Null(request.Proxy);
+        Assert.False(request.AllowAutoRedirect);
+    }
+
+    [Theory]
+    [InlineData("http://localhost:18082/api/v1/health")]
+    [InlineData("http://localhost:18081/other")]
+    [InlineData("http://outside.invalid:18081/api/v1/health")]
+    [InlineData("https://localhost:18081/api/v1/health")]
+    public void Direct_HTTP_rejection_probe_refuses_any_other_target(string value)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            Web5IisExpressHostAdmission.CreateDirectHttpRejectionRequest(new Uri(value)));
     }
 
     [Fact]

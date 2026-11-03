@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -6,6 +7,8 @@ using System.Linq;
 using System.Management;
 using System.Net;
 using System.Security.Cryptography;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -60,8 +63,25 @@ internal static class Web5IisExpressHostAdmission
     internal static Web5IisExpressIdentity Capture(Process process, string configurationPath, string siteName, Uri origin)
     {
         if (process == null) throw new ArgumentNullException(nameof(process));
+        process.Refresh();
         if (process.HasExited) throw new InvalidDataException("Owned IIS Express process has exited.");
-        return Capture(Observe(process.Id), configurationPath, siteName, origin);
+        var ownedProcessId = process.Id;
+        var ownedStartTimeUtc = process.StartTime.ToUniversalTime();
+        var observation = Observe(ownedProcessId);
+        process.Refresh();
+        if (process.HasExited || process.Id != ownedProcessId || process.StartTime.ToUniversalTime() != ownedStartTimeUtc)
+            throw new InvalidDataException("Owned IIS Express process handle changed during capture.");
+        ValidateOwnedHandleIdentity(ownedProcessId, ownedStartTimeUtc, observation);
+        return Capture(observation, configurationPath, siteName, origin);
+    }
+
+    internal static void ValidateOwnedHandleIdentity(int ownedProcessId, DateTime ownedStartTimeUtc,
+        Web5IisExpressProcessObservation observation)
+    {
+        if (observation == null || ownedProcessId <= 0 || ownedStartTimeUtc.Kind != DateTimeKind.Utc ||
+            observation.ProcessId != ownedProcessId ||
+            Math.Abs((observation.StartTimeUtc - ownedStartTimeUtc).Ticks) > 9)
+            throw new InvalidDataException("Fixture process handle and WMI identity do not match.");
     }
 
     internal static Web5IisExpressIdentity Capture(Web5IisExpressProcessObservation process,
@@ -105,6 +125,40 @@ internal static class Web5IisExpressHostAdmission
         ValidateAbsent(identity, observation, snapshot);
     }
 
+    internal static async Task WaitForAdmissionAsync(Web5IisExpressIdentity identity, Process process,
+        TimeSpan budget, CancellationToken token)
+    {
+        if (identity == null) throw new ArgumentNullException(nameof(identity));
+        if (process == null) throw new ArgumentNullException(nameof(process));
+        if (budget <= TimeSpan.Zero || budget > TimeSpan.FromMinutes(1)) throw new ArgumentOutOfRangeException(nameof(budget));
+        var deadline = DateTime.UtcNow + budget;
+        Exception? last = null;
+        while (DateTime.UtcNow < deadline && !process.HasExited)
+        {
+            token.ThrowIfCancellationRequested();
+            try { await VerifyAsync(identity, token); return; }
+            catch (InvalidDataException error) { last = error; }
+            await Task.Delay(200, token);
+        }
+        throw new TimeoutException("Owned IIS Express queue was not admitted within the bounded startup window.", last);
+    }
+
+    internal static async Task WaitForAbsenceAsync(Web5IisExpressIdentity identity, TimeSpan budget, CancellationToken token)
+    {
+        if (identity == null) throw new ArgumentNullException(nameof(identity));
+        if (budget <= TimeSpan.Zero || budget > TimeSpan.FromMinutes(1)) throw new ArgumentOutOfRangeException(nameof(budget));
+        var deadline = DateTime.UtcNow + budget;
+        Exception? last = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            token.ThrowIfCancellationRequested();
+            try { await VerifyAbsentAsync(identity, token); return; }
+            catch (InvalidDataException error) { last = error; }
+            await Task.Delay(200, token);
+        }
+        throw new TimeoutException("Owned IIS Express process or queue absence was not proven.", last);
+    }
+
     internal static Web5HttpRequestQueue ValidateEvidence(Web5IisExpressIdentity identity,
         Web5IisExpressProcessObservation observation, string serviceState)
     {
@@ -129,6 +183,20 @@ internal static class Web5IisExpressHostAdmission
     {
         if (uri == null || !uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps)
             throw new ArgumentException("Direct IIS Express request must use HTTPS.", nameof(uri));
+        return ConfigureDirectRequest(uri);
+    }
+
+    internal static HttpWebRequest CreateDirectHttpRejectionRequest(Uri uri)
+    {
+        if (uri == null || !uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttp ||
+            !string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase) || uri.Port != 18081 ||
+            uri.AbsolutePath != "/api/v1/health" || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+            throw new ArgumentException("Direct HTTP rejection probe target is invalid.", nameof(uri));
+        return ConfigureDirectRequest(uri);
+    }
+
+    private static HttpWebRequest ConfigureDirectRequest(Uri uri)
+    {
         var request = (HttpWebRequest)WebRequest.Create(uri);
         request.Proxy = null;
         request.AllowAutoRedirect = false;
@@ -222,15 +290,15 @@ internal static class Web5OwnedIisExpressAdmissionFixture
             .Any(endpoint => endpoint.Port == 44321))
             throw new InvalidOperationException("Owned IIS Express admission port is already in use.");
 
-        var parent = Path.Combine(Path.GetTempPath(), "mydmsvn-web5-owned-host");
-        Directory.CreateDirectory(parent);
-        var runDirectory = Path.Combine(parent, Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(runDirectory);
+        var runDirectory = CreatePrivateRunDirectory();
         var siteDirectory = Path.Combine(runDirectory, "site");
-        Directory.CreateDirectory(siteDirectory);
+        CreatePrivateDirectory(siteDirectory);
         var nonce = Guid.NewGuid().ToString("N");
+        var releasePath = Path.Combine(runDirectory, "release.signal");
         File.WriteAllText(Path.Combine(siteDirectory, "probe.aspx"),
-            "<%@ Page Language=\"C#\" %><% System.Threading.Thread.Sleep(5000); Response.ContentType=\"text/plain\"; Response.Write(\"" + nonce + "\"); %>");
+            "<%@ Page Language=\"C#\" %><% var deadline=System.DateTime.UtcNow.AddSeconds(15); while(!System.IO.File.Exists(@\"" +
+            releasePath.Replace("\"", "\"\"") + "\") && System.DateTime.UtcNow<deadline) System.Threading.Thread.Sleep(25); " +
+            "Response.ContentType=\"text/plain\"; Response.Write(\"" + nonce + "\"); %>");
         var configuration = CreateConfiguration(runDirectory, siteDirectory);
         Process? process = null;
         Web5IisExpressIdentity? identity = null;
@@ -256,7 +324,7 @@ internal static class Web5OwnedIisExpressAdmissionFixture
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             identity = Web5IisExpressHostAdmission.Capture(process, configuration, SiteName, Origin);
-            await WaitForAdmission(identity, process, TimeSpan.FromSeconds(20));
+            await Web5IisExpressHostAdmission.WaitForAdmissionAsync(identity, process, TimeSpan.FromSeconds(20), CancellationToken.None);
             await Web5IisExpressHostAdmission.VerifyAsync(identity, CancellationToken.None);
 
             var request = Web5IisExpressHostAdmission.CreateDirectRequest(new Uri(Origin, "probe.aspx"));
@@ -268,6 +336,8 @@ internal static class Web5OwnedIisExpressAdmissionFixture
             await Task.Delay(250);
             if (responseTask.IsCompleted) throw new InvalidDataException("Direct probe completed before in-flight ownership verification.");
             await Web5IisExpressHostAdmission.VerifyAsync(identity, timeout.Token);
+            if (responseTask.IsCompleted) throw new InvalidDataException("Direct probe did not remain in flight through ownership verification.");
+            File.WriteAllText(releasePath, "release");
             using (var response = (HttpWebResponse)await responseTask)
             using (var reader = new StreamReader(response.GetResponseStream()))
             {
@@ -295,42 +365,62 @@ internal static class Web5OwnedIisExpressAdmissionFixture
                 }
                 if (identity != null)
                 {
-                    await WaitForAbsence(identity, TimeSpan.FromSeconds(20));
+                    await Web5IisExpressHostAdmission.WaitForAbsenceAsync(identity, TimeSpan.FromSeconds(20), CancellationToken.None);
                     absenceProven = true;
                 }
                 process.Dispose();
             }
             if (absenceProven || process == null)
-                Directory.Delete(runDirectory, true);
+                DeleteOwnedRunDirectory(runDirectory);
             else
                 Console.WriteLine("WEB5_OWNED_HOST_QUARANTINED");
         }
     }
 
-    private static async Task WaitForAdmission(Web5IisExpressIdentity identity, Process process, TimeSpan budget)
+    private static string CreatePrivateRunDirectory()
     {
-        var deadline = DateTime.UtcNow + budget;
-        Exception? last = null;
-        while (DateTime.UtcNow < deadline && !process.HasExited)
-        {
-            try { await Web5IisExpressHostAdmission.VerifyAsync(identity, CancellationToken.None); return; }
-            catch (InvalidDataException error) { last = error; }
-            await Task.Delay(200);
-        }
-        throw new TimeoutException("Owned IIS Express queue was not admitted within the bounded startup window.", last);
+        var path = Path.Combine(Path.GetTempPath(), "mydmsvn-web5-owned-host-" + Guid.NewGuid().ToString("N"));
+        CreatePrivateDirectory(path);
+        return path;
     }
 
-    private static async Task WaitForAbsence(Web5IisExpressIdentity identity, TimeSpan budget)
+    private static void CreatePrivateDirectory(string path)
     {
-        var deadline = DateTime.UtcNow + budget;
-        Exception? last = null;
-        while (DateTime.UtcNow < deadline)
+        using var user = WindowsIdentity.GetCurrent();
+        var acl = new DirectorySecurity();
+        acl.SetAccessRuleProtection(true, false);
+        acl.SetOwner(user.User!);
+        acl.AddAccessRule(new FileSystemAccessRule(user.User!, FileSystemRights.FullControl,
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+        Directory.CreateDirectory(path, acl);
+        Web5AttendedLease.VerifyPrivateDirectory(path, user.User!);
+    }
+
+    private static void DeleteOwnedRunDirectory(string runDirectory)
+    {
+        using var user = WindowsIdentity.GetCurrent();
+        Web5AttendedLease.VerifyPrivateDirectory(runDirectory, user.User!);
+        var siteDirectory = Path.Combine(runDirectory, "site");
+        Web5AttendedLease.VerifyPrivateDirectory(siteDirectory, user.User!);
+        var expectedRoot = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            try { await Web5IisExpressHostAdmission.VerifyAbsentAsync(identity, CancellationToken.None); return; }
-            catch (InvalidDataException error) { last = error; }
-            await Task.Delay(200);
-        }
-        throw new TimeoutException("Owned IIS Express process or queue absence was not proven.", last);
+            Path.Combine(runDirectory, "applicationhost.config"),
+            Path.Combine(runDirectory, "release.signal"),
+            siteDirectory,
+        };
+        var actualRoot = Directory.GetFileSystemEntries(runDirectory);
+        if (actualRoot.Any(path => !expectedRoot.Contains(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0))
+            throw new InvalidDataException("Owned IIS Express run directory contains an unexpected entry; retain it.");
+        var probe = Path.Combine(siteDirectory, "probe.aspx");
+        var actualSite = Directory.GetFileSystemEntries(siteDirectory);
+        if (actualSite.Length != 1 || !string.Equals(actualSite[0], probe, StringComparison.OrdinalIgnoreCase) ||
+            (File.GetAttributes(probe) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidDataException("Owned IIS Express site directory contains an unexpected entry; retain it.");
+        File.Delete(probe);
+        Directory.Delete(siteDirectory);
+        File.Delete(Path.Combine(runDirectory, "release.signal"));
+        File.Delete(Path.Combine(runDirectory, "applicationhost.config"));
+        Directory.Delete(runDirectory);
     }
 
     private static string CreateConfiguration(string runDirectory, string siteDirectory)

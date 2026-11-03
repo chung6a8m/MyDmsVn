@@ -89,6 +89,32 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
     }
 
     [Fact]
+    public void Target_URL_in_inactive_URL_group_is_rejected()
+    {
+        var queues = Web5HttpServiceState.Parse(Owned.Replace("        State: Active", "        State: Inactive"));
+        Assert.Throws<InvalidDataException>(() =>
+            Web5HttpServiceState.RequireOwnedQueue(queues, new Uri("https://localhost:44321/"), 18404));
+    }
+
+    [Fact]
+    public void Duplicate_matching_URL_groups_in_one_queue_are_rejected()
+    {
+        const string extraGroup = @"
+    URL group ID: FB00000B20000004
+        State: Active
+        Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
+        Properties:
+            Number of registered URLs: 1
+            Registered URLs:
+                HTTPS://LOCALHOST:44321/
+        Server session ID: FD00000B100001A0
+";
+        var queues = Web5HttpServiceState.Parse(Owned + extraGroup);
+        Assert.Throws<InvalidDataException>(() =>
+            Web5HttpServiceState.RequireOwnedQueue(queues, new Uri("https://localhost:44321/"), 18404));
+    }
+
+    [Fact]
     public void Foreign_HTTP_sys_wildcard_prefix_does_not_block_exact_owned_queue()
     {
         var foreign = Owned
@@ -156,5 +182,13 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
     {
         using var stop = new CancellationTokenSource(); stop.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Web5HttpServiceState.ReadAsync(TimeSpan.FromSeconds(1), stop.Token));
+    }
+
+    [Fact]
+    public async Task Bounded_reader_rejects_overflow_after_draining_without_retaining_excess_text()
+    {
+        Assert.Equal("exact", await Web5HttpServiceState.ReadBoundedAsync(new StringReader("exact"), 5));
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            Web5HttpServiceState.ReadBoundedAsync(new StringReader(new string('x', 1025)), 1024));
     }
 }

@@ -5,24 +5,40 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
+internal sealed class Web5HttpUrlGroup
+{
+    internal Web5HttpUrlGroup(bool active, string queueName, IReadOnlyList<string> registeredUrls)
+    {
+        Active = active;
+        QueueName = queueName;
+        RegisteredUrls = registeredUrls;
+    }
+    internal bool Active { get; }
+    internal string QueueName { get; }
+    internal IReadOnlyList<string> RegisteredUrls { get; }
+}
+
 internal sealed class Web5HttpRequestQueue
 {
     internal Web5HttpRequestQueue(string name, bool active, int attachedProcessCount, int controllerProcessId,
-        IReadOnlyList<int> processIds, IReadOnlyList<string> registeredUrls)
+        IReadOnlyList<int> processIds, IReadOnlyList<Web5HttpUrlGroup> urlGroups)
     {
         Name = name; Active = active; AttachedProcessCount = attachedProcessCount;
-        ControllerProcessId = controllerProcessId; ProcessIds = processIds; RegisteredUrls = registeredUrls;
+        ControllerProcessId = controllerProcessId; ProcessIds = processIds; UrlGroups = urlGroups;
+        RegisteredUrls = urlGroups.SelectMany(group => group.RegisteredUrls).ToArray();
     }
     internal string Name { get; }
     internal bool Active { get; }
     internal int AttachedProcessCount { get; }
     internal int ControllerProcessId { get; }
     internal IReadOnlyList<int> ProcessIds { get; }
+    internal IReadOnlyList<Web5HttpUrlGroup> UrlGroups { get; }
     internal IReadOnlyList<string> RegisteredUrls { get; }
 }
 
@@ -67,28 +83,42 @@ internal static class Web5HttpServiceState
                 if (lines[index].StartsWith("        ID: ", StringComparison.Ordinal)) processes.Add(ParseProcess(lines, index, end));
                 else if (!string.IsNullOrWhiteSpace(lines[index])) throw new InvalidDataException("HTTP request queue process entry is invalid.");
             if (processes.Count != attached) throw new InvalidDataException("HTTP request queue process count is inconsistent.");
-            var urls = new List<string>();
-            var nestedQueueNames = new List<string>();
-            for (var index = urlGroupsHeader + 1; index < end; index++)
+            var groupStarts = Enumerable.Range(urlGroupsHeader + 1, end - urlGroupsHeader - 1)
+                .Where(index => lines[index].StartsWith("    URL group ID: ", StringComparison.Ordinal)).ToArray();
+            if (groupStarts.Length == 0) throw new InvalidDataException("HTTP request queue has no URL groups.");
+            var groups = new List<Web5HttpUrlGroup>();
+            for (var groupIndex = 0; groupIndex < groupStarts.Length; groupIndex++)
             {
-                if (lines[index].StartsWith("        Request queue name: ", StringComparison.Ordinal))
-                    nestedQueueNames.Add(lines[index].Substring("        Request queue name: ".Length));
-                if (!lines[index].StartsWith("            Number of registered URLs: ", StringComparison.Ordinal)) continue;
-                var count = ParseNonnegative(lines[index].Substring("            Number of registered URLs: ".Length));
-                if (++index >= end || lines[index] != "            Registered URLs:") throw new InvalidDataException("HTTP registered URL section is invalid.");
+                var groupStart = groupStarts[groupIndex];
+                var groupEnd = groupIndex + 1 < groupStarts.Length ? groupStarts[groupIndex + 1] : end;
+                if (string.IsNullOrWhiteSpace(lines[groupStart].Substring("    URL group ID: ".Length)))
+                    throw new InvalidDataException("HTTP URL group identity is invalid.");
+                var groupActive = RequireSingle(lines, groupStart, groupEnd, "        State: ") == "Active";
+                var groupQueueName = RequireSingle(lines, groupStart, groupEnd, "        Request queue name: ");
+                if (!string.Equals(groupQueueName, name, StringComparison.Ordinal))
+                    throw new InvalidDataException("HTTP URL group ownership is inconsistent.");
+                FindSingle(lines, groupStart, groupEnd, "        Properties:");
+                var countText = RequireSingle(lines, groupStart, groupEnd, "            Number of registered URLs: ");
+                var count = ParseNonnegative(countText);
+                var countIndex = Enumerable.Range(groupStart + 1, groupEnd - groupStart - 1)
+                    .Single(index => lines[index].StartsWith("            Number of registered URLs: ", StringComparison.Ordinal));
+                var index = countIndex;
+                if (++index >= groupEnd || lines[index] != "            Registered URLs:") throw new InvalidDataException("HTTP registered URL section is invalid.");
+                var urls = new List<string>();
                 for (var offset = 0; offset < count; offset++)
                 {
                     index++;
-                    if (index >= end || !lines[index].StartsWith("                ", StringComparison.Ordinal))
+                    if (index >= groupEnd || !lines[index].StartsWith("                ", StringComparison.Ordinal))
                         throw new InvalidDataException("HTTP registered URL count is inconsistent.");
                     var value = lines[index].Substring(16);
                     NormalizeRegisteredUrl(value);
                     urls.Add(value);
                 }
+                var session = RequireSingle(lines, groupStart, groupEnd, "        Server session ID: ");
+                if (string.IsNullOrWhiteSpace(session)) throw new InvalidDataException("HTTP URL group session identity is invalid.");
+                groups.Add(new Web5HttpUrlGroup(groupActive, groupQueueName, urls));
             }
-            if (nestedQueueNames.Count == 0 || nestedQueueNames.Any(value => !string.Equals(value, name, StringComparison.Ordinal)))
-                throw new InvalidDataException("HTTP URL group ownership is inconsistent.");
-            queues.Add(new Web5HttpRequestQueue(name, active, attached, controller, processes, urls));
+            queues.Add(new Web5HttpRequestQueue(name, active, attached, controller, processes, groups));
         }
         return queues;
     }
@@ -99,8 +129,11 @@ internal static class Web5HttpServiceState
         if (origin == null || !origin.IsAbsoluteUri || origin.Scheme != Uri.UriSchemeHttps || origin.AbsolutePath != "/" ||
             !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment) || ownedProcessId <= 0)
             throw new ArgumentException("Owned HTTP queue identity is invalid.");
-        var matches = queues.Where(queue => queue.RegisteredUrls.Any(url => MatchesOrigin(url, origin))).ToArray();
-        if (matches.Length != 1) throw new InvalidDataException("Expected exactly one HTTP request queue for the owned origin.");
+        var matches = queues.SelectMany(queue => queue.UrlGroups
+            .Where(group => group.Active && string.Equals(group.QueueName, queue.Name, StringComparison.Ordinal) &&
+                group.RegisteredUrls.Any(url => MatchesOrigin(url, origin)))
+            .Select(group => queue)).ToArray();
+        if (matches.Length != 1) throw new InvalidDataException("Expected exactly one active HTTP URL group for the owned origin.");
         var match = matches[0];
         if (!match.Active || match.AttachedProcessCount != 1 || match.ControllerProcessId != ownedProcessId ||
             match.ProcessIds.Count != 1 || match.ProcessIds[0] != ownedProcessId)
@@ -121,21 +154,43 @@ internal static class Web5HttpServiceState
         };
         using var process = new Process { StartInfo = start };
         if (!process.Start()) throw new InvalidDataException("HTTP service-state reader did not start.");
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
+        var output = ReadBoundedAsync(process.StandardOutput, MaximumSnapshotLength);
+        var error = ReadBoundedAsync(process.StandardError, 4096);
         var exited = Task.Run(() => process.WaitForExit());
+        var drained = Task.WhenAll(exited, output, error);
         var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = token.Register(() => cancelled.TrySetResult(true));
         var timeout = Task.Delay(budget);
-        var completed = await Task.WhenAny(exited, timeout, cancelled.Task);
-        if (completed != exited)
+        var completed = await Task.WhenAny(drained, timeout, cancelled.Task);
+        if (completed != drained)
         {
             try { if (!process.HasExited) process.Kill(); } catch (InvalidOperationException) { }
             if (!process.WaitForExit(5000)) throw new TimeoutException("HTTP service-state reader cleanup is uncertain.");
+            try { await Task.WhenAll(output, error); } catch (InvalidDataException) { }
             token.ThrowIfCancellationRequested();
             throw new TimeoutException("HTTP service-state read timed out.");
         }
+        await drained;
         return ValidateCommandResult(process.ExitCode, await output, await error);
+    }
+
+    internal static async Task<string> ReadBoundedAsync(TextReader reader, int maximumLength)
+    {
+        if (reader == null) throw new ArgumentNullException(nameof(reader));
+        if (maximumLength <= 0 || maximumLength > MaximumSnapshotLength)
+            throw new ArgumentOutOfRangeException(nameof(maximumLength));
+        var result = new StringBuilder(Math.Min(maximumLength, 4096));
+        var buffer = new char[4096];
+        var overflow = false;
+        int read;
+        while ((read = await reader.ReadAsync(buffer, 0, buffer.Length)) != 0)
+        {
+            var remaining = maximumLength - result.Length;
+            if (remaining > 0) result.Append(buffer, 0, Math.Min(read, remaining));
+            if (read > remaining) overflow = true;
+        }
+        if (overflow) throw new InvalidDataException("HTTP service-state command output exceeded its bound.");
+        return result.ToString();
     }
 
     internal static string ValidateCommandResult(int exitCode, string output, string error)
