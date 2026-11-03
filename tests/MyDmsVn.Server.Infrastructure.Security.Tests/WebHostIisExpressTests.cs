@@ -621,10 +621,9 @@ public sealed partial class WebHostIisExpressTests
     private static async Task<Reply> Request(string url, string thumbprint, string? authorization = null, string? origin = null,
         string method = "GET", string? body = null, string? cookie = null, bool csrf = false)
     {
-        var request = (HttpWebRequest)WebRequest.Create(url);
+        var request = Web5IisExpressHostAdmission.CreateDirectRequest(new Uri(url));
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         using var abort = timeout.Token.Register(request.Abort);
-        request.AllowAutoRedirect = false; request.Timeout = 10000; request.ReadWriteTimeout = 10000; request.KeepAlive = false;
         request.Method = method;
         request.Headers["X-Correlation-ID"] = "iis-smoke";
         if (authorization != null) request.Headers["Authorization"] = authorization;

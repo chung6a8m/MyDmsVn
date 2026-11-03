@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,7 +13,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 internal sealed class Web5HttpRequestQueue
 {
     internal Web5HttpRequestQueue(string name, bool active, int attachedProcessCount, int controllerProcessId,
-        IReadOnlyList<int> processIds, IReadOnlyList<Uri> registeredUrls)
+        IReadOnlyList<int> processIds, IReadOnlyList<string> registeredUrls)
     {
         Name = name; Active = active; AttachedProcessCount = attachedProcessCount;
         ControllerProcessId = controllerProcessId; ProcessIds = processIds; RegisteredUrls = registeredUrls;
@@ -22,7 +23,7 @@ internal sealed class Web5HttpRequestQueue
     internal int AttachedProcessCount { get; }
     internal int ControllerProcessId { get; }
     internal IReadOnlyList<int> ProcessIds { get; }
-    internal IReadOnlyList<Uri> RegisteredUrls { get; }
+    internal IReadOnlyList<string> RegisteredUrls { get; }
 }
 
 internal static class Web5HttpServiceState
@@ -35,9 +36,18 @@ internal static class Web5HttpServiceState
         if (snapshot.Length == 0 || snapshot.Length > MaximumSnapshotLength)
             throw new InvalidDataException("HTTP service state snapshot size is invalid.");
         var lines = snapshot.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        var nonempty = lines.Where(line => !string.IsNullOrWhiteSpace(line))
+            .Select(line => line.TrimEnd(' ', '\t')).ToArray();
+        if (nonempty.Length < 2 || nonempty[0] != "Snapshot of HTTP service state (Request Queue View):" ||
+            nonempty[1] != "-----------------------------------------------------")
+            throw new InvalidDataException("HTTP service state request-queue view header is invalid.");
         var starts = Enumerable.Range(0, lines.Length)
             .Where(index => lines[index].StartsWith("Request queue name: ", StringComparison.Ordinal)).ToArray();
-        if (starts.Length == 0) throw new InvalidDataException("HTTP service state contains no request queues.");
+        if (starts.Length == 0)
+        {
+            if (nonempty.Length == 2) return Array.Empty<Web5HttpRequestQueue>();
+            throw new InvalidDataException("HTTP service state contains no valid request-queue view.");
+        }
         var queues = new List<Web5HttpRequestQueue>();
         for (var queueIndex = 0; queueIndex < starts.Length; queueIndex++)
         {
@@ -57,7 +67,7 @@ internal static class Web5HttpServiceState
                 if (lines[index].StartsWith("        ID: ", StringComparison.Ordinal)) processes.Add(ParseProcess(lines, index, end));
                 else if (!string.IsNullOrWhiteSpace(lines[index])) throw new InvalidDataException("HTTP request queue process entry is invalid.");
             if (processes.Count != attached) throw new InvalidDataException("HTTP request queue process count is inconsistent.");
-            var urls = new List<Uri>();
+            var urls = new List<string>();
             var nestedQueueNames = new List<string>();
             for (var index = urlGroupsHeader + 1; index < end; index++)
             {
@@ -72,10 +82,8 @@ internal static class Web5HttpServiceState
                     if (index >= end || !lines[index].StartsWith("                ", StringComparison.Ordinal))
                         throw new InvalidDataException("HTTP registered URL count is inconsistent.");
                     var value = lines[index].Substring(16);
-                    if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
-                        (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-                        throw new InvalidDataException("HTTP registered URL is invalid.");
-                    urls.Add(uri);
+                    NormalizeRegisteredUrl(value);
+                    urls.Add(value);
                 }
             }
             if (nestedQueueNames.Count == 0 || nestedQueueNames.Any(value => !string.Equals(value, name, StringComparison.Ordinal)))
@@ -91,8 +99,7 @@ internal static class Web5HttpServiceState
         if (origin == null || !origin.IsAbsoluteUri || origin.Scheme != Uri.UriSchemeHttps || origin.AbsolutePath != "/" ||
             !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment) || ownedProcessId <= 0)
             throw new ArgumentException("Owned HTTP queue identity is invalid.");
-        var expected = Normalize(origin);
-        var matches = queues.Where(queue => queue.RegisteredUrls.Any(url => Normalize(url) == expected)).ToArray();
+        var matches = queues.Where(queue => queue.RegisteredUrls.Any(url => MatchesOrigin(url, origin))).ToArray();
         if (matches.Length != 1) throw new InvalidDataException("Expected exactly one HTTP request queue for the owned origin.");
         var match = matches[0];
         if (!match.Active || match.AttachedProcessCount != 1 || match.ControllerProcessId != ownedProcessId ||
@@ -139,7 +146,52 @@ internal static class Web5HttpServiceState
         return output;
     }
 
-    private static string Normalize(Uri uri) => uri.GetComponents(UriComponents.SchemeAndServer | UriComponents.Path, UriFormat.SafeUnescaped).TrimEnd('/').ToUpperInvariant() + "/";
+    internal static bool MatchesOrigin(string registeredUrl, Uri origin) =>
+        NormalizeRegisteredUrl(registeredUrl) == NormalizeOrigin(origin);
+
+    private static string NormalizeOrigin(Uri uri) => uri.GetComponents(
+        UriComponents.SchemeAndServer | UriComponents.Path, UriFormat.SafeUnescaped).TrimEnd('/').ToUpperInvariant() + "/";
+
+    private static string NormalizeRegisteredUrl(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 2048 || value.Any(char.IsWhiteSpace))
+            throw new InvalidDataException("HTTP registered URL is invalid.");
+        var separator = value.IndexOf("://", StringComparison.Ordinal);
+        if (separator <= 0) throw new InvalidDataException("HTTP registered URL is invalid.");
+        var scheme = value.Substring(0, separator);
+        if (!string.Equals(scheme, "HTTP", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(scheme, "HTTPS", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("HTTP registered URL scheme is invalid.");
+        var authorityStart = separator + 3;
+        var pathStart = value.IndexOf('/', authorityStart);
+        if (pathStart <= authorityStart || value.IndexOfAny(new[] { '?', '#' }, pathStart) >= 0)
+            throw new InvalidDataException("HTTP registered URL path is invalid.");
+        var authority = value.Substring(authorityStart, pathStart - authorityStart);
+        string host;
+        string portText;
+        if (authority.StartsWith("[", StringComparison.Ordinal))
+        {
+            var close = authority.IndexOf("]:", StringComparison.Ordinal);
+            if (close <= 1) throw new InvalidDataException("HTTP registered URL authority is invalid.");
+            host = authority.Substring(0, close + 1);
+            portText = authority.Substring(close + 2);
+            if (!IPAddress.TryParse(host.Substring(1, host.Length - 2), out _))
+                throw new InvalidDataException("HTTP registered URL host is invalid.");
+        }
+        else
+        {
+            var colon = authority.LastIndexOf(':');
+            if (colon <= 0) throw new InvalidDataException("HTTP registered URL authority is invalid.");
+            host = authority.Substring(0, colon);
+            portText = authority.Substring(colon + 1);
+            if (host != "*" && host != "+" && Uri.CheckHostName(host) == UriHostNameType.Unknown)
+                throw new InvalidDataException("HTTP registered URL host is invalid.");
+        }
+        if (!int.TryParse(portText, NumberStyles.None, CultureInfo.InvariantCulture, out var port) || port <= 0 || port > 65535)
+            throw new InvalidDataException("HTTP registered URL port is invalid.");
+        return scheme.ToUpperInvariant() + "://" + host.ToUpperInvariant() + ":" +
+            port.ToString(CultureInfo.InvariantCulture) + value.Substring(pathStart).TrimEnd('/').ToUpperInvariant() + "/";
+    }
     private static int FindSingle(string[] lines, int start, int end, string exact)
     {
         var matches = Enumerable.Range(start + 1, end - start - 1).Where(index => lines[index] == exact).ToArray();

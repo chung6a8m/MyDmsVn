@@ -9,6 +9,10 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web5HttpServiceStateTests
 {
+    private const string Empty = @"
+Snapshot of HTTP service state (Request Queue View):
+-----------------------------------------------------
+";
     private const string Owned = @"
 Snapshot of HTTP service state (Request Queue View):
 -----------------------------------------------------
@@ -82,6 +86,46 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
     {
         var queues = Web5HttpServiceState.Parse(Owned + Owned);
         Assert.Throws<InvalidDataException>(() => Web5HttpServiceState.RequireOwnedQueue(queues, new Uri("https://localhost:44321/"), 18404));
+    }
+
+    [Fact]
+    public void Foreign_HTTP_sys_wildcard_prefix_does_not_block_exact_owned_queue()
+    {
+        var foreign = Owned
+            .Replace("IISExpressAppPool{11111111-1111-1111-1111-111111111111}", "DefaultAppPool")
+            .Replace("HTTPS://LOCALHOST:44321/", "HTTP://*:80/")
+            .Replace("                HTTP://LOCALHOST:18081/\n", string.Empty)
+            .Replace("Number of registered URLs: 2", "Number of registered URLs: 1");
+        var queues = Web5HttpServiceState.Parse(foreign + Owned);
+
+        var queue = Web5HttpServiceState.RequireOwnedQueue(queues, new Uri("https://localhost:44321/"), 18404);
+
+        Assert.StartsWith("IISExpressAppPool", queue.Name);
+    }
+
+    [Fact]
+    public void Empty_valid_request_queue_snapshot_is_absent_but_never_admitted()
+    {
+        var queues = Web5HttpServiceState.Parse(Empty);
+        Assert.Empty(queues);
+        Assert.Throws<InvalidDataException>(() =>
+            Web5HttpServiceState.RequireOwnedQueue(queues, new Uri("https://localhost:44321/"), 18404));
+    }
+
+    [Fact]
+    public void Localized_or_changed_request_queue_view_header_is_rejected()
+    {
+        Assert.Throws<InvalidDataException>(() => Web5HttpServiceState.Parse(
+            Owned.Replace("Snapshot of HTTP service state (Request Queue View):", "Localized request queue view:")));
+    }
+
+    [Fact]
+    public void Netsh_trailing_header_spaces_are_accepted_without_loosening_header_text()
+    {
+        var snapshot = Owned
+            .Replace("Snapshot of HTTP service state (Request Queue View):", "Snapshot of HTTP service state (Request Queue View): ")
+            .Replace("-----------------------------------------------------", "----------------------------------------------------- ");
+        Assert.NotEmpty(Web5HttpServiceState.Parse(snapshot));
     }
 
     [Theory]
