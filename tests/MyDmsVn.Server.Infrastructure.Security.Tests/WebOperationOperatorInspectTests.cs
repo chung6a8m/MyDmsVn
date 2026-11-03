@@ -155,6 +155,15 @@ public sealed class WebOperationOperatorInspectTests
         Assert.Equal((int)OperatorExitCode.Timeout, exit);
     }
 
+    [Fact]
+    public async Task Hard_process_deadline_invokes_termination_once()
+    {
+        var expirations = 0;
+        using (new OperatorProcessDeadline(TimeSpan.FromMilliseconds(50), () => Interlocked.Increment(ref expirations)))
+            await Task.Delay(250);
+        Assert.Equal(1, expirations);
+    }
+
     [SqlServerFact(SqlTestCategory.SqlConcurrency)]
     public Task Actual_SQL_command_timeout_minus_two_maps_to_timeout_without_DML() => WebOperationResolutionScenario.Owned(async s =>
     {
@@ -296,6 +305,19 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
             Assert.True(login.IsSecretFree(allowed.Stdout + allowed.Stderr));
             Assert.DoesNotContain("private-payload", allowed.Stdout + allowed.Stderr, StringComparison.OrdinalIgnoreCase);
 
+            var blocked = s.Operation(hash: Enumerable.Repeat((byte)10, 32).ToArray());
+            var holder = await s.Transaction();
+            var resource = "MyDmsVn.WebOperation:" + s.Actor + ":" + blocked.OperationId.ToString("N");
+            Assert.True(await holder.Sql.QuerySingleAsync<int>(new SqlTestCommand(
+                "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=@resource,@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=0; SELECT @r;",
+                new { resource }, transaction: holder.Tx, cancellationToken: s.Stop.Token)) >= 0);
+            var bounded = Stopwatch.StartNew();
+            Assert.Equal((int)OperatorExitCode.Timeout,
+                (await RunExecutable(executable, Arguments(s, blocked, timeoutSeconds: 1),
+                    login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
+            Assert.True(bounded.Elapsed < TimeSpan.FromSeconds(4), "The executable process deadline was not bounded.");
+            holder.Tx.Rollback();
+
             await s.Observer.ExecuteAsync("ALTER ROLE MyDmsVnWebOperationOperatorRole DROP MEMBER [" + login.Name + "]; ");
             Assert.Equal((int)OperatorExitCode.Denied,
                 (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
@@ -309,6 +331,19 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
             Assert.Equal((int)OperatorExitCode.Denied,
                 (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
             await s.Observer.ExecuteAsync("ALTER ROLE db_owner DROP MEMBER [" + login.Name + "]; ");
+
+            await s.Observer.ExecuteAsync("ALTER ROLE db_datareader ADD MEMBER MyDmsVnWebOperationOperatorRole;");
+            Assert.Equal((int)OperatorExitCode.Denied,
+                (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
+            await s.Observer.ExecuteAsync("ALTER ROLE db_datareader DROP MEMBER MyDmsVnWebOperationOperatorRole; " +
+                "GRANT INSERT ON dbo.WebOperationJournal TO MyDmsVnWebOperationOperatorRole;");
+            Assert.Equal((int)OperatorExitCode.Denied,
+                (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
+            await s.Observer.ExecuteAsync("REVOKE INSERT ON dbo.WebOperationJournal FROM MyDmsVnWebOperationOperatorRole; " +
+                "GRANT INSERT ON dbo.WebOperationJournal TO public;");
+            Assert.Equal((int)OperatorExitCode.Denied,
+                (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
+            await s.Observer.ExecuteAsync("REVOKE INSERT ON dbo.WebOperationJournal FROM public;");
 
             Assert.Equal((int)OperatorExitCode.EnvironmentFailure,
                 (await RunExecutable(executable, Replace(arguments, "--database", "AnotherOwnedDatabase"),

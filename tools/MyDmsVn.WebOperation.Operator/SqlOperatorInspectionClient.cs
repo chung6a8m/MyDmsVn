@@ -89,6 +89,65 @@ ISNULL(IS_SRVROLEMEMBER(N'dbcreator'),0)+ISNULL(IS_SRVROLEMEMBER(N'bulkadmin'),0
             reader.GetInt32(6) != 0 || reader.GetInt32(7) != 0 || reader.GetInt32(8) != 0 || reader.GetInt32(9) != 0 ||
             await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             throw new WebOperationException("Auth.Forbidden");
+        reader.Close();
+        await VerifyEffectivePermissionsAsync(connection, options, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task VerifyEffectivePermissionsAsync(SqlConnection connection, InspectOptions options,
+        CancellationToken cancellationToken)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = options.TimeoutSeconds;
+        command.CommandText = @"SELECT CASE WHEN
+ISNULL(IS_ROLEMEMBER(N'MyDmsVnWebRuntimeRole'),0)=1 OR ISNULL(IS_ROLEMEMBER(N'MyDmsVnMigrationRole'),0)=1 OR
+ISNULL(IS_ROLEMEMBER(N'db_owner'),0)=1 OR ISNULL(IS_ROLEMEMBER(N'db_ddladmin'),0)=1 OR
+ISNULL(IS_ROLEMEMBER(N'db_securityadmin'),0)=1 OR ISNULL(IS_ROLEMEMBER(N'db_accessadmin'),0)=1 OR
+ISNULL(IS_ROLEMEMBER(N'db_backupoperator'),0)=1 OR ISNULL(IS_ROLEMEMBER(N'db_datareader'),0)=1 OR
+ISNULL(IS_ROLEMEMBER(N'db_datawriter'),0)=1 OR ISNULL(IS_ROLEMEMBER(N'db_denydatareader'),0)=1 OR
+ISNULL(IS_ROLEMEMBER(N'db_denydatawriter'),0)=1 OR
+ISNULL(HAS_PERMS_BY_NAME(NULL,NULL,N'CONTROL SERVER'),0)=1 OR
+ISNULL(HAS_PERMS_BY_NAME(DB_NAME(),N'DATABASE',N'CONTROL'),0)=1 OR
+ISNULL(HAS_PERMS_BY_NAME(DB_NAME(),N'DATABASE',N'ALTER'),0)=1 OR
+ISNULL(HAS_PERMS_BY_NAME(N'dbo',N'SCHEMA',N'CONTROL'),0)=1 OR
+ISNULL(HAS_PERMS_BY_NAME(N'dbo',N'SCHEMA',N'ALTER'),0)=1 OR
+EXISTS(SELECT 1 FROM sys.fn_my_permissions(NULL,N'SERVER')
+ WHERE permission_name NOT IN(N'CONNECT SQL',N'VIEW ANY DATABASE',N'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION',N'VIEW ANY COLUMN MASTER KEY DEFINITION')) OR
+EXISTS(SELECT 1 FROM sys.fn_my_permissions(NULL,N'DATABASE')
+ WHERE permission_name NOT IN(N'CONNECT',N'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION',N'VIEW ANY COLUMN MASTER KEY DEFINITION')) OR
+EXISTS(SELECT 1 FROM sys.schemas AS candidate
+ CROSS APPLY sys.fn_my_permissions(QUOTENAME(candidate.name),N'SCHEMA') AS permission
+ WHERE permission.permission_name IN(N'SELECT',N'INSERT',N'UPDATE',N'DELETE',N'ALTER',N'CONTROL',N'TAKE OWNERSHIP')) OR
+EXISTS(SELECT 1 FROM sys.objects AS candidate
+ JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id=candidate.schema_id
+ CROSS APPLY sys.fn_my_permissions(QUOTENAME(ownerSchema.name)+N'.'+QUOTENAME(candidate.name),N'OBJECT') AS permission
+ WHERE candidate.is_ms_shipped=0 AND candidate.parent_object_id=0 AND
+ (permission.permission_name IN(N'INSERT',N'UPDATE',N'DELETE',N'ALTER',N'CONTROL',N'TAKE OWNERSHIP',N'REFERENCES') OR
+  (permission.permission_name=N'SELECT' AND NOT(ownerSchema.name=N'dbo' AND candidate.name=N'WebOperationTerminalAudit')) OR
+  (permission.permission_name=N'EXECUTE' AND NOT(ownerSchema.name=N'dbo' AND candidate.name IN(N'InspectWebOperationResolution',N'RecordWebOperationNotExecuted'))))) OR
+EXISTS(SELECT 1 FROM sys.tables AS ownerTable
+ JOIN sys.schemas AS ownerSchema ON ownerSchema.schema_id=ownerTable.schema_id
+ JOIN sys.columns AS candidate ON candidate.object_id=ownerTable.object_id
+ CROSS APPLY(VALUES(N'SELECT'),(N'UPDATE')) AS checked(permission_name)
+ WHERE ownerTable.is_ms_shipped=0 AND
+ ISNULL(HAS_PERMS_BY_NAME(QUOTENAME(ownerSchema.name)+N'.'+QUOTENAME(ownerTable.name),N'OBJECT',checked.permission_name,candidate.name,N'COLUMN'),0)=1 AND
+ NOT(ownerSchema.name=N'dbo' AND ownerTable.name=N'WebOperationTerminalAudit' AND checked.permission_name=N'SELECT')) OR
+EXISTS(SELECT 1 FROM sys.database_principals AS candidate WHERE candidate.name<>USER_NAME() AND candidate.type<>N'R' AND
+ (ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'USER',N'IMPERSONATE'),0)=1 OR ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'USER',N'CONTROL'),0)=1 OR
+  ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'USER',N'ALTER'),0)=1 OR ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'USER',N'TAKE OWNERSHIP'),0)=1)) OR
+EXISTS(SELECT 1 FROM sys.database_principals AS candidate WHERE candidate.name<>N'public' AND candidate.type=N'R' AND
+ (ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'ROLE',N'CONTROL'),0)=1 OR ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'ROLE',N'ALTER'),0)=1 OR
+  ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'ROLE',N'TAKE OWNERSHIP'),0)=1)) OR
+EXISTS(SELECT 1 FROM sys.server_principals AS candidate WHERE candidate.name<>ORIGINAL_LOGIN() AND candidate.type<>N'R' AND
+ (ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'LOGIN',N'IMPERSONATE'),0)=1 OR ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'LOGIN',N'CONTROL'),0)=1 OR
+  ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'LOGIN',N'ALTER'),0)=1 OR ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'LOGIN',N'TAKE OWNERSHIP'),0)=1)) OR
+EXISTS(SELECT 1 FROM sys.server_principals AS candidate WHERE candidate.name<>N'public' AND candidate.type=N'R' AND
+ (ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'SERVER ROLE',N'CONTROL'),0)=1 OR ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'SERVER ROLE',N'ALTER'),0)=1 OR
+  ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'SERVER ROLE',N'TAKE OWNERSHIP'),0)=1)) OR
+EXISTS(SELECT 1 FROM sys.database_permissions AS permission
+ JOIN sys.user_token AS token ON token.principal_id=permission.grantee_principal_id WHERE permission.state=N'W')
+THEN 1 ELSE 0 END;";
+        if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0)
+            throw new WebOperationException("Auth.Forbidden");
     }
 }
 
