@@ -31,7 +31,7 @@ public sealed class SqlOperatorDecisionClient : IOperatorDecisionClient
             token => InspectAsync(options, token), token => ExecuteTransactionAsync(options, token), cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<OperatorDecisionCommitOutcome> ExecuteTransactionAsync(RecordNotExecutedOptions options,
+    private async Task<OperatorDecisionTransactionResult> ExecuteTransactionAsync(RecordNotExecutedOptions options,
         CancellationToken cancellationToken)
     {
         var connection = await _connections.OpenAsync(options, cancellationToken).ConfigureAwait(false);

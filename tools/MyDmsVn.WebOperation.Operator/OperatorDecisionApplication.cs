@@ -36,7 +36,7 @@ public static class OperatorDecisionApplication
             if (result == null) throw new WebOperationException("Operation.Unavailable");
             if (result.Outcome == OperatorDecisionOutcome.Unknown)
             {
-                WriteUnknown(stderr); return (int)OperatorExitCode.Unknown;
+                WriteUnknown(stderr, result.UnknownReason); return (int)OperatorExitCode.Unknown;
             }
             if (options.DryRun && result.Outcome == OperatorDecisionOutcome.Preview && result.Inspection?.Disposition == "INDETERMINATE")
             {
@@ -80,8 +80,14 @@ public static class OperatorDecisionApplication
         }
         catch (Exception) { stderr.WriteLine("Operator.EnvironmentFailure: terminal decision was unavailable; re-inspect before any further action."); return (int)OperatorExitCode.EnvironmentFailure; }
     }
-    private static void WriteUnknown(TextWriter stderr)
+    private static void WriteUnknown(TextWriter stderr, OperatorDecisionUnknownReason reason)
     {
+        if (reason == OperatorDecisionUnknownReason.PreCommitCleanupUnverified)
+        {
+            stderr.WriteLine("Operator.UNKNOWN/ESCALATE: pre-Commit rollback or session cleanup could not be verified; never execute again automatically.");
+            stderr.WriteLine("Verify process/session quiescence and run an independent inspect command with the original database, epoch, actor, operation, and fingerprint.");
+            return;
+        }
         stderr.WriteLine("Operator.UNKNOWN/ESCALATE: Commit or post-Commit verification is uncertain; never execute again automatically.");
         stderr.WriteLine("Run an independent inspect command with the same database, epoch, actor, operation, and fingerprint.");
     }

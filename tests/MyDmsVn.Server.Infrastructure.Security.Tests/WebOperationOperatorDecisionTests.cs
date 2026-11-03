@@ -150,6 +150,22 @@ public sealed class WebOperationOperatorDecisionTests
     }
 
     [Fact]
+    public async Task Precommit_cleanup_unknown_output_is_sanitized_and_requires_quiescence_and_inspection()
+    {
+        var stderr = new StringWriter();
+        var result = OperatorDecisionResult.Unknown(OperatorDecisionUnknownReason.PreCommitCleanupUnverified);
+        var exit = await OperatorDecisionApplication.RunAsync(Execute(), _ => new FakeDecisionClient(result),
+            new StringWriter(), stderr, CancellationToken.None);
+
+        Assert.Equal((int)OperatorExitCode.Unknown, exit);
+        Assert.Contains("rollback or session cleanup could not be verified", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("quiescence", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("inspect", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("private", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(Fingerprint, stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Commit_failure_with_successful_cleanup_is_unknown()
     {
         var cleanup = 0;
@@ -157,7 +173,7 @@ public sealed class WebOperationOperatorDecisionTests
             () => throw new InvalidOperationException("commit"), () => cleanup++, () => cleanup++,
             () => cleanup++, () => cleanup++, CancellationToken.None);
 
-        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, outcome);
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, outcome.Outcome);
         Assert.Equal(3, cleanup);
     }
 
@@ -169,7 +185,7 @@ public sealed class WebOperationOperatorDecisionTests
             () => throw new InvalidOperationException("commit"), () => { }, () => throw new InvalidOperationException("close"),
             () => transactionDisposed++, () => connectionDisposed++, CancellationToken.None);
 
-        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, outcome);
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, outcome.Outcome);
         Assert.Equal(1, transactionDisposed);
         Assert.Equal(1, connectionDisposed);
     }
@@ -182,7 +198,7 @@ public sealed class WebOperationOperatorDecisionTests
             () => throw new InvalidOperationException("commit"), () => { }, () => { },
             () => throw new InvalidOperationException("transaction-dispose"), () => connectionDisposed++, CancellationToken.None);
 
-        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, outcome);
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, outcome.Outcome);
         Assert.Equal(1, connectionDisposed);
     }
 
@@ -195,7 +211,7 @@ public sealed class WebOperationOperatorDecisionTests
             inspections++;
             return inspections == 1 ? Task.FromResult(Inspection("INDETERMINATE"))
                 : Task.FromException<WebOperationInspection>(new InvalidOperationException("readback"));
-        }, _ => Task.FromResult(OperatorDecisionCommitOutcome.Committed), CancellationToken.None);
+        }, _ => Task.FromResult(OperatorDecisionTransactionResult.Committed()), CancellationToken.None);
 
         Assert.Equal(OperatorDecisionOutcome.Unknown, result.Outcome);
         Assert.Equal(2, inspections);
@@ -207,7 +223,7 @@ public sealed class WebOperationOperatorDecisionTests
         var inspections = 0;
         var result = await OperatorDecisionExecution.RunAsync(Parse(Execute()), _ =>
             Task.FromResult(++inspections == 1 ? Inspection("INDETERMINATE") : Inspection("CANCELLED")),
-            _ => Task.FromResult(OperatorDecisionCommitOutcome.Committed), CancellationToken.None);
+            _ => Task.FromResult(OperatorDecisionTransactionResult.Committed()), CancellationToken.None);
 
         Assert.Equal(OperatorDecisionOutcome.Completed, result.Outcome);
         Assert.Equal(2, inspections);
@@ -219,7 +235,7 @@ public sealed class WebOperationOperatorDecisionTests
         var transactions = 0;
         await Assert.ThrowsAsync<WebOperationException>(() => OperatorDecisionExecution.RunAsync(Parse(Execute()),
             _ => Task.FromException<WebOperationInspection>(new WebOperationException("Auth.Forbidden")),
-            _ => { transactions++; return Task.FromResult(OperatorDecisionCommitOutcome.Committed); }, CancellationToken.None));
+            _ => { transactions++; return Task.FromResult(OperatorDecisionTransactionResult.Committed()); }, CancellationToken.None));
         Assert.Equal(0, transactions);
     }
 
@@ -253,13 +269,95 @@ public sealed class WebOperationOperatorDecisionTests
     }
 
     [Fact]
+    public async Task Mutation_failure_with_verified_cleanup_propagates_the_original_exception()
+    {
+        var primary = new WebOperationException("Operation.ResolutionConflict"); var cleanup = new CleanupProbe(); var commits = 0;
+        var thrown = await Assert.ThrowsAsync<WebOperationException>(() => OperatorDecisionCommitBoundary.RunAsync(
+            _ => Task.FromException(primary), () => commits++, cleanup.Rollback, cleanup.Close,
+            cleanup.DisposeTransaction, cleanup.DisposeConnection, CancellationToken.None));
+
+        Assert.Same(primary, thrown); Assert.Equal(0, commits); cleanup.AssertAllAttempted();
+    }
+
+    [Fact]
+    public async Task Mutation_failure_with_rollback_failure_is_unknown_and_attempts_remaining_cleanup()
+    {
+        var primary = new WebOperationException("Operation.ResolutionConflict"); var cleanup = new CleanupProbe { ThrowRollback = true }; var commits = 0;
+        var result = await OperatorDecisionCommitBoundary.RunAsync(_ => Task.FromException(primary), () => commits++, cleanup.Rollback,
+            cleanup.Close, cleanup.DisposeTransaction, cleanup.DisposeConnection, CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, result.Outcome); Assert.Same(primary, result.PrimaryFailure);
+        Assert.Equal(OperatorDecisionCleanupFailure.Rollback, result.CleanupFailures); Assert.Equal(0, commits); cleanup.AssertAllAttempted();
+    }
+
+    [Fact]
+    public async Task Mutation_failure_with_close_failure_is_unknown_and_attempts_remaining_cleanup()
+    {
+        var primary = new WebOperationException("Operation.ResolutionConflict"); var cleanup = new CleanupProbe { ThrowClose = true }; var commits = 0;
+        var result = await OperatorDecisionCommitBoundary.RunAsync(_ => Task.FromException(primary), () => commits++, cleanup.Rollback,
+            cleanup.Close, cleanup.DisposeTransaction, cleanup.DisposeConnection, CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, result.Outcome); Assert.Same(primary, result.PrimaryFailure);
+        Assert.Equal(OperatorDecisionCleanupFailure.Close, result.CleanupFailures); Assert.Equal(0, commits); cleanup.AssertAllAttempted();
+    }
+
+    [Fact]
+    public async Task Mutation_failure_with_transaction_dispose_failure_is_unknown_and_attempts_connection_dispose()
+    {
+        var primary = new WebOperationException("Operation.ResolutionConflict"); var cleanup = new CleanupProbe { ThrowTransactionDispose = true }; var commits = 0;
+        var result = await OperatorDecisionCommitBoundary.RunAsync(_ => Task.FromException(primary), () => commits++, cleanup.Rollback,
+            cleanup.Close, cleanup.DisposeTransaction, cleanup.DisposeConnection, CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, result.Outcome); Assert.Same(primary, result.PrimaryFailure);
+        Assert.Equal(OperatorDecisionCleanupFailure.TransactionDispose, result.CleanupFailures); Assert.Equal(0, commits); cleanup.AssertAllAttempted();
+    }
+
+    [Fact]
+    public async Task Mutation_failure_with_connection_dispose_failure_is_unknown_after_all_cleanup_attempts()
+    {
+        var primary = new WebOperationException("Operation.ResolutionConflict"); var cleanup = new CleanupProbe { ThrowConnectionDispose = true }; var commits = 0;
+        var result = await OperatorDecisionCommitBoundary.RunAsync(_ => Task.FromException(primary), () => commits++, cleanup.Rollback,
+            cleanup.Close, cleanup.DisposeTransaction, cleanup.DisposeConnection, CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, result.Outcome); Assert.Same(primary, result.PrimaryFailure);
+        Assert.Equal(OperatorDecisionCleanupFailure.ConnectionDispose, result.CleanupFailures); Assert.Equal(0, commits); cleanup.AssertAllAttempted();
+    }
+
+    [Fact]
+    public async Task Mutation_failure_with_every_cleanup_failure_is_unknown_and_attempts_every_action_once()
+    {
+        var primary = new WebOperationException("Operation.ResolutionConflict");
+        var cleanup = new CleanupProbe { ThrowRollback = true, ThrowClose = true, ThrowTransactionDispose = true, ThrowConnectionDispose = true };
+        var commits = 0;
+        var result = await OperatorDecisionCommitBoundary.RunAsync(_ => Task.FromException(primary), () => commits++, cleanup.Rollback,
+            cleanup.Close, cleanup.DisposeTransaction, cleanup.DisposeConnection, CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, result.Outcome); Assert.Same(primary, result.PrimaryFailure);
+        Assert.Equal(OperatorDecisionCleanupFailure.Rollback | OperatorDecisionCleanupFailure.Close |
+            OperatorDecisionCleanupFailure.TransactionDispose | OperatorDecisionCleanupFailure.ConnectionDispose, result.CleanupFailures);
+        Assert.Equal(0, commits); cleanup.AssertAllAttempted();
+    }
+
+    [Fact]
+    public async Task Cancelled_precommit_mutation_with_rollback_failure_is_unknown_not_cancelled()
+    {
+        using var cancelled = new CancellationTokenSource(); var cleanup = new CleanupProbe { ThrowRollback = true }; var commits = 0;
+        var result = await OperatorDecisionCommitBoundary.RunAsync(_ => { cancelled.Cancel(); return Task.CompletedTask; },
+            () => commits++, cleanup.Rollback, cleanup.Close, cleanup.DisposeTransaction, cleanup.DisposeConnection, cancelled.Token);
+
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, result.Outcome);
+        Assert.IsType<OperationCanceledException>(result.PrimaryFailure);
+        Assert.Equal(OperatorDecisionCleanupFailure.Rollback, result.CleanupFailures); Assert.Equal(0, commits); cleanup.AssertAllAttempted();
+    }
+
+    [Fact]
     public async Task Unknown_commit_outcome_is_never_reexecuted_or_reinspected()
     {
         var inspections = 0; var transactions = 0;
         var result = await OperatorDecisionExecution.RunAsync(Parse(Execute()), _ =>
         {
             inspections++; return Task.FromResult(Inspection("INDETERMINATE"));
-        }, _ => { transactions++; return Task.FromResult(OperatorDecisionCommitOutcome.Unknown); }, CancellationToken.None);
+        }, _ => { transactions++; return Task.FromResult(OperatorDecisionTransactionResult.Unknown()); }, CancellationToken.None);
 
         Assert.Equal(OperatorDecisionOutcome.Unknown, result.Outcome);
         Assert.Equal(1, transactions);
@@ -671,6 +769,27 @@ CREATE USER Web6DecisionDenied WITHOUT LOGIN;");
             if (_waitForCancellation) await Task.Delay(Timeout.Infinite, token);
             if (_error != null) throw _error;
             return _result!;
+        }
+    }
+
+    private sealed class CleanupProbe
+    {
+        public bool ThrowRollback { get; set; }
+        public bool ThrowClose { get; set; }
+        public bool ThrowTransactionDispose { get; set; }
+        public bool ThrowConnectionDispose { get; set; }
+        public int RollbackCalls { get; private set; }
+        public int CloseCalls { get; private set; }
+        public int TransactionDisposeCalls { get; private set; }
+        public int ConnectionDisposeCalls { get; private set; }
+        public void Rollback() { RollbackCalls++; if (ThrowRollback) throw new InvalidOperationException("rollback-private"); }
+        public void Close() { CloseCalls++; if (ThrowClose) throw new InvalidOperationException("close-private"); }
+        public void DisposeTransaction() { TransactionDisposeCalls++; if (ThrowTransactionDispose) throw new InvalidOperationException("transaction-dispose-private"); }
+        public void DisposeConnection() { ConnectionDisposeCalls++; if (ThrowConnectionDispose) throw new InvalidOperationException("connection-dispose-private"); }
+        public void AssertAllAttempted()
+        {
+            Assert.Equal(1, RollbackCalls); Assert.Equal(1, CloseCalls);
+            Assert.Equal(1, TransactionDisposeCalls); Assert.Equal(1, ConnectionDisposeCalls);
         }
     }
 
