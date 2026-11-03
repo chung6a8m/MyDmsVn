@@ -1,6 +1,6 @@
 # WEB6 B01 — Source and safety policy checkpoint
 
-**Status: READY FOR OWNER TECHNICAL REVIEW, 2026-11-03. No runtime capability is enabled.** This checkpoint maps current source at backend `c7782429e105688e916fe2a0d41bb58fc0a1cb4d` and paired frontend `a011230fc9d5057ab76321251ad0a292e18aecbc`. It does not implement B02–B06/F02–F05, change a frozen contract, or authorize a resend.
+**Status: READY FOR OWNER TECHNICAL REVIEW, 2026-11-03. No runtime capability is enabled.** This checkpoint maps runtime source at backend `c7782429e105688e916fe2a0d41bb58fc0a1cb4d` and paired frontend `a011230fc9d5057ab76321251ad0a292e18aecbc`. The checkpoint document commits are backend B01 `8586de3` and frontend F01 `9f5ae59`; later review-fix commits do not change the runtime pins. It does not implement B02–B06/F02–F05, change a frozen contract, or authorize a resend.
 
 ## 1. Frozen baseline
 
@@ -14,6 +14,16 @@
 | Candidate status | same-key resend OFF; staging not accepted; production NO-GO/DEFERRED |
 
 The seven-day value is result-byte availability, not deletion of the operation identity and not proof that an absent row rolled back. Historical quarantine and WEB5 archive remain untouched.
+
+### Source, dependency and publish inventory
+
+| Inventory | Pinned checkpoint |
+|---|---|
+| Backend platform | .NET SDK `8.0.400` driving net48 projects; `global.json` SHA-256 `b245497a2898df63c85fa09a4e0117613552d3d97f4b40f9ecc72e7c734b4b8c` |
+| Central packages relevant to the boundary | MediatR `12.5.0`, MediatR.Contracts `2.0.1`, Microsoft.Data.SqlClient `7.0.2`, Newtonsoft.Json `13.0.4` |
+| Locked owners | HttpHost `e415809ffd9971e46383ed770cc8a3f2186d4b64e378aa8ef69a9a9a40d16f36`; HttpHost.Tests `18d1ec93be5ac20f1c605504feb6a3e82325571d441a683a61385d918eea986d`; Security.Tests `bbdee8bba02e7da16851a41c82120572316d9c569cd08dae9bbde174fbf996fd`; Inventory.Tests `b02c41ad3104d5a8ce114b19c538cb463b6996871d47d37b251e6bd00957188d`; Migrations.Tests `1d85d70e4c036a3169b8e8ea705da04ba6eae72990fc7228f1ec4f472367f194` |
+| CI inventory | `.github/workflows/backend-web.yml`; protected SQL tag workflows `backend-web-sql-baseline.yml` and `backend-web-sql-candidate.yml` |
+| Candidate publish provenance | **NOT BUILT / NOT AVAILABLE for B01.** No backend binary, React asset, IIS directory, SQL allocation, manifest, or publish hash was created. B05/F04 owns the future pinned published pair. |
 
 ## 2. Three actions that must not collapse
 
@@ -43,7 +53,7 @@ Line references are for the pinned backend commit above.
 | Runtime principal | `deployment/sql/Provision-MyDmsVnWebPrincipals.sql` | No CONTROL/DDL/journal UPDATE/DELETE and no terminal procedure execution |
 | Operator principal | `deployment/sql/Provision-MyDmsVnWebOperationOperator.sql` | EXECUTE only on exact inspect/terminal procedures; no broad runtime elevation |
 
-The frontend source map is owned by its F01 checkpoint. Backend consumption confirms that `frozenWriteRequest` sends the persisted original GUID/method/route/body/epoch, while ordinary `write()` creates a new UUID and is therefore forbidden for resend.
+The paired [frontend F01 checkpoint](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/9f5ae59/docs/development/WEB6_F01_SOURCE_SAFETY_POLICY.md) owns the full client map. At the pinned frontend runtime source: `frozenWriteRequest` is `src/infrastructure/http/frozenWriteRequest.ts:10`; `createWeb4MutationRuntime` and ordinary `write()` are `src/app/runtime/web4MutationRuntime.ts:60,303`; IDB open/transaction/original `begin` are `src/infrastructure/drafts/web4OperationRepository.ts:180,225,245`. The frozen request sends the persisted original GUID/method/route/body/epoch, while ordinary `write()` creates a new UUID and is therefore forbidden for resend.
 
 ## 4. State-transition and eligibility matrix
 

@@ -4,8 +4,8 @@
 
 ## Scope and revisions
 
-- Backend source: `c7782429e105688e916fe2a0d41bb58fc0a1cb4d`.
-- Paired frontend source inspected: `a011230fc9d5057ab76321251ad0a292e18aecbc` (frontend PR #32 merged).
+- Backend runtime source: `c7782429e105688e916fe2a0d41bb58fc0a1cb4d`; B01 checkpoint content commit: `8586de3`.
+- Paired frontend runtime source: `a011230fc9d5057ab76321251ad0a292e18aecbc` (frontend PR #32 merged); F01 checkpoint content commit consumed: `9f5ae59`.
 - Deliverable: [B01 source and safety policy](../../development/WEB6_B01_SOURCE_SAFETY_POLICY.md).
 - Only B01/F01 source, policy, threat/state/test mapping was reviewed. B02–B06/F02–F05 were not implemented or executed.
 
@@ -19,6 +19,8 @@
 | Journal | actor/key/epoch fence, current session/grant, same-transaction COMMITTED result, seven-day result retention |
 | Status/resolution | 404/`NOT_OBSERVED` returns no rollback proof; v2 context explicitly reports `sameKeyResendEnabled: false` |
 | SQL authority | runtime and operator/maintenance paths remain separated; no grant change |
+| Dependencies | SDK/net48, central package versions, five relevant lockfile hashes and three CI workflows are recorded in the B01 policy |
+| Candidate publish | NOT BUILT / NOT AVAILABLE; no binary/assets/IIS/SQL allocation/publish manifest or hash exists for B01 |
 
 ## Verification performed
 
@@ -57,4 +59,4 @@ Executed runtime tests: **0**. Browser/SQL/IIS cases: **NOT RUN**, appropriate f
 
 Owner review is required for the proposed additive `web6-resend-eligibility-v1`, the authoritative age source, the initial seven-day eligibility ceiling, and the one-claim policy. The recommendation is a server-issued receipt bound to actor/epoch/key/fingerprint before original dispatch. Until that choice and B04 proof, `NOT_OBSERVED` remains `INDETERMINATE`, resend stays OFF, and B01 is not an implementation approval.
 
-**Acceptance state:** B6-SRC-01/B6-SRC-02 evidence is prepared for review, not Owner-accepted. P0/P1 review status is not claimed before PR review completes.
+**Acceptance state:** B6-SRC-01/B6-SRC-02 evidence is prepared for review, including explicit no-publish provenance, but is not Owner-accepted. P0/P1 review status is recorded only after PR review completes.
