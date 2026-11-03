@@ -67,6 +67,11 @@ public static class OperatorDecisionApplication
         }
         catch (TimeoutException) { stderr.WriteLine("Operator.Timeout: terminal decision exceeded the bounded timeout; SQL outcome is unknown."); return (int)OperatorExitCode.Timeout; }
         catch (SqlException exception) when (exception.Number == -2) { stderr.WriteLine("Operator.Timeout: terminal decision exceeded the bounded timeout; SQL outcome is unknown."); return (int)OperatorExitCode.Timeout; }
+        catch (WebOperationException exception) when (exception.Code == "Operation.FenceUnavailable")
+        {
+            stderr.WriteLine("Operator.Timeout: the operation fence was not acquired; no terminal outcome was established.");
+            return (int)OperatorExitCode.Timeout;
+        }
         catch (WebOperationException exception) when (exception.Code == "Auth.Forbidden" || exception.Code == "Deployment.EpochMismatch" ||
             exception.Code == "Idempotency.FingerprintMismatch" || exception.Code == "Operation.ResolutionConflict")
         {

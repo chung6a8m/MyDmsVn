@@ -6,7 +6,7 @@ using MyDmsVn.Server.Application.Operations;
 
 namespace MyDmsVn.WebOperation.Operator;
 
-public sealed class RecordNotExecutedOptions
+public sealed class RecordNotExecutedOptions : IOperatorTargetOptions
 {
     private static readonly Regex Label = new Regex(@"\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z", RegexOptions.CultureInvariant);
     private static readonly Regex Sha256 = new Regex(@"\A[0-9a-fA-F]{64}\z", RegexOptions.CultureInvariant);

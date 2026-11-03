@@ -30,7 +30,10 @@ internal static class Program
         {
             if (args.Length > 0 && args[0] == "record-not-executed")
                 return OperatorDecisionApplication.RunAsync(args,
-                    _ => throw new InvalidOperationException("The guarded SQL decision client is not available."),
+                    _ => new SqlOperatorDecisionClient(new OperatorSqlConnectionFactory(
+                        Environment.GetEnvironmentVariable(OperatorInspectApplication.ConnectionStringEnvironmentVariable),
+                        Environment.GetEnvironmentVariable(OperatorInspectApplication.DatabaseUserEnvironmentVariable),
+                        Environment.GetEnvironmentVariable(OperatorInspectApplication.LoginEnvironmentVariable))),
                     Console.Out, Console.Error, stop.Token).GetAwaiter().GetResult();
             return OperatorInspectApplication.RunAsync(args,
                 _ => new SqlOperatorInspectionClient(new OperatorSqlConnectionFactory(

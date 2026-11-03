@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Application.Operations;
+using MyDmsVn.Testing.Sql;
 using MyDmsVn.WebOperation.Operator;
 using Xunit;
 
@@ -142,6 +143,7 @@ public sealed class WebOperationOperatorDecisionTests
     [InlineData("Deployment.EpochMismatch", 3)]
     [InlineData("Idempotency.FingerprintMismatch", 3)]
     [InlineData("Operation.ResolutionConflict", 3)]
+    [InlineData("Operation.FenceUnavailable", 6)]
     [InlineData("Operation.Unavailable", 5)]
     public async Task Decision_failures_are_sanitized(string code, int expectedExit)
     {
@@ -180,6 +182,68 @@ public sealed class WebOperationOperatorDecisionTests
         Assert.Equal(7, (int)OperatorExitCode.Preview);
         Assert.Equal(8, (int)OperatorExitCode.Unknown);
     }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Guarded_dry_run_is_byte_equal_and_execute_commits_then_independently_verifies() =>
+        WebOperationResolutionScenario.Owned(async s =>
+        {
+            await s.Observer.ExecuteAsync("CREATE USER Web6DecisionOperator WITHOUT LOGIN; ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER Web6DecisionOperator;");
+            var operation = WebOperationResolutionScenario.Operation(s, WebOperationKind.SalesCreate);
+            var dryOptions = Parse(DryRunArguments(s, operation));
+            var factory = new ImpersonatingDecisionConnectionFactory(s.Database.ConnectionString, "Web6DecisionOperator");
+            var client = new SqlOperatorDecisionClient(factory);
+            var before = await SqlSnapshot(s.Observer);
+
+            var preview = await client.DryRunAsync(dryOptions, s.Stop.Token);
+
+            Assert.Equal(OperatorDecisionOutcome.Preview, preview.Outcome);
+            Assert.Equal("INDETERMINATE", preview.Inspection!.Disposition);
+            Assert.Equal(before, await SqlSnapshot(s.Observer));
+
+            var executeOptions = Parse(ExecuteArguments(s, operation));
+            var completed = await client.ExecuteAsync(executeOptions, s.Stop.Token);
+
+            Assert.Equal(1, await s.Observer.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE ActorUserId=@actor AND OperationId=@operation AND Disposition='CANCELLED';",
+                new { actor = s.Actor, operation = operation.OperationId }));
+            Assert.Equal(1, await s.Observer.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.WebOperationTerminalAudit WHERE ActorUserId=@actor AND OperationId=@operation AND DecisionId=@decision AND CaseId='CASE-42' AND ReasonCode='ORIGINAL_NOT_EXECUTED' AND EvidenceReference='case://CASE-42/evidence-1' AND OperatorDatabaseUser='Web6DecisionOperator';",
+                new { actor = s.Actor, operation = operation.OperationId, decision = executeOptions.DecisionId }));
+            Assert.Equal(OperatorDecisionOutcome.Completed, completed.Outcome);
+            Assert.Equal("CANCELLED", completed.Inspection!.Disposition);
+            Assert.Equal(executeOptions.DecisionId, completed.Inspection.Terminal!.DecisionId);
+            Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.SalesReceipts;"));
+            Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.GoodsReceipts;"));
+            Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockLedger;"));
+            Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.StockValuationEntries;"));
+        });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Existing_disposition_wrong_target_and_wrong_authority_fail_closed_without_DML() =>
+        WebOperationResolutionScenario.Owned(async s =>
+        {
+            await s.Observer.ExecuteAsync(@"CREATE USER Web6DecisionOperator WITHOUT LOGIN;
+ALTER ROLE MyDmsVnWebOperationOperatorRole ADD MEMBER Web6DecisionOperator;
+CREATE USER Web6DecisionDenied WITHOUT LOGIN;");
+            var operation = WebOperationResolutionScenario.Operation(s, WebOperationKind.SalesCreate);
+            await s.Observer.ExecuteAsync("DECLARE @n datetime2(7)=SYSUTCDATETIME(); INSERT dbo.WebOperationJournal VALUES(@actor,@id,@epoch,1,1,1,NULL,@hash,41,'COMMITTED',0x7B7D,@n,@n,DATEADD(day,7,@n));",
+                new { actor = s.Actor, id = operation.OperationId, epoch = s.Epoch, hash = operation.Fingerprint });
+            var options = Parse(DryRunArguments(s, operation));
+            var before = await SqlSnapshot(s.Observer);
+
+            await Assert.ThrowsAsync<WebOperationException>(() => new SqlOperatorDecisionClient(
+                new ImpersonatingDecisionConnectionFactory(s.Database.ConnectionString, "Web6DecisionOperator"))
+                .DryRunAsync(options, s.Stop.Token));
+            await Assert.ThrowsAsync<WebOperationException>(() => new SqlOperatorDecisionClient(
+                new ImpersonatingDecisionConnectionFactory(s.Database.ConnectionString, "Web6DecisionDenied"))
+                .DryRunAsync(options, s.Stop.Token));
+
+            var wrongTarget = Parse(DryRunArguments(s, operation, database: "AnotherOwnedDatabase"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => new SqlOperatorDecisionClient(
+                new OperatorSqlConnectionFactory(s.Database.ConnectionString, "Web6DecisionOperator", "Web6DecisionOperator"))
+                .DryRunAsync(wrongTarget, s.Stop.Token));
+            Assert.Equal(before, await SqlSnapshot(s.Observer));
+        });
 
     public static IEnumerable<object[]> InvalidArguments()
     {
@@ -229,6 +293,45 @@ public sealed class WebOperationOperatorDecisionTests
     };
 
     private static string[] Execute() => Append(DryRun().WithReplaced("--dry-run", "--execute"), "--confirm", Confirmation);
+
+    private static RecordNotExecutedOptions Parse(string[] args)
+    {
+        Assert.True(RecordNotExecutedOptions.TryParse(args, out var options, out var error), error);
+        return options!;
+    }
+
+    private static string[] DryRunArguments(WebOperationJournalTests.Scenario s, WebOperationContext operation, string? database = null)
+    {
+        var args = DryRun();
+        args = Replace(args, "--database", database ?? s.Database.DatabaseName);
+        args = Replace(args, "--epoch", s.Epoch.ToString("D"));
+        args = Replace(args, "--actor", s.Actor.ToString());
+        args = Replace(args, "--operation", operation.OperationId.ToString("D"));
+        args = Replace(args, "--kind", ((byte)operation.Kind).ToString());
+        args = Replace(args, "--target", operation.RequestTargetId?.ToString() ?? "NONE");
+        return Replace(args, "--fingerprint", Hex(operation.Fingerprint));
+    }
+
+    private static string[] ExecuteArguments(WebOperationJournalTests.Scenario s, WebOperationContext operation)
+    {
+        var dry = Parse(DryRunArguments(s, operation));
+        return Append(DryRunArguments(s, operation).WithReplaced("--dry-run", "--execute"), "--confirm", dry.ConfirmationText);
+    }
+
+    private static string Hex(byte[] bytes) => BitConverter.ToString(bytes).Replace("-", string.Empty).ToLowerInvariant();
+
+    private static async Task<string> SqlSnapshot(SqlConnection sql)
+    {
+        var values = new List<string>();
+        foreach (var source in new[]
+        {
+            "WebOperationJournal ORDER BY ActorUserId,OperationId", "WebOperationTerminalAudit ORDER BY ActorUserId,OperationId",
+            "SalesReceipts ORDER BY SaleId", "SalesReceiptLines ORDER BY SaleLineId", "GoodsReceipts ORDER BY ReceiptId",
+            "GoodsReceiptLines ORDER BY ReceiptLineId", "StockBalances ORDER BY WarehouseId,ProductId",
+            "StockLedger ORDER BY LedgerId", "StockValuationEntries ORDER BY LedgerId"
+        }) values.Add(await sql.QuerySingleAsync<string>("SELECT COALESCE((SELECT * FROM dbo." + source + " FOR JSON PATH,INCLUDE_NULL_VALUES),N'[]');"));
+        return string.Join("|", values);
+    }
 
     private static string[] WithKindAndTarget(string[] source, string kind, string target) =>
         Replace(Replace(source, "--kind", kind), "--target", target);
@@ -288,6 +391,25 @@ public sealed class WebOperationOperatorDecisionTests
             if (_waitForCancellation) await Task.Delay(Timeout.Infinite, token);
             if (_error != null) throw _error;
             return _result!;
+        }
+    }
+
+    private sealed class ImpersonatingDecisionConnectionFactory : IOperatorSqlConnectionFactory
+    {
+        private readonly string _connectionString;
+        private readonly string _databaseUser;
+        public ImpersonatingDecisionConnectionFactory(string connectionString, string databaseUser)
+        {
+            _connectionString = connectionString; _databaseUser = databaseUser;
+        }
+        public async Task<SqlConnection> OpenAsync(IOperatorTargetOptions options, CancellationToken cancellationToken)
+        {
+            var connection = new SqlConnection(new SqlConnectionStringBuilder(_connectionString) { Pooling = false }.ConnectionString);
+            await connection.OpenAsync(cancellationToken);
+            using var command = connection.CreateCommand();
+            command.CommandText = "EXECUTE AS USER=N'" + _databaseUser + "';";
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            return connection;
         }
     }
 }

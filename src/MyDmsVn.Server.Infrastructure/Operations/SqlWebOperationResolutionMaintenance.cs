@@ -48,6 +48,7 @@ public sealed class SqlWebOperationResolutionMaintenance
         catch (SqlException error)
         {
             throw new WebOperationException(error.Number == 51307 ? "Idempotency.FingerprintMismatch"
+                : error.Number == 51306 ? "Operation.FenceUnavailable"
                 : error.Number == 51305 ? "Deployment.EpochMismatch" : error.Number == 51302 || error.Number == 229 ? "Auth.Forbidden" : "Operation.Unavailable");
         }
     }
@@ -72,6 +73,7 @@ public sealed class SqlWebOperationResolutionMaintenance
         catch (SqlException error) when (error.Number >= 51301 && error.Number <= 51306)
         {
             throw new WebOperationException(error.Number == 51303 ? "Operation.ResolutionConflict" : error.Number == 51302 ? "Auth.Forbidden"
+                : error.Number == 51306 ? "Operation.FenceUnavailable"
                 : error.Number == 51305 ? "Deployment.EpochMismatch" : "Operation.Unavailable");
         }
     }
