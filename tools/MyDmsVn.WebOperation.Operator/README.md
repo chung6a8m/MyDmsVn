@@ -1,6 +1,8 @@
-# WEB6 read-only operation inspector
+# WEB6 guarded Web operation operator CLI
 
-This net48 console application inspects one exact schema13 Web operation through the existing restricted operator stored procedure. It never records `NOT_EXECUTED`, changes the journal, creates a support case, or connects to another database as fallback.
+This isolated net48 console application uses the schema13 restricted operator procedures. It can inspect one exact Web operation, preview a terminal-negative decision without mutation, or record one audited `NOT_EXECUTED` decision as a matched `CANCELLED` journal/audit pair. It is not part of HttpHost, does not create a support case or new client intent, and does not enable manual resend.
+
+## Restricted connection
 
 Configure the dedicated operator connection outside source control:
 
@@ -10,7 +12,9 @@ $env:MYDMSVN_WEB_OPERATION_OPERATOR_DATABASE_USER = '<expected restricted databa
 $env:MYDMSVN_WEB_OPERATION_OPERATOR_LOGIN = '<expected restricted SQL login>'
 ```
 
-Run:
+The connection must target the explicit application database and use a separate member of `MyDmsVnWebOperationOperatorRole`. The tool rejects system databases, attach/user-instance connections, target/identity mismatch, runtime/migration/fixed roles, direct or inherited DML/broad reads, `PUBLIC`/nested-role over-grants, schema/database/server/custom-securable authority and grant option. It disables pooling and never falls back to `master` or another database.
+
+## Read-only inspect
 
 ```powershell
 MyDmsVn.WebOperation.Operator.exe inspect `
@@ -22,8 +26,76 @@ MyDmsVn.WebOperation.Operator.exe inspect `
   --fingerprint 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ```
 
-Use the real non-empty deployment epoch. `--timeout-seconds` accepts 1 through 25 and defaults to 15. This public bound expires before the Infrastructure read command's 30-second hard timeout; an actual SQL command timeout (`SqlException -2`) is also reported as the bounded timeout exit. The executable arms a process watchdog at the same deadline: if provider rollback/close/disposal does not return, the dedicated process terminates with exit 6 and reports the SQL outcome as unknown. Caller cancellation that completes before the deadline remains distinct at exit 130.
+`INDETERMINATE` or a missing journal row is unknown. It is never proof of rollback or `NOT_EXECUTED`.
 
-The tool validates that both the configured initial catalog and `DB_NAME()` equal `--database`; system databases, attach/user-instance connections, missing configuration and target mismatch fail closed. Before inspection it also requires exact configured `USER_NAME()` and `ORIGINAL_LOGIN()`, membership in `MyDmsVnWebOperationOperatorRole`, no additional direct database role/grant beyond normal `CONNECT`, and no effective runtime/migration/fixed-role, DML, broad read, schema/database/server/custom-securable control, impersonation/grant-option or unexpected execute/reference authority. Every explicit permission supplied by nested roles, `PUBLIC` or operator-role over-grants is compared with an exact catalog allowlist; only normal system catalog/endpoint access and the two existing schema13 operator procedure executes are allowed. Unknown or ambiguous membership is denied. Do not point this CLI at a runtime, migration, maintenance or administrator connection.
+## Terminal decision dry-run
 
-Exit codes: `0` authoritative COMMITTED/EXPIRED/CANCELLED or help, `2` invalid arguments, `3` denied identity/authority, `4` INDETERMINATE (including a missing/foreign row), `5` SQL/environment unavailable or cleanup failure, `6` bounded timeout, `130` caller cancellation. `environmentLabel` is explicitly accompanied by `environmentLabelSource=operator-supplied`; it is not an authoritative environment identity. Output contains bounded metadata only, never connection data, credentials, JWT/cookies or original business/result payload.
+Dry-run validates the complete decision, target and restricted SQL identity, then calls only the read-only inspection procedure inside a rolled-back transaction. It does not insert/update/delete journal, audit or business data and cannot reserve execute against a later race.
+
+```powershell
+MyDmsVn.WebOperation.Operator.exe record-not-executed --dry-run `
+  --environment nonproduction `
+  --database MyDmsVn_ExactTarget `
+  --epoch bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb `
+  --actor 123 `
+  --operation aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa `
+  --kind 1 `
+  --target NONE `
+  --fingerprint 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef `
+  --case CASE-123 `
+  --reason ORIGINAL_NOT_EXECUTED `
+  --evidence case://CASE-123/evidence-1 `
+  --decision dddddddd-dddd-4ddd-8ddd-dddddddddddd
+```
+
+Kinds are `1` Sales Create, `2` Sales Update, `3` Sales Post, `4` Goods Receipt Create, `5` Goods Receipt Update and `6` Goods Receipt Post. Create requires `--target NONE`; Update/Post require a canonical positive target ID. Operation and decision IDs are distinct-purpose GUIDv4 values; the decision ID is audit metadata and never replaces the original operation ID.
+
+## Guarded execute and confirmation
+
+Execute is a separate invocation. There is no default execute and no dry-run-to-execute transition. `--confirm` must exactly equal this case-sensitive composite built from the same validated values:
+
+```text
+record-not-executed|environment=<environment>|database=<database>|epoch=<epoch>|actor=<actor>|operation=<operation>|kind=<1..6>|target=<NONE-or-id>|fingerprint=<lowercase-sha256>|decision=<decision-guid>|case=<case>|reason=<reason>|evidence=<evidence>
+```
+
+Example shape:
+
+```powershell
+MyDmsVn.WebOperation.Operator.exe record-not-executed --execute `
+  --environment nonproduction --database MyDmsVn_ExactTarget `
+  --epoch bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb --actor 123 `
+  --operation aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa --kind 1 --target NONE `
+  --fingerprint 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef `
+  --case CASE-123 --reason ORIGINAL_NOT_EXECUTED --evidence case://CASE-123/evidence-1 `
+  --decision dddddddd-dddd-4ddd-8ddd-dddddddddddd `
+  --confirm 'record-not-executed|environment=nonproduction|database=MyDmsVn_ExactTarget|epoch=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb|actor=123|operation=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|kind=1|target=NONE|fingerprint=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef|decision=dddddddd-dddd-4ddd-8ddd-dddddddddddd|case=CASE-123|reason=ORIGINAL_NOT_EXECUTED|evidence=case://CASE-123/evidence-1'
+```
+
+Execute first performs a new inspection, then opens a separate explicit SQL transaction and calls only `dbo.RecordWebOperationNotExecuted`. Schema13 owns epoch validation, the actor/key application lock, active-actor check, durable conflict fence and atomic matched audit/journal insert. Success is printed only after Commit returns and a fresh restricted connection re-inspects the exact identity as `CANCELLED` with the matching decision and case.
+
+## Timeout, cancellation and unknown Commit
+
+`--timeout-seconds` accepts 1 through 25 and defaults to 15. The process watchdog uses the same bound. Exit `6` means the SQL/process deadline expired and the outcome is unknown. Exit `8` means Commit or post-Commit readback could not be proved and is explicitly `UNKNOWN/ESCALATE`.
+
+For either outcome:
+
+1. Do not automatically execute again and do not create a new operation ID for the same-key action.
+2. Wait for process/SQL ownership to drain under the approved operator procedure.
+3. Run an independent `inspect` with the same database, epoch, actor, original operation and fingerprint.
+4. Escalate COMMITTED/EXPIRED/CANCELLED/INDETERMINATE according to the recovery protocol. A 404, timeout, process exit or missing row is never rollback evidence.
+
+## Exit codes and output
+
+| Code | Meaning |
+|---:|---|
+| 0 | Help, authoritative inspect state, or known-Commit terminal decision with matched readback |
+| 2 | Invalid, missing, duplicate, unknown or confirmation-mismatched arguments; SQL is not opened |
+| 3 | Denied authority, identity, durable conflict, epoch or fingerprint |
+| 4 | Inspect-only `INDETERMINATE` |
+| 5 | SQL/environment/cleanup unavailable before a known terminal outcome |
+| 6 | Bounded timeout; outcome unknown, inspect independently |
+| 7 | Completed read-only dry-run preview; still not proof of `NOT_EXECUTED` |
+| 8 | `UNKNOWN/ESCALATE` for uncertain Commit or failed post-Commit verification |
+| 130 | Caller cancellation; inspect independently before further action |
+
+Output is bounded and sanitized. It never prints the connection string, credential, JWT/cookie, fingerprint, original request/result bytes or business payload. `environmentLabelSource=operator-supplied` explicitly states that the label itself is not authoritative environment identity.
