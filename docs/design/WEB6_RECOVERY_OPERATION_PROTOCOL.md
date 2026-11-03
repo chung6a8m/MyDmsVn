@@ -49,7 +49,7 @@ Before UI enablement, test and annotate exact behavior of `SqlWebOperationJourna
 
 Check each command's response specifics (Sales Post version, Receipt Post no version; stable line IDs for saves), duplicate Sales products/gifts, Receipt unique product constraint, moving-average quantity/value/COGS and SQL transaction isolation.
 
-**Do not claim exactly-once HTTP transport.** The target is *at most one client transmission per durable user consent* plus *at most one committed SQL business effect per original operation key* through backend journal. A malicious client can send HTTP more often; backend idempotency and auth must still keep one effect.
+**Do not claim exactly-once HTTP transport.** The target is *at most one client transmission per durable user consent* plus *at most one committed SQL business effect per original operation key* through backend journal. A malicious client or a separate browser profile/device can send HTTP more often; browser IndexedDB CAS is local to its storage partition, **not a cross-device lock**. Backend idempotency and auth must still keep one effect. Include concurrent independently hosted clients in B04 tests.
 
 ## 4. Operator SQL authority and runtime segregation
 
