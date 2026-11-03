@@ -52,6 +52,12 @@ On 2026-11-03, the test-only supervisor/SQL ownership candidate `3a0fb72` had **
 
 Additional host/login/composite components are under development after that candidate; their source and later SQL-free checks do not inherit the earlier live SQL result. They require independent review, exact candidate pinning and separate owned end-to-end checks before use. The cutover and bounded workload documents remain design work, not execution evidence.
 
+### Owned host readiness remains blocked
+
+The local IIS Express diagnostic observed the HTTPS TCP listener reported as PID 4 and a corresponding HTTP.sys request-queue view. PID 4 alone does not identify the owned IIS worker or prove that it receives the requests. A command to write a request-queue ownership parser was rejected by the execution policy (the stated reason was only blocked by policy); no queue ownership proof or alternative acceptance was established. The fixture remains fail-closed. The rejection has not been bypassed, and no foreign endpoint has been used to supply readiness.
+
+The host, workload and cutover components developed after the SQL supervisor checkpoint are uncommitted local work in progress. A supplemental SQL-free verifier for a signed actor/session/epoch challenge does not establish listener PID ownership and cannot rule out a relay; it is not an admission substitute. Physical workload oracle code and its SQL-free checks are also WIP, with no live SQL verification. **Owned workload and cutover remain NOT RUN**; the earlier paired browser and SQL supervisor results do not establish either gate.
+
 ## Paired and attended checkpoint
 
 The later paired runs at the source pins above used IIS Express and separate owned nonproduction SQL fixtures. `web5-pinned-chromium.trx` and `web5-pinned-edge.trx` each report **14/14 browser PASS**, zero failed/skipped/interrupted/retries, and **1/1 wrapper PASS**. Each reports `WEB5_OWNED_SQL_CLEANUP verified=1 remaining=0`; the SQL oracle and browser counts are distinct from the wrapper count. This result covers six committed original commands and one Sales.Create operator-first durable negative/late original, not all negative commands or lock-order races.
