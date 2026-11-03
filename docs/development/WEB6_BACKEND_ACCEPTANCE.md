@@ -38,7 +38,7 @@ Every test must record repository SHA, inspected source tree, built artifact has
 | B6-REL-02 | B06 | Named Owner-approved numeric target versus measured final candidate for latency, errors, throughput, journal, RPO/RTO, alert, unresolved age | NOT RUN |
 | B6-REL-03 | B06 | Separate approval for nonproduction resend enable, staging and production; no implicit GO by docs merge or CI | NOT RUN |
 
-Frontend companion gates [F6-...] (https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/development/WEB6_WEB_ACCEPTANCE.md) are **independently owned**. Backend B04 alone cannot enable F02. Cross-repo candidate gate B6-PAIR-01 needs both owners' results and exact hashes.
+Frontend companion gates [Frontend F6 acceptance](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/development/WEB6_WEB_ACCEPTANCE.md) are **independently owned**. Backend B04 alone cannot enable F02. Cross-repo candidate gate B6-PAIR-01 needs both owners' results and exact hashes.
 
 ## 3. SQL replay oracle for every mutation
 
