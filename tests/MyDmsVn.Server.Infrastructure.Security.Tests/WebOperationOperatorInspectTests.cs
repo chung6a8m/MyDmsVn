@@ -1,5 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using MyDmsVn.Server.Application.Operations;
 using MyDmsVn.WebOperation.Operator;
 using Xunit;
 
@@ -60,6 +64,81 @@ public sealed class WebOperationOperatorInspectTests
         Assert.Equal(130, (int)OperatorExitCode.Cancelled);
     }
 
+    [Fact]
+    public async Task Help_does_not_construct_a_SQL_client()
+    {
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var exit = await OperatorInspectApplication.RunAsync(new[] { "--help" },
+            _ => throw new InvalidOperationException("client must not be created"), stdout, stderr, CancellationToken.None);
+        Assert.Equal((int)OperatorExitCode.Completed, exit);
+        Assert.Contains("inspect --environment", stdout.ToString());
+        Assert.Equal(string.Empty, stderr.ToString());
+    }
+
+    [Theory]
+    [InlineData("COMMITTED", 0)]
+    [InlineData("EXPIRED", 0)]
+    [InlineData("CANCELLED", 0)]
+    [InlineData("INDETERMINATE", 4)]
+    public async Task Status_output_is_bounded_and_exit_code_is_stable(string disposition, int expectedExit)
+    {
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var result = Inspection(disposition);
+        var exit = await OperatorInspectApplication.RunAsync(Valid(), _ => new FakeClient(result), stdout, stderr, CancellationToken.None);
+        Assert.Equal(expectedExit, exit);
+        Assert.Contains("status=" + disposition, stdout.ToString());
+        Assert.Contains("environment=owned-test", stdout.ToString());
+        Assert.Contains("database=MyDmsVn_Test_Operator", stdout.ToString());
+        Assert.DoesNotContain(Fingerprint, stdout.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("private-payload", stdout.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(string.Empty, stderr.ToString());
+    }
+
+    [Theory]
+    [InlineData("Auth.Forbidden", 3)]
+    [InlineData("Deployment.EpochMismatch", 3)]
+    [InlineData("Idempotency.FingerprintMismatch", 3)]
+    [InlineData("Operation.Unavailable", 5)]
+    public async Task Operation_failures_are_sanitized(string code, int expectedExit)
+    {
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var exit = await OperatorInspectApplication.RunAsync(Valid(), _ => new FakeClient(new WebOperationException(code)), stdout, stderr, CancellationToken.None);
+        Assert.Equal(expectedExit, exit);
+        Assert.Equal(string.Empty, stdout.ToString());
+        Assert.DoesNotContain(Fingerprint, stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("private-payload", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Unexpected_environment_failure_does_not_echo_exception_or_secrets()
+    {
+        var stderr = new StringWriter();
+        var exit = await OperatorInspectApplication.RunAsync(Valid(),
+            _ => new FakeClient(new InvalidOperationException("Server=secret;Password=private-payload")),
+            new StringWriter(), stderr, CancellationToken.None);
+        Assert.Equal((int)OperatorExitCode.EnvironmentFailure, exit);
+        Assert.DoesNotContain("Server=", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("private-payload", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_is_distinct_from_timeout()
+    {
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        var callerExit = await OperatorInspectApplication.RunAsync(Valid(), _ => new FakeClient(waitForCancellation: true),
+            new StringWriter(), new StringWriter(), cancelled.Token);
+        Assert.Equal((int)OperatorExitCode.Cancelled, callerExit);
+
+        var timeoutArgs = Replace("--timeout-seconds", "1");
+        var timeoutExit = await OperatorInspectApplication.RunAsync(timeoutArgs, _ => new FakeClient(waitForCancellation: true),
+            new StringWriter(), new StringWriter(), CancellationToken.None);
+        Assert.Equal((int)OperatorExitCode.Timeout, timeoutExit);
+    }
+
     public static IEnumerable<object[]> InvalidArguments()
     {
         yield return new object[] { Array.Empty<string>() };
@@ -107,5 +186,26 @@ public sealed class WebOperationOperatorInspectTests
         var result = new List<string>(args);
         result.RemoveRange(index, 2);
         return result.ToArray();
+    }
+
+    private static WebOperationInspection Inspection(string disposition) => new WebOperationInspection(
+        Guid.Parse(Epoch), 42, Guid.Parse(Operation),
+        disposition == "INDETERMINATE" ? (WebOperationKind?)null : WebOperationKind.SalesCreate,
+        null, disposition, disposition == "COMMITTED", disposition == "COMMITTED", disposition == "COMMITTED", null);
+
+    private sealed class FakeClient : IOperatorInspectionClient
+    {
+        private readonly WebOperationInspection? _result;
+        private readonly Exception? _error;
+        private readonly bool _waitForCancellation;
+        public FakeClient(WebOperationInspection result) { _result = result; }
+        public FakeClient(Exception error) { _error = error; }
+        public FakeClient(bool waitForCancellation) { _waitForCancellation = waitForCancellation; }
+        public async Task<WebOperationInspection> InspectAsync(InspectOptions options, CancellationToken cancellationToken)
+        {
+            if (_waitForCancellation) await Task.Delay(Timeout.Infinite, cancellationToken);
+            if (_error != null) throw _error;
+            return _result!;
+        }
     }
 }
