@@ -123,4 +123,3 @@ public sealed class Web5OwnedSupervisorTests
         await s.Start(); await Assert.ThrowsAsync<InvalidDataException>(() => s.Finish()); Assert.Equal(Web5SupervisorState.Quarantined, s.State);
     }
 }
-
