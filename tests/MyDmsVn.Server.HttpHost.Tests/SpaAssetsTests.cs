@@ -33,6 +33,7 @@ public sealed class SpaAssetsTests
             Assert.Contains("style-src 'self' 'nonce-" + nonce + "'", policy);
             Assert.Contains("script-src 'self';", policy);
             Assert.DoesNotContain("unsafe-inline", policy); Assert.DoesNotContain("unsafe-eval", policy);
+            Assert.Equal("max-age=31536000", Assert.Single(response.Headers.GetValues("Strict-Transport-Security")));
             Assert.True(body.IndexOf(match.Value, StringComparison.Ordinal) < body.IndexOf("<script", StringComparison.Ordinal));
             Assert.True(response.Headers.CacheControl.NoStore);
             nonces.Add(nonce);
@@ -64,6 +65,26 @@ public sealed class SpaAssetsTests
         using var fixture = new Assets();
         using var response = await fixture.Server.HttpClient.GetAsync(HostFixture.Origin + path);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Empty(await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Theory]
+    [InlineData("http")]
+    [InlineData("host")]
+    [InlineData("forwarded-rfc")]
+    [InlineData("forwarded-for")]
+    public async Task Direct_assets_reject_wrong_transport_and_all_forwarded_authority(string defect)
+    {
+        using var fixture = new Assets();
+        using var request = new HttpRequestMessage(HttpMethod.Get, HostFixture.Origin + "/");
+        if (defect == "http") request.RequestUri = new Uri("http://web2.mydmsvn.test/");
+        if (defect == "host") request.RequestUri = new Uri("https://untrusted.invalid/");
+        if (defect == "forwarded-rfc") request.Headers.Add("Forwarded", "for=127.0.0.1;proto=https;host=web2.mydmsvn.test");
+        if (defect == "forwarded-for") request.Headers.Add("X-Forwarded-For", "127.0.0.1");
+
+        using var response = await fixture.Server.HttpClient.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(await response.Content.ReadAsByteArrayAsync());
     }
 
