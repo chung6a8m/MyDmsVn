@@ -7,7 +7,7 @@
 | Task | Planned evidence | Status |
 |---|---|---|
 | B01 | [Exact source/contract/risk/expiry eligibility checkpoint](20261103-b01-source-safety-policy.md) and Owner scope | PR #99 MERGED; source-policy checkpoint present; Owner policy decisions still pending; runtime NOT CHANGED |
-| B02a/B02b | [B02a isolated read-only operator CLI](20261103-b02a-read-only-operator-cli.md); B02b typed terminal command/races remain pending | PR #101 PENDING; B02a locally VERIFIED NONPRODUCTION for B6-OPS-01/02; B02b NOT IMPLEMENTED |
+| B02a/B02b | [B02a isolated read-only operator CLI](20261103-b02a-read-only-operator-cli.md); B02b typed terminal command/races remain pending | PR #101 PENDING; B02a LOCAL VERIFIED NONPRODUCTION for B6-OPS-01/02; protected exact-candidate SQL CI prepared but PENDING / NOT RUN; B02b NOT IMPLEMENTED |
 | B03 | Compaction/retention/positive-case/backup-restore/epoch drill, independent SQL oracle | PLANNED |
 | B04 | Six-command same-key/terminal/OS-death local proof and original-result/one-effect oracle are carried by independent PR #100 | PR #100 PENDING; local verification recorded there; protected exact-candidate SQL CI BLOCKED / NOT RUN; B6-RPL-05 PARTIAL with Owner decisions pending |
 | B05a/B05b | Actual audit/limiter, owned IIS Express paired candidate, old/new cutover, load and service recovery | PLANNED |
