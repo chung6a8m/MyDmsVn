@@ -5,13 +5,13 @@
 ## Candidate and scope
 
 - Base SHA: `01c3c429fa8b4a67c41635629d99e762b4955fce` (`origin/main`, merged B02a and B04 baseline).
-- Locally tested runtime/test source SHA before documentation-only evidence commit: `685a0af015dfa002e31c9b08c65dd77359eb0073`.
-- Implementation commits: `335bc2624733cb3faa7aa836b0e6c648563ff445`, `6d11848ca1c197a2f78f669597cae8246cc178f2`, `685a0af015dfa002e31c9b08c65dd77359eb0073`.
+- Locally tested runtime/test source SHA before the final documentation-only evidence commit: `269fe78da89310cd5971248849e8a4edb216feba`.
+- Implementation commits: `335bc2624733cb3faa7aa836b0e6c648563ff445`, `6d11848ca1c197a2f78f669597cae8246cc178f2`, `685a0af015dfa002e31c9b08c65dd77359eb0073`, `269fe78da89310cd5971248849e8a4edb216feba`.
 - Branch: `codex/web6-b02-operator-decision`.
 - Scope: isolated `record-not-executed --dry-run|--execute` CLI only. No schema13, migration, grant, HTTP runtime/controller/DI, JWT/session, frontend/manual-resend or frozen corpus change.
 - Toolchain: Windows/net48, .NET SDK `8.0.427`, VSTest `17.11.1`, Microsoft.Data.SqlClient `7.0.2`; SQL Server `14.0.2140.2` Developer Edition (64-bit), engine edition 3.
 - Schema: exact13 / `web5`; expected fingerprint `D0A86EA0CACAB3D68F1188A1166227DFA5DE452572D1719CD55A3FA3C16F02C9`. Each SQL case allocated a fresh owned database and a nonempty current epoch; raw database/epoch/login identities remain local.
-- Release CLI SHA-256 at tested source: `eedc8bac9b3c0025aed5f8981cdff8f7ee15edf0fb24da5a51a5cf5b18050d7a`.
+- Release CLI SHA-256 at tested source: `f2883fef86983880ca195a482a7e621f20912be1a2291d7c80e75fbe64d73b15`.
 
 The command validates all input before SQL; requires exactly one mode; validates GUIDv4 operation/decision, kind/target, canonical positive actor, epoch, SHA-256 and schema13 metadata; and binds execute confirmation to command, environment, database, epoch, actor, original operation, kind/target, fingerprint, decision, case, reason and evidence. Dry-run performs only a guarded inspection and reports an explicit non-certificate preview. Execute re-inspects, opens one explicit transaction, calls existing `SqlWebOperationResolutionMaintenance.RecordNotExecutedAsync`, waits for known Commit, and reopens a restricted connection to verify matched CANCELLED/decision/case through `InspectWebOperationResolution`.
 
@@ -23,12 +23,12 @@ Locked restore passed for the CLI and Security Tests graphs. Release/net48 CLI b
 
 | Gate / local artifact | Discovered | Executed | Pass | Fail | Skip | Result |
 |---|---:|---:|---:|---:|---:|---|
-| New decision class — `TestResults/web6-b02b-task3-final/task3-final.trx` | 41 | 41 | 41 | 0 | 0 | PASS in 34s; SHA-256 `b6dc74ef81255aa71ab3e1b994501bab85fa3f3a8601386314a20886adc97537` |
-| Existing terminal resolution + OS process interruption — `TestResults/web6-b02b-task3-resolution-crash/resolution-crash.trx` | 26 | 26 | 26 | 0 | 0 | PASS in 1m46s; SHA-256 `864e1a5a59eed0d268ea02922cb7225c91e555d1e06590d1e3737fb42ad5c93b` |
-| Exact B04 operator-first/original-first six-kind races — `TestResults/web6-b02b-task3-races/races-final.trx` | 2 | 2 | 2 | 0 | 0 | PASS in 2m08s; 12 command scenarios; SHA-256 `c53000e1bfdfbbccdcde291ecde0518fe4911b91d74a1887527c2da617738d6a` |
-| B02a inspect regression during implementation — `TestResults/web6-b02b-task2/task2.trx` combined | 40 inspect + 38 then-current decision | 78 | 78 | 0 | 0 | PASS; existing inspect exit codes unchanged |
+| New decision class — `TestResults/web6-b02b-final-head/decision.trx` | 41 | 41 | 41 | 0 | 0 | PASS in 36s; SHA-256 `eca9e79860fc24300abd008508c554b23543e0bd2f48598b21448b1ecc7baf76` |
+| Existing B02a inspect regression — `TestResults/web6-b02b-final-head/inspect.trx` | 40 | 40 | 40 | 0 | 0 | PASS in 32s; SHA-256 `b2f3d04691bcf5236d65f42d517039c0f9f104a01d61e4b3ee9598ea3f6354f0`; inspect exit codes unchanged |
+| Existing terminal resolution + OS process interruption — `TestResults/web6-b02b-final-head/resolution.trx` | 26 | 26 | 26 | 0 | 0 | PASS in 1m40s; SHA-256 `695b5e44e48635159b4dc2c302505ad018b0832d5b300a99e3b98ae7945f8cf4` |
+| Exact B04 operator-first/original-first six-kind races — `TestResults/web6-b02b-final-head/races.trx` | 2 | 2 | 2 | 0 | 0 | PASS in 2m07s; 12 command scenarios; SHA-256 `7f25e61222990da72e0a246d34623fd58abb477240469a7f3fff1ec15c98c746` |
 
-Independent `--list-tests` discovery at the tested source returned exactly 41 decision, 26 resolution/crash and 2 allowlisted race cases. One earlier development command used the source filename as a class filter and discovered zero; it was rejected as evidence and replaced with the source-verified `WebOperationHttpSqlTests` names. No retry is counted.
+Independent `--list-tests` discovery at the tested source returned exactly 41 decision, 40 inherited inspect, 26 resolution/crash and 2 allowlisted race cases. One earlier development command used the source filename as a class filter and discovered zero; it was rejected as evidence and replaced with the source-verified `WebOperationHttpSqlTests` names. No retry is counted.
 
 The new 41-case class covers strict parser/help/exit/output boundaries, exact confirmation field mutation, no-client-on-invalid input, dry-run byte-equal SQL snapshots, existing disposition and wrong principal/target denial, six kinds, duplicate decision rejection, lock timeout, cancellation after a test-only trigger independently observes the write transaction, and an actual Release EXE with a generated restricted SQL login. The executable smoke proves preview exit 7, wrong confirmation exit 2 without SQL change, execute exit 0 only after matched readback, inherited `db_datareader` denial, secret-free output, session drain and exact SID-owned login removal.
 
