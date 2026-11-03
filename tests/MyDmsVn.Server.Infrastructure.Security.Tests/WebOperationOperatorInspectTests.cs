@@ -343,7 +343,11 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
                 "GRANT INSERT ON dbo.WebOperationJournal TO public;");
             Assert.Equal((int)OperatorExitCode.Denied,
                 (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
-            await s.Observer.ExecuteAsync("REVOKE INSERT ON dbo.WebOperationJournal FROM public;");
+            await s.Observer.ExecuteAsync("REVOKE INSERT ON dbo.WebOperationJournal FROM public; " +
+                "CREATE TYPE dbo.Web6PermissionProbe FROM int; GRANT CONTROL ON TYPE::dbo.Web6PermissionProbe TO public;");
+            Assert.Equal((int)OperatorExitCode.Denied,
+                (await RunExecutable(executable, arguments, login.ConnectionString(s.Database.DatabaseName), login.Name, login.Name)).ExitCode);
+            await s.Observer.ExecuteAsync("REVOKE CONTROL ON TYPE::dbo.Web6PermissionProbe FROM public; DROP TYPE dbo.Web6PermissionProbe;");
 
             Assert.Equal((int)OperatorExitCode.EnvironmentFailure,
                 (await RunExecutable(executable, Replace(arguments, "--database", "AnotherOwnedDatabase"),

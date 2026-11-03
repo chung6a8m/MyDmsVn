@@ -144,7 +144,16 @@ EXISTS(SELECT 1 FROM sys.server_principals AS candidate WHERE candidate.name<>N'
  (ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'SERVER ROLE',N'CONTROL'),0)=1 OR ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'SERVER ROLE',N'ALTER'),0)=1 OR
   ISNULL(HAS_PERMS_BY_NAME(candidate.name,N'SERVER ROLE',N'TAKE OWNERSHIP'),0)=1)) OR
 EXISTS(SELECT 1 FROM sys.database_permissions AS permission
- JOIN sys.user_token AS token ON token.principal_id=permission.grantee_principal_id WHERE permission.state=N'W')
+ JOIN sys.user_token AS token ON token.principal_id=permission.grantee_principal_id
+ WHERE NOT(permission.state=N'G' AND permission.minor_id=0 AND
+  ((permission.class=0 AND permission.major_id=0 AND permission.permission_name IN(N'CONNECT',N'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION',N'VIEW ANY COLUMN MASTER KEY DEFINITION')) OR
+   (permission.class=1 AND permission.major_id<0 AND permission.permission_name=N'SELECT') OR
+   (permission.class=1 AND permission.major_id IN(OBJECT_ID(N'dbo.InspectWebOperationResolution'),OBJECT_ID(N'dbo.RecordWebOperationNotExecuted')) AND permission.permission_name=N'EXECUTE')))) OR
+EXISTS(SELECT 1 FROM sys.server_permissions AS permission
+ JOIN sys.login_token AS token ON token.principal_id=permission.grantee_principal_id
+ WHERE NOT(permission.state=N'G' AND
+  ((permission.class=100 AND permission.major_id=0 AND permission.permission_name IN(N'CONNECT SQL',N'VIEW ANY DATABASE',N'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION',N'VIEW ANY COLUMN MASTER KEY DEFINITION')) OR
+   (permission.class=105 AND permission.major_id IN(2,3,4,5) AND permission.permission_name=N'CONNECT'))))
 THEN 1 ELSE 0 END;";
         if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0)
             throw new WebOperationException("Auth.Forbidden");
