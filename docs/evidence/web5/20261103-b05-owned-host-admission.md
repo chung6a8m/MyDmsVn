@@ -5,8 +5,8 @@
 ## Candidate and environment
 
 - Backend base: `233ce368b368729e2b6c7f3adeb4bf197c6637c3` (merged PR #94).
-- Implementation source: `45c9e1f7c6e6621f89233690aef0b4cec45e3e13`; tree `97682e8044da0f87e40e0061baca09fafe299e02`; branch `codex/web5-b05-owned-host`.
-- Implementation commits: `47abec8` supervisor admission phases; `ce12c29` HTTP.sys queue parser; `1df7b74` exact IIS Express admission; `9b861bc` read-only quarantine forensics; `2c5d27a` packaged-host gate and review fixes; `45c9e1f` fail-closed URL-count hardening.
+- Implementation source: `b7a8c5e941a73a3ebd36b1c79d4cf2016ffe21f2`; tree `82d130c4f8c8be769b0030777425b61642a29494`; branch `codex/web5-b05-owned-host`.
+- Implementation commits: `47abec8` supervisor admission phases; `ce12c29` HTTP.sys queue parser; `1df7b74` exact IIS Express admission; `9b861bc` read-only quarantine forensics; `2c5d27a` packaged-host gate and review fixes; `45c9e1f` fail-closed URL-count hardening; `b7a8c5e` competing HTTP.sys route rejection.
 - Frontend reference only: `492d60958e918867bb5a733faf51da89d10f800d`; no frontend file or artifact was used or changed.
 - Windows `10.0.26300` build `26300`; .NET SDK `8.0.427`; test target `.NET Framework 4.8`; IIS Express `10.0.26013.1000`.
 - Existing localhost:44321 machine certificate binding was read into the test process and used only for exact TLS pinning. Its thumbprint and private material were not logged or committed.
@@ -27,14 +27,14 @@ Microsoft documents HTTP.sys as the kernel HTTP listener and request queues as t
 The final SQL-free run used:
 
 ```text
-dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --filter "(FullyQualifiedName~Web5OwnedSupervisorTests|FullyQualifiedName~Web5HttpServiceStateTests|FullyQualifiedName~Web5IisExpressHostAdmissionTests|FullyQualifiedName~Web5BackupSafetyTests|FullyQualifiedName~Web5OriginalFirstControlTests|FullyQualifiedName~Web5OriginalRaceForensicsTests)&Category!=Web5OwnedHostAdmission&Category!=Web5HistoricalForensics" --logger "trx;LogFileName=web5-b05a-final-sql-free.trx"
+dotnet test tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj -c Release -f net48 --no-restore --filter "(FullyQualifiedName~Web5OwnedSupervisorTests|FullyQualifiedName~Web5HttpServiceStateTests|FullyQualifiedName~Web5IisExpressHostAdmissionTests|FullyQualifiedName~Web5BackupSafetyTests|FullyQualifiedName~Web5OriginalFirstControlTests|FullyQualifiedName~Web5OriginalRaceForensicsTests)&Category!=Web5OwnedHostAdmission&Category!=Web5HistoricalForensics" --logger "trx;LogFileName=web5-b05a-review-fix-sql-free.trx"
 ```
 
-TRX `web5-b05a-final-sql-free.trx`, SHA-256 `8242D9C08D5F483955AF3884A0C33AA80B3DA95FAED22E5781CBFEEC3E7C2840`: **75 discovered / 75 executed / 75 passed / 0 failed / 0 skipped**.
+TRX `web5-b05a-review-fix-sql-free.trx`, SHA-256 `267E95637AEF35F10026877DAC8F47D6DC9F1FE902E5D88175DA025BD51708F9`: **79 discovered / 79 executed / 79 passed / 0 failed / 0 skipped**.
 
-The final private live opt-in run selected `Category=Web5OwnedHostAdmission` and used no SQL, published application or foreign endpoint. TRX `web5-b05a-final-live-owned-host.trx`, SHA-256 `33CBB26B4CB70215CF7611D424795F0EF31213F13490A2A4F3D97ADDE105BA81`: **1 discovered / 1 executed / 1 passed / 0 failed / 0 skipped**. It reported exact owned PID `11696`, origin `https://localhost:44321`, three exclusive queue snapshots and proxy disabled.
+The final private live opt-in run selected `Category=Web5OwnedHostAdmission` and used no SQL, published application or foreign endpoint. TRX `web5-b05a-review-fix-live-owned-host.trx`, SHA-256 `7D9BB0D53E4C7DFE09F0FA90C78A6079DAE32A4C745F4BB884AA282BD3875F67`: **1 discovered / 1 executed / 1 passed / 0 failed / 0 skipped**. It reported exact owned PID `39208`, origin `https://localhost:44321`, three exclusive queue snapshots and proxy disabled.
 
-The final published-host admission-only run selected `Published_WEB5_host_is_admitted_before_HTTP_and_absent_before_SQL_cleanup`. TRX `web5-b05a-final-published-web5.trx`, SHA-256 `F796DF646B95AFC19DFDB7970F685A7BC8BEBB4180A4B89CAAB145D44B3AEC6D`: **1 discovered / 1 executed / 1 passed / 0 failed / 0 skipped**. It created a fresh owned disposable SQL database, admitted the immutable published host before health, proved absence before cleanup and reported `WEB5_OWNED_SQL_CLEANUP verified=1 remaining=0`. Published artifact hashes were HTTP host DLL `862E6F60EAFC45D8A3E4260BE4D42A334B65DBE6F37B41C6FDFF6DD1B45826AF` and `Web.config` `8FEDF54AA653B05D6F8D9D0155D3AB5322F460B9BCADD5B1554A60E85CAEB4FE`. A separate post-run read found **0 IIS Express processes** and **0 listeners on port 44321**.
+The final published-host admission-only run selected `Published_WEB5_host_is_admitted_before_HTTP_and_absent_before_SQL_cleanup`. TRX `web5-b05a-review-fix-published-web5.trx`, SHA-256 `CC928D691D62A5186CE00B0C8FA94FC73D81F2774BDC77D4990742702DD38407`: **1 discovered / 1 executed / 1 passed / 0 failed / 0 skipped**. It created a fresh owned disposable SQL database, admitted the immutable published host before health, proved absence before cleanup and reported `WEB5_OWNED_SQL_CLEANUP verified=1 remaining=0`. Published artifact hashes were HTTP host DLL `862E6F60EAFC45D8A3E4260BE4D42A334B65DBE6F37B41C6FDFF6DD1B45826AF` and `Web.config` `8FEDF54AA653B05D6F8D9D0155D3AB5322F460B9BCADD5B1554A60E85CAEB4FE`. A separate post-run read found **0 IIS Express processes** and **0 listeners on port 44321**.
 
 Test-first controls were observed rather than inferred:
 
@@ -42,7 +42,7 @@ Test-first controls were observed rather than inferred:
 - HTTP.sys tests failed to compile before the parser existed. A deliberate mutation removing PID/controller equality produced **2 failures / 12 passes**, then the restored gate passed.
 - The first live RED exposed valid foreign prefix `HTTP://*:80/`; regression tests retained strict exact-origin matching.
 - A later live RED exposed trailing spaces emitted by actual `netsh` headers; the parser now accepts only trailing space/tab while retaining exact English request-queue header text. Localized-header negative coverage remains.
-- Independent review first found that the packaged runner bypassed admission and did not prove queue absence before SQL cleanup, plus PID-reuse, structured URL-group, bounded-output and deterministic in-flight gaps. Those findings were reproduced and fixed in `2c5d27a`; final review reported **0 P0 / 0 P1 / 0 P2**. The last parser review observation (declared URL count smaller than present entries) failed first, passed after `45c9e1f`, and was independently re-reviewed with no remaining finding.
+- Independent review first found that the packaged runner bypassed admission and did not prove queue absence before SQL cleanup, plus PID-reuse, structured URL-group, bounded-output and deterministic in-flight gaps. Those findings were reproduced and fixed in `2c5d27a`. The parser URL-count observation failed first and passed after `45c9e1f`. Owner review then found a P1 routing-precedence gap: foreign active strong-wildcard or longer explicit registrations could capture owned paths. Four admission/absence cases failed before the fix, then passed after `b7a8c5e`; the full focused and live evidence above was regenerated.
 
 The complete Security project and broad SQL suites were not run. The focused classes, private live wrapper and single fresh-owned-SQL published-host admission wrapper provide nonzero, zero-skip evidence for this B05-A scope. No compatibility, security/limiter workload or cutover suite was run.
 
