@@ -1,6 +1,6 @@
 # WEB6 B01 — Source and safety policy checkpoint
 
-**Status: READY FOR OWNER TECHNICAL REVIEW, 2026-11-03. No runtime capability is enabled.** This checkpoint maps runtime source at backend `c7782429e105688e916fe2a0d41bb58fc0a1cb4d` and paired frontend `a011230fc9d5057ab76321251ad0a292e18aecbc`. The checkpoint document commits are backend B01 `8586de3` and frontend F01 `9f5ae59`; later review-fix commits do not change the runtime pins. It does not implement B02–B06/F02–F05, change a frozen contract, or authorize a resend.
+**Status: READY FOR OWNER TECHNICAL REVIEW, 2026-11-03. No runtime capability is enabled.** This checkpoint maps runtime source at backend `c7782429e105688e916fe2a0d41bb58fc0a1cb4d` and paired frontend `a011230fc9d5057ab76321251ad0a292e18aecbc`. Original checkpoint content commits are backend B01 `8586de3` and frontend F01 `9f5ae59`; reviewed provenance/reference fixes are backend `8eb5cc9` and frontend `c6344b4`. These documentation commits do not change the runtime pins. It does not implement B02–B06/F02–F05, change a frozen contract, or authorize a resend.
 
 ## 1. Frozen baseline
 

@@ -4,8 +4,8 @@
 
 ## Scope and revisions
 
-- Backend runtime source: `c7782429e105688e916fe2a0d41bb58fc0a1cb4d`; B01 checkpoint content commit: `8586de3`.
-- Paired frontend runtime source: `a011230fc9d5057ab76321251ad0a292e18aecbc` (frontend PR #32 merged); F01 checkpoint content commit consumed: `9f5ae59`.
+- Backend runtime source: `c7782429e105688e916fe2a0d41bb58fc0a1cb4d`; B01 original content commit `8586de3`, reviewed provenance/reference fix `8eb5cc9`.
+- Paired frontend runtime source: `a011230fc9d5057ab76321251ad0a292e18aecbc` (frontend PR #32 merged); F01 original content commit `9f5ae59`, reviewed revision-pin fix `c6344b4`.
 - Deliverable: [B01 source and safety policy](../../development/WEB6_B01_SOURCE_SAFETY_POLICY.md).
 - Only B01/F01 source, policy, threat/state/test mapping was reviewed. B02–B06/F02–F05 were not implemented or executed.
 
