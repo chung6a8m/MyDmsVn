@@ -14,12 +14,21 @@ public sealed class Web5OwnedSupervisorTests
         public readonly List<string> Calls = new List<string>();
         public string? Fail;
         public bool FailQuarantine;
+        public bool HostOwned = true;
         public bool Owned = true;
         public bool Absent = true;
         public TaskCompletionSource<bool>? HeldDrain;
+        public TaskCompletionSource<bool>? HeldVerifyHost;
         private Task Step(string name) { Calls.Add(name); if (Fail == name) throw new InvalidOperationException(name); return Task.CompletedTask; }
         public Task Allocate(CancellationToken token) => Step("allocate");
         public Task Start(CancellationToken token) => Step("start");
+        public async Task<bool> VerifyHost(CancellationToken token)
+        {
+            await (HeldVerifyHost?.Task ?? Step("verify-host"));
+            if (HeldVerifyHost != null) Calls.Add("verify-host");
+            return HostOwned;
+        }
+        public Task Admit(CancellationToken token) => Step("admit");
         public Task StopAdmission(CancellationToken token) => Step("stop");
         public Task Drain(CancellationToken token) { var result = Step("drain"); return HeldDrain?.Task ?? result; }
         public Task<bool> VerifyOwnershipAndQuiescence(CancellationToken token) { Calls.Add("verify"); return Task.FromResult(Owned); }
@@ -65,19 +74,44 @@ public sealed class Web5OwnedSupervisorTests
     {
         var f = new Fixture(); var s = new Web5OwnedSupervisor(f, TimeSpan.FromSeconds(2));
         await s.Start(); await s.Finish();
-        Assert.Equal(new[] { "allocate", "start", "stop", "drain", "verify", "oracle", "remove", "absent" }, f.Calls);
+        Assert.Equal(new[] { "allocate", "start", "verify-host", "admit", "stop", "drain", "verify", "oracle", "remove", "absent" }, f.Calls);
         Assert.Equal(Web5SupervisorState.Complete, s.State);
         await Assert.ThrowsAsync<InvalidOperationException>(() => s.Finish());
     }
     [Theory]
-    [InlineData("allocate")][InlineData("start")][InlineData("stop")][InlineData("drain")][InlineData("oracle")][InlineData("remove")]
+    [InlineData("allocate")][InlineData("start")][InlineData("verify-host")][InlineData("admit")][InlineData("stop")][InlineData("drain")][InlineData("oracle")][InlineData("remove")]
     public async Task Fault_quarantines_and_never_admits_later_steps(string fault)
     {
         var f = new Fixture { Fail = fault }; var s = new Web5OwnedSupervisor(f, TimeSpan.FromSeconds(2));
-        if (fault == "allocate" || fault == "start") await Assert.ThrowsAsync<InvalidOperationException>(() => s.Start());
+        if (fault == "allocate" || fault == "start" || fault == "verify-host" || fault == "admit") await Assert.ThrowsAsync<InvalidOperationException>(() => s.Start());
         else { await s.Start(); await Assert.ThrowsAsync<InvalidOperationException>(() => s.Finish()); }
         Assert.Equal(Web5SupervisorState.Quarantined, s.State); Assert.Equal("quarantine", f.Calls[f.Calls.Count - 1]);
         if (fault != "remove") Assert.DoesNotContain("remove", f.Calls);
+    }
+
+    [Fact]
+    public async Task Host_ownership_mismatch_quarantines_before_admission()
+    {
+        var f = new Fixture { HostOwned = false };
+        var s = new Web5OwnedSupervisor(f, TimeSpan.FromSeconds(2));
+        await Assert.ThrowsAsync<InvalidDataException>(() => s.Start());
+        Assert.Equal(new[] { "allocate", "start", "verify-host", "quarantine" }, f.Calls);
+        Assert.DoesNotContain("admit", f.Calls);
+        Assert.Equal(Web5SupervisorState.Quarantined, s.State);
+    }
+
+    [Fact]
+    public async Task Host_verification_timeout_never_admits_late_worker()
+    {
+        var f = new Fixture { HeldVerifyHost = new TaskCompletionSource<bool>() };
+        var s = new Web5OwnedSupervisor(f, TimeSpan.FromMilliseconds(50));
+        await Assert.ThrowsAsync<TimeoutException>(() => s.Start());
+        Assert.Equal(Web5SupervisorState.Quarantined, s.State);
+        Assert.DoesNotContain("admit", f.Calls);
+        f.HeldVerifyHost.SetResult(true);
+        await Task.Delay(100);
+        Assert.DoesNotContain("admit", f.Calls);
+        Assert.DoesNotContain("remove", f.Calls);
     }
     [Fact]
     public async Task Quarantine_record_failure_preserves_both_errors_and_never_completes()
