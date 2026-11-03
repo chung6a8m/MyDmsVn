@@ -16,7 +16,7 @@
 | B02 terminal negative | DONE / VERIFIED NONPRODUCTION (bounded); exact-candidate local and hosted proof | [B02 candidate](20261102-b02-terminal-resolution.md); [contract](../../contracts/web5-resolution-v1/README.md) |
 | B03 operator tooling/rehearsal | PLANNED | `YYYYMMDD-b03-operator-drill.md` |
 | B04 SQL CI | A+B DONE / VERIFIED NONPRODUCTION (bounded); B hosted 167/167 PASS | [B04-A baseline](20261102-b04a-protected-sql-ci.md); [B04-B candidate](20261102-b04b-candidate-sql.md) |
-| B05 IIS Express bounded work | IN PROGRESS / NOT ACCEPTED; full IIS NOT RUN (Owner exception) | [20261103 work in progress](20261103-b05-iis-express-wip.md) |
+| B05 IIS Express bounded work | Bounded companion evidence for Owner-directed WEB5-04 closure; full B05 IN PROGRESS / NOT ACCEPTED; full IIS and remaining gates NOT RUN | [20261103 evidence and exceptions](20261103-b05-iis-express-wip.md) |
 | B06 release dossier | PLANNED | `YYYYMMDD-b06-release-decision.md` |
 
 [Owning plan](../../plans/20261102-001-web5-operational-safety-backend.md) · [protocol](../../design/WEB5_OPERATION_SAFETY_PROTOCOL.md) · [acceptance](../../development/WEB5_BACKEND_ACCEPTANCE.md) · [Codex handoff](../../development/WEB5_CODEX_HANDOFF.md) · [WEB4 historical evidence](../web4/README.md). Record original source SHA, command, runner, actual TRX counts, SQL oracle, cleanup and limits per candidate; never infer a current PASS from archived WEB4.

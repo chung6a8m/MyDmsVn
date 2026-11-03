@@ -2,6 +2,8 @@
 
 **Status: IN PROGRESS / NOT ACCEPTED.** The Owner selected B05 as the F04 prerequisite and, on 2026-11-03, accepted an exception for full IIS in this work. The actual host used below is IIS Express, not W3SVC/WAS staging. Full IIS remains **NOT RUN**; this exception is not production approval. B06/F05, same-key resend, production and the independently active CEX roadmap remain separate.
 
+**Owner direction for WEB5-04, 2026-11-03:** close the frontend milestone and merge the paired PRs with the results and exceptions recorded. The B05 companion scope supporting that disposition is the bounded IIS Express evidence in this document; the remaining B05 operational gates are not implied to have passed or to be waived. The full B05 task belongs to WEB5-05 and remains **IN PROGRESS / NOT ACCEPTED**. PR merge and any exact-head CI result must be recorded from their actual disposition, not inferred from this direction. The two prior databases and private manifests remain quarantined as described below.
+
 ## Candidate and observations
 
 - Paired fixture source `37414d5340d84a85aaddc1f76765920a18381036` and frontend source `7196358ba9eccf4652ec084bdeb90d3bd92368d3`; later supervisor changes do not inherit these results. Published host was built from backend base `68cf49e5c16811f2777d271808488d70ba7b66cb`; `src` and `deployment` are unchanged between that base and `37414d5`. Published `MyDmsVn.Server.HttpHost.dll` SHA-256 is `aa65e68c9d39ed97d43626d7f53d4d5c1fe989313d8500766b35eeb0244284f5`; it was not built from `37414d5`. Frontend `dist` and published assets matched 9/9 SHA-256 with no missing or extra files.
