@@ -48,7 +48,7 @@ MyDmsVn.WebOperation.Operator.exe record-not-executed --dry-run `
   --decision dddddddd-dddd-4ddd-8ddd-dddddddddddd
 ```
 
-Kinds are `1` Sales Create, `2` Sales Update, `3` Sales Post, `4` Goods Receipt Create, `5` Goods Receipt Update and `6` Goods Receipt Post. Create requires `--target NONE`; Update/Post require a canonical positive target ID. Operation and decision IDs are distinct-purpose GUIDv4 values; the decision ID is audit metadata and never replaces the original operation ID.
+Kinds are `1` Sales Create, `2` Sales Update, `3` Sales Post, `4` Goods Receipt Create, `5` Goods Receipt Update and `6` Goods Receipt Post. Create requires `--target NONE`; Update/Post require a canonical positive target ID. Operation and decision IDs must be different GUIDv4 values; the decision ID is audit metadata and never replaces the original operation ID or any login session identity.
 
 ## Guarded execute and confirmation
 
