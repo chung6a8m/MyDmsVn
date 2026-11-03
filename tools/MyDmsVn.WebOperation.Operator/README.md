@@ -75,7 +75,7 @@ Execute first performs a new inspection, then opens a separate explicit SQL tran
 
 ## Timeout, cancellation and unknown Commit
 
-`--timeout-seconds` accepts 1 through 25 and defaults to 15. The process watchdog uses the same bound. Exit `6` means the SQL/process deadline expired and the outcome is unknown. Exit `8` means Commit or post-Commit readback could not be proved and is explicitly `UNKNOWN/ESCALATE`.
+`--timeout-seconds` accepts 1 through 25 and defaults to 15. The process watchdog uses the same bound. Exit `6` means the SQL/process deadline expired and the outcome is unknown. Exit `8` means pre-Commit rollback/session cleanup, Commit, or post-Commit readback could not be proved and is explicitly `UNKNOWN/ESCALATE`. For unverified pre-Commit cleanup, verify process/session quiescence and independently inspect the original operation before any further action.
 
 For either outcome:
 
@@ -95,7 +95,7 @@ For either outcome:
 | 5 | SQL/environment/cleanup unavailable before a known terminal outcome |
 | 6 | Bounded timeout; outcome unknown, inspect independently |
 | 7 | Completed read-only dry-run preview; still not proof of `NOT_EXECUTED` |
-| 8 | `UNKNOWN/ESCALATE` for uncertain Commit or failed post-Commit verification |
+| 8 | `UNKNOWN/ESCALATE` for unverified pre-Commit rollback/session cleanup, uncertain Commit, or failed post-Commit verification |
 | 130 | Caller cancellation; inspect independently before further action |
 
 Output is bounded and sanitized. It never prints the connection string, credential, JWT/cookie, fingerprint, original request/result bytes or business payload. `environmentLabelSource=operator-supplied` explicitly states that the label itself is not authoritative environment identity.
