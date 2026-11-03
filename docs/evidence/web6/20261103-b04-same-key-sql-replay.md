@@ -1,11 +1,12 @@
 # WEB6 B04 evidence — six-command same-key SQL replay
 
-**Date:** 2026-11-03 (Asia/Bangkok). **State:** IMPLEMENTED / VERIFIED NONPRODUCTION for the existing journal and HTTP mutation boundary. Manual resend remains OFF; no eligibility endpoint or frontend behavior was added. Owner review and CI are pending.
+**Date:** 2026-11-03 (Asia/Bangkok). **State:** IMPLEMENTED / LOCAL VERIFIED NONPRODUCTION; PROTECTED SQL CI BLOCKED / NOT RUN. Manual resend remains OFF; no eligibility endpoint or frontend behavior was added. Owner review and protected environment execution are pending.
 
 ## Candidate and environment
 
 - Base: backend `fe790b14f0e1c2247fbe3f5a1fc519f293d63d5b` (merged B01 PR #99); paired frontend read-only reference `92afef7c9090605a172ffc351d1e641d9df12100` (merged F01 PR #33).
 - Tested implementation commit: `1ab750189f65030c32a1054aeae6c7918b54c421` on `codex/web6-b04-same-key-proof`.
+- Review-fix workflow/register commit: `ffccfda76313c275dcad98cd2453bde1ea0a1476`; this adds no runtime/test behavior.
 - Native Windows, net48, .NET SDK `8.0.427`, VSTest `17.11.1`, Microsoft.Data.SqlClient `7.0.2`.
 - SQL Server `14.0.2140.2`, Developer Edition (64-bit), engine edition 3. Fresh owned disposable databases were migrated to exact schema13; source/compatibility fingerprint `D0A86EA0CACAB3D68F1188A1166227DFA5DE452572D1719CD55A3FA3C16F02C9`.
 - Changed runtime source: none. Changed test owners: `Web6SameKeyReplayTests.cs` and the existing crash fixture's explicit schema13 mode switch in `WebOperationCrashSqlTests.cs`. The implementation plan is under `docs/superpowers/plans/`.
@@ -29,36 +30,41 @@ All eight process/SQL matrices executed on the exact candidate, each over Sales 
 
 The independent, non-pooled SQL oracle runs only after child/process drain and bounded epoch/key-fence quiescence. It checks exact actor/key/epoch/kind/target/fingerprint and one COMMITTED journal row; retained result bytes; header, ordered line IDs and row version; Receipt Post's intentional no-version response; posted state; stock balances; stock ledger; moving-average valuation; COGS; Sales duplicate product/gift lines; Goods Receipt line uniqueness; and an unaffected second warehouse. Replay snapshots prove no second source, sequence, stock, ledger, valuation or COGS effect.
 
-## Final execution record
+## Review regression record
 
 | Selector/artifact | Executed | Pass | Fail | Skip | Result |
 |---|---:|---:|---:|---:|---|
-| `WebOperationJournalTests|WebOperationResolutionTests|WebOperationCrashProcessTests` — `TestResults/web6-b04-final-core/b04-journal-resolution-process-final.trx` | 49 | 49 | 0 | 0 | PASS |
-| Five original crash/contention matrices, each isolated — `web6-b04-final-before`, `-commit-window`, `-after`, `-delayed`, `-killed` | 5 | 5 | 0 | 0 | PASS; 30 command scenarios |
-| Three new ordering matrices — `TestResults/web6-b04-final-new-races/b04-new-races-final.trx` | 3 | 3 | 0 | 0 | PASS; 18 command scenarios |
-| HTTP/SQL identity, terminal, unavailable, 404 and no-auto-retry boundaries — `TestResults/web6-b04-final-boundaries/b04-failure-boundaries-final.trx` | 15 | 15 | 0 | 0 | PASS |
-| SQL-free v1/v2 endpoint, legacy-mode and frozen error boundaries — `TestResults/web6-b04-final-http/b04-http-boundaries-final.trx` | 31 | 31 | 0 | 0 | PASS |
-| **Successful final total** | **103** | **103** | **0** | **0** | **PASS** |
+| Exact eight B04 process/SQL matrices — `TestResults/web6-b04-review-eight/b04-review-eight-matrices.trx` | 8 | 8 | 0 | 0 | PASS in 9m49s; 48 command scenarios |
+| HTTP/SQL identity, terminal, unavailable, 404 and no-auto-retry boundaries — `TestResults/web6-b04-review-boundaries/b04-review-boundaries.trx` | 15 | 15 | 0 | 0 | PASS in 1m46s |
+| `WebOperationJournalTests|WebOperationResolutionTests|WebOperationCrashProcessTests` — `TestResults/web6-b04-review-core/b04-review-core.trx` | 49 | 49 | 0 | 0 | PASS in 3m08s |
+| SQL-free v1/v2 endpoint, legacy-mode and frozen error boundaries — `TestResults/web6-b04-review-http/b04-review-http.trx` | 31 | 31 | 0 | 0 | PASS in 5s |
+| **Successful review total** | **103** | **103** | **0** | **0** | **PASS** |
 
-The test assembly and CrashHost were rebuilt from the candidate before execution; no `--list-tests` result is counted. Full solution build, IIS/IIS Express, browser, frontend and protected hosted CI were NOT RUN for this test-only PR.
+The Security test assembly and CrashHost were rebuilt in Release/net48 before execution; the HttpHost boundary project was also built in Release/net48. No `--list-tests` result is counted. The eight-matrix selector independently discovered exactly the eight required methods before the run. All SQL owners ran sequentially; a post-run process census found zero matching testhost, CrashHost or DbMigrator processes. Full solution build, IIS/IIS Express, browser, frontend and protected hosted CI were NOT RUN for this test-only PR.
+
+## Protected exact-candidate SQL CI handoff
+
+`.github/workflows/backend-web6-b04-sql-candidate.yml` is a dedicated Owner-tag-triggered Windows/net48 workflow. It reuses the protected `web5-sql-candidate` environment, exact-SHA dual checkout, frozen WEB4 corpus check, evidence-guard self-test, private SID-owned LocalDB lifecycle and sanitized artifacts. Its filter names exactly the eight B04 methods; discovery and TRX must reconcile to 8 executed / 8 passed / 0 failed / 0 skipped / 0 retry. Each method runs its embedded six-command independent SQL oracle. The job refuses completion unless the exact candidate SHA remained unchanged and the owned instance reports verified ownership, zero user databases/active owners, graceful removal and no quarantine.
+
+**BLOCKED — PROTECTED SQL CI NOT RUN.** Only Owner `chung6a8m` may create and push a `web6-b04-sql-candidate-*` tag pointing at the final reviewed PR HEAD and approve the protected environment. Prerequisites are the pushed final candidate SHA, GitHub-hosted Windows 2022 with reviewed SQL 2019/2022 LocalDB, protected environment approval and no concurrent candidate job. After final review, the Owner command is `git tag web6-b04-sql-candidate-20261103-<short-sha>-1 <exact-final-pr-head>` followed by `git push origin refs/tags/web6-b04-sql-candidate-20261103-<short-sha>-1`. The run URL, exact SHA, image/SQL version, sanitized artifact digest/counts and lifecycle result must be added before B6-RPL-02 or B04 overall can close. Existing SQL-free `Backend Web checks` are not a substitute.
 
 ## Failed development runs and resource disposition
 
 RED/GREEN work found two fixture issues rather than a production defect: operator races initially used schema12, and the in-process operator observer passed a SQL session ID to a helper expecting an OS process ID. The final tests explicitly use schema13, observe the operator SQL session, use a dedicated MARS connection to drain the expected XACT_ABORT conflict, and dispose it before quiescence.
 
-Five newly allocated development fixtures were fail-closed **QUARANTINED** after cleanup/quiescence could not be proved: four while diagnosing the operator-client transaction lifecycle and one when an eight-matrix run was mistakenly overlapped with another SQL test process. They were not inspected, adopted or deleted by prefix; their private identities are not published here. A combined run from that overlap recorded 2 pass/6 fail, with five fail-fast results after the first quarantine, and is not acceptance evidence. Every final successful matrix independently reported child drain, SQL quiescence/fence proof and owned database removal. The two historical WEB5 quarantines were never queried or changed.
+Five newly allocated development fixtures were fail-closed **QUARANTINED** after cleanup/quiescence could not be proved: four while diagnosing the operator-client transaction lifecycle and one when an eight-matrix run was mistakenly overlapped with another SQL test process. They were not inspected, adopted or deleted by prefix; their private identities are not published here. A combined run from that overlap recorded 2 pass/6 fail, with five fail-fast results after the first quarantine, and is not acceptance evidence. Every final/review successful matrix independently reported child drain, SQL quiescence/fence proof and owned database removal. The two historical WEB5 quarantines were never queried or changed. The [sanitized quarantine register](20261103-b04-quarantine-register.md) separates both historical WEB5, five WEB6 development and successful-fixture dispositions; exact identities remain private and require a separate Owner/operator decision.
 
 ## Acceptance and review
 
 | Gate | State | Evidence |
 |---|---|---|
 | B6-RPL-01 | VERIFIED NONPRODUCTION | Six retained-result replay paths preserve bytes/version/line IDs and one effect |
-| B6-RPL-02 | VERIFIED NONPRODUCTION | Six before/near/after death and both original/resend ordering matrices, real processes and independent SQL oracle |
+| B6-RPL-02 | LOCAL VERIFIED / PROTECTED CI BLOCKED | Six before/near/after death and both original/resend ordering matrices, real processes and independent SQL oracle pass locally; exact-candidate protected SQL CI is NOT RUN, so this gate and B04 overall are incomplete |
 | B6-RPL-03 | VERIFIED NONPRODUCTION | Six operator-first and original-first terminal races under exact epoch/actor/key/fingerprint fence |
 | B6-RPL-04 | VERIFIED NONPRODUCTION | Actor/session/grant/epoch/body/target/kind/fingerprint, expired/unavailable, lock/cancel/availability and old-mode/capability cases fail closed |
 | B6-RPL-05 | PARTIAL / OWNER DECISION PENDING | Server dispatch/no-auto-retry and 404 observation boundaries verified; proposed `web6-resend-eligibility-v1`, authoritative age source, seven-day ceiling and consent/claim policy remain unapproved and unimplemented |
 
-Self-review findings: P0 0, P1 0, P2 1. The P2 is operational resource retention: five new quarantined development allocations require a separate exact-identity Owner disposition; no source safety defect remains known and this PR grants no cleanup authority. CI is pending. B04 does not authorize F02, production, or manual resend.
+Review-fix self-check: no known P0/P1/P2 source defect remains. Two acceptance/operational blockers remain explicit: protected exact-candidate SQL CI is NOT RUN, and five new quarantined development allocations require a separate exact-identity Owner disposition. This PR grants no tag/environment approval or cleanup authority. B04 is not DONE and does not authorize F02, production or manual resend.
 
 ## F02 handoff
 

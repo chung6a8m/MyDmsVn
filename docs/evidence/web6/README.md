@@ -1,15 +1,15 @@
-# WEB6 backend evidence — selected, awaiting execution
+# WEB6 backend evidence — selected, work in independent review
 
-**Roadmap selected 2026-11-03; ALL WEB6 implementation and verification tasks PLANNED / NOT RUN.** This is a routing index only; a documentation PR creates no source, SQL, browser, CI or release acceptance.
+**Roadmap selected 2026-11-03; overall acceptance remains incomplete and production remains NO-GO.** B01 is merged, while B02a PR #101 and B04 PR #100 are independent pending reviews. Local evidence is not Owner acceptance and is not protected hosted SQL CI.
 
 [Owning plan](../../plans/20261103-001-web6-recovery-quality-backend.md) · [safety design](../../design/WEB6_RECOVERY_OPERATION_PROTOCOL.md) · [acceptance gates](../../development/WEB6_BACKEND_ACCEPTANCE.md) · [Codex handoff](../../development/WEB6_CODEX_HANDOFF.md) · [paired candidate runbook](../../development/WEB6_CANDIDATE_RUNBOOK.md) · [archived WEB5 evidence](../web5/20261103-web5-roadmap-closeout.md).
 
 | Task | Planned evidence | Status |
 |---|---|---|
-| B01 | [Exact source/contract/risk/expiry eligibility checkpoint](20261103-b01-source-safety-policy.md) and Owner scope | READY FOR OWNER TECHNICAL REVIEW; runtime NOT CHANGED |
-| B02a/B02b | Read-only CLI, typed terminal command, SQL operator/authority/race audit evidence | PLANNED |
+| B01 | [Exact source/contract/risk/expiry eligibility checkpoint](20261103-b01-source-safety-policy.md) and Owner scope | PR #99 MERGED; source-policy checkpoint present; Owner policy decisions still pending; runtime NOT CHANGED |
+| B02a/B02b | B02a read-only CLI is carried by independent PR #101; B02b typed terminal command/races remain pending | PR #101 PENDING with local nonproduction evidence there; B02b NOT IMPLEMENTED |
 | B03 | Compaction/retention/positive-case/backup-restore/epoch drill, independent SQL oracle | PLANNED |
-| B04 | [Six-command same-key/terminal/OS-death SQL proof](20261103-b04-same-key-sql-replay.md) | IMPLEMENTED / VERIFIED NONPRODUCTION for B6-RPL-01..04; RPL-05 PARTIAL / OWNER DECISION PENDING; resend OFF |
+| B04 | [Six-command same-key/terminal/OS-death SQL proof](20261103-b04-same-key-sql-replay.md) and [quarantine register](20261103-b04-quarantine-register.md) | PR #100 PENDING; 103/103 local PASS; B6-RPL-02 protected exact-candidate SQL CI BLOCKED / NOT RUN; B6-RPL-05 PARTIAL / OWNER DECISION PENDING; resend OFF |
 | B05a/B05b | Actual audit/limiter, owned IIS Express paired candidate, old/new cutover, load and service recovery | PLANNED |
 | B06 | Exact frontend/backend paired release manifest, target-vs-actual and named Owner disposition | PLANNED |
 
