@@ -27,50 +27,35 @@ public sealed class SqlOperatorDecisionClient : IOperatorDecisionClient
     public async Task<OperatorDecisionResult> ExecuteAsync(RecordNotExecutedOptions options, CancellationToken cancellationToken)
     {
         if (options == null) throw new ArgumentNullException(nameof(options));
-        var preview = await InspectAsync(options, cancellationToken).ConfigureAwait(false);
-        if (preview.Disposition != "INDETERMINATE")
-            throw new WebOperationException("Operation.ResolutionConflict");
+        return await OperatorDecisionExecution.RunAsync(options,
+            token => InspectAsync(options, token), token => ExecuteTransactionAsync(options, token), cancellationToken).ConfigureAwait(false);
+    }
 
-        using (var connection = await _connections.OpenAsync(options, cancellationToken).ConfigureAwait(false))
-        using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
-        {
-            var context = new DecisionContext(connection, transaction);
-            var operation = new WebOperationTerminalIdentity(options.OperationId, options.DeploymentEpoch,
-                options.Kind, options.RequestTargetId, options.FingerprintBytes());
-            try
-            {
-                await new SqlWebOperationResolutionMaintenance(context).RecordNotExecutedAsync(operation, options.ActorUserId,
-                    options.DecisionId, options.CaseId, options.ReasonCode, options.EvidenceReference, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception exception) when (cancellationToken.IsCancellationRequested)
-            {
-                connection.Close();
-                throw new OperationCanceledException("The guarded SQL decision transaction was cancelled before Commit.", exception, cancellationToken);
-            }
-            try
-            {
-                transaction.Commit();
-            }
-            catch
-            {
-                connection.Close();
-                return OperatorDecisionResult.Unknown();
-            }
-        }
-
+    private async Task<OperatorDecisionCommitOutcome> ExecuteTransactionAsync(RecordNotExecutedOptions options,
+        CancellationToken cancellationToken)
+    {
+        var connection = await _connections.OpenAsync(options, cancellationToken).ConfigureAwait(false);
+        SqlTransaction transaction;
         try
         {
-            var verified = await InspectAsync(options, cancellationToken).ConfigureAwait(false);
-            if (verified.Disposition != "CANCELLED" || verified.Kind != options.Kind ||
-                verified.RequestTargetId != options.RequestTargetId || verified.Terminal?.DecisionId != options.DecisionId ||
-                verified.Terminal.CaseId != options.CaseId)
-                return OperatorDecisionResult.Unknown();
-            return OperatorDecisionResult.Completed(verified);
+            transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
         }
         catch
         {
-            return OperatorDecisionResult.Unknown();
+            try { connection.Close(); } catch { }
+            try { connection.Dispose(); } catch { }
+            throw;
         }
+        var context = new DecisionContext(connection, transaction);
+        var operation = new WebOperationTerminalIdentity(options.OperationId, options.DeploymentEpoch,
+            options.Kind, options.RequestTargetId, options.FingerprintBytes());
+        return await OperatorDecisionCommitBoundary.RunAsync(
+            async token =>
+            {
+                await new SqlWebOperationResolutionMaintenance(context).RecordNotExecutedAsync(operation, options.ActorUserId,
+                    options.DecisionId, options.CaseId, options.ReasonCode, options.EvidenceReference, token).ConfigureAwait(false);
+            }, transaction.Commit, transaction.Rollback, connection.Close, transaction.Dispose, connection.Dispose,
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<WebOperationInspection> InspectAsync(RecordNotExecutedOptions options, CancellationToken cancellationToken)

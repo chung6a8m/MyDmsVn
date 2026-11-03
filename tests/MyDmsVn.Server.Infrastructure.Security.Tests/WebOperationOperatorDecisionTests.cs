@@ -149,6 +149,110 @@ public sealed class WebOperationOperatorDecisionTests
         Assert.DoesNotContain(Fingerprint, stderr.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Commit_failure_with_successful_cleanup_is_unknown()
+    {
+        var cleanup = 0;
+        var outcome = await OperatorDecisionCommitBoundary.RunAsync(_ => Task.CompletedTask,
+            () => throw new InvalidOperationException("commit"), () => cleanup++, () => cleanup++,
+            () => cleanup++, () => cleanup++, CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, outcome);
+        Assert.Equal(3, cleanup);
+    }
+
+    [Fact]
+    public async Task Commit_failure_with_close_failure_is_still_unknown_and_disposes_everything()
+    {
+        var transactionDisposed = 0; var connectionDisposed = 0;
+        var outcome = await OperatorDecisionCommitBoundary.RunAsync(_ => Task.CompletedTask,
+            () => throw new InvalidOperationException("commit"), () => { }, () => throw new InvalidOperationException("close"),
+            () => transactionDisposed++, () => connectionDisposed++, CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, outcome);
+        Assert.Equal(1, transactionDisposed);
+        Assert.Equal(1, connectionDisposed);
+    }
+
+    [Fact]
+    public async Task Commit_failure_with_dispose_failure_is_still_unknown_and_continues_cleanup()
+    {
+        var connectionDisposed = 0;
+        var outcome = await OperatorDecisionCommitBoundary.RunAsync(_ => Task.CompletedTask,
+            () => throw new InvalidOperationException("commit"), () => { }, () => { },
+            () => throw new InvalidOperationException("transaction-dispose"), () => connectionDisposed++, CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionCommitOutcome.Unknown, outcome);
+        Assert.Equal(1, connectionDisposed);
+    }
+
+    [Fact]
+    public async Task Successful_commit_with_post_commit_inspection_failure_is_unknown()
+    {
+        var inspections = 0;
+        var result = await OperatorDecisionExecution.RunAsync(Parse(Execute()), _ =>
+        {
+            inspections++;
+            return inspections == 1 ? Task.FromResult(Inspection("INDETERMINATE"))
+                : Task.FromException<WebOperationInspection>(new InvalidOperationException("readback"));
+        }, _ => Task.FromResult(OperatorDecisionCommitOutcome.Committed), CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionOutcome.Unknown, result.Outcome);
+        Assert.Equal(2, inspections);
+    }
+
+    [Fact]
+    public async Task Successful_commit_with_exact_matched_readback_is_completed()
+    {
+        var inspections = 0;
+        var result = await OperatorDecisionExecution.RunAsync(Parse(Execute()), _ =>
+            Task.FromResult(++inspections == 1 ? Inspection("INDETERMINATE") : Inspection("CANCELLED")),
+            _ => Task.FromResult(OperatorDecisionCommitOutcome.Committed), CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionOutcome.Completed, result.Outcome);
+        Assert.Equal(2, inspections);
+    }
+
+    [Fact]
+    public async Task Preflight_failure_never_starts_the_transaction()
+    {
+        var transactions = 0;
+        await Assert.ThrowsAsync<WebOperationException>(() => OperatorDecisionExecution.RunAsync(Parse(Execute()),
+            _ => Task.FromException<WebOperationInspection>(new WebOperationException("Auth.Forbidden")),
+            _ => { transactions++; return Task.FromResult(OperatorDecisionCommitOutcome.Committed); }, CancellationToken.None));
+        Assert.Equal(0, transactions);
+    }
+
+    [Fact]
+    public async Task Cancellation_before_commit_rolls_back_and_never_calls_commit()
+    {
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+        var rollback = 0; var close = 0; var transactionDisposed = 0; var connectionDisposed = 0; var commits = 0;
+        await Assert.ThrowsAsync<OperationCanceledException>(() => OperatorDecisionCommitBoundary.RunAsync(
+            token => Task.FromException(new OperationCanceledException(token)), () => commits++, () => rollback++, () => close++,
+            () => transactionDisposed++, () => connectionDisposed++, cancelled.Token));
+
+        Assert.Equal(0, commits);
+        Assert.Equal(1, rollback);
+        Assert.Equal(1, close);
+        Assert.Equal(1, transactionDisposed);
+        Assert.Equal(1, connectionDisposed);
+    }
+
+    [Fact]
+    public async Task Unknown_commit_outcome_is_never_reexecuted_or_reinspected()
+    {
+        var inspections = 0; var transactions = 0;
+        var result = await OperatorDecisionExecution.RunAsync(Parse(Execute()), _ =>
+        {
+            inspections++; return Task.FromResult(Inspection("INDETERMINATE"));
+        }, _ => { transactions++; return Task.FromResult(OperatorDecisionCommitOutcome.Unknown); }, CancellationToken.None);
+
+        Assert.Equal(OperatorDecisionOutcome.Unknown, result.Outcome);
+        Assert.Equal(1, transactions);
+        Assert.Equal(1, inspections);
+    }
+
     [Theory]
     [InlineData("Auth.Forbidden", 3)]
     [InlineData("Deployment.EpochMismatch", 3)]
