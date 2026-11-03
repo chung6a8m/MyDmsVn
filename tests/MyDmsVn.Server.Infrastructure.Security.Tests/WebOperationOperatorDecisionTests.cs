@@ -286,15 +286,32 @@ CREATE USER Web6DecisionDenied WITHOUT LOGIN;");
         timeoutHolder.Tx.Rollback();
 
         var cancelledOperation = WebOperationResolutionScenario.Operation(s);
-        var cancelledHolder = await s.Transaction();
-        await HoldFence(cancelledHolder, s.Actor, cancelledOperation.OperationId, s.Stop.Token);
-        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
-        await Assert.ThrowsAsync<OperationCanceledException>(() => client.ExecuteAsync(
-            Parse(ExecuteArguments(s, cancelledOperation, Guid.NewGuid())), cancel.Token));
-        cancelledHolder.Tx.Rollback();
+        await s.Observer.ExecuteAsync("CREATE TABLE dbo.Web6B02bWriteSignal(OperationId uniqueidentifier NOT NULL PRIMARY KEY);");
+        await s.Observer.ExecuteAsync(
+            "CREATE TRIGGER dbo.Web6B02bCancelDuringWrite ON dbo.WebOperationJournal AFTER INSERT AS BEGIN SET NOCOUNT ON; " +
+            "IF EXISTS(SELECT 1 FROM inserted WHERE OperationId='" + cancelledOperation.OperationId.ToString("D") + "') BEGIN " +
+            "INSERT dbo.Web6B02bWriteSignal(OperationId) SELECT OperationId FROM inserted WHERE OperationId='" + cancelledOperation.OperationId.ToString("D") + "'; " +
+            "WAITFOR DELAY '00:00:20'; END END;");
+        using var cancel = new CancellationTokenSource();
+        var cancelled = client.ExecuteAsync(Parse(ExecuteArguments(s, cancelledOperation, Guid.NewGuid())), cancel.Token);
+        var writeObserved = false;
+        var observationBudget = Stopwatch.StartNew();
+        while (observationBudget.Elapsed < TimeSpan.FromSeconds(5))
+        {
+            writeObserved = await s.Observer.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM dbo.Web6B02bWriteSignal WITH (NOLOCK) WHERE OperationId=@id;",
+                new { id = cancelledOperation.OperationId }) == 1;
+            if (writeObserved) break;
+            if (cancelled.IsCompleted) break;
+            await Task.Delay(25, s.Stop.Token);
+        }
+        Assert.True(writeObserved, "The decision write transaction never reached the owned cancellation trigger.");
+        cancel.Cancel();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => cancelled);
 
         Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal;"));
         Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationTerminalAudit;"));
+        Assert.Equal(0, await s.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.Web6B02bWriteSignal;"));
     });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]

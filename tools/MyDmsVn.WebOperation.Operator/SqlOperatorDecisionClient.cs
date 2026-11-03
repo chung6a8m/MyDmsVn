@@ -37,8 +37,16 @@ public sealed class SqlOperatorDecisionClient : IOperatorDecisionClient
             var context = new DecisionContext(connection, transaction);
             var operation = new WebOperationContext(options.OperationId, options.DeploymentEpoch, options.DecisionId,
                 options.Kind, options.RequestTargetId, options.FingerprintBytes(), UnusedCodec.Instance);
-            await new SqlWebOperationResolutionMaintenance(context).RecordNotExecutedAsync(operation, options.ActorUserId,
-                options.DecisionId, options.CaseId, options.ReasonCode, options.EvidenceReference, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await new SqlWebOperationResolutionMaintenance(context).RecordNotExecutedAsync(operation, options.ActorUserId,
+                    options.DecisionId, options.CaseId, options.ReasonCode, options.EvidenceReference, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (cancellationToken.IsCancellationRequested)
+            {
+                connection.Close();
+                throw new OperationCanceledException("The guarded SQL decision transaction was cancelled before Commit.", exception, cancellationToken);
+            }
             try
             {
                 transaction.Commit();

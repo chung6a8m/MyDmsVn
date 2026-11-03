@@ -101,6 +101,22 @@ jobs:
           if ($summary.total -ne 41 -or $summary.executed -ne 41 -or $summary.passed -ne 41 -or $summary.failed -ne 0 -or $summary.skipped -ne 0 -or $summary.requiredClasses.WebOperationOperatorDecisionTests -ne 41) { throw 'Exactly 41 decision cases must pass.' }
           $summary | Add-Member -NotePropertyName retry -NotePropertyValue 0; [IO.File]::WriteAllText("$env:WEB6_SAFE/decision.json",($summary|ConvertTo-Json -Depth 5 -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
           if ($testExit -ne 0) { throw 'Decision test process failed.' }
+      - name: Run exact inherited B02a inspect regression
+        timeout-minutes: 10
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference='Stop'; . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          $project='tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
+          $class='MyDmsVn.Server.Infrastructure.IntegrationTests.WebOperationOperatorInspectTests'; $filter='FullyQualifiedName~'+$class
+          dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB6_RAW/inspect-discovery.log"
+          if ($LASTEXITCODE -ne 0) { throw 'Inspect regression discovery failed.' }
+          dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --blame-hang-timeout 90s --blame-hang-dump-type none --logger 'trx;LogFileName=inspect.trx' --results-directory $env:WEB6_RAW *> "$env:WEB6_RAW/inspect-run.log"
+          $testExit=$LASTEXITCODE
+          Assert-Web5SqlEvidence -TrxPath "$env:WEB6_RAW/inspect.trx" -DiscoveryPath "$env:WEB6_RAW/inspect-discovery.log" -RequiredClasses @('WebOperationOperatorInspectTests') -SummaryPath "$env:WEB6_SAFE/inspect.json" -Label B02aInspectRegression
+          $summary=Get-Content "$env:WEB6_SAFE/inspect.json" -Raw | ConvertFrom-Json
+          if ($summary.total -ne 40 -or $summary.executed -ne 40 -or $summary.passed -ne 40 -or $summary.failed -ne 0 -or $summary.skipped -ne 0 -or $summary.requiredClasses.WebOperationOperatorInspectTests -ne 40) { throw 'Exactly 40 inspect regression cases must pass.' }
+          $summary | Add-Member -NotePropertyName retry -NotePropertyValue 0; [IO.File]::WriteAllText("$env:WEB6_SAFE/inspect.json",($summary|ConvertTo-Json -Depth 5 -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+          if ($testExit -ne 0) { throw 'Inspect regression test process failed.' }
       - name: Run exact terminal resolution and OS interruption regression
         timeout-minutes: 10
         working-directory: candidate
@@ -152,12 +168,13 @@ jobs:
         run: |
           $instance=Get-Content "$env:WEB6_SAFE/instance.json" -Raw|ConvertFrom-Json
           $decision=Get-Content "$env:WEB6_SAFE/decision.json" -Raw|ConvertFrom-Json
+          $inspect=Get-Content "$env:WEB6_SAFE/inspect.json" -Raw|ConvertFrom-Json
           $resolution=Get-Content "$env:WEB6_SAFE/resolution.json" -Raw|ConvertFrom-Json
           $races=Get-Content "$env:WEB6_SAFE/races.json" -Raw|ConvertFrom-Json
           if ($instance.phase -ne 'Removed' -or $instance.quarantine -or -not $instance.instanceOwnershipVerified -or $instance.userDatabases -ne 0 -or $instance.activeOwners -ne 0) { throw 'SQL lifecycle was not proven clean.' }
           if ($instance.controlSha -ne $env:GITHUB_SHA -or $instance.testSourceSha -ne $env:GITHUB_SHA) { throw 'Evidence SHA mismatch.' }
-          if ($decision.retry -ne 0 -or $resolution.retry -ne 0 -or $races.retry -ne 0) { throw 'Retries are forbidden.' }
-          'B02b: decision 41/41; resolution/crash 26/26; races 2/2; zero fail/skip/retry; owned cleanup required.' >> $env:GITHUB_STEP_SUMMARY
+          if ($decision.retry -ne 0 -or $inspect.retry -ne 0 -or $resolution.retry -ne 0 -or $races.retry -ne 0) { throw 'Retries are forbidden.' }
+          'B02b: decision 41/41; inherited inspect 40/40; resolution/crash 26/26; races 2/2; zero fail/skip/retry; owned cleanup required.' >> $env:GITHUB_STEP_SUMMARY
       - name: Publish sanitized evidence only
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
