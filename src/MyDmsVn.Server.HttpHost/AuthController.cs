@@ -65,8 +65,9 @@ public sealed class AuthController : ApiController
             return AuthenticationRequired();
         }
         var session = await _sessions.RotateAsync(cookie, cancellationToken).ConfigureAwait(false);
+        // Rotation can commit before the new credentials are admitted to the client.
         await Audit("WebAuthRefresh", session == null ? SecurityAuditOutcome.Denied : SecurityAuditOutcome.Succeeded,
-            session?.User.UserId, session != null, session == null ? cancellationToken : CancellationToken.None).ConfigureAwait(false);
+            session?.User.UserId, false, session == null ? cancellationToken : CancellationToken.None).ConfigureAwait(false);
         return session == null ? AuthenticationRequired() : Authenticated(session);
     }
 
@@ -76,7 +77,8 @@ public sealed class AuthController : ApiController
         if (!NoQueryOrTokenHeaders() || !await EmptyBody().ConfigureAwait(false)) return Invalid();
         var cookie = ReadCookie();
         if (cookie != null) await _sessions.RevokeAsync(cookie, cancellationToken).ConfigureAwait(false);
-        await Audit("WebAuthLogout", SecurityAuditOutcome.Succeeded, null, cookie != null, cookie == null ? cancellationToken : CancellationToken.None).ConfigureAwait(false);
+        await Audit("WebAuthLogout", SecurityAuditOutcome.Succeeded, null, cookie != null,
+            cookie == null ? cancellationToken : CancellationToken.None, requiresAdmission: false).ConfigureAwait(false);
         var response = HttpJson.Success(new { });
         WriteCookie(response, null);
         return response;
@@ -135,8 +137,10 @@ public sealed class AuthController : ApiController
         .TryAdmit(operation, subject, Context.Request.RemoteIpAddress ?? "unknown", _clock.UtcNow);
     private HttpResponseMessage Invalid() => HttpJson.Error(400, "ValidationError", "The request is invalid.", _correlation.CorrelationId!);
     private HttpResponseMessage AuthenticationRequired() => HttpJson.Error(401, "Auth.Unauthorized", "Authentication is required.", _correlation.CorrelationId!);
-    private Task Audit(string category, SecurityAuditOutcome outcome, int? userId, bool committed, CancellationToken cancellationToken) =>
-        _audit.WriteAsync(new SecurityAuditEntry(SecurityAuditAction.Authentication, outcome, userId, _clock.UtcNow, category), committed, cancellationToken);
+    private Task Audit(string category, SecurityAuditOutcome outcome, int? userId, bool committed,
+        CancellationToken cancellationToken, bool requiresAdmission = true) =>
+        _audit.WriteAsync(new SecurityAuditEntry(SecurityAuditAction.Authentication, outcome, userId, _clock.UtcNow,
+            category, requiresAdmission: requiresAdmission), committed, cancellationToken);
     private async Task<HttpResponseMessage> Throttled(CancellationToken cancellationToken)
     {
         await Audit("WebAuthThrottled", SecurityAuditOutcome.Denied, null, false, cancellationToken).ConfigureAwait(false);

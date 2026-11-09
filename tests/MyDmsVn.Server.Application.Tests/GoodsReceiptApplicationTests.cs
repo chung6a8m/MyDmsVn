@@ -518,7 +518,7 @@ public sealed class GoodsReceiptApplicationTests
     }
 
     [Fact]
-    public async Task Successful_post_audit_is_emitted_only_after_the_business_commit()
+    public async Task Post_audits_admission_before_the_handler_and_success_after_commit()
     {
         var repository = new FakeGoodsReceiptWriteRepository();
         var unitOfWork = new FakeUnitOfWork(repository);
@@ -534,8 +534,10 @@ public sealed class GoodsReceiptApplicationTests
             CancellationToken.None);
 
         Assert.False(result.IsError);
-        var entry = Assert.Single(audit.Entries);
-        Assert.True(audit.CommitStates[0]);
+        Assert.Equal(new[] { SecurityAuditOutcome.Admitted, SecurityAuditOutcome.Succeeded },
+            audit.Entries.Select(entry => entry.Outcome));
+        Assert.Equal(new[] { false, true }, audit.CommitStates);
+        var entry = audit.Entries[1];
         Assert.Equal(SecurityAuditAction.GoodsReceiptPost, entry.Action);
         Assert.Equal(SecurityAuditOutcome.Succeeded, entry.Outcome);
         Assert.Equal(42, entry.UserId);
@@ -685,15 +687,17 @@ public sealed class GoodsReceiptApplicationTests
     }
 
     [Fact]
-    public async Task Post_commit_audit_failure_is_reported_without_claiming_business_rollback()
+    public async Task committed_sales_and_receipt_post_preserve_success_when_audit_fails_but_readiness_degrades()
     {
         var unitOfWork = new FakeUnitOfWork(new FakeGoodsReceiptWriteRepository());
         var reporter = new CapturingAuditFailureReporter();
+        var readiness = new TestSecurityAuditReadiness();
         using var provider = CreateProvider(
             unitOfWork,
             permissionStore: new PostOnlyPermissionStore(),
             auditSink: new ThrowingAuditSink(),
-            auditFailureReporter: reporter);
+            auditFailureReporter: reporter,
+            auditReadiness: readiness);
 
         var result = await provider.GetRequiredService<ISender>().Send(
             new PostGoodsReceiptCommand(
@@ -701,9 +705,11 @@ public sealed class GoodsReceiptApplicationTests
             CancellationToken.None);
 
         Assert.False(result.IsError);
-        Assert.True(unitOfWork.Committed);
+        Assert.Equal(GoodsReceiptStatuses.Posted, result.Value.Status);
+        Assert.Equal(1, unitOfWork.CommitCount);
         Assert.Equal(SecurityAuditAction.GoodsReceiptPost, reporter.Action);
         Assert.True(reporter.BusinessOperationCommitted);
+        Assert.Equal(SecurityAuditReadinessStatus.Degraded, readiness.Snapshot.Status);
     }
 
     [Fact]
@@ -786,7 +792,8 @@ public sealed class GoodsReceiptApplicationTests
         IGoodsReceiptQueryService? queryService = null,
         IPermissionStore? permissionStore = null,
         ISecurityAuditSink? auditSink = null,
-        ISecurityAuditFailureReporter? auditFailureReporter = null)
+        ISecurityAuditFailureReporter? auditFailureReporter = null,
+        ISecurityAuditReadiness? auditReadiness = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IUnitOfWorkFactory>(new FakeUnitOfWorkFactory(unitOfWork));
@@ -804,6 +811,11 @@ public sealed class GoodsReceiptApplicationTests
         if (auditFailureReporter != null)
         {
             services.AddSingleton(auditFailureReporter);
+        }
+
+        if (auditReadiness != null)
+        {
+            services.AddSingleton(auditReadiness);
         }
 
         services.AddServerApplication();
@@ -893,7 +905,8 @@ public sealed class GoodsReceiptApplicationTests
 
         public UnitOfWorkState State { get; private set; } = UnitOfWorkState.Created;
         public bool BeganTransaction { get; private set; }
-        public bool Committed { get; private set; }
+        public bool Committed => CommitCount > 0;
+        public int CommitCount { get; private set; }
 
         public void BeginTransaction()
         {
@@ -906,7 +919,7 @@ public sealed class GoodsReceiptApplicationTests
 
         public void Commit()
         {
-            Committed = true;
+            CommitCount++;
             State = UnitOfWorkState.Committed;
         }
 
@@ -1042,7 +1055,9 @@ public sealed class GoodsReceiptApplicationTests
     private sealed class ThrowingAuditSink : ISecurityAuditSink
     {
         public Task WriteAsync(SecurityAuditEntry entry, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("audit storage unavailable");
+            entry.Outcome == SecurityAuditOutcome.Admitted
+                ? Task.CompletedTask
+                : throw new InvalidOperationException("audit storage unavailable");
     }
 
     private sealed class CapturingAuditFailureReporter : ISecurityAuditFailureReporter

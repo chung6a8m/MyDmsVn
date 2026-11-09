@@ -34,6 +34,54 @@ namespace MyDmsVn.Server.Application.Tests
             Assert.Equal(DateTimeKind.Utc, entry.OccurredAtUtc.Kind);
         }
 
+        [Fact]
+        public async Task successful_login_fails_closed_when_required_audit_cannot_persist()
+        {
+            var store = new FakeUserStore { User = StoredUser(isActive: true, algorithm: "BCrypt") };
+            var readiness = new TestSecurityAuditReadiness();
+            var errors = new CapturingApplicationExceptionReporter();
+            using var provider = CreateProvider(store, new FakePasswordHasher(), new FakeLegacyVerifier(), new FailingAuditSink(), readiness, errors);
+
+            var result = await provider.GetRequiredService<MediatR.ISender>()
+                .Send(new LoginCommand("operator", "correct-password"), CancellationToken.None);
+
+            Assert.True(result.IsError);
+            Assert.Equal("InternalError", result.FirstError.Code);
+            Assert.Equal(SecurityAuditReadinessStatus.Degraded, readiness.Snapshot.Status);
+            var failure = Assert.IsType<SecurityAuditUnavailableException>(errors.Exception);
+            Assert.Null(failure.InnerException);
+            Assert.DoesNotContain("private audit location", failure.Message);
+        }
+
+        [Fact]
+        public async Task invalid_login_remains_invalid_when_audit_sink_fails()
+        {
+            var store = new FakeUserStore { User = StoredUser(isActive: true, algorithm: "BCrypt") };
+            var readiness = new TestSecurityAuditReadiness();
+            using var provider = CreateProvider(store, new FakePasswordHasher(), new FakeLegacyVerifier(), new FailingAuditSink(), readiness);
+
+            var result = await provider.GetRequiredService<MediatR.ISender>()
+                .Send(new LoginCommand("operator", "wrong-password"), CancellationToken.None);
+
+            Assert.True(result.IsError);
+            Assert.Equal("Auth.InvalidCredentials", result.FirstError.Code);
+            Assert.Equal(SecurityAuditReadinessStatus.Degraded, readiness.Snapshot.Status);
+            Assert.Equal("SecurityAudit.Unavailable", readiness.Snapshot.ReasonCode);
+            Assert.Equal(new DateTime(2026, 10, 9, 6, 0, 0, DateTimeKind.Utc), readiness.Snapshot.LastFailureAtUtc);
+        }
+
+        private sealed class CapturingApplicationExceptionReporter : IApplicationExceptionReporter
+        {
+            public Exception? Exception { get; private set; }
+            public void Report(Type requestType, Exception exception) => Exception = exception;
+        }
+
+        private sealed class FailingAuditSink : ISecurityAuditSink
+        {
+            public Task WriteAsync(SecurityAuditEntry entry, CancellationToken cancellationToken) =>
+                throw new System.IO.IOException("private audit location");
+        }
+
         [Theory]
         [InlineData(false, "BCrypt", "wrong-password")]
         [InlineData(true, "UnknownLegacy", "correct-password")]
@@ -248,13 +296,17 @@ namespace MyDmsVn.Server.Application.Tests
             IUserStore store,
             IPasswordHasher passwordHasher,
             ILegacyPasswordVerifier legacyVerifier,
-            ISecurityAuditSink auditSink)
+            ISecurityAuditSink auditSink,
+            ISecurityAuditReadiness? readiness = null,
+            IApplicationExceptionReporter? exceptionReporter = null)
         {
             var services = new ServiceCollection();
             services.AddSingleton(store);
             services.AddSingleton(passwordHasher);
             services.AddSingleton(legacyVerifier);
             services.AddSingleton(auditSink);
+            if (readiness != null) services.AddSingleton(readiness);
+            if (exceptionReporter != null) services.AddSingleton(exceptionReporter);
             services.AddSingleton<IUtcClock>(
                 new StubUtcClock(new DateTime(2026, 10, 9, 6, 0, 0, DateTimeKind.Utc)));
             services.AddServerApplication();
@@ -399,5 +451,12 @@ namespace MyDmsVn.Server.Application.Tests
                 return Task.FromResult(_isActive);
             }
         }
+    }
+
+    internal sealed class TestSecurityAuditReadiness : ISecurityAuditReadiness
+    {
+        public SecurityAuditReadinessSnapshot Snapshot { get; private set; } = new();
+
+        public void MarkDegraded(DateTime failedAtUtc) => Snapshot = new SecurityAuditReadinessSnapshot(failedAtUtc);
     }
 }

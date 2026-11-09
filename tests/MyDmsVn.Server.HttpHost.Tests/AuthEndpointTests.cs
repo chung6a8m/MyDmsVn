@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web.Http;
 using System.Web.Http.Dispatcher;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Owin.Testing;
@@ -60,6 +61,39 @@ public sealed class AuthEndpointTests
         Assert.False(response.Headers.Contains("Set-Cookie"));
         Assert.Equal(0, host.Store.Issues);
         Assert.Single(host.Store.Audits);
+    }
+
+    [Theory]
+    [InlineData("login")]
+    [InlineData("refresh")]
+    public async Task Positive_authentication_audit_failure_withholds_credentials(string route)
+    {
+        using var host = new AuthFixture(services => services.AddSingleton<ISecurityAuditSink, UnavailableAuditSink>());
+        using var response = route == "login" ? await host.Login() : await host.Post("refresh", refresh: AuthFixture.InitialRefresh);
+
+        await Error(response, 500, "InternalError");
+        Assert.False(response.Headers.Contains("Set-Cookie"));
+        Assert.Equal(0, host.Store.Issues);
+        Assert.Equal(route == "refresh" ? 1 : 0, host.Store.Rotations);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Logout_preserves_cookie_clearing_when_audit_is_unavailable(bool hasCookie)
+    {
+        using var host = new AuthFixture(services => services.AddSingleton<ISecurityAuditSink, UnavailableAuditSink>());
+        using var response = await host.Post("logout", refresh: hasCookie ? AuthFixture.InitialRefresh : null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Max-Age=0", Assert.Single(response.Headers.GetValues("Set-Cookie")));
+        Assert.Equal(hasCookie ? 1 : 0, host.Store.Revocations);
+    }
+
+    private sealed class UnavailableAuditSink : ISecurityAuditSink
+    {
+        public Task WriteAsync(SecurityAuditEntry entry, CancellationToken cancellationToken) =>
+            throw new System.IO.IOException("private audit location");
     }
 
     [Fact]
@@ -333,9 +367,10 @@ internal sealed class AuthFixture : IDisposable
     public WebHostOptions Options { get; }
     public TestServer Server { get; }
     public AuthFixture(Action<IServiceCollection>? configure = null, Action<IOwinContext>? configureRequest = null,
-        bool web4Enabled = false, bool web5Enabled = false, bool web6ResendEligibilityEnabled = false, string? web6CandidateId = null)
+        bool web4Enabled = false, bool web5Enabled = false, bool web6ResendEligibilityEnabled = false, string? web6CandidateId = null,
+        WebHostOptions? options = null, Action<HttpConfiguration>? configureApi = null)
     {
-        Options = new WebHostOptions(Origin, Origin, "auth-tests", "active", new Dictionary<string, byte[]> { ["active"] = Encoding.UTF8.GetBytes("active-test-key-at-least-32-bytes-long"), ["previous"] = Encoding.UTF8.GetBytes("previous-test-key-at-least-32-bytes-long") }, web4Enabled: web4Enabled, web5Enabled: web5Enabled,
+        Options = options ?? new WebHostOptions(Origin, Origin, "auth-tests", "active", new Dictionary<string, byte[]> { ["active"] = Encoding.UTF8.GetBytes("active-test-key-at-least-32-bytes-long"), ["previous"] = Encoding.UTF8.GetBytes("previous-test-key-at-least-32-bytes-long") }, web4Enabled: web4Enabled, web5Enabled: web5Enabled,
             web6ResendEligibilityEnabled: web6ResendEligibilityEnabled, web6CandidateId: web6CandidateId);
         var services = new ServiceCollection();
         services.AddServerApplication().AddHttpRequestIdentity();
@@ -359,7 +394,11 @@ internal sealed class AuthFixture : IDisposable
                 configureRequest?.Invoke(context);
                 await next();
             });
-            Web2Pipeline.Configure(app, Options, _provider, config => config.Services.Replace(typeof(IAssembliesResolver), new AuthAssemblies()));
+            Web2Pipeline.Configure(app, Options, _provider, config =>
+            {
+                config.Services.Replace(typeof(IAssembliesResolver), new AuthAssemblies());
+                configureApi?.Invoke(config);
+            });
         });
     }
     public HttpRequestMessage PostRequest(string route, string? body = null)
