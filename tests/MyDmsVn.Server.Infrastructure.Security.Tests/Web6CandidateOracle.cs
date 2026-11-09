@@ -367,9 +367,11 @@ internal static class Web6CutoverOracle
         "web6-cutover-same-epoch-restart", "web6-cutover-restored-epoch-rejected",
     };
 
-    internal static void Validate(JObject count, JObject result, Web6CandidateCutoverPlan plan)
+    internal static void Validate(JObject count, JObject result, Web6CandidateCutoverPlan plan,
+        Web6CandidateExpected current, JObject protectedHandles)
     {
-        if (count == null || result == null || plan == null) throw Invalid();
+        if (count == null || result == null || plan == null || current == null ||
+            current.CandidateId != plan.CurrentCandidateId || !JToken.DeepEquals(protectedHandles, plan.FrontendHandles())) throw Invalid();
         Exact(count, "version", "discovered", "passed", "failed", "skipped", "interrupted", "retries");
         foreach (var name in new[] { "version", "discovered", "passed", "failed", "skipped", "interrupted", "retries" })
             if (count[name]?.Type != JTokenType.Integer) throw Invalid();
@@ -382,14 +384,14 @@ internal static class Web6CutoverOracle
         if (result["version"]?.Type != JTokenType.Integer || (int)result["version"]! != 2 ||
             (string?)result["mode"] != "web6-candidate" ||
             (string?)result["candidateId"] != plan.CurrentCandidateId ||
-            (string?)result["frontendSourceSha"] != plan.FrontendSourceSha ||
-            (string?)result["backendSourceSha"] != plan.BackendSourceSha ||
-            (string?)result["frontendDistManifestSha256"] != plan.FrontendArtifactHash ||
+            (string?)result["frontendSourceSha"] != current.FrontendSourceSha ||
+            (string?)result["backendSourceSha"] != current.BackendSourceSha ||
+            (string?)result["frontendDistManifestSha256"] != current.FrontendDistManifestSha256 ||
             result["operations"] is not JArray operations || operations.Count != 0 ||
             result["checks"] is not JArray checks)
             throw Invalid();
         var markers = checks.Select(token => token.Type == JTokenType.String ? (string?)token : null).ToArray();
-        if (markers.Any(marker => marker == null) || markers.Distinct(StringComparer.Ordinal).Count() != Checks.Length ||
+        if (markers.Length != Checks.Length || markers.Any(marker => marker == null) || markers.Distinct(StringComparer.Ordinal).Count() != Checks.Length ||
             !new HashSet<string>(markers!, StringComparer.Ordinal).SetEquals(Checks))
             throw Invalid();
     }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
@@ -465,13 +465,14 @@ internal static class Web6CutoverControl
             frame["action"]?.Type != JTokenType.String)
             throw new InvalidDataException("Invalid WEB6 cutover control frame.");
         var action = (string)frame["action"]!;
-        var expected = PairActions.Contains(action)
+        var cleanupGrant = action == "revokeGrantOff" && frame["operationId"] == null;
+        var expected = PairActions.Contains(action) || cleanupGrant
             ? new[] { "id", "token", "action" }
             : OperationActions.Contains(action) ? new[] { "id", "token", "action", "operationId" } : Array.Empty<string>();
         if (expected.Length == 0 || !frame.Properties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
             .SequenceEqual(expected.OrderBy(name => name, StringComparer.Ordinal)))
             throw new InvalidDataException("Invalid WEB6 cutover control frame.");
-        if (OperationActions.Contains(action) && (frame["operationId"]?.Type != JTokenType.String ||
+        if (OperationActions.Contains(action) && !cleanupGrant && (frame["operationId"]?.Type != JTokenType.String ||
             !Guid.TryParseExact((string)frame["operationId"]!, "D", out var operation) || operation == Guid.Empty))
             throw new InvalidDataException("Invalid WEB6 cutover control frame.");
         return action;
@@ -508,15 +509,16 @@ internal sealed class Web6CandidateCutoverOrchestrator
         foreach (var browser in new[] { "chromium", "edge" })
         {
             var coordinator = new Web6CandidateCutoverCoordinator(plan);
-            foreach (var pair in new[] { Web6CutoverPair.Current, Web6CutoverPair.Old })
+            // The frontend pack switches hosts over the owned IPC channel. Run it once per browser.
+            foreach (var pair in new[] { Web6CutoverPair.Current })
             {
                 Exception? failure = null;
                 var started = false;
                 var admitted = false;
                 try
                 {
+                    started = true; // Start can fail after creating a process: cleanup is already armed.
                     var admission = await _operations.StartAndObserve(browser, pair, token).ConfigureAwait(false);
-                    started = true;
                     coordinator.Admit(pair, admission);
                     admitted = true;
                     var result = await _operations.RunAndValidate(browser, pair, token).ConfigureAwait(false);
@@ -548,6 +550,8 @@ internal static class Web6CutoverAcceptanceGate
 {
     private static readonly string[] Required =
     {
+        "MYDMSVN_WEB6_CANDIDATE_ID",
+        "MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY",
         "MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY",
         "MYDMSVN_WEB6_CUTOVER_BACKEND_ARCHIVE_DIRECTORY",
         "MYDMSVN_WEB6_CUTOVER_FRONTEND_DIST_DIRECTORY",

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
@@ -39,6 +39,7 @@ internal sealed class WebRecoveryPilotControl
     private readonly string? _runtimeUser;
     private readonly Dictionary<Guid, WebOperationHttpSqlTests.Intent> _web6Operations = new Dictionary<Guid, WebOperationHttpSqlTests.Intent>();
     private readonly Web6CandidateHostMismatch? _candidateMismatch;
+    private Func<string, Guid?, Task<JObject>>? _cutover;
     private bool _eligibilityUserDisabled;
     private bool _eligibilityJournalDenied;
     private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null, Web6CandidateHostMismatch? candidateMismatch = null)
@@ -72,6 +73,15 @@ internal sealed class WebRecoveryPilotControl
         var control = new WebRecoveryPilotControl(connectionString, web5: true, web6: true, runtimeUser: runtimeUser, candidateMismatch: candidateMismatch);
         using (var sql = new SqlConnection(connectionString))
             control._epochs.Add(await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;"));
+        control._serving = control.Serve();
+        return control;
+    }
+
+    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<string, Guid?, Task<JObject>> handler)
+    {
+        var control = new WebRecoveryPilotControl("", web5: true, web6: true);
+        control._cutover = handler ?? throw new ArgumentNullException(nameof(handler));
+        control._epochs.Add(epoch);
         control._serving = control.Serve();
         return control;
     }
@@ -137,6 +147,14 @@ internal sealed class WebRecoveryPilotControl
                 using var close = _stop.Token.Register(() => pipe.Dispose());
                 await pipe.WaitForConnectionAsync(_stop.Token).ConfigureAwait(false);
                 var frame = await WebFrontendPortBridge.ReadFrame(pipe, _stop.Token).ConfigureAwait(false);
+                if (_cutover != null)
+                {
+                    var cutoverAction = Web6CutoverControl.Validate(frame, _token);
+                    var cutoverReply = await _cutover(cutoverAction, frame["operationId"] == null ? (Guid?)null : Guid.ParseExact((string)frame["operationId"]!, "D")).ConfigureAwait(false);
+                    cutoverReply["id"] = frame["id"]!.DeepClone(); cutoverReply["ok"] = true;
+                    await WebFrontendPortBridge.WriteFrame(pipe, cutoverReply, _stop.Token).ConfigureAwait(false);
+                    continue;
+                }
                 var action = Validate(frame, _token, _web6);
                 using var sql = new SqlConnection(_connectionString);
                 await sql.OpenAsync(_stop.Token).ConfigureAwait(false);

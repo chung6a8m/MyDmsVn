@@ -42,10 +42,9 @@ public sealed class Web6CandidateCutoverTests
         await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None);
         Assert.Equal(new[]
         {
-            "authority", "manifest", "chromium:current:start", "chromium:current:validate", "chromium:current:drain",
-            "chromium:old:start", "chromium:old:validate", "chromium:old:drain", "chromium:restore",
+            "authority", "manifest", "chromium:current:start", "chromium:current:validate", "chromium:current:drain", "chromium:restore",
             "edge:current:start", "edge:current:validate", "edge:current:drain",
-            "edge:old:start", "edge:old:validate", "edge:old:drain", "edge:restore", "complete"
+            "edge:restore", "complete"
         }, operations.Calls);
         await Assert.ThrowsAsync<IOException>(() => new Web6CandidateCutoverOrchestrator(
             new RecordingCutoverOperations(Plan()) { SkipChromium = true }).Execute(CancellationToken.None));
@@ -61,7 +60,7 @@ public sealed class Web6CandidateCutoverTests
         var count = JObject.Parse("{\"version\":2,\"discovered\":3,\"passed\":3,\"failed\":0,\"skipped\":0,\"interrupted\":0,\"retries\":0}");
         var result = CutoverResult(plan);
 
-        Web6CutoverOracle.Validate(count, result, plan);
+        Web6CutoverOracle.Validate(count, result, plan, CurrentExpected(), plan.FrontendHandles());
         Assert.Empty((JArray)result["operations"]!);
 
         var sixKind = new Web6CandidateExpected(plan.CurrentCandidateId, plan.FrontendSourceSha,
@@ -75,13 +74,13 @@ public sealed class Web6CandidateCutoverTests
         var plan = Plan();
         var count = JObject.Parse("{\"version\":2,\"discovered\":3,\"passed\":3,\"failed\":0,\"skipped\":0,\"interrupted\":0,\"retries\":0}");
         var operation = CutoverResult(plan); ((JArray)operation["operations"]!).Add(new JObject());
-        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, operation, plan));
+        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, operation, plan, CurrentExpected(), plan.FrontendHandles()));
         var pin = CutoverResult(plan); pin["backendSourceSha"] = new string('1', 40);
-        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, pin, plan));
+        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, pin, plan, CurrentExpected(), plan.FrontendHandles()));
         var marker = CutoverResult(plan); ((JArray)marker["checks"]!).RemoveAt(0);
-        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, marker, plan));
+        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, marker, plan, CurrentExpected(), plan.FrontendHandles()));
         var retry = (JObject)count.DeepClone(); retry["retries"] = 1;
-        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(retry, CutoverResult(plan), plan));
+        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(retry, CutoverResult(plan), plan, CurrentExpected(), plan.FrontendHandles()));
     }
 
     [Theory]
@@ -278,20 +277,122 @@ public sealed class Web6CandidateCutoverTests
             : new Web6CutoverAdmission(plan.OldOrigin, plan.OldSchema, plan.OldDatabaseReceipt,
                 plan.OldArtifactHash, Guid.Empty, controllers, workers, queueOwned: true);
 
-    private static JObject CutoverResult(Web6CandidateCutoverPlan plan) => new JObject
+    [Fact]
+    public async Task IPC_session_maps_frontend_switches_and_requires_actual_lifecycle_observations()
     {
-        ["version"] = 2,
-        ["mode"] = "web6-candidate",
-        ["candidateId"] = plan.CurrentCandidateId,
-        ["frontendSourceSha"] = plan.FrontendSourceSha,
-        ["backendSourceSha"] = plan.BackendSourceSha,
-        ["frontendDistManifestSha256"] = plan.FrontendArtifactHash,
-        ["operations"] = new JArray(),
-        ["checks"] = new JArray(
-            "web6-cutover-old-client-new-host", "web6-cutover-new-client-old-host",
-            "web6-cutover-revoked-grant", "web6-cutover-committed-unavailable-protected",
-            "web6-cutover-same-epoch-restart", "web6-cutover-restored-epoch-rejected"),
-    };
+        var runtime = new RecordingRuntime();
+        var session = new Web6CutoverSession(Plan(), runtime);
+        await session.Begin();
+        var id = Guid.NewGuid();
+        await session.Handle("oldClientNewHostOn", null);
+        await session.Handle("verifyNoCutoverMutation", Guid.NewGuid());
+        await session.Handle("oldClientNewHostOff", null);
+        await session.Handle("newClientOldHostOn", null);
+        await session.Handle("verifyNoCutoverMutation", Guid.NewGuid());
+        await session.Handle("newClientOldHostOff", null);
+        await session.Handle("sameEpochRestart", id);
+        await session.Handle("revokeGrantOn", id);
+        await session.Handle("revokeGrantOff", id);
+        await session.Handle("committedUnavailable", id);
+        await session.Handle("restoreEpoch", id);
+        await session.Handle("verifyNoCutoverMutation", id);
+        session.VerifyComplete();
+        Assert.Equal(new[] { "Current:current", "Current:cached", "zero", "Current:current", "Old:current", "zero",
+            "Current:current", "identity", "Current:current", "identity", "grant:False", "grant:True",
+            "committed", "unavailable", "Current:current", "zero" }, runtime.Calls);
+        var incomplete = new Web6CutoverSession(Plan(), new RecordingRuntime());
+        await incomplete.Begin();
+        Assert.Throws<InvalidDataException>(incomplete.VerifyComplete);
+    }
+
+    [Fact]
+    public async Task Missing_committed_identity_never_arms_unavailable_mode()
+    {
+        var runtime = new RecordingRuntime { RejectCommitted = true };
+        var session = new Web6CutoverSession(Plan(), runtime);
+        await session.Begin();
+        await Assert.ThrowsAsync<InvalidDataException>(() => session.Handle("committedUnavailable", Guid.NewGuid()));
+        Assert.DoesNotContain("unavailable", runtime.Calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Owned_allocations_outlive_browser_oracle_and_are_not_disposed_if_drain_is_uncertain(bool failed)
+    {
+        var calls = new List<string>();
+        Func<Task> body = () => { calls.Add("browser-oracle"); if (failed) throw new IOException("browser failed"); return Task.CompletedTask; };
+        Func<Task<bool>> drain = () => { calls.Add("drain"); return Task.FromResult(true); };
+        Func<Task>[] cleanup = { () => { calls.Add("current-dispose"); return Task.CompletedTask; }, () => { calls.Add("old-dispose"); return Task.CompletedTask; } };
+        if (failed) await Assert.ThrowsAsync<IOException>(() => Web6CutoverLifetime.Run(body, drain, cleanup));
+        else await Web6CutoverLifetime.Run(body, drain, cleanup);
+        Assert.Equal(new[] { "browser-oracle", "drain", "current-dispose", "old-dispose" }, calls);
+        calls.Clear();
+        await Assert.ThrowsAsync<IOException>(() => Web6CutoverLifetime.Run(() => Task.CompletedTask, () => Task.FromResult(false), cleanup));
+        Assert.Empty(calls);
+    }
+
+    private sealed class RecordingRuntime : IWeb6CutoverRuntime
+    {
+        internal List<string> Calls { get; } = new List<string>();
+        internal bool RejectCommitted;
+        public Task Switch(Web6CutoverPair pair, bool cached, Guid epoch) { Calls.Add(pair + (cached ? ":cached" : ":current")); return Task.CompletedTask; }
+        public Task VerifyOperation(Guid id, bool committed) { Calls.Add(committed ? "committed" : "identity"); if (committed && RejectCommitted) throw new InvalidDataException(); return Task.CompletedTask; }
+        public Task SetGrant(bool granted) { Calls.Add("grant:" + granted); return Task.CompletedTask; }
+        public Task MakeCommittedUnavailable(Guid id) { Calls.Add("unavailable"); return Task.CompletedTask; }
+        public Task VerifyZeroMutation(Guid id) { Calls.Add("zero"); return Task.CompletedTask; }
+    }
+
+    private static Web6CandidateExpected CurrentExpected() => new Web6CandidateExpected("web6-current",
+        "0e0330d5bfcf131f577f784ee6372f865b90e24e", "9cde71a6528615d369ededcbaf2f5b3490cb5d3a", new string('8', 64));
+
+    [Fact]
+    public void Frontend_shaped_result_binds_current_identity_and_all_historical_manifest_handles()
+    {
+        var count = JObject.Parse("{\"version\":2,\"discovered\":3,\"passed\":3,\"failed\":0,\"skipped\":0,\"interrupted\":0,\"retries\":0}");
+        var plan = Plan();
+        foreach (var property in plan.FrontendHandles().Properties())
+        {
+            var handles = plan.FrontendHandles(); handles[property.Name] = "wrong";
+            Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, CutoverResult(plan), plan, CurrentExpected(), handles));
+        }
+        var duplicate = CutoverResult(plan); ((JArray)duplicate["checks"]!).Add(duplicate["checks"]![0]!.DeepClone());
+        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, duplicate, plan, CurrentExpected(), plan.FrontendHandles()));
+        for (var missing = 0; missing < 6; missing++)
+        {
+            var flags = new[] { true, true, true, true, true, true }; flags[missing] = false;
+            Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.ValidateDisposition(flags[0], flags[1], flags[2], flags[3], flags[4], flags[5]));
+        }
+    }
+
+    [Fact]
+    public async Task Start_failure_still_drains_armed_host_before_releasing_allocations()
+    {
+        var operations = new RecordingCutoverOperations(Plan()) { FailStart = true };
+        await Assert.ThrowsAsync<IOException>(() => new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None));
+        Assert.Contains("chromium:current:drain", operations.Calls);
+        Assert.DoesNotContain("complete", operations.Calls);
+    }
+
+    [Fact]
+    public void Frontend_after_each_can_restore_grant_without_operation_id()
+    {
+        var frame = JObject.Parse("{\"id\":2,\"token\":\"secret\",\"action\":\"revokeGrantOff\"}");
+        Assert.Equal("revokeGrantOff", Web6CutoverControl.Validate(frame, "secret"));
+    }
+
+    // Literal shape emitted by frontend createWeb6PilotResult at reviewed 0e0330d5.
+    // Historical pins are in the separately protected input manifest, never invented result fields.
+    private static JObject CutoverResult(Web6CandidateCutoverPlan plan) => JObject.Parse(@"{
+        ""version"":2,""mode"":""web6-candidate"",""candidateId"":""web6-current"",
+        ""frontendSourceSha"":""0e0330d5bfcf131f577f784ee6372f865b90e24e"",
+        ""backendSourceSha"":""9cde71a6528615d369ededcbaf2f5b3490cb5d3a"",
+        ""frontendDistManifestSha256"":""8888888888888888888888888888888888888888888888888888888888888888"",
+        ""operations"":[],""checks"": [
+            ""web6-cutover-old-client-new-host"",""web6-cutover-new-client-old-host"",
+            ""web6-cutover-revoked-grant"",""web6-cutover-committed-unavailable-protected"",
+            ""web6-cutover-same-epoch-restart"",""web6-cutover-restored-epoch-rejected""]
+    }");
 
     private sealed class RecordingCutoverOperations : IWeb6CandidateCutoverOperations
     {
@@ -300,11 +401,13 @@ public sealed class Web6CandidateCutoverTests
         internal List<string> Calls { get; } = new List<string>();
         internal bool SkipChromium { get; set; }
         internal bool DriftAdmission { get; set; }
+        internal bool FailStart { get; set; }
         public Task<Web6CandidateCutoverPlan> VerifyAuthority(CancellationToken token) { Calls.Add("authority"); return Task.FromResult(_plan); }
         public Task SealProtectedManifest(JObject handles, CancellationToken token) { Calls.Add("manifest"); return Task.CompletedTask; }
         public Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token)
         {
             Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":start");
+            if (FailStart) throw new IOException("start failed after process creation");
             var admission = Admission(_plan, pair);
             return Task.FromResult(DriftAdmission ? admission.WithReceipt(new string('0', 64)) : admission);
         }

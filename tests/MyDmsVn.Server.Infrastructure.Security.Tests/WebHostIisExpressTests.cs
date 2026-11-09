@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -503,13 +503,6 @@ public sealed partial class WebHostIisExpressTests
 
     private static async Task RunCutoverCandidate()
     {
-        var plan = await RunCutoverPreflight().ConfigureAwait(false);
-        await Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true, web5Pilot: true,
-            web6Candidate: true, web6Cutover: true, cutoverPlan: plan).ConfigureAwait(false);
-    }
-
-    private static async Task<Web6CandidateCutoverPlan> RunCutoverPreflight()
-    {
         var values = Web6CutoverAcceptanceGate.EnvironmentValues();
         Web6CutoverAcceptanceGate.RequireLive(values);
         string Required(string name) => values[name] ?? throw new InvalidOperationException("Cutover prerequisite disappeared.");
@@ -535,9 +528,12 @@ public sealed partial class WebHostIisExpressTests
         SqlTestDatabase? currentDatabase = null, oldDatabase = null;
         SqlTestOwnershipManifest? currentControl = null, oldControl = null;
         var complete = false;
-        Web6CandidateCutoverPlan? verifiedPlan = null;
+        LiveCutoverOperations? operations = null;
+        var currentRecorded = false; var oldRecorded = false;
         try
         {
+            await Web6CutoverLifetime.Run(async () =>
+            {
             currentControl = SqlTestOwnershipManifest.Create(controlParent);
             oldControl = SqlTestOwnershipManifest.Create(controlParent);
             currentDatabase = await SqlTestDatabase.CreateAsync(admin).ConfigureAwait(false);
@@ -560,34 +556,41 @@ public sealed partial class WebHostIisExpressTests
                     SqlSchemaDefinitionFingerprint.Schema12);
             }
             await currentDatabase.WriteOwnershipManifestAsync(currentControl, CancellationToken.None).ConfigureAwait(false);
+            currentRecorded = true;
             await oldDatabase.WriteOwnershipManifestAsync(oldControl, CancellationToken.None).ConfigureAwait(false);
+            oldRecorded = true;
             var currentReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(currentControl, currentControl.VerifiedDigest(),
                 SqlSchemaDefinitionFingerprint.Schema13, "current-allocation").Digest;
             var oldReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(oldControl, oldControl.VerifiedDigest(),
                 SqlSchemaDefinitionFingerprint.Schema12, "old-allocation").Digest;
-            var plan = new Web6CandidateCutoverPlan("web6-current", "web4-old", "web6-restored",
+            var plan = new Web6CandidateCutoverPlan(Required("MYDMSVN_WEB6_CANDIDATE_ID"), "web4-old", "web6-restored",
                 new Uri("https://localhost:44321/"), new Uri("https://localhost:44322/"),
                 frontendIdentity.Sha, frontendIdentity.Tree, frontendArtifact,
                 backendIdentity.Sha, backendIdentity.Tree, oldArtifact, currentArtifact,
                 13, 12, currentReceipt, oldReceipt, currentEpoch, restoredEpoch);
             plan.VerifyArchives(new Web6CutoverArchive(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact),
                 new Web6CutoverArchive(backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact));
-            _ = plan.FrontendHandles();
-            verifiedPlan = plan;
+            operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, currentControl, oldControl);
+            await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None).ConfigureAwait(false);
             complete = true;
-        }
-        finally
-        {
-            if (complete && currentDatabase != null && oldDatabase != null && currentControl != null && oldControl != null)
+            }, async () => operations == null || await operations.Cleanup().ConfigureAwait(false), new Func<Task>[]
             {
-                await currentDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
-                await oldDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
-                await currentDatabase.CompleteOwnershipManifestAsync(currentControl, CancellationToken.None).ConfigureAwait(false);
-                await oldDatabase.CompleteOwnershipManifestAsync(oldControl, CancellationToken.None).ConfigureAwait(false);
-            }
-            currentControl?.Dispose(); oldControl?.Dispose();
+                async () =>
+                {
+                    if (currentDatabase == null) return;
+                    await currentDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
+                    if (currentRecorded) await currentDatabase.CompleteOwnershipManifestAsync(currentControl!, CancellationToken.None).ConfigureAwait(false);
+                },
+                async () =>
+                {
+                    if (oldDatabase == null) return;
+                    await oldDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
+                    if (oldRecorded) await oldDatabase.CompleteOwnershipManifestAsync(oldControl!, CancellationToken.None).ConfigureAwait(false);
+                },
+            }).ConfigureAwait(false);
+            if (complete) operations!.VerifyFinalDisposition();
         }
-        return verifiedPlan ?? throw new InvalidOperationException("Cutover authority did not produce a verified plan.");
+        finally { currentControl?.Dispose(); oldControl?.Dispose(); operations?.DisposeManifests(); }
     }
     private static async Task SeedBrowserActors(SqlConnection connection)
     {
@@ -621,7 +624,8 @@ public sealed partial class WebHostIisExpressTests
     private static async Task RunBrowser(SqlTestDatabase database, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot, bool web5Pilot, bool originalFirstPilot,
         bool web6Candidate = false, string? runtimeUser = null, Action? candidateValidated = null,
         Web6CandidateManifest? candidateManifest = null, Web6CandidateHostMismatch? candidateMismatch = null,
-        bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null)
+        bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null,
+        WebRecoveryPilotControl? cutoverControl = null, string? cutoverBrowser = null, Action<JObject, JObject>? cutoverResult = null)
     {
         var connectionString = database.ConnectionString;
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
@@ -657,9 +661,9 @@ public sealed partial class WebHostIisExpressTests
         {
             Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web4-recovery-live.spec.ts")));
             if (web5Pilot) Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web5-resolution-live.spec.ts")));
-            recovery = web6Candidate ? await WebRecoveryPilotControl.StartCandidate(connectionString, runtimeUser!, candidateMismatch!) :
+            recovery = cutoverControl ?? (web6Candidate ? await WebRecoveryPilotControl.StartCandidate(connectionString, runtimeUser!, candidateMismatch!) :
                 originalFirstPilot ? await WebRecoveryPilotControl.StartOriginalFirst(database, Environment.GetEnvironmentVariable("MYDMSVN_WEB5_RACE_PARENT_DIRECTORY")!) :
-                await WebRecoveryPilotControl.Start(connectionString, web5Pilot);
+                await WebRecoveryPilotControl.Start(connectionString, web5Pilot));
             manifestJson["mode"] = web5Pilot ? "web5-recovery" : "web4-recovery";
             manifestJson["recovery"] = recovery.Manifest;
             if (originalFirstPilot) manifestJson["recovery"]!["originalFirst"] = true;
@@ -737,7 +741,7 @@ public sealed partial class WebHostIisExpressTests
             }
             if (web6Candidate)
             {
-                foreach (var project in new[] { "chromium", "edge" })
+                foreach (var project in cutoverBrowser == null ? new[] { "chromium", "edge" } : new[] { cutoverBrowser })
                 {
                     var initialResult = new JObject
                     {
@@ -755,7 +759,8 @@ public sealed partial class WebHostIisExpressTests
                     if (web6Cutover)
                     {
                         Web6CutoverOracle.Validate(count, candidateResult,
-                            cutoverPlan ?? throw new InvalidOperationException("Cutover plan disappeared."));
+                            cutoverPlan ?? throw new InvalidOperationException("Cutover plan disappeared."), web6Expected!, (JObject)manifestJson["cutover"]!);
+                        cutoverResult?.Invoke(count, candidateResult);
                     }
                     else
                     {
