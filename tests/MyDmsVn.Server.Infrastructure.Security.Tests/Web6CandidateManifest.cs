@@ -388,6 +388,7 @@ internal sealed class Web6CandidateManifest : IDisposable
     private readonly string _rootId;
     private readonly string _rootAcl;
     private readonly Dictionary<string, SealedRecord> _records = new Dictionary<string, SealedRecord>(StringComparer.Ordinal);
+    private readonly Dictionary<string, PrivateInput> _privateInputs = new Dictionary<string, PrivateInput>(StringComparer.Ordinal);
     private Web6CandidateFileSet? _files;
     private string? _artifacts, _sqlReceipt, _manifestHash, _auditId, _auditAcl;
     private State _state;
@@ -518,6 +519,56 @@ internal sealed class Web6CandidateManifest : IDisposable
         }
     }
 
+    internal PrivateInput CreatePrivateInput(string name, byte[] payload)
+    {
+        lock (_gate)
+        {
+            RequireState(State.Sealed);
+            if (string.IsNullOrEmpty(name) || Path.GetFileName(name) != name || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                !name.EndsWith(".json", StringComparison.Ordinal) || payload == null || payload.Length == 0 || payload.Length > 1048576)
+                throw new IOException("Candidate private input name or payload is invalid.");
+            VerifyRecords();
+            var path = Path.Combine(Root, "private-" + name);
+            if (_privateInputs.ContainsKey(path)) throw new IOException("Candidate private input already exists.");
+            string id, acl;
+            FileStream? reader = null;
+            try
+            {
+                using (var writer = new FileStream(path, FileMode.CreateNew, FileSystemRights.ReadData | FileSystemRights.WriteData,
+                    FileShare.Read, 4096, FileOptions.WriteThrough, SqlTestPrivateRecord.FileAcl(_owner)))
+                {
+                    File.SetAccessControl(path, SqlTestPrivateRecord.FileAcl(_owner));
+                    id = Web6CandidateFileSystem.Identity(writer.SafeFileHandle, directory: false);
+                    writer.Write(payload, 0, payload.Length);
+                    writer.Flush(flushToDisk: true);
+                }
+                acl = FileAcl(path);
+                reader = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                var input = new PrivateInput(this, path, reader, id, acl, (byte[])payload.Clone());
+                _privateInputs.Add(path, input);
+                input.Verify();
+                RequireChildren(includeAudit: true);
+                return input;
+            }
+            catch { reader?.Dispose(); if (File.Exists(path)) File.Delete(path); throw; }
+        }
+    }
+
+    private void RemovePrivateInput(PrivateInput input)
+    {
+        lock (_gate)
+        {
+            if (!_privateInputs.TryGetValue(input.Path, out var current) || !ReferenceEquals(input, current)) return;
+            input.VerifyCore();
+            input.Reader.Dispose();
+            File.Delete(input.Path);
+            if (File.Exists(input.Path)) throw new IOException("Candidate private input cleanup was ambiguous.");
+            _privateInputs.Remove(input.Path);
+            RequireChildren(includeAudit: true);
+            input.MarkDisposed();
+        }
+    }
+
     private string WriteRecord(string path, string body)
     {
         var payload = SqlTestPrivateRecord.Seal(body);
@@ -548,6 +599,7 @@ internal sealed class Web6CandidateManifest : IDisposable
         VerifyRoot();
         RequireChildren(includeAudit: true);
         foreach (var entry in _records) entry.Value.Verify(entry.Key, FileAcl(entry.Key));
+        foreach (var input in _privateInputs.Values) input.VerifyCore();
     }
 
     private void VerifyRoot()
@@ -563,6 +615,7 @@ internal sealed class Web6CandidateManifest : IDisposable
     private void RequireChildren(bool includeAudit)
     {
         var expected = new HashSet<string>(_records.Keys, StringComparer.Ordinal);
+        expected.UnionWith(_privateInputs.Keys);
         if (includeAudit) expected.Add(AuditPath);
         if (!expected.SetEquals(Directory.EnumerateFileSystemEntries(Root)))
             throw new IOException("Candidate control root contains missing or unrecognized children.");
@@ -611,11 +664,38 @@ internal sealed class Web6CandidateManifest : IDisposable
         lock (_gate)
         {
             if (_state == State.Disposed) return;
+            if (_privateInputs.Count != 0) throw new IOException("Candidate private inputs must be verified and removed before manifest disposal.");
             _state = State.Disposed;
             foreach (var record in _records.Values) record.Reader.Dispose();
             _rootLease.Dispose();
             _parents.Dispose();
         }
+    }
+
+    internal sealed class PrivateInput : IDisposable
+    {
+        private readonly Web6CandidateManifest _owner;
+        private readonly string _id, _acl;
+        private readonly byte[] _payload;
+        private bool _disposed;
+        internal PrivateInput(Web6CandidateManifest owner, string path, FileStream reader, string id, string acl, byte[] payload)
+        { _owner = owner; Path = path; Reader = reader; _id = id; _acl = acl; _payload = payload; }
+        internal string Path { get; }
+        internal FileStream Reader { get; }
+        internal void Verify() { lock (_owner._gate) { if (_disposed) throw new ObjectDisposedException(nameof(PrivateInput)); _owner.VerifyRoot(); VerifyCore(); } }
+        internal void VerifyCore()
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(PrivateInput));
+            var acl = _owner.FileAcl(Path);
+            using var fresh = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (Web6CandidateFileSystem.Identity(fresh.SafeFileHandle, directory: false) != _id || acl != _acl || fresh.Length != _payload.Length)
+                throw new IOException("Candidate private input identity, ACL or length changed.");
+            var actual = new byte[_payload.Length];
+            using (var binary = new BinaryReader(fresh, Encoding.UTF8, leaveOpen: true)) actual = binary.ReadBytes(_payload.Length);
+            if (!actual.SequenceEqual(_payload)) throw new IOException("Candidate private input contents changed.");
+        }
+        internal void MarkDisposed() => _disposed = true;
+        public void Dispose() => _owner.RemovePrivateInput(this);
     }
 
     private sealed class SealedRecord

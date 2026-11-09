@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using Newtonsoft.Json.Linq;
@@ -134,6 +135,28 @@ public sealed class Web6CandidateSafetyTests
         fixture.Manifest.Dispose();
         Assert.Throws<ObjectDisposedException>(() => fixture.Manifest.RecordDisposition(Web6CandidateStage.Edge, Web6CandidateOutcome.Passed));
         Assert.True(File.Exists(fixture.ManifestPath));
+    }
+
+    [Fact]
+    public void Candidate_private_input_is_pinned_private_create_new_and_removed_only_after_verified_cleanup()
+    {
+        using var fixture = new CandidateFixture();
+        fixture.Seal();
+        var input = fixture.Manifest.CreatePrivateInput("browser-input.json", Encoding.UTF8.GetBytes("{\"password\":\"private\"}"));
+        Assert.StartsWith(fixture.ControlPath + Path.DirectorySeparatorChar, input.Path, StringComparison.OrdinalIgnoreCase);
+        input.Verify();
+        Assert.Throws<IOException>(() => File.Move(input.Path, input.Path + ".swap"));
+
+        var original = File.GetAccessControl(input.Path, SqlTestPrivateRecord.Sections);
+        var broad = SqlTestPrivateRecord.RestoreFile(original.GetSecurityDescriptorBinaryForm());
+        broad.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), FileSystemRights.Read, AccessControlType.Allow));
+        File.SetAccessControl(input.Path, broad);
+        Assert.Throws<IOException>(() => input.Dispose());
+        Assert.True(File.Exists(input.Path));
+        File.SetAccessControl(input.Path, SqlTestPrivateRecord.RestoreFile(original.GetSecurityDescriptorBinaryForm()));
+        input.Dispose();
+        Assert.False(File.Exists(input.Path));
+        Assert.Throws<IOException>(() => fixture.Manifest.CreatePrivateInput("nested\\browser-input.json", new byte[] { 1 }));
     }
 
     [Theory]

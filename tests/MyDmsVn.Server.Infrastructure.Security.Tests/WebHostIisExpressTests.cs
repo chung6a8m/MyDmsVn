@@ -69,6 +69,7 @@ public sealed partial class WebHostIisExpressTests
         bool web5Pilot = false, bool attended = false, bool originalFirstPilot = false, bool admissionOnly = false, bool web6Candidate = false)
     {
         GuiTestSafety.ThrowIfPoisoned();
+        if (web6Candidate) Web6CandidateAcceptanceGate.RequireLive(Web6CandidateAcceptanceGate.EnvironmentValues());
         if (web6Candidate && (!browser || !receiptPilot || !integratedPilot || !recoveryPilot || !web5Pilot || attended || originalFirstPilot || admissionOnly))
             throw new InvalidOperationException("WEB6 candidate requires the exact paired browser fixture.");
         if (browser && !attended && !web6Candidate) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
@@ -91,6 +92,7 @@ public sealed partial class WebHostIisExpressTests
         Web5IisExpressIdentity? hostIdentity = null;
         Web6CandidateManifest? candidateManifest = null;
         Web6CandidateInputs? candidateInputs = null;
+        Web6CandidateHostMismatch? candidateMismatch = null;
         string? candidateSqlReceipt = null;
         var failures = new List<Exception>();
         var drained = true;
@@ -190,34 +192,45 @@ public sealed partial class WebHostIisExpressTests
                 start.EnvironmentVariables["MYDMSVN_WEB6_CANDIDATE_ROOT"] = candidateRoot;
                 start.EnvironmentVariables["MYDMSVN_WEB_SECURITY_AUDIT_PATH"] = auditPath;
             }
-            process = new Process { StartInfo = start };
-            process.OutputDataReceived += (_, _) => { }; process.ErrorDataReceived += (_, _) => { };
-            Assert.True(process.Start()); drained = false;
-            process.BeginOutputReadLine(); process.BeginErrorReadLine();
-            hostIdentity = Web5IisExpressHostAdmission.Capture(process, configuration, "Web2Smoke", new Uri("https://localhost:44321/"));
-            await Web5IisExpressHostAdmission.WaitForAdmissionAsync(
-                hostIdentity, process, TimeSpan.FromSeconds(45), CancellationToken.None);
-            if (web6Candidate)
+            async Task SwitchOwnedHost(string candidateId)
             {
+                if (process != null)
+                {
+                    var prior = process; var priorIdentity = hostIdentity;
+                    if (!prior.HasExited) { try { prior.StandardInput.WriteLine("q"); } catch (IOException) { } if (!prior.WaitForExit(10000)) prior.Kill(); }
+                    if (!prior.WaitForExit(10000) || priorIdentity == null) throw new InvalidOperationException("Owned candidate host did not stop for configuration switch.");
+                    await Web5IisExpressHostAdmission.WaitForAbsenceAsync(priorIdentity, TimeSpan.FromSeconds(20), CancellationToken.None);
+                    prior.Dispose(); process = null; hostIdentity = null;
+                }
+                if (web6Candidate) start.EnvironmentVariables["MYDMSVN_WEB6_CANDIDATE_ID"] = candidateId;
+                process = new Process { StartInfo = start };
+                process.OutputDataReceived += (_, _) => { }; process.ErrorDataReceived += (_, _) => { };
+                Assert.True(process.Start()); drained = false;
+                process.BeginOutputReadLine(); process.BeginErrorReadLine();
+                hostIdentity = Web5IisExpressHostAdmission.Capture(process, configuration, "Web2Smoke", new Uri("https://localhost:44321/"));
+                await Web5IisExpressHostAdmission.WaitForAdmissionAsync(hostIdentity, process, TimeSpan.FromSeconds(45), CancellationToken.None);
                 var queue = await Web5IisExpressHostAdmission.VerifyAsync(hostIdentity, CancellationToken.None);
-                candidateManifest!.VerifyBeforeAdmission(process.Id, process.StartTime.ToUniversalTime(), queue.Name, () =>
-                    new Web6CandidateObservation((candidateInputs!.Backend.Sha, candidateInputs.Backend.Tree, true),
-                        (candidateInputs.Frontend.Sha, candidateInputs.Frontend.Tree, true),
-                        SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(), candidateInputs.CertificateHash,
-                        candidateSqlReceipt, new[] { queue }, new Web6CandidateAuditLaunch(process.Id,
-                            process.StartTime.ToUniversalTime(), Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ROOT")!),
-                            candidateManifest.AuditPath, candidateInputs.CandidateId)));
+                if (web6Candidate && candidateId == candidateInputs!.CandidateId)
+                    candidateManifest!.VerifyBeforeAdmission(process.Id, process.StartTime.ToUniversalTime(), queue.Name, () =>
+                        new Web6CandidateObservation((candidateInputs.Backend.Sha, candidateInputs.Backend.Tree, true),
+                            (candidateInputs.Frontend.Sha, candidateInputs.Frontend.Tree, true), SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(),
+                            candidateInputs.CertificateHash, candidateSqlReceipt, new[] { queue }, new Web6CandidateAuditLaunch(process.Id,
+                                process.StartTime.ToUniversalTime(), Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ROOT")!),
+                                candidateManifest.AuditPath, candidateInputs.CandidateId)));
             }
+            if (web6Candidate) candidateMismatch = new Web6CandidateHostMismatch(candidateInputs!.CandidateId, SwitchOwnedHost);
+            await SwitchOwnedHost(web6Candidate ? candidateInputs!.CandidateId : "");
+            var admittedProcess = process ?? throw new InvalidOperationException("Owned host process was not captured.");
             Reply? health = null;
             var deadline = DateTime.UtcNow.AddSeconds(45);
-            while (DateTime.UtcNow < deadline && !process.HasExited)
+            while (DateTime.UtcNow < deadline && !admittedProcess.HasExited)
             {
                 try { health = await Request("https://localhost:44321/api/v1/health", thumbprint!); if (health.Status == 200) break; }
                 catch (WebException) { }
                 await Task.Delay(250);
             }
             Assert.NotNull(health);
-            Assert.False(process.HasExited);
+            Assert.False(admittedProcess.HasExited);
             Assert.Equal(200, health!.Status);
             Assert.Contains("application/json", health.ContentType);
             Assert.Equal("{\"data\":{\"status\":\"ok\"}}", health.Body);
@@ -242,7 +255,7 @@ public sealed partial class WebHostIisExpressTests
                 else
                     await RunBrowser(database, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated,
                         recoveryPilot, web5Pilot, originalFirstPilot, web6Candidate, login.Name,
-                        web6Candidate ? () => candidateBrowserValidated = true : null);
+                        web6Candidate ? () => candidateBrowserValidated = true : null, candidateManifest, candidateMismatch);
             }
             else
             {
@@ -334,7 +347,7 @@ public sealed partial class WebHostIisExpressTests
                 var crossOrigin = await Request("https://localhost:44321/api/v1/health", thumbprint!, origin: "https://outside.invalid");
                 Assert.Equal(403, crossOrigin.Status);
             }
-            await Web5IisExpressHostAdmission.VerifyAsync(hostIdentity, CancellationToken.None);
+            await Web5IisExpressHostAdmission.VerifyAsync(hostIdentity!, CancellationToken.None);
         }
         catch (Exception error) { failures.Add(error); }
         finally
@@ -468,12 +481,7 @@ public sealed partial class WebHostIisExpressTests
     {
         public Web6CandidateSqlFactAttribute()
         {
-            foreach (var variable in new[] { "MYDMSVN_WEB6_CANDIDATE_ENABLE", "MYDMSVN_WEB6_CANDIDATE_ROOT",
-                "MYDMSVN_WEB6_CANDIDATE_ID", "MYDMSVN_WEB_TEST_BROWSER_DIRECTORY" })
-                if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(variable)))
-                    Skip = "WEB6 paired candidate requires explicit frontend, candidate root/identity, browser and owned IIS Express/SQL opt-in.";
-            if (Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ENABLE") != "1")
-                Skip = "WEB6 paired candidate requires exact explicit nonproduction opt-in.";
+            Skip = Web6CandidateAcceptanceGate.OrdinarySkipReason(Web6CandidateAcceptanceGate.EnvironmentValues());
         }
     }
 
@@ -508,7 +516,8 @@ public sealed partial class WebHostIisExpressTests
     }
 
     private static async Task RunBrowser(SqlTestDatabase database, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot, bool web5Pilot, bool originalFirstPilot,
-        bool web6Candidate = false, string? runtimeUser = null, Action? candidateValidated = null)
+        bool web6Candidate = false, string? runtimeUser = null, Action? candidateValidated = null,
+        Web6CandidateManifest? candidateManifest = null, Web6CandidateHostMismatch? candidateMismatch = null)
     {
         var connectionString = database.ConnectionString;
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
@@ -542,7 +551,7 @@ public sealed partial class WebHostIisExpressTests
         {
             Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web4-recovery-live.spec.ts")));
             if (web5Pilot) Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web5-resolution-live.spec.ts")));
-            recovery = web6Candidate ? await WebRecoveryPilotControl.StartCandidate(connectionString, runtimeUser!) :
+            recovery = web6Candidate ? await WebRecoveryPilotControl.StartCandidate(connectionString, runtimeUser!, candidateMismatch!) :
                 originalFirstPilot ? await WebRecoveryPilotControl.StartOriginalFirst(database, Environment.GetEnvironmentVariable("MYDMSVN_WEB5_RACE_PARENT_DIRECTORY")!) :
                 await WebRecoveryPilotControl.Start(connectionString, web5Pilot);
             manifestJson["mode"] = web5Pilot ? "web5-recovery" : "web4-recovery";
@@ -569,6 +578,7 @@ public sealed partial class WebHostIisExpressTests
             manifestJson["frontendDistManifestSha256"] = web6Expected.FrontendDistManifestSha256;
         }
         Exception? browserFailure = null;
+        Web6CandidateManifest.PrivateInput? privateInput = null;
         var browserDrained = true;
         async Task<GuiProcessResult> ExecuteBrowser(string project, string outputName)
         {
@@ -596,7 +606,12 @@ public sealed partial class WebHostIisExpressTests
         }
         try
         {
-            File.WriteAllText(manifestPath, manifestJson.ToString(Formatting.None), new UTF8Encoding(false));
+            if (web6Candidate)
+            {
+                privateInput = candidateManifest!.CreatePrivateInput("browser-input.json", new UTF8Encoding(false).GetBytes(manifestJson.ToString(Formatting.None)));
+                manifestPath = privateInput.Path;
+            }
+            else File.WriteAllText(manifestPath, manifestJson.ToString(Formatting.None), new UTF8Encoding(false));
             using (var certificates = new X509Store(StoreName.My, StoreLocation.LocalMachine))
             {
                 certificates.Open(OpenFlags.ReadOnly);
@@ -692,7 +707,7 @@ public sealed partial class WebHostIisExpressTests
         {
             try { if (recovery != null) await recovery.Stop(browserDrained); }
             catch (Exception cleanup) when (browserFailure != null) { throw new AggregateException("Browser scenario and recovery control drain failed.", browserFailure, cleanup); }
-            finally { File.Delete(manifestPath); File.Delete(certificatePath); }
+            finally { if (privateInput != null) privateInput.Dispose(); else File.Delete(manifestPath); File.Delete(certificatePath); }
         }
     }
     private static async Task VerifyReceiptStock(SqlConnection oracle, JToken[] receipts, int warehouse, int product)

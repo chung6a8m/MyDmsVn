@@ -38,11 +38,11 @@ internal sealed class WebRecoveryPilotControl
     private readonly bool _web6;
     private readonly string? _runtimeUser;
     private readonly Dictionary<Guid, WebOperationHttpSqlTests.Intent> _web6Operations = new Dictionary<Guid, WebOperationHttpSqlTests.Intent>();
-    private Guid? _candidateMismatchOriginalEpoch;
+    private readonly Web6CandidateHostMismatch? _candidateMismatch;
     private bool _eligibilityUserDisabled;
     private bool _eligibilityJournalDenied;
-    private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null)
-    { _connectionString = connectionString; _web5 = web5; _web6 = web6; _runtimeUser = runtimeUser; }
+    private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null, Web6CandidateHostMismatch? candidateMismatch = null)
+    { _connectionString = connectionString; _web5 = web5; _web6 = web6; _runtimeUser = runtimeUser; _candidateMismatch = candidateMismatch; }
     public Guid[] Epochs => _epochs.ToArray();
     public bool NegativeVerified => _negativeSequence.Complete && _negativeIdentities.Count == 6;
     public Web5NegativePilot.Identity[] NegativeIdentities => _negativeIdentities.ToArray();
@@ -64,11 +64,12 @@ internal sealed class WebRecoveryPilotControl
         return control;
     }
 
-    public static async Task<WebRecoveryPilotControl> StartCandidate(string connectionString, string runtimeUser)
+    public static async Task<WebRecoveryPilotControl> StartCandidate(string connectionString, string runtimeUser, Web6CandidateHostMismatch candidateMismatch)
     {
         if (string.IsNullOrEmpty(runtimeUser) || !runtimeUser.All(character => char.IsLetterOrDigit(character) || character == '_'))
             throw new ArgumentException("Candidate runtime identity is invalid.", nameof(runtimeUser));
-        var control = new WebRecoveryPilotControl(connectionString, web5: true, web6: true, runtimeUser: runtimeUser);
+        if (candidateMismatch == null) throw new ArgumentNullException(nameof(candidateMismatch));
+        var control = new WebRecoveryPilotControl(connectionString, web5: true, web6: true, runtimeUser: runtimeUser, candidateMismatch: candidateMismatch);
         using (var sql = new SqlConnection(connectionString))
             control._epochs.Add(await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;"));
         control._serving = control.Serve();
@@ -92,19 +93,18 @@ internal sealed class WebRecoveryPilotControl
         _stopped = true; _stop.Cancel();
         var failures = new List<Exception>();
         try { await _serving.ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
-        if (_web6 && (_candidateMismatchOriginalEpoch.HasValue || _eligibilityUserDisabled || _eligibilityJournalDenied))
+        if (_web6 && ((_candidateMismatch?.IsArmed ?? false) || _eligibilityUserDisabled || _eligibilityJournalDenied))
         {
             try
             {
                 using var sql = new SqlConnection(_connectionString);
                 await sql.OpenAsync().ConfigureAwait(false);
-                if (_candidateMismatchOriginalEpoch.HasValue)
-                    await sql.ExecuteAsync("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@epoch WHERE Id=1;", new { epoch = _candidateMismatchOriginalEpoch.Value }).ConfigureAwait(false);
+                if (_candidateMismatch?.IsArmed == true) await _candidateMismatch.RestoreIfNeededAsync().ConfigureAwait(false);
                 if (_eligibilityUserDisabled)
                     await sql.ExecuteAsync("UPDATE dbo.Users SET IsActive=1 WHERE Username=N'integratedEditor' AND IsActive=0;").ConfigureAwait(false);
                 if (_eligibilityJournalDenied && _runtimeUser != null)
                     await sql.ExecuteAsync("REVOKE SELECT ON dbo.WebOperationJournal TO [" + _runtimeUser + "];").ConfigureAwait(false);
-                _candidateMismatchOriginalEpoch = null; _eligibilityUserDisabled = false; _eligibilityJournalDenied = false;
+                _eligibilityUserDisabled = false; _eligibilityJournalDenied = false;
             }
             catch (Exception error) { failures.Add(error); }
         }
@@ -174,24 +174,9 @@ internal sealed class WebRecoveryPilotControl
                 }
                 else if (action == "candidateMismatchOn" || action == "candidateMismatchOff")
                 {
-                    if (!_web6) throw new InvalidDataException("Candidate control is not enabled.");
-                    if (action == "candidateMismatchOn")
-                    {
-                        if (_candidateMismatchOriginalEpoch.HasValue) throw new InvalidDataException("Candidate mismatch is already armed.");
-                        var previous = await sql.QuerySingleAsync<Guid>(new SqlTestCommand("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;", cancellationToken: _stop.Token));
-                        var next = Guid.NewGuid();
-                        if (await sql.ExecuteAsync(new SqlTestCommand("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@next WHERE Id=1 AND DeploymentEpoch=@previous;",
-                            new { next, previous }, cancellationToken: _stop.Token)) != 1) throw new InvalidDataException("Candidate mismatch fence changed.");
-                        _candidateMismatchOriginalEpoch = previous;
-                    }
-                    else
-                    {
-                        if (!_candidateMismatchOriginalEpoch.HasValue) throw new InvalidDataException("Candidate mismatch is not armed.");
-                        if (await sql.ExecuteAsync(new SqlTestCommand("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@previous WHERE Id=1;",
-                            new { previous = _candidateMismatchOriginalEpoch.Value }, cancellationToken: _stop.Token)) != 1)
-                            throw new InvalidDataException("Candidate mismatch fence could not be restored.");
-                        _candidateMismatchOriginalEpoch = null;
-                    }
+                    if (!_web6 || _candidateMismatch == null) throw new InvalidDataException("Candidate control is not enabled.");
+                    if (action == "candidateMismatchOn") await _candidateMismatch.ArmAsync().ConfigureAwait(false);
+                    else await _candidateMismatch.RestoreAsync().ConfigureAwait(false);
                 }
                 else if (action == "eligibility401" || action == "eligibility500" || action == "eligibilityNormal")
                 {
@@ -319,4 +304,35 @@ internal sealed class WebRecoveryPilotControl
             throw new InvalidDataException("Invalid recovery fixture control request.");
         return action;
     }
+}
+
+internal sealed class Web6CandidateHostMismatch
+{
+    private readonly Func<string, Task> _switchHost;
+    internal Web6CandidateHostMismatch(string expectedCandidateId, Func<string, Task> switchHost)
+    {
+        if (string.IsNullOrWhiteSpace(expectedCandidateId) || !System.Text.RegularExpressions.Regex.IsMatch(expectedCandidateId, @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z"))
+            throw new ArgumentException("Candidate identity is required.", nameof(expectedCandidateId));
+        ExpectedCandidateId = expectedCandidateId;
+        const string suffix = "-mismatch";
+        MismatchCandidateId = expectedCandidateId.Substring(0, Math.Min(expectedCandidateId.Length, 64 - suffix.Length)) + suffix;
+        _switchHost = switchHost ?? throw new ArgumentNullException(nameof(switchHost));
+    }
+    internal string ExpectedCandidateId { get; }
+    internal string MismatchCandidateId { get; }
+    internal bool IsArmed { get; private set; }
+    internal async Task ArmAsync()
+    {
+        if (IsArmed) throw new InvalidOperationException("Candidate mismatch is already armed.");
+        // A failed restart is ambiguous: cleanup must restore the exact admitted pair.
+        IsArmed = true;
+        await _switchHost(MismatchCandidateId).ConfigureAwait(false);
+    }
+    internal async Task RestoreAsync()
+    {
+        if (!IsArmed) throw new InvalidOperationException("Candidate mismatch is not armed.");
+        await _switchHost(ExpectedCandidateId).ConfigureAwait(false);
+        IsArmed = false;
+    }
+    internal Task RestoreIfNeededAsync() => IsArmed ? RestoreAsync() : Task.CompletedTask;
 }

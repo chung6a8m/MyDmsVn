@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Testing.Sql;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
+using MyDmsVn.Server.HttpHost;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
@@ -123,6 +125,40 @@ internal static class Web6CandidateOracle
             throw new InvalidDataException("WEB6 candidate disposition is not clean and healthy.");
     }
 
+    internal static JObject ValidateCanonicalResultBytes(int operationKind, byte[] bytes)
+    {
+        if (operationKind is < 1 or > 6 || bytes == null || bytes.Length == 0) throw Invalid();
+        JObject envelope;
+        try { envelope = new WebOperationResultCodec().DecodeEnvelope((MyDmsVn.Server.Application.Operations.WebOperationKind)operationKind, bytes); }
+        catch { throw Invalid(); }
+        var canonical = System.Text.Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(envelope, Formatting.None));
+        if (!canonical.SequenceEqual(bytes)) throw Invalid();
+        return envelope;
+    }
+
+    internal static void ValidateDraftProjection(int operationKind, JObject envelope, JObject header, JArray lines)
+    {
+        if (operationKind is not (1 or 2 or 4 or 5) || envelope?["data"] is not JObject data || header == null || lines == null)
+            throw Invalid();
+        var sales = operationKind <= 2;
+        var headerMap = sales
+            ? new[] { ("saleId", "saleId"), ("saleNumber", "saleNumber"), ("saleDate", "saleDate"), ("customerId", "customerId"), ("warehouseId", "warehouseId"), ("employeeId", "employeeId"), ("status", "status"), ("note", "note"), ("version", "version") }
+            : new[] { ("receiptId", "receiptId"), ("receiptNumber", "receiptNumber"), ("receiptDate", "receiptDate"), ("warehouseId", "warehouseId"), ("employeeId", "employeeId"), ("status", "status"), ("note", "note"), ("version", "version") };
+        foreach (var pair in headerMap)
+        {
+            var expected = data[pair.Item1]; var actual = header[pair.Item2];
+            if (!((expected == null || expected.Type == JTokenType.Null) && (actual == null || actual.Type == JTokenType.Null)) &&
+                !JToken.DeepEquals(expected, actual)) throw Invalid();
+        }
+        if (data["lines"] is not JArray expectedLines || expectedLines.Count != lines.Count || lines.Count == 0) throw Invalid();
+        var names = sales
+            ? new[] { "saleLineId", "lineNo", "productId", "qty", "unitPrice", "isGift", "lineAmount" }
+            : new[] { "receiptLineId", "lineNumber", "productId", "quantity", "unitCost" };
+        for (var index = 0; index < lines.Count; index++)
+            foreach (var name in names)
+                if (!JToken.DeepEquals(expectedLines[index]![name], lines[index]![name])) throw Invalid();
+    }
+
     internal static async Task VerifySqlAsync(string connectionString, JObject result, Web6CandidateExpected expected,
         CancellationToken cancellationToken)
     {
@@ -133,7 +169,7 @@ internal static class Web6CandidateOracle
         {
             var operationId = Guid.ParseExact(Text(claimed, "operationId"), "D");
             var row = await sql.QuerySingleAsync<JournalRow>(new SqlTestCommand(@"
-SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition
+SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes
 FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId
 WHERE j.OperationId=@operation;", new { operation = operationId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             var expectedKind = Array.IndexOf(Kinds, Text(claimed, "operationKind")) + 1;
@@ -142,7 +178,9 @@ WHERE j.OperationId=@operation;", new { operation = operationId }, cancellationT
                 row.ResultDocumentId <= 0 || (expectedKind is 1 or 4 ? row.RequestTargetId.HasValue : row.RequestTargetId != row.ResultDocumentId) ||
                 row.DeploymentEpoch == Guid.Empty)
                 throw Invalid();
+            var envelope = ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes);
             await VerifyPhysicalEffect(sql, row, cancellationToken).ConfigureAwait(false);
+            await VerifyResultProjection(sql, row, envelope, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -153,10 +191,49 @@ WHERE j.OperationId=@operation;", new { operation = operationId }, cancellationT
             new { operation = operationId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         if (count != 1) throw Invalid();
         var row = await sql.QuerySingleAsync<JournalRow>(new SqlTestCommand(@"
-SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition
+SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes
 FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation;",
             new { operation = operationId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         await VerifyPhysicalEffect(sql, row, cancellationToken).ConfigureAwait(false);
+        var envelope = ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes);
+        await VerifyResultProjection(sql, row, envelope, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task VerifyResultProjection(SqlConnection sql, JournalRow row, JObject envelope, CancellationToken cancellationToken)
+    {
+        if (row.OperationKind is 1 or 2)
+        {
+            var header = await sql.QuerySingleAsync<SalesHeader>(new SqlTestCommand(
+                "SELECT SaleId,SaleNumber,SaleDate,CustomerId,WarehouseId,EmployeeId,Status,Note,RowVersion FROM dbo.SalesReceipts WHERE SaleId=@id;",
+                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            var lines = (await sql.QueryAsync<SalesLine>(new SqlTestCommand(
+                "SELECT SaleLineId,LineNo,ProductId,Qty,UnitPrice,IsGift,LineAmount FROM dbo.SalesReceiptLines WHERE SaleId=@id ORDER BY LineNo;",
+                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
+            ValidateDraftProjection(row.OperationKind, envelope, header.Json(), new JArray(lines.Select(line => line.Json())));
+        }
+        else if (row.OperationKind is 4 or 5)
+        {
+            var header = await sql.QuerySingleAsync<ReceiptHeader>(new SqlTestCommand(
+                "SELECT ReceiptId,ReceiptNo ReceiptNumber,ReceiptDate,WarehouseId,EmployeeId,Status,Note,RowVersion FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
+                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            var lines = (await sql.QueryAsync<ReceiptLine>(new SqlTestCommand(
+                "SELECT ReceiptLineId,LineNo LineNumber,ProductId,Quantity,UnitCost FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id ORDER BY LineNo;",
+                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
+            ValidateDraftProjection(row.OperationKind, envelope, header.Json(), new JArray(lines.Select(line => line.Json())));
+        }
+        else
+        {
+            var data = (JObject)envelope["data"]!;
+            var idName = row.OperationKind == 3 ? "saleId" : "receiptId";
+            var posted = await sql.QuerySingleAsync<PostHeader>(new SqlTestCommand(row.OperationKind == 3
+                ? "SELECT Status,PostedAtUtc,RowVersion FROM dbo.SalesReceipts WHERE SaleId=@id;"
+                : "SELECT Status,PostedAtUtc,CAST(NULL AS binary(8)) RowVersion FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
+                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            if ((string?)data[idName] != row.ResultDocumentId.ToString(CultureInfo.InvariantCulture) || (string?)data["status"] != posted.Status ||
+                !DateTime.TryParse((string?)data["postedAtUtc"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var expectedPosted) ||
+                expectedPosted != DateTime.SpecifyKind(posted.PostedAtUtc, DateTimeKind.Utc) ||
+                (row.OperationKind == 3 && (string?)data["version"] != Convert.ToBase64String(posted.RowVersion!))) throw Invalid();
+        }
     }
 
     private static async Task VerifyPhysicalEffect(SqlConnection sql, JournalRow row, CancellationToken cancellationToken)
@@ -209,5 +286,29 @@ WHERE l.DocumentType='GoodsReceipt' AND l.DocumentId=@id AND
         public byte[] RequestFingerprint { get; set; } = Array.Empty<byte>();
         public Guid DeploymentEpoch { get; set; }
         public string Disposition { get; set; } = "";
+        public byte[] ResultBytes { get; set; } = Array.Empty<byte>();
     }
+
+    private sealed class SalesHeader { public long SaleId { get; set; } public string SaleNumber { get; set; } = ""; public DateTime SaleDate { get; set; } public int CustomerId { get; set; } public int WarehouseId { get; set; } public int EmployeeId { get; set; } public string Status { get; set; } = ""; public string? Note { get; set; } public byte[] RowVersion { get; set; } = Array.Empty<byte>(); internal JObject Json() => new JObject { ["saleId"] = SaleId.ToString(CultureInfo.InvariantCulture), ["saleNumber"] = SaleNumber, ["saleDate"] = SaleDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ["customerId"] = CustomerId, ["warehouseId"] = WarehouseId, ["employeeId"] = EmployeeId, ["status"] = Status, ["note"] = Note == null ? JValue.CreateNull() : Note, ["version"] = Convert.ToBase64String(RowVersion) }; }
+    private sealed class SalesLine { public long SaleLineId { get; set; } public int LineNo { get; set; } public int ProductId { get; set; } public decimal Qty { get; set; } public decimal UnitPrice { get; set; } public bool IsGift { get; set; } public decimal LineAmount { get; set; } internal JObject Json() => new JObject { ["saleLineId"] = SaleLineId.ToString(CultureInfo.InvariantCulture), ["lineNo"] = LineNo, ["productId"] = ProductId, ["qty"] = Qty.ToString("F4", CultureInfo.InvariantCulture), ["unitPrice"] = UnitPrice.ToString("F4", CultureInfo.InvariantCulture), ["isGift"] = IsGift, ["lineAmount"] = LineAmount.ToString("F4", CultureInfo.InvariantCulture) }; }
+    private sealed class ReceiptHeader { public long ReceiptId { get; set; } public string ReceiptNumber { get; set; } = ""; public DateTime ReceiptDate { get; set; } public int WarehouseId { get; set; } public int EmployeeId { get; set; } public string Status { get; set; } = ""; public string? Note { get; set; } public byte[] RowVersion { get; set; } = Array.Empty<byte>(); internal JObject Json() => new JObject { ["receiptId"] = ReceiptId.ToString(CultureInfo.InvariantCulture), ["receiptNumber"] = ReceiptNumber, ["receiptDate"] = ReceiptDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ["warehouseId"] = WarehouseId, ["employeeId"] = EmployeeId, ["status"] = Status, ["note"] = Note == null ? JValue.CreateNull() : Note, ["version"] = Convert.ToBase64String(RowVersion) }; }
+    private sealed class ReceiptLine { public long ReceiptLineId { get; set; } public int LineNumber { get; set; } public int ProductId { get; set; } public decimal Quantity { get; set; } public decimal UnitCost { get; set; } internal JObject Json() => new JObject { ["receiptLineId"] = ReceiptLineId.ToString(CultureInfo.InvariantCulture), ["lineNumber"] = LineNumber, ["productId"] = ProductId, ["quantity"] = Quantity.ToString("F4", CultureInfo.InvariantCulture), ["unitCost"] = UnitCost.ToString("F4", CultureInfo.InvariantCulture) }; }
+    private sealed class PostHeader { public string Status { get; set; } = ""; public DateTime PostedAtUtc { get; set; } public byte[]? RowVersion { get; set; } }
+}
+
+internal static class Web6CandidateAcceptanceGate
+{
+    private static readonly string[] Required = { "MYDMSVN_WEB6_CANDIDATE_ROOT", "MYDMSVN_WEB6_CANDIDATE_ID", "MYDMSVN_WEB_TEST_BROWSER_DIRECTORY", "MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY", "MYDMSVN_WEB_TEST_TLS_THUMBPRINT", "MYDMSVN_WEB_PILOT_PROJECT", "MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING", "MYDMSVN_SQL_TEST_APPROVAL_FILE" };
+    internal static string? OrdinarySkipReason(IReadOnlyDictionary<string, string?> values) =>
+        Value(values, "MYDMSVN_WEB6_CANDIDATE_ENABLE") == "1" ? null : "WEB6 paired candidate requires exact explicit nonproduction opt-in.";
+    internal static void RequireLive(IReadOnlyDictionary<string, string?> values)
+    {
+        if (Value(values, "MYDMSVN_WEB6_CANDIDATE_ENABLE") != "1") throw new InvalidOperationException("MYDMSVN_WEB6_CANDIDATE_ENABLE must equal 1.");
+        var missing = Required.Where(name => string.IsNullOrWhiteSpace(Value(values, name))).ToArray();
+        if (missing.Length != 0) throw new InvalidOperationException("WEB6 paired candidate BLOCKED: missing " + string.Join(",", missing));
+    }
+    internal static IReadOnlyDictionary<string, string?> EnvironmentValues() => Environment.GetEnvironmentVariables().Keys.Cast<object>()
+        .Select(key => key.ToString()!).Where(key => key.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase))
+        .ToDictionary(key => key, Environment.GetEnvironmentVariable, StringComparer.OrdinalIgnoreCase);
+    private static string? Value(IReadOnlyDictionary<string, string?> values, string name) => values.TryGetValue(name, out var value) ? value : null;
 }

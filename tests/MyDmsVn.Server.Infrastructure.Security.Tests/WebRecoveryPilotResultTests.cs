@@ -2,6 +2,9 @@
 using System.IO;
 using System.Data;
 using System.Linq;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -45,6 +48,98 @@ public sealed class WebRecoveryPilotResultTests
                 "web6-two-tab-one-claim", "web6-fail-closed-boundaries", "web6-ime-double-click"),
         };
     }
+
+    [Fact]
+    public void Web6_live_acceptance_gate_fails_enabled_runs_with_missing_prerequisites_without_affecting_ordinary_discovery()
+    {
+        var disabled = new Dictionary<string, string?> { ["MYDMSVN_WEB6_CANDIDATE_ENABLE"] = null };
+        Assert.NotNull(Web6CandidateAcceptanceGate.OrdinarySkipReason(disabled));
+
+        var enabled = new Dictionary<string, string?> { ["MYDMSVN_WEB6_CANDIDATE_ENABLE"] = "1" };
+        Assert.Null(Web6CandidateAcceptanceGate.OrdinarySkipReason(enabled));
+        var failure = Assert.Throws<InvalidOperationException>(() => Web6CandidateAcceptanceGate.RequireLive(enabled));
+        Assert.Contains("MYDMSVN_WEB6_CANDIDATE_ROOT", failure.Message);
+    }
+
+    [Fact]
+    public async Task Candidate_mismatch_lifecycle_switches_the_owned_host_candidate_and_restores_the_exact_pair()
+    {
+        var switched = new List<string>();
+        var lifecycle = new Web6CandidateHostMismatch("candidate-a", id => { switched.Add(id); return Task.CompletedTask; });
+        await lifecycle.ArmAsync();
+        Assert.Equal(new[] { "candidate-a-mismatch", "candidate-a" }, new[] { switched[0], lifecycle.ExpectedCandidateId });
+        await Assert.ThrowsAsync<InvalidOperationException>(() => lifecycle.ArmAsync());
+        await lifecycle.RestoreAsync();
+        Assert.Equal(new[] { "candidate-a-mismatch", "candidate-a" }, switched);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => lifecycle.RestoreAsync());
+
+        await lifecycle.ArmAsync();
+        await lifecycle.RestoreIfNeededAsync();
+        Assert.Equal(new[] { "candidate-a-mismatch", "candidate-a", "candidate-a-mismatch", "candidate-a" }, switched);
+    }
+
+    [Fact]
+    public async Task Candidate_mismatch_lifecycle_restores_after_an_ambiguous_switch_failure()
+    {
+        var switched = new List<string>();
+        var lifecycle = new Web6CandidateHostMismatch("candidate-a", id =>
+        {
+            switched.Add(id);
+            if (id.EndsWith("-mismatch", StringComparison.Ordinal)) throw new IOException("ambiguous restart");
+            return Task.CompletedTask;
+        });
+        await Assert.ThrowsAsync<IOException>(() => lifecycle.ArmAsync());
+        Assert.True(lifecycle.IsArmed);
+        await lifecycle.RestoreIfNeededAsync();
+        Assert.Equal(new[] { "candidate-a-mismatch", "candidate-a" }, switched);
+    }
+
+    [Fact]
+    public void Candidate_mismatch_identity_remains_a_distinct_valid_bounded_candidate()
+    {
+        var expected = "a" + new string('b', 63);
+        var lifecycle = new Web6CandidateHostMismatch(expected, _ => Task.CompletedTask);
+        Assert.NotEqual(expected, lifecycle.MismatchCandidateId);
+        Assert.Matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", lifecycle.MismatchCandidateId);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Candidate_oracle_rejects_noncanonical_sales_result_bytes_and_changed_draft_projection(int operationKind)
+    {
+        var envelope = JObject.Parse("{\"data\":{\"saleId\":\"1\",\"saleNumber\":\"SA0000000001\",\"saleDate\":\"2026-11-10\",\"customerId\":1,\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"version\":\"AAAAAAAAAAA=\",\"lines\":[{\"saleLineId\":\"4\",\"lineNo\":1,\"productId\":5,\"qty\":\"2.0000\",\"unitPrice\":\"3.0000\",\"isGift\":false,\"lineAmount\":\"6.0000\",\"productIsActive\":true,\"unit\":\"EA\",\"productDisplayName\":\"P\"}],\"totalAmount\":\"6.0000\",\"customerIsActive\":true,\"warehouseIsActive\":true,\"employeeIsActive\":true,\"customerDisplayName\":\"C\",\"warehouseDisplayName\":\"W\",\"employeeDisplayName\":\"E\"}}" );
+        var bytes = Encoding.UTF8.GetBytes(envelope.ToString(Newtonsoft.Json.Formatting.None));
+        Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, bytes);
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, Encoding.UTF8.GetBytes(" " + Encoding.UTF8.GetString(bytes))));
+
+        var header = JObject.Parse("{\"saleId\":\"1\",\"saleNumber\":\"SA0000000001\",\"saleDate\":\"2026-11-10\",\"customerId\":1,\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"note\":null,\"version\":\"AAAAAAAAAAA=\"}");
+        var lines = JArray.Parse("[{\"saleLineId\":\"4\",\"lineNo\":1,\"productId\":5,\"qty\":\"2.0000\",\"unitPrice\":\"3.0000\",\"isGift\":false,\"lineAmount\":\"6.0000\"}]");
+        Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines);
+        header["warehouseId"] = 9;
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines));
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(5)]
+    public void Candidate_oracle_compares_exact_receipt_header_lines_and_cardinality(int operationKind)
+    {
+        var envelope = JObject.Parse("{\"data\":{\"receiptId\":\"1\",\"receiptNumber\":\"GR0000000001\",\"receiptDate\":\"2026-11-10\",\"warehouseId\":2,\"warehouseDisplayName\":null,\"warehouseIsActive\":true,\"employeeId\":3,\"employeeDisplayName\":null,\"employeeIsActive\":true,\"status\":\"Draft\",\"note\":null,\"postedAtUtc\":null,\"version\":\"AAAAAAAAAAA=\",\"lines\":[{\"receiptLineId\":\"4\",\"lineNumber\":1,\"productId\":5,\"quantity\":\"2.0000\",\"unitCost\":\"3.0000\",\"productDisplayName\":null,\"productIsActive\":true}]}}" );
+        var bytes = Encoding.UTF8.GetBytes(envelope.ToString(Newtonsoft.Json.Formatting.None));
+        Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, bytes);
+        var header = JObject.Parse("{\"receiptId\":\"1\",\"receiptNumber\":\"GR0000000001\",\"receiptDate\":\"2026-11-10\",\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"note\":null,\"version\":\"AAAAAAAAAAA=\"}");
+        var lines = JArray.Parse("[{\"receiptLineId\":\"4\",\"lineNumber\":1,\"productId\":5,\"quantity\":\"2.0000\",\"unitCost\":\"3.0000\"}]");
+        Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines);
+        lines.Add(lines[0]!.DeepClone());
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines));
+    }
+
+    [Theory]
+    [InlineData(3, "{\"data\":{\"saleId\":\"1\",\"status\":\"Posted\",\"postedAtUtc\":\"2026-11-10T00:00:00Z\",\"version\":\"AAAAAAAAAAA=\"}}")]
+    [InlineData(6, "{\"data\":{\"receiptId\":\"1\",\"status\":\"Posted\",\"postedAtUtc\":\"2026-11-10T00:00:00Z\"}}")]
+    public void Candidate_oracle_decodes_canonical_post_result_bytes_for_both_modules(int operationKind, string json) =>
+        Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, Encoding.UTF8.GetBytes(json));
 
     [Fact]
     public void Web6_candidate_result_requires_exact_six_unique_kinds_and_one_consent()
