@@ -1,0 +1,262 @@
+name: WEB6 protected SQL B03 candidate
+
+# Explicit Owner opt-in. The tag must point at the exact reviewed PR HEAD.
+on:
+  push:
+    tags: ['web6-b03-sql-candidate-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web6-b03-sql-candidate
+  cancel-in-progress: false
+
+jobs:
+  b03-sql-candidate:
+    if: >-
+      github.repository_id == '1409766698' && github.actor == 'chung6a8m' &&
+      github.triggering_actor == 'chung6a8m' && github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/web6-b03-sql-candidate-')
+    environment: web5-sql-candidate
+    runs-on: windows-2022
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      MSBUILDDISABLENODEREUSE: '1'
+      DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: '1'
+      MSBuildEnableWorkloadResolver: 'false'
+      MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING: ''
+    steps:
+      - name: Set private and sanitized evidence paths
+        run: |
+          $runToken=[guid]::NewGuid().ToString('N')
+          "WEB6_RUN_TOKEN=$runToken" >> $env:GITHUB_ENV
+          "WEB6_CHECKPOINT_ROOT=$env:SystemDrive\w6cp-$runToken" >> $env:GITHUB_ENV
+          "WEB6_STATE=$env:RUNNER_TEMP/web6-b03-sql-state.json" >> $env:GITHUB_ENV
+          "WEB6_RAW=$env:RUNNER_TEMP/web6-b03-sql-raw" >> $env:GITHUB_ENV
+          "WEB6_SAFE=$env:RUNNER_TEMP/web6-b03-sql-safe" >> $env:GITHUB_ENV
+          "WEB6_SANDBOX_STATE=$env:RUNNER_TEMP/web6-b03-sandbox-state.json" >> $env:GITHUB_ENV
+      - name: Checkout exact reviewed control commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+      - name: Checkout exact reviewed B03 source and tests
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify exact candidate and evidence guard
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path $env:WEB6_RAW,$env:WEB6_SAFE | Out-Null
+          if ((git -C candidate rev-parse HEAD) -ne $env:GITHUB_SHA -or $LASTEXITCODE -ne 0) { throw 'Candidate pin mismatch.' }
+          if ((git -C control rev-parse HEAD) -ne $env:GITHUB_SHA -or $LASTEXITCODE -ne 0) { throw 'Control pin mismatch.' }
+          & ./control/.github/scripts/Test-Web5SqlEvidence.ps1 -B03
+          if ((git -C candidate rev-parse HEAD:docs/contracts/web5-resolution-v1) -ne '43c922fd9fded72118555d29e3a068762984a985' -or $LASTEXITCODE -ne 0) { throw 'Frozen WEB5 corpus changed.' }
+          if ((git -C candidate rev-parse HEAD:docs/contracts/web4-v1) -ne 'fcab4a1e7505b150a132ce2899002930e9f2a6ee' -or $LASTEXITCODE -ne 0) { throw 'Frozen WEB4 corpus changed.' }
+      - name: Allocate private SID-owned SQL instance
+        shell: powershell
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Initialize -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+      - name: Require hosted LocalDB SQL-login capability
+        run: |
+          $ErrorActionPreference='Stop'
+          $connection=New-Object System.Data.SqlClient.SqlConnection($env:MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING)
+          try {
+            $connection.Open()
+            $command=$connection.CreateCommand(); $command.CommandTimeout=3
+            $command.CommandText="SELECT CONVERT(int,SERVERPROPERTY('IsLocalDB')),CONVERT(int,SERVERPROPERTY('IsIntegratedSecurityOnly'));"
+            $reader=$command.ExecuteReader()
+            if (-not $reader.Read() -or $reader.GetInt32(0) -ne 1 -or $reader.GetInt32(1) -ne 0) { throw 'Owned LocalDB cannot exercise restricted SQL-login CLI.' }
+            $reader.Close()
+            [IO.File]::WriteAllText("$env:WEB6_SAFE/capability.json",'{"localDb":true,"sqlAuthenticationEnabled":true}'+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+          } finally { $connection.Dispose() }
+      - name: Allocate exact private evidence sandbox
+        shell: powershell
+        run: |
+          & ./control/.github/scripts/Web6B03EvidenceSandbox.ps1 -Action Initialize -StatePath $env:WEB6_SANDBOX_STATE -RunToken $env:WEB6_RUN_TOKEN -SummaryPath "$env:WEB6_SAFE/sandbox.json" -CheckpointRoot $env:WEB6_CHECKPOINT_ROOT -CheckpointProfile B03Candidate -CheckpointPhase Initialize
+      - name: Restore and build exact Release net48 candidate
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference='Stop'
+          $project='tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
+          dotnet restore $project --locked-mode *> "$env:WEB6_RAW/restore.log"
+          if ($LASTEXITCODE -ne 0) { throw 'B03 locked restore failed; raw output withheld.' }
+          dotnet build $project -c Release -f net48 --no-restore -p:UseSharedCompilation=false *> "$env:WEB6_RAW/build.log"
+          if ($LASTEXITCODE -ne 0) { throw 'B03 Release/net48 build failed; raw output withheld.' }
+          $sdk=dotnet --version
+          if ($LASTEXITCODE -ne 0 -or $sdk -notmatch '^8\.0\.[0-9]+$') { throw 'SDK evidence missing.' }
+          $artifacts=[ordered]@{ sourceSha=$env:GITHUB_SHA; configuration='Release'; framework='net48'; sdk=$sdk; windowsVersion=[Environment]::OSVersion.Version.ToString(); sha256=[ordered]@{} }
+          foreach ($file in @('tools/MyDmsVn.WebOperation.Operator/bin/Release/net48/MyDmsVn.WebOperation.Operator.exe','tests/MyDmsVn.Server.Infrastructure.Security.Tests/bin/Release/net48/MyDmsVn.Server.Infrastructure.Security.Tests.dll','src/MyDmsVn.Server.Infrastructure/bin/Release/net48/MyDmsVn.Server.Infrastructure.dll')) {
+            $artifacts.sha256[[IO.Path]::GetFileName($file)]=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          }
+          [IO.File]::WriteAllText("$env:WEB6_SAFE/artifacts.json",($artifacts|ConvertTo-Json -Depth 5 -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+      - name: Run allowlisted B03 classes and inherited regressions sequentially
+        timeout-minutes: 30
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference='Stop'; . ../control/.github/scripts/Assert-Web5SqlEvidence.ps1
+          [IO.File]::WriteAllText($env:WEB6_STATE+'.active','B03-candidate')
+          [IO.File]::WriteAllText($env:WEB6_SANDBOX_STATE+'.active','B03-candidate')
+          $project='tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'
+          $selections=[ordered]@{
+            WebOperationMaintenanceOperatorTests=89
+            WebOperationMaintenanceEvidenceTests=33
+            WebOperationReconciliationOperatorTests=21
+            Web6MaintenanceRecoveryTests=28
+            WebOperationOperatorDecisionTests=59
+            WebOperationOperatorInspectTests=40
+            WebOperationResolutionTests=24
+            WebOperationTerminalCrashTests=2
+            Web5BackupSafetyTests=2
+            WebRecoveryPilotResultTests=43
+            Web5BackupRestoreTests=1
+            WebOperationHttpSqlTests=2
+          }
+          foreach ($class in $selections.Keys) {
+            $filter='FullyQualifiedName~MyDmsVn.Server.Infrastructure.IntegrationTests.'+$class
+            if ($class -eq 'WebOperationHttpSqlTests') {
+              $one='MyDmsVn.Server.Infrastructure.IntegrationTests.WebOperationHttpSqlTests.Operator_first_cancelled_blocks_delayed_original_and_resend_for_all_six_commands'
+              $two='MyDmsVn.Server.Infrastructure.IntegrationTests.WebOperationHttpSqlTests.Original_first_commit_remains_authoritative_over_waiting_operator_for_all_six_commands'
+              $filter="FullyQualifiedName=$one|FullyQualifiedName=$two"
+            }
+            dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter *> "$env:WEB6_RAW/$class-discovery.log"
+            if ($LASTEXITCODE -ne 0) { throw 'B03 discovery failed; raw output withheld.' }
+          }
+          $escaped=[Security.SecurityElement]::Escape($env:WEB6_EVIDENCE_TEMP)
+          $settings='<RunSettings><RunConfiguration><EnvironmentVariables><TEMP>'+$escaped+'</TEMP><TMP>'+$escaped+'</TMP><MYDMSVN_WEB6_EXPECTED_EVIDENCE_TEMP>'+$escaped+'</MYDMSVN_WEB6_EXPECTED_EVIDENCE_TEMP></EnvironmentVariables></RunConfiguration></RunSettings>'
+          [IO.File]::WriteAllText("$env:WEB6_RAW/evidence.runsettings",$settings,[Text.UTF8Encoding]::new($false))
+          foreach ($class in $selections.Keys) {
+            $expected=$selections[$class]
+            $filter='FullyQualifiedName~MyDmsVn.Server.Infrastructure.IntegrationTests.'+$class
+            if ($class -eq 'WebOperationHttpSqlTests') {
+              $one='MyDmsVn.Server.Infrastructure.IntegrationTests.WebOperationHttpSqlTests.Operator_first_cancelled_blocks_delayed_original_and_resend_for_all_six_commands'
+              $two='MyDmsVn.Server.Infrastructure.IntegrationTests.WebOperationHttpSqlTests.Original_first_commit_remains_authoritative_over_waiting_operator_for_all_six_commands'
+              $filter="FullyQualifiedName=$one|FullyQualifiedName=$two"
+            }
+            powershell -NoProfile -File ../control/.github/scripts/Web6B03EvidenceSandbox.ps1 -Action CheckEvidence -StatePath $env:WEB6_SANDBOX_STATE -RunToken $env:WEB6_RUN_TOKEN -SummaryPath "$env:WEB6_SAFE/sandbox.json" -CheckpointRoot $env:WEB6_CHECKPOINT_ROOT -CheckpointProfile B03Candidate -CheckpointPhase ("Before:"+$class)
+            if ($LASTEXITCODE -ne 0) { throw 'Evidence baseline not empty.' }
+            if ($class -eq 'Web5BackupRestoreTests') {
+            # A separately owned empty backup parent; each fixture owns its exact files/clone.
+            $backup=Join-Path $env:WEB6_EVIDENCE_TEMP 'web5-backup-regression'
+            if (Test-Path -LiteralPath $backup) { throw 'Backup root already exists.' }
+            $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
+            try {
+              $acl=New-Object Security.AccessControl.DirectorySecurity
+              $acl.SetOwner($identity.User); $acl.SetAccessRuleProtection($true,$false)
+              $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($identity.User,'FullControl','ContainerInherit,ObjectInherit','None','Allow'))
+              # Windows PowerShell supplies the Framework DirectorySecurity creation overload.
+              $aclBytes=$acl.GetSecurityDescriptorBinaryForm()
+              $encoded=[Convert]::ToBase64String($aclBytes)
+              $env:WEB6_BACKUP_ROOT=$backup; $env:WEB6_BACKUP_ACL=$encoded
+              powershell -NoProfile -Command '$a=New-Object Security.AccessControl.DirectorySecurity; $a.SetSecurityDescriptorBinaryForm([Convert]::FromBase64String($env:WEB6_BACKUP_ACL)); [IO.Directory]::CreateDirectory($env:WEB6_BACKUP_ROOT,$a) | Out-Null'
+              if ($LASTEXITCODE -ne 0) { throw 'Backup parent creation failed.' }
+            } finally { $identity.Dispose() }
+            $backupCreated=(Get-Item -LiteralPath $backup).CreationTimeUtc.Ticks
+            $backupAcl=(Get-Acl -LiteralPath $backup).Sddl
+            $backupOwner=[ordered]@{ sourceSha=$env:GITHUB_SHA; runId=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; path=$backup; createdTicks=$backupCreated.ToString(); acl=$backupAcl }
+            [IO.File]::WriteAllText("$env:WEB6_RAW/backup-parent.json",($backupOwner|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
+            $env:MYDMSVN_WEB5_BACKUP_TEST_ENABLE='1'
+            $env:MYDMSVN_WEB5_BACKUP_TEST_DIRECTORY=$backup
+            }
+            dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --settings "$env:WEB6_RAW/evidence.runsettings" --blame-hang-timeout 180s --blame-hang-dump-type none --logger "trx;LogFileName=$class.trx" --results-directory $env:WEB6_RAW *> "$env:WEB6_RAW/$class-run.log"
+            $testExit=$LASTEXITCODE
+            Assert-Web5SqlEvidence -TrxPath "$env:WEB6_RAW/$class.trx" -DiscoveryPath "$env:WEB6_RAW/$class-discovery.log" -RequiredClasses @($class) -SummaryPath "$env:WEB6_SAFE/$class.json" -Label $class
+            $summary=Get-Content "$env:WEB6_SAFE/$class.json" -Raw | ConvertFrom-Json
+            if ($summary.discovered -ne $expected -or $summary.total -ne $expected -or $summary.executed -ne $expected -or $summary.passed -ne $expected -or $summary.failed -ne 0 -or $summary.skipped -ne 0 -or $summary.requiredClasses.$class -ne $expected) { throw 'B03 exact class count mismatch.' }
+            $summary | Add-Member -NotePropertyName retry -NotePropertyValue 0
+            $summary | Add-Member -NotePropertyName sourceSha -NotePropertyValue $env:GITHUB_SHA
+            $summary | Add-Member -NotePropertyName trxSha256 -NotePropertyValue (Get-FileHash "$env:WEB6_RAW/$class.trx" -Algorithm SHA256).Hash.ToLowerInvariant()
+            [IO.File]::WriteAllText("$env:WEB6_SAFE/$class.json",($summary|ConvertTo-Json -Depth 5 -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+            if ($testExit -ne 0) { throw 'B03 test process failed.' }
+            if ($class -eq 'Web5BackupRestoreTests') {
+              $entry=Get-Item -LiteralPath $backup -Force
+              if ($entry.CreationTimeUtc.Ticks -ne $backupCreated -or ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or (Get-Acl -LiteralPath $backup).Sddl -ne $backupAcl -or @(Get-ChildItem -LiteralPath $backup -Force).Count -ne 0) { throw 'Backup parent uncertainty; quarantine.' }
+              [IO.Directory]::Delete($backup,$false)
+            }
+            powershell -NoProfile -File ../control/.github/scripts/Web6B03EvidenceSandbox.ps1 -Action CheckEvidence -StatePath $env:WEB6_SANDBOX_STATE -RunToken $env:WEB6_RUN_TOKEN -SummaryPath "$env:WEB6_SAFE/sandbox.json" -CheckpointRoot $env:WEB6_CHECKPOINT_ROOT -CheckpointProfile B03Candidate -CheckpointPhase ("After:"+$class)
+            if ($LASTEXITCODE -ne 0) { throw 'Evidence children remain after selected class.' }
+          }
+          # Require the actual Release EXE restricted-principal smoke, not a pure mock proxy.
+          [xml]$smoke=Get-Content "$env:WEB6_RAW/WebOperationMaintenanceOperatorTests.trx" -Raw
+          $smokeRows=@($smoke.TestRun.Results.UnitTestResult | Where-Object { $_.testName.EndsWith('.Compact_execute_release_changes_only_result_storage_and_second_attempt_is_no_change') -and $_.outcome -eq 'Passed' })
+          if ($smokeRows.Count -ne 1) { throw 'Release CLI restricted-principal smoke missing.' }
+          $smokeOutput=($smoke.SelectNodes('//*[local-name()="StdOut"]') | ForEach-Object { $_.InnerText }) -join "`n"
+          if ([regex]::Matches($smokeOutput,'WEB6_CANDIDATE_ENV testhost=1 releaseEnvironment=1').Count -ne 1) { throw 'Testhost/Release evidence environment proof missing or duplicated.' }
+          $proof=[ordered]@{ sourceSha=$env:GITHUB_SHA; restrictedReleaseSmoke=1; environmentMarkers=1; testhostEvidenceRootVerified=$true; releaseEnvironmentVerified=$true; primaryBackupPairsDelivered=$true }
+          [IO.File]::WriteAllText("$env:WEB6_SAFE/smoke.json",($proof|ConvertTo-Json -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+          # TEST_CLEANUP_ONLY is capability-gated hygiene; workflowSuccess=0 remains failure evidence.
+          [xml]$recovery=Get-Content "$env:WEB6_RAW/Web6MaintenanceRecoveryTests.trx" -Raw
+          $output=($recovery.SelectNodes('//*[local-name()="StdOut"]') | ForEach-Object { $_.InnerText }) -join "`n"
+          if ([regex]::Matches($output,'TEST_CLEANUP_ONLY resourcesAbsent=1 workflowSuccess=0').Count -ne 4) { throw 'Four separately authorized injected-fault cleanup outcomes required.' }
+          if ([regex]::Matches($output,'WEB6_RECOVERY exactResourcesAbsent=1').Count -ne 5) { throw 'Five exact fixture cleanup confirmations required.' }
+          $recoveryProof=[ordered]@{ sourceSha=$env:GITHUB_SHA; authorizedTestCleanupOnly=4; failedWorkflowsRemainFailed=4; exactResourcesAbsent=5; currentOperation='restricted-runtime journal Admit+Complete'; fullHttpBusinessHandlerRun=$false; serviceRpoRtoRun=$false }
+          [IO.File]::WriteAllText("$env:WEB6_SAFE/recovery-lifecycle.json",($recoveryProof|ConvertTo-Json -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+          powershell -NoProfile -File ../control/.github/scripts/Web6B03EvidenceSandbox.ps1 -Action SealTools -StatePath $env:WEB6_SANDBOX_STATE -RunToken $env:WEB6_RUN_TOKEN -SummaryPath "$env:WEB6_SAFE/sandbox.json" -CheckpointRoot $env:WEB6_CHECKPOINT_ROOT -CheckpointProfile B03Candidate -CheckpointPhase SealTools
+          if ($LASTEXITCODE -ne 0) { throw 'Final tooling processes/inventory did not seal.' }
+          Remove-Item -LiteralPath ($env:WEB6_STATE+'.active'),($env:WEB6_SANDBOX_STATE+'.active')
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'SQL owners did not drain.' }
+          powershell -NoProfile -File ../control/.github/scripts/Web6B03EvidenceSandbox.ps1 -Action Check -StatePath $env:WEB6_SANDBOX_STATE -RunToken $env:WEB6_RUN_TOKEN -SummaryPath "$env:WEB6_SAFE/sandbox.json" -CheckpointRoot $env:WEB6_CHECKPOINT_ROOT -CheckpointProfile B03Candidate -CheckpointPhase PostSealCheck
+          if ($LASTEXITCODE -ne 0) { throw 'Evidence roots did not drain.' }
+      - name: Verify exact candidate source remained unchanged
+        run: |
+          $changes=git -C candidate status --porcelain --untracked-files=normal
+          if ($LASTEXITCODE -ne 0 -or $changes) { throw 'Reviewed candidate source changed.' }
+      - name: Prove ownership and drain before instance removal
+        if: ${{ always() }}
+        shell: powershell
+        timeout-minutes: 2
+        run: |
+          & ./control/.github/scripts/Web5SqlInstance.ps1 -Action Complete -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+      - name: Remove exact empty evidence sandbox or quarantine
+        if: ${{ always() }}
+        shell: powershell
+        run: |
+          & ./control/.github/scripts/Web6B03EvidenceSandbox.ps1 -Action Complete -StatePath $env:WEB6_SANDBOX_STATE -RunToken $env:WEB6_RUN_TOKEN -SummaryPath "$env:WEB6_SAFE/sandbox.json" -CheckpointRoot $env:WEB6_CHECKPOINT_ROOT -CheckpointProfile B03Candidate -CheckpointPhase Complete
+      - name: Verify and materialize immutable checkpoint chain
+        if: ${{ always() }}
+        shell: powershell
+        run: |
+          & ./control/.github/scripts/Web6B03CheckpointEvidence.ps1 -Action Materialize -StatePath $env:WEB6_SANDBOX_STATE -CheckpointRoot $env:WEB6_CHECKPOINT_ROOT -CheckpointProfile B03Candidate -ArtifactPath ([IO.Path]::GetFullPath("$env:WEB6_SAFE/checkpoint-chain.json")) -RunToken $env:WEB6_RUN_TOKEN
+      - name: Remove only manifest-listed checkpoint entries
+        if: ${{ always() }}
+        shell: powershell
+        run: |
+          & ./control/.github/scripts/Web6B03CheckpointEvidence.ps1 -Action Remove -StatePath $env:WEB6_SANDBOX_STATE -CheckpointRoot $env:WEB6_CHECKPOINT_ROOT -CheckpointProfile B03Candidate -ArtifactPath ([IO.Path]::GetFullPath("$env:WEB6_SAFE/checkpoint-chain.json")) -RunToken $env:WEB6_RUN_TOKEN
+      - name: Require exact evidence and clean lifecycle
+        if: ${{ always() }}
+        run: |
+          powershell -NoProfile -File ./control/.github/scripts/Web6B03CheckpointEvidence.ps1 -Action VerifyMaterialized -StatePath $env:WEB6_SANDBOX_STATE -CheckpointRoot $env:WEB6_CHECKPOINT_ROOT -CheckpointProfile B03Candidate -ArtifactPath ([IO.Path]::GetFullPath("$env:WEB6_SAFE/checkpoint-chain.json")) -RunToken $env:WEB6_RUN_TOKEN
+          if ($LASTEXITCODE -ne 0) { throw 'Full B03 checkpoint chain or separate cleanup not verified.' }
+          $instance=Get-Content "$env:WEB6_SAFE/instance.json" -Raw|ConvertFrom-Json
+          $sandbox=Get-Content "$env:WEB6_SAFE/sandbox.json" -Raw|ConvertFrom-Json
+          if ($instance.phase -ne 'Removed' -or $instance.quarantine -or -not $instance.instanceOwnershipVerified -or $instance.userDatabases -ne 0 -or $instance.activeOwners -ne 0) { throw 'SQL lifecycle was not proven clean.' }
+          if ($instance.controlSha -ne $env:GITHUB_SHA -or $instance.testSourceSha -ne $env:GITHUB_SHA) { throw 'Evidence SHA mismatch.' }
+          if ($sandbox.phase -ne 'Removed' -or -not $sandbox.toolInventorySealed -or $sandbox.quarantine -or -not $sandbox.ownershipVerified -or $sandbox.unexpectedChildren -ne 0 -or $sandbox.activeProcesses -ne 0 -or -not $sandbox.primaryBackupPairsOwnedByFixtures -or $sandbox.sourceSha -ne $env:GITHUB_SHA) { throw 'Evidence sandbox lifecycle was not proven clean.' }
+          $classes=@('WebOperationMaintenanceOperatorTests','WebOperationMaintenanceEvidenceTests','WebOperationReconciliationOperatorTests','Web6MaintenanceRecoveryTests','WebOperationOperatorDecisionTests','WebOperationOperatorInspectTests','WebOperationResolutionTests','WebOperationTerminalCrashTests','Web5BackupSafetyTests','WebRecoveryPilotResultTests','Web5BackupRestoreTests','WebOperationHttpSqlTests')
+          foreach ($class in $classes) {
+            $result=Get-Content "$env:WEB6_SAFE/$class.json" -Raw|ConvertFrom-Json
+            if (-not $result.complete -or $result.retry -ne 0 -or $result.sourceSha -ne $env:GITHUB_SHA) { throw 'Incomplete candidate evidence.' }
+          }
+          'B03 local candidate is bounded; protected evidence requires exact classes, zero fail/skip/retry and owned SQL/file cleanup. Manual resend OFF; staging NOT ACCEPTED; production NO-GO.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Publish sanitized evidence only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web6-b03-sql-candidate-counts
+          path: ${{ env.WEB6_SAFE }}/*.json
+          if-no-files-found: error
+          retention-days: 14

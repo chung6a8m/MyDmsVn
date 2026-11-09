@@ -1,6 +1,6 @@
 # WEB6 backend evidence — selected, work in independent review
 
-**Roadmap selected 2026-11-03; overall acceptance remains incomplete and production remains NO-GO.** B01 and bounded B02a are merged; the Owner accepted bounded B04 SQL proof through PR #100. These acceptances do not complete B02b/B03/B05/B06, enable resend, accept staging or approve production.
+**Roadmap selected 2026-11-03; overall acceptance remains incomplete and production remains NO-GO.** B01 and bounded B02a are merged; the Owner accepted bounded B04 SQL proof through PR #100. The B02b row records its later bounded acceptance; these acceptances do not complete B03/B05/B06, enable resend, accept staging or approve production.
 
 [Owning plan](../../plans/20261103-001-web6-recovery-quality-backend.md) · [safety design](../../design/WEB6_RECOVERY_OPERATION_PROTOCOL.md) · [acceptance gates](../../development/WEB6_BACKEND_ACCEPTANCE.md) · [Codex handoff](../../development/WEB6_CODEX_HANDOFF.md) · [paired candidate runbook](../../development/WEB6_CANDIDATE_RUNBOOK.md) · [archived WEB5 evidence](../web5/20261103-web5-roadmap-closeout.md).
 
@@ -8,9 +8,21 @@
 |---|---|---|
 | B01 | [Exact source/contract/risk/expiry eligibility checkpoint](20261103-b01-source-safety-policy.md) and Owner scope | PR #99 MERGED; source-policy checkpoint present; Owner policy decisions still pending; runtime NOT CHANGED |
 | B02a/B02b | [B02a isolated read-only operator CLI](20261103-b02a-read-only-operator-cli.md); [B02b guarded terminal decision candidate](20261103-b02b-operator-decision.md) | B02a PR #101 MERGED at `732f799`; Owner accepted exact-head protected SQL run `41642775592` attempt 2 for B6-OPS-01/02 bounded nonproduction. B02b exact `2d47687` protected run `42543717784` passed 59+40+26+2, restricted login and verified owned cleanup; B6-OPS-03/04 PASS / OWNER ACCEPTED BOUNDED NONPRODUCTION, provider fault gap accepted bounded; PR #102 authorized for merge after final checks |
-| B03 | Compaction/retention/positive-case/backup-restore/epoch drill, independent SQL oracle | PLANNED |
+| B03 | [Maintenance, retention, positive-case and owned restore candidate](20261109-b03-maintenance-recovery.md) | IMPLEMENTED / FULL CANDIDATE BLOCKED; historical 342/344 failure retained, bounded R2e/R2f accepted. Durable private witness design unresolved; PROTECTED CI NOT RUN / BLOCKED. B6-OPS-05 and B6-MNT-01..03 BLOCKED; current Draft UNKNOWN, full HTTP recovery/service RPO/RTO NOT RUN |
 | B04 | [Six-command same-key/terminal/OS-death SQL proof](20261103-b04-same-key-sql-replay.md) and [quarantine register](20261103-b04-quarantine-register.md) | OWNER ACCEPTED / SQL-VERIFIED NONPRODUCTION through PR #100; protected run `41643581370` passed 8 exact WEB6 matrices / 48 scenarios with owned cleanup; B6-RPL-05 PARTIAL / OWNER DECISION PENDING; resend OFF |
 | B05a/B05b | Actual audit/limiter, owned IIS Express paired candidate, old/new cutover, load and service recovery | PLANNED |
 | B06 | Exact frontend/backend paired release manifest, target-vs-actual and named Owner disposition | PLANNED |
 
 **Inherited evidence is not a WEB6 result.** WEB5 B01 process-crash, B02 terminal resolution, B04 protected SQL CI, PR #95 host admission, frontend F03 browser and bounded F04 IIS Express are historical source-pinned successes; the new feature and paired candidate must be re-evaluated after changes. Current no-go: STAGING NOT ACCEPTED / PRODUCTION NO-GO / DEFERRED; resend disabled; full IIS/unperformed Narrator NOT RUN exceptions for bounded nonproduction, reverse-proxy topology N/A on direct host; two historical SQL allocations quarantined and outside any cleanup authority. CEX independent.
+
+**Historical B03 final-run stop (2026-11-09):** [candidate evidence](20261109-b03-maintenance-recovery.md) preserves 344 executed, 342 passed / 2 failed / 0 skipped. A net48 path-length failure in the last race arrangement caused its guard to retain a new database and refuse further admission. Fresh quiescence does not replace the missing original allocation tuple or authorize cleanup. The later remediation below does not convert that candidate to PASS.
+
+Three earlier SQL-free 8/9 safety attempts retained synthetic ACL-drift cases without SQL allocation. Their failures and all later failed-attempt resources remain retained; no historical SQL, synthetic or diagnostic quarantine was adopted or cleaned.
+
+## B03 subsequent remediation — 2026-11-09
+
+[Subsequent bounded evidence](20261109-b03-maintenance-recovery.md#subsequent-remediation-20261109) independently accepted **R2e NativeSafety: 9/9, 60 ordered ACL markers and seven immutable checkpoints**, with verified candidate/checkpoint removal and process drain; and **R2f ATTEMPT_05: focused SQL ownership-manifest 1/1**, with bound Intent/Original/Complete, native receipt, fresh independent SQL absence, subject-control absence, exact candidate-root removal and process drain. R2f's administrative master allocator preflight remains **not restricted-runtime/operator proof**. Its three witness records/private controls remain retained. Neither gate replaces the failed full candidate or makes seven NativeSafety phases interchangeable with 28 B03Candidate phases.
+
+**Full 12-selection / 28-checkpoint candidate and protected workflow remain BLOCKED.** Current GitHub-hosted ephemeral storage has no reviewed durable private Intent/Original destination and acknowledgment before SQL side effects; final sanitized hashes cannot replace that witness, and raw private identifiers must not be uploaded. Exact-Fact supervision, full reconciliation and pre-SQL preflight wiring remain incomplete. The Owner authorized **design only** for a self-hosted runner with a persistent encrypted evidence volume: **NOT IMPLEMENTED / NOT VERIFIED**, with no provisioning, runtime, cleanup or dispatch authority.
+
+B6-OPS-05 and B6-MNT-01..03 remain BLOCKED. Provider/network/process-crash compaction proof, deferred Minors and existing recovery/attended acceptance limits remain unchanged; all quarantine/no-cleanup dispositions stand. Manual resend OFF; staging NOT ACCEPTED; production NO-GO.

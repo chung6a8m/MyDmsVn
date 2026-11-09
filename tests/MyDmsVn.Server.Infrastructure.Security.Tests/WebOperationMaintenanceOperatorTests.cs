@@ -30,6 +30,163 @@ public sealed class WebOperationMaintenanceOperatorTests
         "|current-epoch=" + CurrentEpoch + "|stored-epoch=" + StoredEpoch + "|actor=42|operation=" + Operation +
         "|fingerprint=" + Fingerprint + "|correlation=" + Correlation + "|case=case-123|timeout-seconds=15";
 
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Candidate_allocation_manifest_binds_live_original_identity_and_requires_absence_before_removal()
+    {
+        using var supervision = SqlTestSupervision.FromEnvironment();
+        Task Phase(SqlTestSupervisionPhase phase, Func<Task> work) => supervision == null ? work() : supervision.Coordinator.AdvanceAsync(phase, work, default);
+        try
+        {
+            var connection = Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!;
+            var database = supervision == null ? await SqlTestDatabase.CreateAsync(connection) : await SqlTestDatabase.CreateSupervisedAsync(connection, supervision);
+            SqlTestOwnershipManifest control = null!;
+            await Phase(SqlTestSupervisionPhase.SubjectControl, () => { control = SqlTestOwnershipManifest.Create(Path.GetTempPath()); return Task.CompletedTask; });
+            using (control)
+            {
+            using (var sql = new SqlConnection(database.ConnectionString))
+            {
+                string token = "";
+                await Phase(SqlTestSupervisionPhase.ProbePreparation, async () =>
+                {
+                    await sql.OpenAsync(); await database.VerifyOwnershipAsync(sql, default);
+                    token = await sql.QuerySingleAsync<string>("SELECT CONVERT(nvarchar(128),value) FROM sys.extended_properties WHERE class=0 AND name=N'MyDmsVn.TestOwnership';");
+                });
+                async Task Mutate() => await sql.ExecuteAsync("EXEC sys.sp_updateextendedproperty @name=N'MyDmsVn.TestOwnership', @value=N'changed';");
+                async Task Refusal()
+                {
+                    await Assert.ThrowsAsync<InvalidOperationException>(() => database.WriteOwnershipManifestAsync(control, default));
+                    Assert.Empty(Directory.GetFiles(control.ControlPath));
+                }
+                async Task Restore()
+                {
+                    await sql.ExecuteAsync("EXEC sys.sp_updateextendedproperty @name=N'MyDmsVn.TestOwnership', @value=@token;", new { token });
+                    await database.VerifyOwnershipAsync(sql, default);
+                }
+                if (supervision == null) { try { await Mutate(); await Refusal(); } finally { await Restore(); } }
+                else await supervision.Coordinator.ProbeAsync(Mutate, Refusal, Restore, default);
+                await Phase(SqlTestSupervisionPhase.SubjectManifest, async () =>
+                {
+                await database.WriteOwnershipManifestAsync(control, default);
+                string record;
+                using (var file = new FileStream(Path.Combine(control.ControlPath, "allocation.txt"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var reader = new StreamReader(file, Encoding.UTF8)) record = reader.ReadToEnd();
+                var fields = record.TrimEnd('\n').Split('\n').Select(line => line.Split(new[] { '=' }, 2)).ToDictionary(parts => parts[0], parts => parts[1]);
+                var nameMatches = Encoding.UTF8.GetString(Convert.FromBase64String(fields["database"])) == database.DatabaseName;
+                var tokenMatches = fields["ownershipToken"] == token;
+                var idMatches = fields["databaseId"] == (await sql.QuerySingleAsync<int>("SELECT DB_ID();")).ToString(CultureInfo.InvariantCulture);
+                var createdMatches = fields["createDateTicks"] == (await sql.QuerySingleAsync<DateTime>("SELECT create_date FROM sys.databases WHERE database_id=DB_ID();")).Ticks.ToString(CultureInfo.InvariantCulture);
+                var serverMatches = Encoding.UTF8.GetString(Convert.FromBase64String(fields["server"])) == await sql.QuerySingleAsync<string>("SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName'));");
+                using var sha = SHA256.Create();
+                var canonical = record.Substring(0, record.LastIndexOf("sha256=", StringComparison.Ordinal));
+                var hashMatches = fields["sha256"] == BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(canonical))).Replace("-", "").ToLowerInvariant();
+                Assert.True(nameMatches && tokenMatches && idMatches && createdMatches && serverMatches && hashMatches, "Private allocation manifest binding mismatch.");
+                control.Verify();
+                await Assert.ThrowsAsync<InvalidOperationException>(() => database.CompleteOwnershipManifestAsync(control, default));
+                });
+            }
+            if (supervision != null) await Phase(SqlTestSupervisionPhase.Quiescence, () => database.VerifySupervisedQuiescenceAsync(default));
+            await Phase(SqlTestSupervisionPhase.Drop, () => database.DisposeIfQuiescentAsync());
+            if (supervision != null) await Phase(SqlTestSupervisionPhase.Absence, () => database.VerifySupervisedAbsenceAsync(default));
+            await Phase(SqlTestSupervisionPhase.SubjectRemoval, async () => { await database.CompleteOwnershipManifestAsync(control, default); Assert.False(Directory.Exists(control.ControlPath)); });
+            if (supervision != null) await Phase(SqlTestSupervisionPhase.CompletionReceipt, () => { supervision.Complete(); return Task.CompletedTask; });
+            }
+        }
+        catch (Exception error)
+        {
+            // Unexpected failure retains the exact allocation/control record; never manufacture PASS.
+            if (supervision != null) throw supervision.Coordinator.Fail(error);
+            throw new InvalidOperationException("Candidate ownership lifecycle failed; retain private allocation/control for review.");
+        }
+    }
+
+    [Theory]
+    [InlineData("temp")]
+    [InlineData("tmp")]
+    [InlineData("actual")]
+    [InlineData("child-temp")]
+    [InlineData("child-tmp")]
+    public void Candidate_environment_guard_rejects_each_mismatched_observation(string mismatch)
+    {
+        using var roots = new ExecutionEvidenceRoots();
+        var start = new ProcessStartInfo { UseShellExecute = false };
+        start.EnvironmentVariables["TEMP"] = mismatch == "child-temp" ? roots.Backup : roots.Primary;
+        start.EnvironmentVariables["TMP"] = mismatch == "child-tmp" ? roots.Backup : roots.Primary;
+        Assert.Throws<InvalidOperationException>(() => ValidateCandidateEvidenceEnvironment(roots.Primary,
+            mismatch == "temp" ? roots.Backup : roots.Primary,
+            mismatch == "tmp" ? roots.Backup : roots.Primary,
+            mismatch == "actual" ? roots.Backup : roots.Primary, start));
+    }
+
+    [Fact]
+    public void Candidate_environment_guard_admits_exact_private_root_and_child_inheritance()
+    {
+        using var roots = new ExecutionEvidenceRoots();
+        var start = new ProcessStartInfo { UseShellExecute = false };
+        start.EnvironmentVariables["TEMP"] = roots.Primary;
+        start.EnvironmentVariables["TMP"] = roots.Primary;
+        using var verified = ValidateCandidateEvidenceEnvironment(roots.Primary, roots.Primary + "\\",
+            roots.Primary, roots.Primary + "\\", start);
+        Assert.NotNull(verified);
+        verified!.Verify();
+    }
+
+    [Fact]
+    public void Candidate_environment_guard_is_optional_without_expected_root()
+    {
+        using var verified = ValidateCandidateEvidenceEnvironment(null, null, null, "unobserved", new ProcessStartInfo());
+        Assert.Null(verified);
+    }
+
+    [Fact]
+    public void Candidate_environment_guard_rejects_untrusted_root_acl()
+    {
+        using var parent = SqlTestOwnershipManifest.OwnedAclParent.Create(Path.GetTempPath());
+        using var root = parent.CreateTarget(evidencePolicyProbe: true);
+        root.WriteVerifiedRecord("MyDmsVn_Test_11111111111141118111111111111111", "test-server", 17,
+            new DateTime(2026, 11, 9, 1, 2, 3), "22222222222242228222222222222222", false, DateTimeOffset.UtcNow);
+        using var authority = root.PreserveBeforeAclMutation(parent);
+        var start = new ProcessStartInfo { UseShellExecute = false };
+        start.EnvironmentVariables["TEMP"] = root.ControlPath;
+        start.EnvironmentVariables["TMP"] = root.ControlPath;
+        // Establish that the exact starting ACL and compatible lease are accepted, so the
+        // negative assertion proves ACL rejection rather than an unrelated open failure.
+        using (var accepted = ValidateCandidateEvidenceEnvironment(root.ControlPath, root.ControlPath,
+            root.ControlPath, root.ControlPath, start)) Assert.NotNull(accepted);
+        var acl = Directory.GetAccessControl(root.ControlPath, SqlTestPrivateRecord.Sections);
+        acl.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+            new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.WorldSid, null),
+            System.Security.AccessControl.FileSystemRights.Read, System.Security.AccessControl.AccessControlType.Allow));
+        authority.RunMutation(() => Directory.SetAccessControl(root.ControlPath, acl), () =>
+            Assert.Throws<IOException>(() => ValidateCandidateEvidenceEnvironment(root.ControlPath, root.ControlPath,
+                root.ControlPath, root.ControlPath, start)));
+        root.Verify();
+        root.RemoveAfterVerifiedAbsence();
+        parent.RemoveAfterVerifiedChildren();
+    }
+
+    private static EvidenceRoot? ValidateCandidateEvidenceEnvironment(string? expected, string? temp,
+        string? tmp, string actual, ProcessStartInfo start)
+    {
+        if (string.IsNullOrEmpty(expected)) return null;
+        string Canonical(string? value)
+        {
+            try
+            {
+                return !string.IsNullOrEmpty(value) && Path.IsPathRooted(value)
+                    ? Path.GetFullPath(value).TrimEnd(Path.DirectorySeparatorChar) : string.Empty;
+            }
+            catch (ArgumentException) { return string.Empty; }
+            catch (NotSupportedException) { return string.Empty; }
+        }
+        var root = Canonical(expected);
+        if (root.Length == 0 || new[] { temp, tmp, actual, start.EnvironmentVariables["TEMP"], start.EnvironmentVariables["TMP"] }
+            .Any(value => !string.Equals(root, Canonical(value), StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("Candidate evidence temp observation or child inheritance mismatch.");
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        try { return EvidenceRoot.Open(root, identity.User!); }
+        catch (IOException) { throw new IOException("Candidate evidence root identity/ACL/reparse policy denied."); }
+    }
+
     [Theory]
     [InlineData("compact-preview")]
     [InlineData("compact-execute")]
@@ -706,6 +863,8 @@ public sealed class WebOperationMaintenanceOperatorTests
             await Assert.ThrowsAsync<SqlException>(() => scenario.Observer.ExecuteAsync(
                 "UPDATE dbo.WebOperationJournal SET ResultDocumentId=42 WHERE OperationId=@operation;", new { operation }));
             roots.AssertDelivered("case-123");
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_EXPECTED_EVIDENCE_TEMP")))
+                Console.WriteLine("WEB6_CANDIDATE_ENV testhost=1 releaseEnvironment=1");
         });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
@@ -1145,7 +1304,12 @@ VALUES(41,1,@product,1,N'ea',0,9,9,@actor);", new { actor = scenario.Actor });
             environment[OperatorInspectApplication.DatabaseUserEnvironmentVariable] = operatorOnly.Name;
             environment[OperatorInspectApplication.LoginEnvironmentVariable] = operatorOnly.Name;
         }
-        return await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(20), scenario.Stop.Token);
+        using var candidateRoot = ValidateCandidateEvidenceEnvironment(
+            Environment.GetEnvironmentVariable("MYDMSVN_WEB6_EXPECTED_EVIDENCE_TEMP"),
+            Environment.GetEnvironmentVariable("TEMP"), Environment.GetEnvironmentVariable("TMP"), Path.GetTempPath(), start);
+        var processResult = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromSeconds(20), scenario.Stop.Token);
+        candidateRoot?.Verify();
+        return processResult;
     }
 
     private sealed class TestPrincipals

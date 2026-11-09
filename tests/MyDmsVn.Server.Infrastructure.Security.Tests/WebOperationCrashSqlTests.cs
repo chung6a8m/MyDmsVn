@@ -453,10 +453,15 @@ COMMIT;";
         Assert.False(WebOperationCrashProcess.IsPoisoned, "An earlier child cleanup was uncertain; no further database is admitted.");
         var database = await SqlTestDatabase.CreateAsync(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!);
         var scope = new CrashScope { ConnectionString = database.ConnectionString };
+        SqlTestOwnershipManifest? allocationManifest = null;
+        var allocationSealed = false;
         HttpScenario? http = null;
         Exception? failure = null;
         try
         {
+            allocationManifest = SqlTestOwnershipManifest.Create(System.IO.Path.GetTempPath());
+            await database.WriteOwnershipManifestAsync(allocationManifest, default);
+            allocationSealed = true;
             Assert.True((web5
                 ? new DatabaseMigrationRunner().MigrateWeb5(database.ConnectionString)
                 : new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString)).Successful);
@@ -465,7 +470,11 @@ COMMIT;";
             if (web5) await VerifyWeb6FixtureCompatibility(scope);
             await body(scope);
         }
-        catch (Exception error) { failure = error; }
+        catch (Exception error)
+        {
+            failure = error;
+            if (!allocationSealed) GuiTestSafety.Poison(new InvalidOperationException("Private SQL allocation identity was not sealed; retain allocation."));
+        }
         var cleanup = new List<Exception>();
         foreach (var child in scope.Children)
             try { await child.CloseAsync(); } catch (Exception error) { cleanup.Add(error); }
@@ -492,7 +501,9 @@ COMMIT;";
         {
             try
             {
-                await database.DisposeAsync();
+                allocationManifest!.Verify();
+                await database.DisposeIfQuiescentAsync();
+                await database.CompleteOwnershipManifestAsync(allocationManifest, default);
                 _crashOutput.WriteLine("WEB5 cleanup: child drain and independent SQL quiescence/fence proved; owned database removed.");
             }
             catch (Exception error)
@@ -502,6 +513,7 @@ COMMIT;";
                 _crashOutput.WriteLine("WEB5 cleanup: database disposal failed; stop SQL test run.");
             }
         }
+        allocationManifest?.Dispose(); // Release handles only; uncertainty keeps the exact private record.
         if (failure != null) cleanup.Insert(0, failure);
         if (cleanup.Count != 0) throw new AggregateException("Crash fixture failed or cleanup was incomplete.", cleanup);
     }
