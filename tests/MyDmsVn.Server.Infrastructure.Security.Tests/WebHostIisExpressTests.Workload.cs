@@ -17,9 +17,10 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed partial class WebHostIisExpressTests
 {
     private static Task RunCandidateWorkload(SqlTestDatabase database, Web6CandidateManifest manifest, string thumbprint,
-        int customer, int warehouse, int employee, int product, int receiptProduct, Func<Process> process) =>
+        int customer, int warehouse, int employee, int product, int receiptProduct, Web6PrivateDirectoryLease workloadRoot,
+        Func<Process> process, Func<Web5IisExpressIdentity> hostIdentity, string expectedQueueName) =>
         new Web6CandidateWorkloadRunner(new LiveCandidateWorkload(database, manifest, thumbprint, customer, warehouse,
-            employee, product, receiptProduct, process)).Execute(CancellationToken.None);
+            employee, product, receiptProduct, workloadRoot, process, hostIdentity, expectedQueueName)).Execute(CancellationToken.None);
 
     private sealed class LiveCandidateWorkload : IWeb6CandidateWorkloadOperations
     {
@@ -29,9 +30,11 @@ public sealed partial class WebHostIisExpressTests
         private readonly string _thumbprint;
         private readonly int _customer, _warehouse, _employee, _product, _receiptProduct;
         private readonly Func<Process> _process;
+        private readonly Func<Web5IisExpressIdentity> _hostIdentity;
+        private readonly Web6PrivateDirectoryLease _workloadRoot;
+        private readonly string _expectedQueueName;
         private readonly object _gate = new object();
         private readonly List<Guid> _operations = new List<Guid>();
-        private Web6PrivateDirectoryLease? _workloadRoot;
         private string? _access, _cookie;
         private Guid _epoch;
         private long _deadlocksAtAdmission;
@@ -39,18 +42,19 @@ public sealed partial class WebHostIisExpressTests
         private long _clockAtAdmission;
 
         internal LiveCandidateWorkload(SqlTestDatabase database, Web6CandidateManifest manifest, string thumbprint,
-            int customer, int warehouse, int employee, int product, int receiptProduct, Func<Process> process)
+            int customer, int warehouse, int employee, int product, int receiptProduct, Web6PrivateDirectoryLease workloadRoot,
+            Func<Process> process, Func<Web5IisExpressIdentity> hostIdentity, string expectedQueueName)
         {
             _database = database; _manifest = manifest; _thumbprint = thumbprint;
             _customer = customer; _warehouse = warehouse; _employee = employee; _product = product;
-            _receiptProduct = receiptProduct; _process = process;
+            _receiptProduct = receiptProduct; _workloadRoot = workloadRoot; _process = process;
+            _hostIdentity = hostIdentity; _expectedQueueName = expectedQueueName;
         }
 
         public async Task<Web6WorkloadAdmission> VerifyAdmission(CancellationToken token)
         {
-            var root = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_WORKLOAD_ROOT")!;
             var cohort = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_WORKLOAD_ACTOR_COHORT");
-            _workloadRoot = Web6PrivateDirectoryLease.CreateNew(root);
+            _workloadRoot.Verify();
             _manifest.VerifyForWorkload(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!);
             using (var proof = _manifest.CreatePrivateOutput("workload-admission.json"))
             {
@@ -81,9 +85,11 @@ public sealed partial class WebHostIisExpressTests
             var expectedCandidate = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!;
             _manifest.VerifyForWorkload(expectedCandidate);
             var worker = _process(); worker.Refresh();
+            var queue = await Web5IisExpressHostAdmission.VerifyAsync(_hostIdentity(), token);
             var reply = await Request(Origin + "/api/v1/health", _thumbprint);
             var healthy = reply.Status == 200 && reply.Body == "{\"data\":{\"status\":\"ok\"}}";
-            return new Web6WorkloadHealth(healthy, true, worker.HasExited ? 0 : 1, true);
+            return new Web6WorkloadHealth(healthy, string.Equals(queue.Name, _expectedQueueName, StringComparison.Ordinal),
+                worker.HasExited ? 0 : queue.AttachedProcessCount, true);
         }
 
         public async Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Smoke(
@@ -154,11 +160,9 @@ public sealed partial class WebHostIisExpressTests
                 checked((int)Math.Max(0, deadlocks)), runaway, cpu, worker.PrivateMemorySize64, locks, sessions, journalBytes);
         }
 
-        public Task Drain(bool completed, CancellationToken token)
+        public Task SealForOuterCleanup(bool completed, CancellationToken token)
         {
-            var root = Interlocked.Exchange(ref _workloadRoot, null);
-            if (completed) root?.DeleteTreeVerified();
-            root?.Dispose();
+            _workloadRoot.Verify();
             return Task.CompletedTask;
         }
 

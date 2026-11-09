@@ -183,7 +183,7 @@ internal interface IWeb6CandidateWorkloadOperations
     Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Smoke(IReadOnlyList<Web6MetricClass> criticalClasses, CancellationToken token);
     Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Measure(int concurrency, int desiredSamples, CancellationToken token);
     Task<Web6WorkloadObservation> Observe(CancellationToken token);
-    Task Drain(bool completed, CancellationToken token);
+    Task SealForOuterCleanup(bool completed, CancellationToken token);
     Task Complete(IReadOnlyList<Web6WorkloadProfileResult> profiles, CancellationToken token);
 }
 
@@ -224,12 +224,12 @@ internal sealed class Web6CandidateWorkloadRunner
                 (await _operations.Health(token)).Require();
                 profiles.Add(new Web6WorkloadProfileResult(concurrency, result, resources));
             }
-            await _operations.Drain(completed: true, token); admitted = false;
+            await _operations.SealForOuterCleanup(completed: true, token); admitted = false;
             await _operations.Complete(profiles, token);
         }
         finally
         {
-            if (admitted) await _operations.Drain(completed: false, CancellationToken.None);
+            if (admitted) await _operations.SealForOuterCleanup(completed: false, CancellationToken.None);
         }
     }
 
@@ -269,6 +269,29 @@ internal sealed class Web6RuntimeRootCleanupState
             delete(); return true;
         }
         finally { dispose(); }
+    }
+}
+
+internal static class Web6OuterCleanupCoordinator
+{
+    internal static async Task<bool> Execute(bool admitted, Func<Task> deleteRuntime, Func<Task> cleanupSql,
+        Func<Task> deleteWorkload, Action releaseRuntime, Action releaseWorkload)
+    {
+        if (deleteRuntime == null || cleanupSql == null || deleteWorkload == null || releaseRuntime == null || releaseWorkload == null)
+            throw new ArgumentNullException();
+        try
+        {
+            if (!admitted) return false;
+            await deleteRuntime();
+            await cleanupSql();
+            await deleteWorkload();
+            return true;
+        }
+        finally
+        {
+            releaseWorkload();
+            releaseRuntime();
+        }
     }
 }
 

@@ -192,13 +192,13 @@ public sealed class Web6CandidateWorkloadTests
         var operations = new RecordingWorkloadOperations();
         await new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None);
         Assert.Equal(new[] { "admit", "health", "smoke", "observe", "health", "measure:1", "observe", "health",
-            "measure:4", "observe", "health", "measure:8", "observe", "health", "measure:16", "observe", "health", "drain", "complete" }, operations.Calls);
+            "measure:4", "observe", "health", "measure:8", "observe", "health", "measure:16", "observe", "health", "seal", "complete" }, operations.Calls);
         Assert.Equal(new[] { 0, 1, 4, 8, 16 }, operations.CompletedProfiles!.Select(profile => profile.Concurrency));
         Assert.All(operations.CompletedProfiles!, profile => Assert.Equal(10, profile.Metrics.Count));
 
         operations = new RecordingWorkloadOperations { FailAtConcurrency = 4 };
         await Assert.ThrowsAsync<IOException>(() => new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None));
-        Assert.Equal(1, operations.Calls.Count(call => call == "drain"));
+        Assert.Equal(1, operations.Calls.Count(call => call == "seal"));
         Assert.DoesNotContain("complete", operations.Calls);
     }
 
@@ -209,7 +209,7 @@ public sealed class Web6CandidateWorkloadTests
         var error = await Assert.ThrowsAsync<InvalidDataException>(() =>
             new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None));
         Assert.Contains("omitted", error.Message);
-        Assert.Equal(new[] { "admit", "health", "smoke", "drain" }, operations.Calls);
+        Assert.Equal(new[] { "admit", "health", "smoke", "seal" }, operations.Calls);
     }
 
     [Fact]
@@ -237,7 +237,16 @@ public sealed class Web6CandidateWorkloadTests
     {
         var operations = new RecordingWorkloadOperations { UnhealthyAtHealthCall = 3 };
         await Assert.ThrowsAsync<InvalidDataException>(() => new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None));
-        Assert.Equal(new[] { "admit", "health", "smoke", "observe", "health", "measure:1", "observe", "health", "drain" }, operations.Calls);
+        Assert.Equal(new[] { "admit", "health", "smoke", "observe", "health", "measure:1", "observe", "health", "seal" }, operations.Calls);
+        Assert.Null(operations.CompletedProfiles);
+    }
+
+    [Fact]
+    public async Task Workload_runner_refuses_foreign_second_worker_between_profiles()
+    {
+        var operations = new RecordingWorkloadOperations { ForeignWorkerAtHealthCall = 3 };
+        await Assert.ThrowsAsync<InvalidDataException>(() => new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None));
+        Assert.Equal(new[] { "admit", "health", "smoke", "observe", "health", "measure:1", "observe", "health", "seal" }, operations.Calls);
         Assert.Null(operations.CompletedProfiles);
     }
 
@@ -269,6 +278,42 @@ public sealed class Web6CandidateWorkloadTests
         complete.MarkWorkerExitVerified(); complete.MarkQueueAbsenceVerified(); disposed = false;
         Assert.Throws<IOException>(() => complete.Release(false, () => throw new IOException("delete injected"), () => disposed = true));
         Assert.True(disposed); Assert.True(complete.CanDelete(false));
+    }
+
+    [Fact]
+    public async Task Outer_cleanup_keeps_workload_root_until_verified_drain_and_orders_runtime_sql_workload()
+    {
+        using var fixture = new PrivateParent(); var path = Path.Combine(fixture.Path, "workload");
+        var retainedLease = Web6PrivateDirectoryLease.CreateNew(path);
+        Assert.False(await Web6OuterCleanupCoordinator.Execute(false,
+            () => throw new InvalidOperationException("runtime delete must not run"),
+            () => throw new InvalidOperationException("SQL cleanup must not run"),
+            () => throw new InvalidOperationException("workload delete must not run"),
+            () => { }, retainedLease.Dispose));
+        Assert.True(Directory.Exists(path));
+
+        var calls = new List<string>(); var lease = Web6PrivateDirectoryLease.CreateNew(Path.Combine(fixture.Path, "admitted-workload"));
+        Assert.True(await Web6OuterCleanupCoordinator.Execute(true,
+            () => { calls.Add("runtime"); Assert.True(Directory.Exists(lease.Path)); return Task.CompletedTask; },
+            () => { calls.Add("sql"); Assert.True(Directory.Exists(lease.Path)); return Task.CompletedTask; },
+            () => { calls.Add("workload"); lease.DeleteTreeVerified(); return Task.CompletedTask; },
+            () => calls.Add("release-runtime"), () => { calls.Add("release-workload"); lease.Dispose(); }));
+        Assert.Equal(new[] { "runtime", "sql", "workload", "release-workload", "release-runtime" }, calls);
+        Assert.False(Directory.Exists(lease.Path));
+    }
+
+    [Fact]
+    public async Task Outer_cleanup_late_sql_failure_releases_handles_and_retains_workload_evidence()
+    {
+        using var fixture = new PrivateParent(); var path = Path.Combine(fixture.Path, "failed-workload");
+        var lease = Web6PrivateDirectoryLease.CreateNew(path); var calls = new List<string>();
+        await Assert.ThrowsAsync<IOException>(() => Web6OuterCleanupCoordinator.Execute(true,
+            () => { calls.Add("runtime"); return Task.CompletedTask; },
+            () => { calls.Add("sql"); throw new IOException("injected SQL cleanup failure"); },
+            () => { calls.Add("workload"); lease.DeleteTreeVerified(); return Task.CompletedTask; },
+            () => calls.Add("release-runtime"), () => { calls.Add("release-workload"); lease.Dispose(); }));
+        Assert.Equal(new[] { "runtime", "sql", "release-workload", "release-runtime" }, calls);
+        Assert.True(Directory.Exists(path));
     }
 
     [Fact]
@@ -305,6 +350,7 @@ public sealed class Web6CandidateWorkloadTests
         internal int FailAtConcurrency { get; set; }
         internal Web6MetricClass? OmitClass { get; set; }
         internal int UnhealthyAtHealthCall { get; set; }
+        internal int ForeignWorkerAtHealthCall { get; set; }
         private int _healthCalls;
         internal IReadOnlyList<Web6WorkloadProfileResult>? CompletedProfiles { get; private set; }
         public Task<Web6WorkloadAdmission> VerifyAdmission(CancellationToken token)
@@ -312,7 +358,8 @@ public sealed class Web6CandidateWorkloadTests
         public Task<Web6WorkloadHealth> Health(CancellationToken token)
         {
             Calls.Add("health"); _healthCalls++;
-            return Task.FromResult(new Web6WorkloadHealth(_healthCalls != UnhealthyAtHealthCall, true, 1, true));
+            var foreign = _healthCalls == ForeignWorkerAtHealthCall;
+            return Task.FromResult(new Web6WorkloadHealth(_healthCalls != UnhealthyAtHealthCall, !foreign, foreign ? 2 : 1, true));
         }
         public Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Smoke(IReadOnlyList<Web6MetricClass> criticalClasses, CancellationToken token)
         { Calls.Add("smoke"); Assert.Equal(10, criticalClasses.Count); return CompleteMetrics(OmitClass); }
@@ -323,7 +370,7 @@ public sealed class Web6CandidateWorkloadTests
         }
         public Task<Web6WorkloadObservation> Observe(CancellationToken token)
         { Calls.Add("observe"); return Task.FromResult(new Web6WorkloadObservation(false, 0, false, 10, 1024, 1, 1, 1)); }
-        public Task Drain(bool completed, CancellationToken token) { Calls.Add("drain"); return Task.CompletedTask; }
+        public Task SealForOuterCleanup(bool completed, CancellationToken token) { Calls.Add("seal"); return Task.CompletedTask; }
         public Task Complete(IReadOnlyList<Web6WorkloadProfileResult> profiles, CancellationToken token)
         { Calls.Add("complete"); CompletedProfiles = profiles; return Task.CompletedTask; }
         private static Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> CompleteMetrics(Web6MetricClass? omit = null)

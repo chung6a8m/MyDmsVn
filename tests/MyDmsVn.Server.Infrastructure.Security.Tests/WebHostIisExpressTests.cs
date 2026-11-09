@@ -115,6 +115,8 @@ public sealed partial class WebHostIisExpressTests
         Web6CandidateInputs? candidateInputs = null;
         Web6CandidateHostMismatch? candidateMismatch = null;
         Web6PrivateDirectoryLease? runDirectoryLease = null;
+        Web6PrivateDirectoryLease? workloadRootLease = null;
+        string? admittedQueueName = null;
         string? candidateSqlReceipt = null;
         var failures = new List<Exception>();
         var drained = !web6Candidate;
@@ -124,6 +126,16 @@ public sealed partial class WebHostIisExpressTests
         var workloadValidated = false;
         int customer = 0, warehouse = 0, employee = 0, product = 0, receiptProduct = 0;
         IntegratedCatalog? integrated = null;
+        async Task CleanupOwnedSql()
+        {
+            await login.CleanupAsync();
+            await database.DisposeAsync();
+            using var verification = new SqlConnection(new SqlConnectionStringBuilder(admin) { InitialCatalog = "master", Pooling = false }.ConnectionString);
+            await verification.OpenAsync();
+            var remaining = await verification.QuerySingleAsync<int>("SELECT (CASE WHEN DB_ID(@database) IS NULL THEN 0 ELSE 1 END) + (CASE WHEN SUSER_ID(@login) IS NULL THEN 0 ELSE 1 END);", new { database = database.DatabaseName, login = login.Name });
+            if (remaining != 0) throw new InvalidOperationException("Owned fixture resources remain after cleanup.");
+            Console.WriteLine("WEB5_OWNED_SQL_CLEANUP verified=1 remaining=0");
+        }
         try
         {
             var migration = web5Pilot ? new DatabaseMigrationRunner().MigrateWeb5(database.ConnectionString) : recoveryPilot ? new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString) : FrozenWeb11Migration.Install(database.ConnectionString);
@@ -243,6 +255,7 @@ public sealed partial class WebHostIisExpressTests
                 hostIdentity = Web5IisExpressHostAdmission.Capture(process, configuration, "Web2Smoke", new Uri("https://localhost:44321/"));
                 await Web5IisExpressHostAdmission.WaitForAdmissionAsync(hostIdentity, process, TimeSpan.FromSeconds(45), CancellationToken.None);
                 var queue = await Web5IisExpressHostAdmission.VerifyAsync(hostIdentity, CancellationToken.None);
+                admittedQueueName = queue.Name;
                 if (web6Candidate && candidateId == candidateInputs!.CandidateId)
                     candidateManifest!.VerifyBeforeAdmission(process.Id, process.StartTime.ToUniversalTime(), queue.Name, () =>
                         new Web6CandidateObservation((candidateInputs.Backend.Sha, candidateInputs.Backend.Tree, true),
@@ -285,8 +298,13 @@ public sealed partial class WebHostIisExpressTests
                 Assert.Equal(401, (await Request("https://localhost:44321/api/v1/missing", thumbprint!)).Status);
                 if (web6Workload)
                 {
+                    workloadRootLease = Web6PrivateDirectoryLease.CreateNew(
+                        Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_WORKLOAD_ROOT")!));
                     await RunCandidateWorkload(database, candidateManifest!, thumbprint!, customer, warehouse, employee,
-                        product, receiptProduct, () => process ?? throw new InvalidOperationException("Workload host is absent."));
+                        product, receiptProduct, workloadRootLease,
+                        () => process ?? throw new InvalidOperationException("Workload host is absent."),
+                        () => hostIdentity ?? throw new InvalidOperationException("Workload host identity is absent."),
+                        admittedQueueName ?? throw new InvalidOperationException("Workload queue identity is absent."));
                     workloadValidated = true;
                 }
                 else if (attended)
@@ -416,37 +434,29 @@ public sealed partial class WebHostIisExpressTests
                 catch (Exception error) { failures.Add(error); }
                 finally { process.Dispose(); }
             }
-            if (failures.Count == 0 && drained && !GuiTestSafety.IsPoisoned)
-            {
-                var loginDrained = false;
-                try { await login.CleanupAsync(); loginDrained = true; } catch (Exception error) { failures.Add(error); }
-                if (loginDrained)
-                {
-                    try
-                    {
-                        await database.DisposeAsync();
-                        using var verification = new SqlConnection(new SqlConnectionStringBuilder(admin) { InitialCatalog = "master", Pooling = false }.ConnectionString);
-                        await verification.OpenAsync();
-                        var remaining = await verification.QuerySingleAsync<int>("SELECT (CASE WHEN DB_ID(@database) IS NULL THEN 0 ELSE 1 END) + (CASE WHEN SUSER_ID(@login) IS NULL THEN 0 ELSE 1 END);", new { database = database.DatabaseName, login = login.Name });
-                        if (remaining != 0) throw new InvalidOperationException("Owned fixture resources remain after cleanup.");
-                        Console.WriteLine("WEB5_OWNED_SQL_CLEANUP verified=1 remaining=0");
-                    }
-                    catch (Exception error) { failures.Add(error); }
-                }
-            }
-            else if (failures.Count == 0)
-                failures.Add(new InvalidOperationException("Fixture cleanup was not admitted; resources retained."));
-            if (runDirectoryLease != null)
+            if (web6Candidate)
             {
                 try
                 {
-                    runtimeRootDeleted = runtimeCleanup.Release(GuiTestSafety.IsPoisoned || failures.Count != 0,
-                        () => runDirectoryLease.DeleteTreeVerified(), runDirectoryLease.Dispose);
+                    var admittedCleanup = failures.Count == 0 && drained && !GuiTestSafety.IsPoisoned &&
+                        runtimeCleanup.CanDelete(false) && runDirectoryLease != null && (!web6Workload || workloadRootLease != null);
+                    runtimeRootDeleted = await Web6OuterCleanupCoordinator.Execute(admittedCleanup,
+                        () => { runDirectoryLease!.DeleteTreeVerified(); return Task.CompletedTask; },
+                        CleanupOwnedSql,
+                        () => { workloadRootLease?.DeleteTreeVerified(); return Task.CompletedTask; },
+                        () => runDirectoryLease?.Dispose(), () => workloadRootLease?.Dispose());
                     if (!runtimeRootDeleted && failures.Count == 0)
-                        failures.Add(new InvalidOperationException("Candidate runtime root cleanup was not fully admitted; path retained."));
+                        failures.Add(new InvalidOperationException("Candidate cleanup was not fully admitted; workload/runtime/SQL retained."));
                 }
                 catch (Exception error) { failures.Add(error); }
             }
+            else if (failures.Count == 0 && drained && !GuiTestSafety.IsPoisoned)
+            {
+                try { await CleanupOwnedSql(); }
+                catch (Exception error) { failures.Add(error); }
+            }
+            else if (failures.Count == 0)
+                failures.Add(new InvalidOperationException("Fixture cleanup was not admitted; resources retained."));
             if (candidateManifest != null)
             {
                 try
