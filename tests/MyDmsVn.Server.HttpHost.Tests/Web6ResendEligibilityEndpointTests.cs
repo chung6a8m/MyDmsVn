@@ -101,6 +101,82 @@ public sealed class Web6ResendEligibilityEndpointTests
         Assert.Empty(probe.AuthorizedKinds);
     }
 
+    public static IEnumerable<object[]> Decisions()
+    {
+        yield return new object[] { "allow", null!, "ALLOW", "ORIGINAL_NOT_OBSERVED_RECEIPT_VALID" };
+        yield return new object[] { "committed-result-available", Resolution("COMMITTED", true), "DENY", "COMMITTED_RESULT_AVAILABLE" };
+        yield return new object[] { "committed-result-unavailable", Resolution("RESULT_UNAVAILABLE"), "DENY", "COMMITTED_RESULT_UNAVAILABLE" };
+        yield return new object[] { "result-expired", Resolution("RESULT_EXPIRED"), "DENY", "RESULT_EXPIRED" };
+        yield return new object[] { "not-executed", Resolution("NOT_EXECUTED", terminal: true), "DENY", "NOT_EXECUTED" };
+        yield return new object[] { "terminal-audit-incomplete", Resolution("INDETERMINATE"), "INDETERMINATE", "TERMINAL_AUDIT_INCOMPLETE" };
+    }
+
+    [Theory, MemberData(nameof(Decisions))]
+    public async Task Eligibility_decisions_match_additive_corpus_without_outcome_or_terminal(string fixture,
+        WebOperationResolution? resolution, string decision, string reason)
+    {
+        using var probe = new Probe { Resolution = resolution };
+        var receipt = await probe.Receipt();
+        using var response = await probe.Eligibility(receipt);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        var body = Compact(await response.Content.ReadAsStringAsync());
+        Assert.Equal(Compact(Corpus("eligibility-" + fixture + ".json")), body);
+        Assert.Equal(decision, (string)JObject.Parse(body)["data"]!["decision"]!);
+        Assert.Equal(reason, (string)JObject.Parse(body)["data"]!["reason"]!);
+        var data = (JObject)JObject.Parse(body)["data"]!;
+        Assert.Null(data.Property("outcome"));
+        Assert.Null(data.Property("terminal"));
+        Assert.Equal(1, probe.EligibilityReads);
+    }
+
+    [Fact]
+    public async Task Correctly_bound_expired_receipt_denies_without_treating_absence_as_rollback_proof()
+    {
+        using var probe = new Probe();
+        probe.Clock.Now = probe.Clock.Now.AddMinutes(-1);
+        var receipt = await probe.Receipt();
+        probe.Clock.Now = probe.Clock.Now.AddSeconds(Web6ResendReceiptCodec.LifetimeSeconds);
+        probe.ResetAccess();
+        using var response = await probe.Eligibility(receipt);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(Compact(Corpus("eligibility-receipt-expired.json")), Compact(await response.Content.ReadAsStringAsync()));
+        Assert.Empty(probe.EligibilityKinds);
+        Assert.Contains(WebOperationKind.SalesCreate, probe.AuthorizedKinds);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("duplicate")]
+    [InlineData("malformed")]
+    [InlineData("wrong-signature")]
+    public async Task Invalid_receipt_never_reaches_current_authority_or_protected_state(string defect)
+    {
+        using var probe = new Probe();
+        var receipt = await probe.Receipt();
+        using var response = await probe.Eligibility(receipt, request =>
+        {
+            request.Headers.Remove("X-MyDmsVn-Resend-Receipt");
+            if (defect == "duplicate") request.Headers.TryAddWithoutValidation("X-MyDmsVn-Resend-Receipt", new[] { receipt, receipt });
+            else if (defect == "malformed") request.Headers.Add("X-MyDmsVn-Resend-Receipt", "not-a-jws");
+            else if (defect == "wrong-signature") request.Headers.Add("X-MyDmsVn-Resend-Receipt", receipt.Substring(0, receipt.Length - 1) + (receipt.EndsWith("A", StringComparison.Ordinal) ? "B" : "A"));
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(probe.AuthorizedKinds);
+        Assert.Empty(probe.EligibilityKinds);
+    }
+
+    private static WebOperationResolution Resolution(string state, bool result = false, bool terminal = false)
+    {
+        var completed = new DateTime(2026, 10, 31, 8, 0, 0, DateTimeKind.Utc);
+        var status = new WebOperationStatus(Operation, Epoch, WebOperationKind.SalesCreate, null,
+            Enumerable.Range(0, 32).Select(value => (byte)value).ToArray(), result ? 42 : (long?)null,
+            completed, state, result ? Encoding.UTF8.GetBytes("{}") : null);
+        return new WebOperationResolution(status, terminal
+            ? new WebOperationTerminalDecision(Guid.Parse("12345678-1234-4123-8123-123456789abc"), "CASE-1", completed)
+            : null);
+    }
+
     private static string Corpus(string name)
     {
         for (var root = new DirectoryInfo(AppContext.BaseDirectory); root != null; root = root.Parent)
@@ -118,6 +194,11 @@ public sealed class Web6ResendEligibilityEndpointTests
         private readonly AuthFixture _host;
         private string? _token;
         internal readonly List<WebOperationKind> AuthorizedKinds = new List<WebOperationKind>();
+        internal readonly List<WebOperationKind> EligibilityKinds = new List<WebOperationKind>();
+        internal WebOperationResolution? Resolution;
+        internal int EligibilityReads;
+        internal AuthClock Clock => _host.Clock;
+        internal void ResetAccess() => _token = null;
 
         internal Probe()
         {
@@ -138,6 +219,29 @@ public sealed class Web6ResendEligibilityEndpointTests
             return await _host.Server.HttpClient.SendAsync(request);
         }
 
+        internal async Task<string> Receipt()
+        {
+            using var response = await Get(Operation.ToString("D") + "/resend-receipt", IdentityHeaders);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            AuthorizedKinds.Clear();
+            return (string)JObject.Parse(await response.Content.ReadAsStringAsync())["data"]!["receipt"]!;
+        }
+
+        internal Task<HttpResponseMessage> Eligibility(string receipt, Action<HttpRequestMessage>? configure = null) =>
+            Get(Operation.ToString("D") + "/resend-eligibility", request =>
+            {
+                IdentityHeaders(request);
+                request.Headers.Add("X-MyDmsVn-Resend-Receipt", receipt);
+                configure?.Invoke(request);
+            });
+
+        private static void IdentityHeaders(HttpRequestMessage request)
+        {
+            request.Headers.Add("X-MyDmsVn-Deployment-Epoch", Epoch.ToString("D"));
+            request.Headers.Add("X-MyDmsVn-Operation-Fingerprint", Fingerprint);
+            request.Headers.Add("X-MyDmsVn-Operation-Kind", "Sales.Create");
+        }
+
         public IUnitOfWork Create() => new Uow(this);
         public Task<IUnitOfWork> CreateAsync(CancellationToken cancellationToken) => Task.FromResult<IUnitOfWork>(Create());
         public Task<Guid> ReadContextAsync(int actorUserId, Guid sessionId, CancellationToken cancellationToken) => Task.FromResult(Epoch);
@@ -146,7 +250,8 @@ public sealed class Web6ResendEligibilityEndpointTests
         public Task AuthorizeReceiptAsync(int actorUserId, Guid sessionId, Guid deploymentEpoch, WebOperationKind kind, CancellationToken cancellationToken)
         { AuthorizedKinds.Add(kind); return Task.CompletedTask; }
         public Task<WebOperationResolution?> ReadEligibilityAsync(int actorUserId, Guid sessionId, Guid deploymentEpoch,
-            Guid operationId, WebOperationKind expectedKind, long? expectedTargetId, byte[] expectedFingerprint, CancellationToken cancellationToken) => throw new NotSupportedException();
+            Guid operationId, WebOperationKind expectedKind, long? expectedTargetId, byte[] expectedFingerprint, CancellationToken cancellationToken)
+        { EligibilityReads++; EligibilityKinds.Add(expectedKind); return Task.FromResult(Resolution); }
         public void Dispose() => _host.Dispose();
 
         private sealed class Uow : IUnitOfWork

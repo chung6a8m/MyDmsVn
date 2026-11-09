@@ -55,6 +55,36 @@ public sealed class Web6ResendEligibilityController : ApiController
         try { uow.Commit(); return response; } catch { response.Dispose(); throw; }
     }, token);
 
+    [HttpGet, Route("{operationId}/resend-eligibility", Order = 2)]
+    public Task<HttpResponseMessage> Eligibility(string operationId, CancellationToken token) => Read(async (provider, options) =>
+    {
+        var operation = WebOperationWireInput.OperationId(operationId);
+        WebOperationResolutionWire.Path(Request, "/api/v3/operations/" + operation.ToString("D") + "/resend-eligibility");
+        var epoch = WebOperationWireInput.DeploymentEpoch(Request);
+        var fingerprint = WebOperationWireInput.StatusFingerprint(Request);
+        var kind = WebOperationWireInput.ResendKind(Request);
+        var target = WebOperationWireInput.ResendTarget(Request, kind);
+        var compactReceipt = WebOperationWireInput.ResendReceipt(Request);
+        await SalesWireInput.EmptyBody(Request).ConfigureAwait(false);
+        var requestIdentity = Identity(provider);
+        var identity = new Web6ResendIdentity(requestIdentity.Current.UserId!.Value, options.Web6CandidateId!, epoch,
+            operation, kind, target, fingerprint);
+        var validated = new Web6ResendReceiptCodec(options, provider.GetRequiredService<IUtcClock>()).Validate(compactReceipt, identity);
+
+        using var uow = await provider.GetRequiredService<IUnitOfWorkFactory>().CreateAsync(token).ConfigureAwait(false);
+        uow.BeginTransaction();
+        var repository = uow.Repository<IWebOperationResendEligibilityRepository>();
+        WebOperationResolution? resolution = null;
+        if (validated.IsExpired)
+            await repository.AuthorizeReceiptAsync(identity.ActorUserId, requestIdentity.SessionId!.Value, epoch, kind, token).ConfigureAwait(false);
+        else
+            resolution = await repository.ReadEligibilityAsync(identity.ActorUserId, requestIdentity.SessionId!.Value,
+                epoch, operation, kind, target, fingerprint, token).ConfigureAwait(false);
+        var clock = provider.GetRequiredService<IUtcClock>();
+        var response = HttpJson.Success(Web6ResendEligibilityWire.Eligibility(identity, validated, resolution, clock.UtcNow));
+        try { uow.Commit(); return response; } catch { response.Dispose(); throw; }
+    }, token);
+
     private async Task<HttpResponseMessage> Read(Func<IServiceProvider, WebHostOptions, Task<HttpResponseMessage>> read, CancellationToken token)
     {
         try

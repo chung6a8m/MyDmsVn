@@ -59,6 +59,7 @@ public static class WebOperationWireInput
         _ => throw new WireInputException()
     };
     public static WebOperationKind ResendKind(HttpRequestMessage request) => ParseKind(Header(request, "X-MyDmsVn-Operation-Kind"));
+    public static string ResendReceipt(HttpRequestMessage request) => Header(request, "X-MyDmsVn-Resend-Receipt");
     public static long? ResendTarget(HttpRequestMessage request, WebOperationKind kind)
     {
         var value = OptionalHeader(request, "X-MyDmsVn-Operation-Target-Id");
