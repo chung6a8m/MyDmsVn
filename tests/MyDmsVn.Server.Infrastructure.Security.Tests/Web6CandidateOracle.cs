@@ -355,6 +355,62 @@ WHERE l.WarehouseId=@warehouse AND l.ProductId=@product;", new { warehouse = key
     private sealed class StockBalance { public decimal Quantity { get; set; } public decimal InventoryValue { get; set; } }
 }
 
+// The cutover pack deliberately emits lifecycle checks and no successful mutation rows.
+// Keep this contract separate from Web6CandidateOracle, whose six-kind SQL proof is owned by
+// the ordinary resend candidate pack.
+internal static class Web6CutoverOracle
+{
+    private static readonly string[] Checks =
+    {
+        "web6-cutover-old-client-new-host", "web6-cutover-new-client-old-host",
+        "web6-cutover-revoked-grant", "web6-cutover-committed-unavailable-protected",
+        "web6-cutover-same-epoch-restart", "web6-cutover-restored-epoch-rejected",
+    };
+
+    internal static void Validate(JObject count, JObject result, Web6CandidateCutoverPlan plan)
+    {
+        if (count == null || result == null || plan == null) throw Invalid();
+        Exact(count, "version", "discovered", "passed", "failed", "skipped", "interrupted", "retries");
+        foreach (var name in new[] { "version", "discovered", "passed", "failed", "skipped", "interrupted", "retries" })
+            if (count[name]?.Type != JTokenType.Integer) throw Invalid();
+        if ((int)count["version"]! != 2 || (int)count["discovered"]! != 3 || (int)count["passed"]! != 3 ||
+            new[] { "failed", "skipped", "interrupted", "retries" }.Any(name => (int)count[name]! != 0))
+            throw Invalid();
+
+        Exact(result, "version", "mode", "candidateId", "frontendSourceSha", "backendSourceSha",
+            "frontendDistManifestSha256", "operations", "checks");
+        if (result["version"]?.Type != JTokenType.Integer || (int)result["version"]! != 2 ||
+            (string?)result["mode"] != "web6-candidate" ||
+            (string?)result["candidateId"] != plan.CurrentCandidateId ||
+            (string?)result["frontendSourceSha"] != plan.FrontendSourceSha ||
+            (string?)result["backendSourceSha"] != plan.BackendSourceSha ||
+            (string?)result["frontendDistManifestSha256"] != plan.FrontendArtifactHash ||
+            result["operations"] is not JArray operations || operations.Count != 0 ||
+            result["checks"] is not JArray checks)
+            throw Invalid();
+        var markers = checks.Select(token => token.Type == JTokenType.String ? (string?)token : null).ToArray();
+        if (markers.Any(marker => marker == null) || markers.Distinct(StringComparer.Ordinal).Count() != Checks.Length ||
+            !new HashSet<string>(markers!, StringComparer.Ordinal).SetEquals(Checks))
+            throw Invalid();
+    }
+
+    internal static void ValidateDisposition(bool lifecycleMutationAbsent, bool operationIdentityPreserved,
+        bool receiptIdentityPreserved, bool browserDrained, bool hostDrained, bool cleanupVerified)
+    {
+        if (!lifecycleMutationAbsent || !operationIdentityPreserved || !receiptIdentityPreserved ||
+            !browserDrained || !hostDrained || !cleanupVerified)
+            throw Invalid();
+    }
+
+    private static void Exact(JObject value, params string[] names)
+    {
+        if (!value.Properties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
+            .SequenceEqual(names.OrderBy(name => name, StringComparer.Ordinal))) throw Invalid();
+    }
+
+    private static InvalidDataException Invalid() => new InvalidDataException("Invalid WEB6 cutover evidence.");
+}
+
 internal static class Web6CandidateAcceptanceGate
 {
     private static readonly string[] Required = { "MYDMSVN_WEB6_CANDIDATE_ROOT", "MYDMSVN_WEB6_CANDIDATE_ID", "MYDMSVN_WEB_TEST_BROWSER_DIRECTORY", "MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY", "MYDMSVN_WEB_TEST_TLS_THUMBPRINT", "MYDMSVN_WEB_PILOT_PROJECT", "MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING", "MYDMSVN_SQL_TEST_APPROVAL_FILE" };

@@ -55,6 +55,57 @@ public sealed class Web6CandidateCutoverTests
     }
 
     [Fact]
+    public void Cutover_result_is_validated_without_the_six_operation_candidate_oracle()
+    {
+        var plan = Plan();
+        var count = JObject.Parse("{\"version\":2,\"discovered\":3,\"passed\":3,\"failed\":0,\"skipped\":0,\"interrupted\":0,\"retries\":0}");
+        var result = CutoverResult(plan);
+
+        Web6CutoverOracle.Validate(count, result, plan);
+        Assert.Empty((JArray)result["operations"]!);
+
+        var sixKind = new Web6CandidateExpected(plan.CurrentCandidateId, plan.FrontendSourceSha,
+            plan.BackendSourceSha, plan.FrontendArtifactHash);
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(result, sixKind));
+    }
+
+    [Fact]
+    public void Cutover_result_refuses_mutation_wrong_pin_or_incomplete_lifecycle_markers()
+    {
+        var plan = Plan();
+        var count = JObject.Parse("{\"version\":2,\"discovered\":3,\"passed\":3,\"failed\":0,\"skipped\":0,\"interrupted\":0,\"retries\":0}");
+        var operation = CutoverResult(plan); ((JArray)operation["operations"]!).Add(new JObject());
+        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, operation, plan));
+        var pin = CutoverResult(plan); pin["backendSourceSha"] = new string('1', 40);
+        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, pin, plan));
+        var marker = CutoverResult(plan); ((JArray)marker["checks"]!).RemoveAt(0);
+        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(count, marker, plan));
+        var retry = (JObject)count.DeepClone(); retry["retries"] = 1;
+        Assert.Throws<InvalidDataException>(() => Web6CutoverOracle.Validate(retry, CutoverResult(plan), plan));
+    }
+
+    [Theory]
+    [InlineData("oldClientNewHostOn")]
+    [InlineData("oldClientNewHostOff")]
+    [InlineData("newClientOldHostOn")]
+    [InlineData("newClientOldHostOff")]
+    [InlineData("sameEpochRestart")]
+    [InlineData("revokeGrantOn")]
+    [InlineData("revokeGrantOff")]
+    [InlineData("restoreEpoch")]
+    [InlineData("committedUnavailable")]
+    [InlineData("verifyNoCutoverMutation")]
+    public void Cutover_control_maps_only_the_frontend_lifecycle_actions(string action)
+    {
+        var frame = new JObject { ["id"] = 7, ["token"] = "secret", ["action"] = action };
+        if (action is "sameEpochRestart" or "revokeGrantOn" or "revokeGrantOff" or "restoreEpoch" or "committedUnavailable" or "verifyNoCutoverMutation")
+            frame["operationId"] = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+        Assert.Equal(action, Web6CutoverControl.Validate(frame, "secret"));
+        frame["extra"] = true;
+        Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "secret"));
+    }
+
+    [Fact]
     public void Independently_sealed_build_authority_rejects_arbitrary_published_artifact()
     {
         var authority = new Web6CutoverBuildAuthority(FrontendArchive, FrontendTree, FrontendArtifact,
@@ -227,6 +278,21 @@ public sealed class Web6CandidateCutoverTests
             : new Web6CutoverAdmission(plan.OldOrigin, plan.OldSchema, plan.OldDatabaseReceipt,
                 plan.OldArtifactHash, Guid.Empty, controllers, workers, queueOwned: true);
 
+    private static JObject CutoverResult(Web6CandidateCutoverPlan plan) => new JObject
+    {
+        ["version"] = 2,
+        ["mode"] = "web6-candidate",
+        ["candidateId"] = plan.CurrentCandidateId,
+        ["frontendSourceSha"] = plan.FrontendSourceSha,
+        ["backendSourceSha"] = plan.BackendSourceSha,
+        ["frontendDistManifestSha256"] = plan.FrontendArtifactHash,
+        ["operations"] = new JArray(),
+        ["checks"] = new JArray(
+            "web6-cutover-old-client-new-host", "web6-cutover-new-client-old-host",
+            "web6-cutover-revoked-grant", "web6-cutover-committed-unavailable-protected",
+            "web6-cutover-same-epoch-restart", "web6-cutover-restored-epoch-rejected"),
+    };
+
     private sealed class RecordingCutoverOperations : IWeb6CandidateCutoverOperations
     {
         private readonly Web6CandidateCutoverPlan _plan;
@@ -246,7 +312,12 @@ public sealed class Web6CandidateCutoverTests
         {
             Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":validate");
             return Task.FromResult(new Web6CutoverBrowserResult(3, SkipChromium && browser == "chromium" ? 2 : 3,
-                0, SkipChromium && browser == "chromium" ? 1 : 0, 0, new[] { "old-client-new-host", "new-client-old-host", "restored-epoch-rejected" }));
+                0, SkipChromium && browser == "chromium" ? 1 : 0, 0, new[]
+                {
+                    "web6-cutover-old-client-new-host", "web6-cutover-new-client-old-host",
+                    "web6-cutover-revoked-grant", "web6-cutover-committed-unavailable-protected",
+                    "web6-cutover-same-epoch-restart", "web6-cutover-restored-epoch-rejected",
+                }));
         }
         public Task<Web6CutoverDrain> Drain(string browser, Web6CutoverPair pair, CancellationToken token) { Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":drain"); return Task.FromResult(new Web6CutoverDrain(true, true)); }
         public Task VerifyRestore(string browser, CancellationToken token) { Calls.Add(browser + ":restore"); return Task.CompletedTask; }

@@ -751,10 +751,18 @@ public sealed partial class WebHostIisExpressTests
                     privateNetwork!.Replace(new UTF8Encoding(false).GetBytes("[]"));
                     await ExecuteBrowser(project, "browser-output-" + project + ".log");
                     var count = JObject.Parse(privateCount.ReadAllText(1024), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
-                    Web6CandidateOracle.ValidateBrowserCount(count);
                     var candidateResult = JObject.Parse(privateResult.ReadAllText(1048576), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
-                    await Web6CandidateOracle.VerifySqlAsync(connectionString, candidateResult, web6Expected!, CancellationToken.None);
-                    Web6CandidateOracle.ValidateNetwork(JArray.Parse(privateNetwork.ReadAllText(16384), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error }));
+                    if (web6Cutover)
+                    {
+                        Web6CutoverOracle.Validate(count, candidateResult,
+                            cutoverPlan ?? throw new InvalidOperationException("Cutover plan disappeared."));
+                    }
+                    else
+                    {
+                        Web6CandidateOracle.ValidateBrowserCount(count);
+                        await Web6CandidateOracle.VerifySqlAsync(connectionString, candidateResult, web6Expected!, CancellationToken.None);
+                        Web6CandidateOracle.ValidateNetwork(JArray.Parse(privateNetwork.ReadAllText(16384), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error }));
+                    }
                     Console.WriteLine("WEB6_BROWSER_COUNT browser=" + project + " " + count.ToString(Formatting.None));
                 }
                 await recovery!.Stop(browserDrained);

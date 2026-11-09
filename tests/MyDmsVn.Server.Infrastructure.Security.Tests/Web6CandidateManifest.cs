@@ -138,6 +138,9 @@ internal sealed class Web6CandidateCutoverPlan
     internal string OldDatabaseReceipt { get; }
     internal Guid CurrentEpoch { get; }
     internal Guid RestoredEpoch { get; }
+    internal string CurrentCandidateId => CurrentPairId;
+    internal string FrontendSourceSha => FrontendArchiveSha;
+    internal string BackendSourceSha => BackendArchiveSha;
 
     internal void VerifyArchives(Web6CutoverArchive frontend, Web6CutoverArchive backend)
     {
@@ -443,6 +446,38 @@ internal sealed class Web6CutoverDrain
     internal bool QueueAbsent { get; }
 }
 
+internal static class Web6CutoverControl
+{
+    private static readonly HashSet<string> PairActions = new HashSet<string>(new[]
+    {
+        "oldClientNewHostOn", "oldClientNewHostOff", "newClientOldHostOn", "newClientOldHostOff",
+    }, StringComparer.Ordinal);
+    private static readonly HashSet<string> OperationActions = new HashSet<string>(new[]
+    {
+        "sameEpochRestart", "revokeGrantOn", "revokeGrantOff", "restoreEpoch",
+        "committedUnavailable", "verifyNoCutoverMutation",
+    }, StringComparer.Ordinal);
+
+    internal static string Validate(JObject frame, string token)
+    {
+        if (frame == null || string.IsNullOrEmpty(token) || frame["id"]?.Type != JTokenType.Integer ||
+            frame["token"]?.Type != JTokenType.String || (string)frame["token"]! != token ||
+            frame["action"]?.Type != JTokenType.String)
+            throw new InvalidDataException("Invalid WEB6 cutover control frame.");
+        var action = (string)frame["action"]!;
+        var expected = PairActions.Contains(action)
+            ? new[] { "id", "token", "action" }
+            : OperationActions.Contains(action) ? new[] { "id", "token", "action", "operationId" } : Array.Empty<string>();
+        if (expected.Length == 0 || !frame.Properties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
+            .SequenceEqual(expected.OrderBy(name => name, StringComparer.Ordinal)))
+            throw new InvalidDataException("Invalid WEB6 cutover control frame.");
+        if (OperationActions.Contains(action) && (frame["operationId"]?.Type != JTokenType.String ||
+            !Guid.TryParseExact((string)frame["operationId"]!, "D", out var operation) || operation == Guid.Empty))
+            throw new InvalidDataException("Invalid WEB6 cutover control frame.");
+        return action;
+    }
+}
+
 internal interface IWeb6CandidateCutoverOperations
 {
     Task<Web6CandidateCutoverPlan> VerifyAuthority(CancellationToken token);
@@ -456,7 +491,12 @@ internal interface IWeb6CandidateCutoverOperations
 
 internal sealed class Web6CandidateCutoverOrchestrator
 {
-    private static readonly string[] RequiredMarkers = { "new-client-old-host", "old-client-new-host", "restored-epoch-rejected" };
+    private static readonly string[] RequiredMarkers =
+    {
+        "web6-cutover-old-client-new-host", "web6-cutover-new-client-old-host",
+        "web6-cutover-revoked-grant", "web6-cutover-committed-unavailable-protected",
+        "web6-cutover-same-epoch-restart", "web6-cutover-restored-epoch-rejected",
+    };
     private readonly IWeb6CandidateCutoverOperations _operations;
     internal Web6CandidateCutoverOrchestrator(IWeb6CandidateCutoverOperations operations) =>
         _operations = operations ?? throw new ArgumentNullException(nameof(operations));
