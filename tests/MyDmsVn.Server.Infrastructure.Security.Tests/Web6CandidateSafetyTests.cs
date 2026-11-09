@@ -159,6 +159,33 @@ public sealed class Web6CandidateSafetyTests
         Assert.Throws<IOException>(() => fixture.Manifest.CreatePrivateInput("nested\\browser-input.json", new byte[] { 1 }));
     }
 
+    [Fact]
+    public void Candidate_private_output_is_a_protected_direct_child_and_cleanup_targets_the_retained_identity()
+    {
+        using var fixture = new CandidateFixture();
+        fixture.Seal();
+        var output = fixture.Manifest.CreatePrivateOutput("browser-result.json");
+        Assert.Equal(fixture.ControlPath, Path.GetDirectoryName(output.Path));
+        output.Clear();
+        using (var writer = new FileStream(output.Path, FileMode.Truncate, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+        {
+            var bytes = new UTF8Encoding(false).GetBytes("{\"version\":2}"); writer.Write(bytes, 0, bytes.Length); writer.Flush(true);
+        }
+        output.Verify();
+        Assert.Equal("{\"version\":2}", output.ReadAllText(1024));
+        Assert.Throws<IOException>(() => File.Move(output.Path, output.Path + ".swap"));
+
+        var original = File.GetAccessControl(output.Path, SqlTestPrivateRecord.Sections);
+        var broad = SqlTestPrivateRecord.RestoreFile(original.GetSecurityDescriptorBinaryForm());
+        broad.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), FileSystemRights.Read, AccessControlType.Allow));
+        File.SetAccessControl(output.Path, broad);
+        Assert.Throws<IOException>(() => output.Dispose());
+        Assert.True(File.Exists(output.Path));
+        File.SetAccessControl(output.Path, SqlTestPrivateRecord.RestoreFile(original.GetSecurityDescriptorBinaryForm()));
+        output.Dispose();
+        Assert.False(File.Exists(output.Path));
+    }
+
     [Theory]
     [InlineData("extra-child")]
     [InlineData("root-acl")]

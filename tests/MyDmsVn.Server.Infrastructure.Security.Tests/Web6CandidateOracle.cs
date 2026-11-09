@@ -18,7 +18,7 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 internal sealed class Web6CandidateExpected
 {
     internal Web6CandidateExpected(string candidateId, string frontendSourceSha, string backendSourceSha,
-        string frontendDistManifestSha256)
+        string frontendDistManifestSha256, Web6StockExpectation? stock = null)
     {
         if (!Regex.IsMatch(candidateId ?? "", @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z", RegexOptions.CultureInvariant))
             throw new ArgumentException("Invalid candidate identity.", nameof(candidateId));
@@ -26,12 +26,33 @@ internal sealed class Web6CandidateExpected
         FrontendSourceSha = Web6CandidateInputs.RequireHash(frontendSourceSha, 40);
         BackendSourceSha = Web6CandidateInputs.RequireHash(backendSourceSha, 40);
         FrontendDistManifestSha256 = Web6CandidateInputs.RequireHash(frontendDistManifestSha256);
+        Stock = stock;
     }
 
     internal string CandidateId { get; }
     internal string FrontendSourceSha { get; }
     internal string BackendSourceSha { get; }
     internal string FrontendDistManifestSha256 { get; }
+    internal Web6StockExpectation? Stock { get; }
+}
+
+internal sealed class Web6StockExpectation
+{
+    internal Web6StockExpectation(int warehouseId, int salesProductId, int receiptProductId)
+    {
+        if (warehouseId <= 0 || salesProductId <= 0 || receiptProductId <= 0 || salesProductId == receiptProductId) throw new ArgumentException("WEB6 stock keys are invalid.");
+        WarehouseId = warehouseId; SalesProductId = salesProductId; ReceiptProductId = receiptProductId;
+    }
+    internal int WarehouseId { get; }
+    internal int SalesProductId { get; }
+    internal int ReceiptProductId { get; }
+    internal (decimal Quantity, decimal Value) Initial(int warehouse, int product)
+    {
+        if (warehouse != WarehouseId) throw new InvalidDataException("Invalid WEB6 candidate evidence.");
+        if (product == SalesProductId) return (1000m, 15000m);
+        if (product == ReceiptProductId) return (0m, 0m);
+        throw new InvalidDataException("Invalid WEB6 candidate evidence.");
+    }
 }
 
 internal static class Web6CandidateOracle
@@ -150,6 +171,8 @@ internal static class Web6CandidateOracle
             if (!((expected == null || expected.Type == JTokenType.Null) && (actual == null || actual.Type == JTokenType.Null)) &&
                 !JToken.DeepEquals(expected, actual)) throw Invalid();
         }
+        if (header.Property("postedAtUtc", StringComparison.Ordinal) == null || header.Property("postedByUserId", StringComparison.Ordinal) == null ||
+            header["postedAtUtc"]!.Type != JTokenType.Null || header["postedByUserId"]!.Type != JTokenType.Null) throw Invalid();
         if (data["lines"] is not JArray expectedLines || expectedLines.Count != lines.Count || lines.Count == 0) throw Invalid();
         var names = sales
             ? new[] { "saleLineId", "lineNo", "productId", "qty", "unitPrice", "isGift", "lineAmount" }
@@ -157,6 +180,19 @@ internal static class Web6CandidateOracle
         for (var index = 0; index < lines.Count; index++)
             foreach (var name in names)
                 if (!JToken.DeepEquals(expectedLines[index]![name], lines[index]![name])) throw Invalid();
+    }
+
+    internal static void ValidateStockBalance(string initialQuantity, string initialValue, string quantityChange,
+        string valueChange, string actualQuantity, string actualValue)
+    {
+        static decimal ExactDecimal(string value)
+        {
+            if (!Regex.IsMatch(value ?? "", @"\A-?(?:0|[1-9][0-9]*)\.[0-9]{4}\z", RegexOptions.CultureInvariant) ||
+                !decimal.TryParse(value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsed)) throw Invalid();
+            return parsed;
+        }
+        if (ExactDecimal(initialQuantity) + ExactDecimal(quantityChange) != ExactDecimal(actualQuantity) ||
+            ExactDecimal(initialValue) + ExactDecimal(valueChange) != ExactDecimal(actualValue)) throw Invalid();
     }
 
     internal static async Task VerifySqlAsync(string connectionString, JObject result, Web6CandidateExpected expected,
@@ -179,7 +215,7 @@ WHERE j.OperationId=@operation;", new { operation = operationId }, cancellationT
                 row.DeploymentEpoch == Guid.Empty)
                 throw Invalid();
             var envelope = ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes);
-            await VerifyPhysicalEffect(sql, row, cancellationToken).ConfigureAwait(false);
+            await VerifyPhysicalEffect(sql, row, expected.Stock, cancellationToken).ConfigureAwait(false);
             await VerifyResultProjection(sql, row, envelope, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -194,7 +230,7 @@ WHERE j.OperationId=@operation;", new { operation = operationId }, cancellationT
 SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes
 FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation;",
             new { operation = operationId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
-        await VerifyPhysicalEffect(sql, row, cancellationToken).ConfigureAwait(false);
+        await VerifyPhysicalEffect(sql, row, null, cancellationToken).ConfigureAwait(false);
         var envelope = ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes);
         await VerifyResultProjection(sql, row, envelope, cancellationToken).ConfigureAwait(false);
     }
@@ -204,7 +240,7 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE 
         if (row.OperationKind is 1 or 2)
         {
             var header = await sql.QuerySingleAsync<SalesHeader>(new SqlTestCommand(
-                "SELECT SaleId,SaleNumber,SaleDate,CustomerId,WarehouseId,EmployeeId,Status,Note,RowVersion FROM dbo.SalesReceipts WHERE SaleId=@id;",
+                "SELECT SaleId,SaleNumber,SaleDate,CustomerId,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.SalesReceipts WHERE SaleId=@id;",
                 new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             var lines = (await sql.QueryAsync<SalesLine>(new SqlTestCommand(
                 "SELECT SaleLineId,LineNo,ProductId,Qty,UnitPrice,IsGift,LineAmount FROM dbo.SalesReceiptLines WHERE SaleId=@id ORDER BY LineNo;",
@@ -214,7 +250,7 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE 
         else if (row.OperationKind is 4 or 5)
         {
             var header = await sql.QuerySingleAsync<ReceiptHeader>(new SqlTestCommand(
-                "SELECT ReceiptId,ReceiptNo ReceiptNumber,ReceiptDate,WarehouseId,EmployeeId,Status,Note,RowVersion FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
+                "SELECT ReceiptId,ReceiptNo ReceiptNumber,ReceiptDate,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
                 new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             var lines = (await sql.QueryAsync<ReceiptLine>(new SqlTestCommand(
                 "SELECT ReceiptLineId,LineNo LineNumber,ProductId,Quantity,UnitCost FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id ORDER BY LineNo;",
@@ -236,7 +272,7 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE 
         }
     }
 
-    private static async Task VerifyPhysicalEffect(SqlConnection sql, JournalRow row, CancellationToken cancellationToken)
+    private static async Task VerifyPhysicalEffect(SqlConnection sql, JournalRow row, Web6StockExpectation? stock, CancellationToken cancellationToken)
     {
         var sales = row.OperationKind <= 3;
         var exists = await sql.QuerySingleAsync<int>(new SqlTestCommand(sales
@@ -265,6 +301,25 @@ WHERE l.DocumentType='GoodsReceipt' AND l.DocumentId=@id AND
 (l.QuantityChange<>r.Quantity OR v.ValueChange<>ROUND(r.Quantity*r.UnitCost,4));",
             new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         if (posted != 1 || sourceLines <= 0 || ledger != sourceLines || invalid != 0) throw Invalid();
+        if (stock != null)
+        {
+            var keys = (await sql.QueryAsync<StockKey>(new SqlTestCommand(
+                "SELECT DISTINCT WarehouseId,ProductId FROM dbo.StockLedger WHERE DocumentType=@type AND DocumentId=@id;",
+                new { type = sales ? "SalesReceipt" : "GoodsReceipt", id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
+            if (keys.Length == 0) throw Invalid();
+            foreach (var key in keys)
+            {
+                var initial = stock.Initial(key.WarehouseId, key.ProductId);
+                var movement = await sql.QuerySingleAsync<StockMovement>(new SqlTestCommand(@"
+SELECT COALESCE(SUM(l.QuantityChange),0) QuantityChange,COALESCE(SUM(v.ValueChange),0) ValueChange
+FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId
+WHERE l.WarehouseId=@warehouse AND l.ProductId=@product;", new { warehouse = key.WarehouseId, product = key.ProductId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                var balance = await sql.QuerySingleAsync<StockBalance>(new SqlTestCommand(
+                    "SELECT Quantity,InventoryValue FROM dbo.StockBalances WHERE WarehouseId=@warehouse AND ProductId=@product;",
+                    new { warehouse = key.WarehouseId, product = key.ProductId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                ValidateStockBalance(Decimal(initial.Quantity), Decimal(initial.Value), Decimal(movement.QuantityChange), Decimal(movement.ValueChange), Decimal(balance.Quantity), Decimal(balance.InventoryValue));
+            }
+        }
     }
 
     private static void Exact(JObject value, params string[] keys)
@@ -289,11 +344,15 @@ WHERE l.DocumentType='GoodsReceipt' AND l.DocumentId=@id AND
         public byte[] ResultBytes { get; set; } = Array.Empty<byte>();
     }
 
-    private sealed class SalesHeader { public long SaleId { get; set; } public string SaleNumber { get; set; } = ""; public DateTime SaleDate { get; set; } public int CustomerId { get; set; } public int WarehouseId { get; set; } public int EmployeeId { get; set; } public string Status { get; set; } = ""; public string? Note { get; set; } public byte[] RowVersion { get; set; } = Array.Empty<byte>(); internal JObject Json() => new JObject { ["saleId"] = SaleId.ToString(CultureInfo.InvariantCulture), ["saleNumber"] = SaleNumber, ["saleDate"] = SaleDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ["customerId"] = CustomerId, ["warehouseId"] = WarehouseId, ["employeeId"] = EmployeeId, ["status"] = Status, ["note"] = Note == null ? JValue.CreateNull() : Note, ["version"] = Convert.ToBase64String(RowVersion) }; }
+    private static string Decimal(decimal value) => value.ToString("F4", CultureInfo.InvariantCulture);
+    private sealed class SalesHeader { public long SaleId { get; set; } public string SaleNumber { get; set; } = ""; public DateTime SaleDate { get; set; } public int CustomerId { get; set; } public int WarehouseId { get; set; } public int EmployeeId { get; set; } public string Status { get; set; } = ""; public string? Note { get; set; } public byte[] RowVersion { get; set; } = Array.Empty<byte>(); public DateTime? PostedAtUtc { get; set; } public int? PostedByUserId { get; set; } internal JObject Json() => new JObject { ["saleId"] = SaleId.ToString(CultureInfo.InvariantCulture), ["saleNumber"] = SaleNumber, ["saleDate"] = SaleDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ["customerId"] = CustomerId, ["warehouseId"] = WarehouseId, ["employeeId"] = EmployeeId, ["status"] = Status, ["note"] = Note == null ? JValue.CreateNull() : Note, ["version"] = Convert.ToBase64String(RowVersion), ["postedAtUtc"] = PostedAtUtc.HasValue ? new JValue(PostedAtUtc.Value) : JValue.CreateNull(), ["postedByUserId"] = PostedByUserId.HasValue ? new JValue(PostedByUserId.Value) : JValue.CreateNull() }; }
     private sealed class SalesLine { public long SaleLineId { get; set; } public int LineNo { get; set; } public int ProductId { get; set; } public decimal Qty { get; set; } public decimal UnitPrice { get; set; } public bool IsGift { get; set; } public decimal LineAmount { get; set; } internal JObject Json() => new JObject { ["saleLineId"] = SaleLineId.ToString(CultureInfo.InvariantCulture), ["lineNo"] = LineNo, ["productId"] = ProductId, ["qty"] = Qty.ToString("F4", CultureInfo.InvariantCulture), ["unitPrice"] = UnitPrice.ToString("F4", CultureInfo.InvariantCulture), ["isGift"] = IsGift, ["lineAmount"] = LineAmount.ToString("F4", CultureInfo.InvariantCulture) }; }
-    private sealed class ReceiptHeader { public long ReceiptId { get; set; } public string ReceiptNumber { get; set; } = ""; public DateTime ReceiptDate { get; set; } public int WarehouseId { get; set; } public int EmployeeId { get; set; } public string Status { get; set; } = ""; public string? Note { get; set; } public byte[] RowVersion { get; set; } = Array.Empty<byte>(); internal JObject Json() => new JObject { ["receiptId"] = ReceiptId.ToString(CultureInfo.InvariantCulture), ["receiptNumber"] = ReceiptNumber, ["receiptDate"] = ReceiptDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ["warehouseId"] = WarehouseId, ["employeeId"] = EmployeeId, ["status"] = Status, ["note"] = Note == null ? JValue.CreateNull() : Note, ["version"] = Convert.ToBase64String(RowVersion) }; }
+    private sealed class ReceiptHeader { public long ReceiptId { get; set; } public string ReceiptNumber { get; set; } = ""; public DateTime ReceiptDate { get; set; } public int WarehouseId { get; set; } public int EmployeeId { get; set; } public string Status { get; set; } = ""; public string? Note { get; set; } public byte[] RowVersion { get; set; } = Array.Empty<byte>(); public DateTime? PostedAtUtc { get; set; } public int? PostedByUserId { get; set; } internal JObject Json() => new JObject { ["receiptId"] = ReceiptId.ToString(CultureInfo.InvariantCulture), ["receiptNumber"] = ReceiptNumber, ["receiptDate"] = ReceiptDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ["warehouseId"] = WarehouseId, ["employeeId"] = EmployeeId, ["status"] = Status, ["note"] = Note == null ? JValue.CreateNull() : Note, ["version"] = Convert.ToBase64String(RowVersion), ["postedAtUtc"] = PostedAtUtc.HasValue ? new JValue(PostedAtUtc.Value) : JValue.CreateNull(), ["postedByUserId"] = PostedByUserId.HasValue ? new JValue(PostedByUserId.Value) : JValue.CreateNull() }; }
     private sealed class ReceiptLine { public long ReceiptLineId { get; set; } public int LineNumber { get; set; } public int ProductId { get; set; } public decimal Quantity { get; set; } public decimal UnitCost { get; set; } internal JObject Json() => new JObject { ["receiptLineId"] = ReceiptLineId.ToString(CultureInfo.InvariantCulture), ["lineNumber"] = LineNumber, ["productId"] = ProductId, ["quantity"] = Quantity.ToString("F4", CultureInfo.InvariantCulture), ["unitCost"] = UnitCost.ToString("F4", CultureInfo.InvariantCulture) }; }
     private sealed class PostHeader { public string Status { get; set; } = ""; public DateTime PostedAtUtc { get; set; } public byte[]? RowVersion { get; set; } }
+    private sealed class StockKey { public int WarehouseId { get; set; } public int ProductId { get; set; } }
+    private sealed class StockMovement { public decimal QuantityChange { get; set; } public decimal ValueChange { get; set; } }
+    private sealed class StockBalance { public decimal Quantity { get; set; } public decimal InventoryValue { get; set; } }
 }
 
 internal static class Web6CandidateAcceptanceGate

@@ -314,8 +314,7 @@ internal sealed class Web6CandidateHostMismatch
         if (string.IsNullOrWhiteSpace(expectedCandidateId) || !System.Text.RegularExpressions.Regex.IsMatch(expectedCandidateId, @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z"))
             throw new ArgumentException("Candidate identity is required.", nameof(expectedCandidateId));
         ExpectedCandidateId = expectedCandidateId;
-        const string suffix = "-mismatch";
-        MismatchCandidateId = expectedCandidateId.Substring(0, Math.Min(expectedCandidateId.Length, 64 - suffix.Length)) + suffix;
+        MismatchCandidateId = expectedCandidateId == "web6-mismatch" ? "web6-mismatch-2" : "web6-mismatch";
         _switchHost = switchHost ?? throw new ArgumentNullException(nameof(switchHost));
     }
     internal string ExpectedCandidateId { get; }

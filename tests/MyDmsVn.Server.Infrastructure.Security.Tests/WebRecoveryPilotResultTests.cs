@@ -67,15 +67,15 @@ public sealed class WebRecoveryPilotResultTests
         var switched = new List<string>();
         var lifecycle = new Web6CandidateHostMismatch("candidate-a", id => { switched.Add(id); return Task.CompletedTask; });
         await lifecycle.ArmAsync();
-        Assert.Equal(new[] { "candidate-a-mismatch", "candidate-a" }, new[] { switched[0], lifecycle.ExpectedCandidateId });
+        Assert.Equal(new[] { lifecycle.MismatchCandidateId, "candidate-a" }, new[] { switched[0], lifecycle.ExpectedCandidateId });
         await Assert.ThrowsAsync<InvalidOperationException>(() => lifecycle.ArmAsync());
         await lifecycle.RestoreAsync();
-        Assert.Equal(new[] { "candidate-a-mismatch", "candidate-a" }, switched);
+        Assert.Equal(new[] { lifecycle.MismatchCandidateId, "candidate-a" }, switched);
         await Assert.ThrowsAsync<InvalidOperationException>(() => lifecycle.RestoreAsync());
 
         await lifecycle.ArmAsync();
         await lifecycle.RestoreIfNeededAsync();
-        Assert.Equal(new[] { "candidate-a-mismatch", "candidate-a", "candidate-a-mismatch", "candidate-a" }, switched);
+        Assert.Equal(new[] { lifecycle.MismatchCandidateId, "candidate-a", lifecycle.MismatchCandidateId, "candidate-a" }, switched);
     }
 
     [Fact]
@@ -91,13 +91,23 @@ public sealed class WebRecoveryPilotResultTests
         await Assert.ThrowsAsync<IOException>(() => lifecycle.ArmAsync());
         Assert.True(lifecycle.IsArmed);
         await lifecycle.RestoreIfNeededAsync();
-        Assert.Equal(new[] { "candidate-a-mismatch", "candidate-a" }, switched);
+        Assert.Equal(new[] { lifecycle.MismatchCandidateId, "candidate-a" }, switched);
     }
 
     [Fact]
     public void Candidate_mismatch_identity_remains_a_distinct_valid_bounded_candidate()
     {
         var expected = "a" + new string('b', 63);
+        var lifecycle = new Web6CandidateHostMismatch(expected, _ => Task.CompletedTask);
+        Assert.NotEqual(expected, lifecycle.MismatchCandidateId);
+        Assert.Matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", lifecycle.MismatchCandidateId);
+    }
+
+    [Fact]
+    public void Candidate_mismatch_identity_never_collides_with_a_maximum_length_suffix_candidate()
+    {
+        var expected = new string('a', 55) + "-mismatch";
+        Assert.Equal(64, expected.Length);
         var lifecycle = new Web6CandidateHostMismatch(expected, _ => Task.CompletedTask);
         Assert.NotEqual(expected, lifecycle.MismatchCandidateId);
         Assert.Matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", lifecycle.MismatchCandidateId);
@@ -113,10 +123,12 @@ public sealed class WebRecoveryPilotResultTests
         Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, bytes);
         Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, Encoding.UTF8.GetBytes(" " + Encoding.UTF8.GetString(bytes))));
 
-        var header = JObject.Parse("{\"saleId\":\"1\",\"saleNumber\":\"SA0000000001\",\"saleDate\":\"2026-11-10\",\"customerId\":1,\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"note\":null,\"version\":\"AAAAAAAAAAA=\"}");
+        var header = JObject.Parse("{\"saleId\":\"1\",\"saleNumber\":\"SA0000000001\",\"saleDate\":\"2026-11-10\",\"customerId\":1,\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"note\":null,\"version\":\"AAAAAAAAAAA=\",\"postedAtUtc\":null,\"postedByUserId\":null}");
         var lines = JArray.Parse("[{\"saleLineId\":\"4\",\"lineNo\":1,\"productId\":5,\"qty\":\"2.0000\",\"unitPrice\":\"3.0000\",\"isGift\":false,\"lineAmount\":\"6.0000\"}]");
         Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines);
         header["warehouseId"] = 9;
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines));
+        header["warehouseId"] = 2; header["postedAtUtc"] = "2026-11-10T00:00:00Z"; header["postedByUserId"] = 7;
         Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines));
     }
 
@@ -128,11 +140,22 @@ public sealed class WebRecoveryPilotResultTests
         var envelope = JObject.Parse("{\"data\":{\"receiptId\":\"1\",\"receiptNumber\":\"GR0000000001\",\"receiptDate\":\"2026-11-10\",\"warehouseId\":2,\"warehouseDisplayName\":null,\"warehouseIsActive\":true,\"employeeId\":3,\"employeeDisplayName\":null,\"employeeIsActive\":true,\"status\":\"Draft\",\"note\":null,\"postedAtUtc\":null,\"version\":\"AAAAAAAAAAA=\",\"lines\":[{\"receiptLineId\":\"4\",\"lineNumber\":1,\"productId\":5,\"quantity\":\"2.0000\",\"unitCost\":\"3.0000\",\"productDisplayName\":null,\"productIsActive\":true}]}}" );
         var bytes = Encoding.UTF8.GetBytes(envelope.ToString(Newtonsoft.Json.Formatting.None));
         Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, bytes);
-        var header = JObject.Parse("{\"receiptId\":\"1\",\"receiptNumber\":\"GR0000000001\",\"receiptDate\":\"2026-11-10\",\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"note\":null,\"version\":\"AAAAAAAAAAA=\"}");
+        var header = JObject.Parse("{\"receiptId\":\"1\",\"receiptNumber\":\"GR0000000001\",\"receiptDate\":\"2026-11-10\",\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"note\":null,\"version\":\"AAAAAAAAAAA=\",\"postedAtUtc\":null,\"postedByUserId\":null}");
         var lines = JArray.Parse("[{\"receiptLineId\":\"4\",\"lineNumber\":1,\"productId\":5,\"quantity\":\"2.0000\",\"unitCost\":\"3.0000\"}]");
         Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines);
         lines.Add(lines[0]!.DeepClone());
         Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines));
+    }
+
+    [Theory]
+    [InlineData("1000.0000", "15000.0000", "-2.0000", "-30.0000", "998.0000", "14970.0000")]
+    [InlineData("0.0000", "0.0000", "2.0000", "6.0000", "2.0000", "6.0000")]
+    public void Candidate_oracle_requires_the_exact_stock_balance_after_one_post(string initialQuantity, string initialValue,
+        string quantityChange, string valueChange, string actualQuantity, string actualValue)
+    {
+        Web6CandidateOracle.ValidateStockBalance(initialQuantity, initialValue, quantityChange, valueChange, actualQuantity, actualValue);
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateStockBalance(initialQuantity, initialValue,
+            quantityChange, valueChange, (decimal.Parse(actualQuantity, System.Globalization.CultureInfo.InvariantCulture) + 1).ToString("F4", System.Globalization.CultureInfo.InvariantCulture), actualValue));
     }
 
     [Theory]

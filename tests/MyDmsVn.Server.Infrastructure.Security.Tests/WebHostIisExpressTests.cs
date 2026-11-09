@@ -527,6 +527,8 @@ public sealed partial class WebHostIisExpressTests
         Assert.True(File.Exists(Path.Combine(checkout, "playwright.pilot.config.ts")));
         var manifestPath = Path.Combine(runDirectory, "browser-manifest.json");
         var resultPath = Path.Combine(runDirectory, "browser-result.json");
+        var countPath = Path.Combine(runDirectory, "browser-count.json");
+        var networkPath = Path.Combine(runDirectory, "browser-network.json");
         var certificatePath = Path.Combine(runDirectory, "localhost-public.pem");
         object Actor(string username) => new { username, password = BrowserPassword };
         var manifest = new { origin = "https://localhost:44321", actors = new { alice = Actor("alice"), bob = Actor("bob"), poster = Actor("poster") }, catalog = new { customerId = customer, warehouseId = warehouse, employeeId = employee, productId = product }, resultPath };
@@ -569,7 +571,7 @@ public sealed partial class WebHostIisExpressTests
             var publishedHash = Web6CandidateFileSet.MeasureTree(publishedDist);
             Assert.Equal(sourceHash, publishedHash);
             web6Expected = new Web6CandidateExpected(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!,
-                frontendSha, backendSha, sourceHash);
+                frontendSha, backendSha, sourceHash, new Web6StockExpectation(warehouse, product, receiptProduct));
             manifestJson["version"] = 2;
             manifestJson["mode"] = "web6-candidate";
             manifestJson["candidateId"] = web6Expected.CandidateId;
@@ -579,6 +581,7 @@ public sealed partial class WebHostIisExpressTests
         }
         Exception? browserFailure = null;
         Web6CandidateManifest.PrivateInput? privateInput = null;
+        Web6CandidateManifest.PrivateOutput? privateResult = null, privateCount = null, privateNetwork = null;
         var browserDrained = true;
         async Task<GuiProcessResult> ExecuteBrowser(string project, string outputName)
         {
@@ -608,6 +611,11 @@ public sealed partial class WebHostIisExpressTests
         {
             if (web6Candidate)
             {
+                privateResult = candidateManifest!.CreatePrivateOutput("browser-result.json");
+                privateCount = candidateManifest.CreatePrivateOutput("browser-count.json");
+                privateNetwork = candidateManifest.CreatePrivateOutput("browser-network.json");
+                resultPath = privateResult.Path; countPath = privateCount.Path; networkPath = privateNetwork.Path;
+                manifestJson["resultPath"] = resultPath;
                 privateInput = candidateManifest!.CreatePrivateInput("browser-input.json", new UTF8Encoding(false).GetBytes(manifestJson.ToString(Formatting.None)));
                 manifestPath = privateInput.Path;
             }
@@ -625,18 +633,22 @@ public sealed partial class WebHostIisExpressTests
             {
                 foreach (var project in new[] { "chromium", "edge" })
                 {
-                    foreach (var path in new[] { resultPath, Path.Combine(runDirectory, "browser-count.json"), Path.Combine(runDirectory, "browser-network.json") })
-                        if (File.Exists(path)) File.Delete(path);
+                    var initialResult = new JObject
+                    {
+                        ["version"] = 2, ["mode"] = "web6-candidate", ["candidateId"] = web6Expected!.CandidateId,
+                        ["frontendSourceSha"] = web6Expected.FrontendSourceSha, ["backendSourceSha"] = web6Expected.BackendSourceSha,
+                        ["frontendDistManifestSha256"] = web6Expected.FrontendDistManifestSha256,
+                        ["operations"] = new JArray(), ["checks"] = new JArray(),
+                    };
+                    privateResult!.Replace(new UTF8Encoding(false).GetBytes(initialResult.ToString(Formatting.None)));
+                    privateCount!.Replace(new UTF8Encoding(false).GetBytes("{}"));
+                    privateNetwork!.Replace(new UTF8Encoding(false).GetBytes("[]"));
                     await ExecuteBrowser(project, "browser-output-" + project + ".log");
-                    var countPath = Path.Combine(runDirectory, "browser-count.json");
-                    if (!File.Exists(countPath) || new FileInfo(countPath).Length > 1024) throw new InvalidDataException("Missing or oversized WEB6 browser count.");
-                    var count = JObject.Parse(File.ReadAllText(countPath), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+                    var count = JObject.Parse(privateCount.ReadAllText(1024), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
                     Web6CandidateOracle.ValidateBrowserCount(count);
-                    var candidateResult = JObject.Parse(File.ReadAllText(resultPath), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+                    var candidateResult = JObject.Parse(privateResult.ReadAllText(1048576), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
                     await Web6CandidateOracle.VerifySqlAsync(connectionString, candidateResult, web6Expected!, CancellationToken.None);
-                    var networkPath = Path.Combine(runDirectory, "browser-network.json");
-                    if (!File.Exists(networkPath) || new FileInfo(networkPath).Length > 16384) throw new InvalidDataException("Missing or oversized WEB6 network summary.");
-                    Web6CandidateOracle.ValidateNetwork(JArray.Parse(File.ReadAllText(networkPath), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error }));
+                    Web6CandidateOracle.ValidateNetwork(JArray.Parse(privateNetwork.ReadAllText(16384), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error }));
                     Console.WriteLine("WEB6_BROWSER_COUNT browser=" + project + " " + count.ToString(Formatting.None));
                 }
                 await recovery!.Stop(browserDrained);
@@ -655,7 +667,6 @@ public sealed partial class WebHostIisExpressTests
                 {
                     Assert.True(recovery.NegativeVerified);
                     if (originalFirstPilot) Assert.True(recovery.OriginalFirstVerified);
-                    var countPath = Path.Combine(runDirectory, "browser-count.json");
                     if (!File.Exists(countPath) || new FileInfo(countPath).Length > 1024) throw new InvalidDataException("Missing or oversized browser count.");
                     var count = JObject.Parse(File.ReadAllText(countPath), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
                     ValidateWeb5BrowserCount(count);
@@ -707,7 +718,15 @@ public sealed partial class WebHostIisExpressTests
         {
             try { if (recovery != null) await recovery.Stop(browserDrained); }
             catch (Exception cleanup) when (browserFailure != null) { throw new AggregateException("Browser scenario and recovery control drain failed.", browserFailure, cleanup); }
-            finally { if (privateInput != null) privateInput.Dispose(); else File.Delete(manifestPath); File.Delete(certificatePath); }
+            finally
+            {
+                try { if (privateInput != null) privateInput.Dispose(); else File.Delete(manifestPath); }
+                finally
+                {
+                    try { privateResult?.Dispose(); }
+                    finally { try { privateCount?.Dispose(); } finally { privateNetwork?.Dispose(); File.Delete(certificatePath); } }
+                }
+            }
         }
     }
     private static async Task VerifyReceiptStock(SqlConnection oracle, JToken[] receipts, int warehouse, int product)
