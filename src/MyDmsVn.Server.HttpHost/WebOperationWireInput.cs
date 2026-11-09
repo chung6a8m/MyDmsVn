@@ -48,6 +48,26 @@ public static class WebOperationWireInput
         WebOperationKind.ReceiptCreate => "Receipt.Create", WebOperationKind.ReceiptUpdate => "Receipt.Update", WebOperationKind.ReceiptPost => "Receipt.Post",
         _ => throw new WireInputException()
     };
+    public static WebOperationKind ParseKind(string value) => value switch
+    {
+        "Sales.Create" => WebOperationKind.SalesCreate,
+        "Sales.Update" => WebOperationKind.SalesUpdate,
+        "Sales.Post" => WebOperationKind.SalesPost,
+        "Receipt.Create" => WebOperationKind.ReceiptCreate,
+        "Receipt.Update" => WebOperationKind.ReceiptUpdate,
+        "Receipt.Post" => WebOperationKind.ReceiptPost,
+        _ => throw new WireInputException()
+    };
+    public static WebOperationKind ResendKind(HttpRequestMessage request) => ParseKind(Header(request, "X-MyDmsVn-Operation-Kind"));
+    public static long? ResendTarget(HttpRequestMessage request, WebOperationKind kind)
+    {
+        var value = OptionalHeader(request, "X-MyDmsVn-Operation-Target-Id");
+        var create = kind == WebOperationKind.SalesCreate || kind == WebOperationKind.ReceiptCreate;
+        if (create) { if (value != null) throw new WireInputException(); return null; }
+        if (value == null || !long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var target) ||
+            target <= 0 || value != target.ToString(CultureInfo.InvariantCulture)) throw new WireInputException();
+        return target;
+    }
     public static string Method(WebOperationKind kind) => kind switch
     {
         WebOperationKind.SalesUpdate or WebOperationKind.ReceiptUpdate => "PUT",
@@ -110,6 +130,13 @@ public static class WebOperationWireInput
         if (!request.Headers.TryGetValues(name, out var values)) throw new WireInputException();
         var headers = values.ToArray();
         if (headers.Length != 1 || headers[0].IndexOf(',') >= 0) throw new WireInputException();
+        return headers[0];
+    }
+    private static string? OptionalHeader(HttpRequestMessage request, string name)
+    {
+        if (!request.Headers.TryGetValues(name, out var values)) return null;
+        var headers = values.ToArray();
+        if (headers.Length != 1 || headers[0].Length == 0 || headers[0].IndexOf(',') >= 0) throw new WireInputException();
         return headers[0];
     }
     private static Guid GuidValue(string value, bool v4)
