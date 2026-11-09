@@ -117,7 +117,9 @@ public sealed partial class WebHostIisExpressTests
         Web6PrivateDirectoryLease? runDirectoryLease = null;
         string? candidateSqlReceipt = null;
         var failures = new List<Exception>();
-        var drained = true;
+        var drained = !web6Candidate;
+        var runtimeRootDeleted = false;
+        var runtimeCleanup = new Web6RuntimeRootCleanupState();
         var candidateBrowserValidated = false;
         var workloadValidated = false;
         int customer = 0, warehouse = 0, employee = 0, product = 0, receiptProduct = 0;
@@ -235,6 +237,7 @@ public sealed partial class WebHostIisExpressTests
                 if (web6Candidate) start.EnvironmentVariables["MYDMSVN_WEB6_CANDIDATE_ID"] = candidateId;
                 process = new Process { StartInfo = start };
                 process.OutputDataReceived += (_, _) => { }; process.ErrorDataReceived += (_, _) => { };
+                runtimeCleanup.MarkStartAttempted();
                 Assert.True(process.Start()); drained = false;
                 process.BeginOutputReadLine(); process.BeginErrorReadLine();
                 hostIdentity = Web5IisExpressHostAdmission.Capture(process, configuration, "Web2Smoke", new Uri("https://localhost:44321/"));
@@ -402,16 +405,18 @@ public sealed partial class WebHostIisExpressTests
                         if (!process.WaitForExit(10000)) process.Kill();
                         if (!process.WaitForExit(10000)) throw new InvalidOperationException("Owned IIS Express worker did not drain; retain SQL resources.");
                     }
+                    runtimeCleanup.MarkWorkerExitVerified();
                     if (hostIdentity == null)
                         throw new InvalidOperationException("Owned IIS Express identity was not captured; retain SQL resources.");
                     await Web5IisExpressHostAdmission.WaitForAbsenceAsync(
                         hostIdentity, TimeSpan.FromSeconds(20), CancellationToken.None);
+                    runtimeCleanup.MarkQueueAbsenceVerified();
                     drained = true;
                 }
                 catch (Exception error) { failures.Add(error); }
                 finally { process.Dispose(); }
             }
-            if (drained && !GuiTestSafety.IsPoisoned)
+            if (failures.Count == 0 && drained && !GuiTestSafety.IsPoisoned)
             {
                 var loginDrained = false;
                 try { await login.CleanupAsync(); loginDrained = true; } catch (Exception error) { failures.Add(error); }
@@ -433,9 +438,14 @@ public sealed partial class WebHostIisExpressTests
                 failures.Add(new InvalidOperationException("Fixture cleanup was not admitted; resources retained."));
             if (runDirectoryLease != null)
             {
-                try { runDirectoryLease.DeleteTreeVerified(); }
+                try
+                {
+                    runtimeRootDeleted = runtimeCleanup.Release(GuiTestSafety.IsPoisoned || failures.Count != 0,
+                        () => runDirectoryLease.DeleteTreeVerified(), runDirectoryLease.Dispose);
+                    if (!runtimeRootDeleted && failures.Count == 0)
+                        failures.Add(new InvalidOperationException("Candidate runtime root cleanup was not fully admitted; path retained."));
+                }
                 catch (Exception error) { failures.Add(error); }
-                finally { runDirectoryLease.Dispose(); }
             }
             if (candidateManifest != null)
             {
@@ -452,14 +462,14 @@ public sealed partial class WebHostIisExpressTests
                             failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
                     }
                     candidateManifest.RecordDisposition(Web6CandidateStage.Cleanup,
-                        failures.Count == 0 && drained ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Quarantined);
+                        failures.Count == 0 && drained && runtimeRootDeleted ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Quarantined);
                 }
                 catch (Exception error) { failures.Add(error); }
                 finally { candidateManifest.Dispose(); }
             }
         }
         if (web6Candidate && !web6Workload && failures.Count == 0)
-            Web6CandidateOracle.ValidateDisposition(candidateBrowserValidated, browserDrained: true, hostDrained: drained, cleanupVerified: true);
+            Web6CandidateOracle.ValidateDisposition(candidateBrowserValidated, browserDrained: true, hostDrained: drained, cleanupVerified: runtimeRootDeleted);
         if (failures.Count > 0) throw new AggregateException("Packaged host scenario or owned cleanup failed.", failures);
     }
 

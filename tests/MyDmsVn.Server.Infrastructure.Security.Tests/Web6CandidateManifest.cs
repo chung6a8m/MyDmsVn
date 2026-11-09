@@ -1205,11 +1205,13 @@ internal sealed class Web6CandidateManifest : IDisposable
             throw new IOException("Candidate artifacts or protected audit destination changed.");
     }
 
-    internal void VerifyForWorkload()
+    internal void VerifyForWorkload(string expectedCandidateId)
     {
         lock (_gate)
         {
             RequireState(State.Sealed);
+            if (!string.Equals(_inputs.CandidateId, expectedCandidateId, StringComparison.Ordinal))
+                throw new IOException("Candidate identity changed before workload observation.");
             VerifyAdmissionFiles();
         }
     }

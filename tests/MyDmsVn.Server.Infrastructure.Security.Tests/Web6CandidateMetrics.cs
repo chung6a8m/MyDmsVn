@@ -125,6 +125,7 @@ internal static class Web6CandidateWorkloadPlan
 {
     internal static readonly IReadOnlyList<int> ConcurrencyProfiles = new[] { 1, 4, 8, 16 };
     internal const int DesiredSamplesPerCriticalClass = 1000;
+    internal const int ProfileBudgetSeconds = 60;
     internal static readonly IReadOnlyList<Web6MetricClass> CriticalClasses = new[]
     {
         Web6MetricClass.SalesCreate, Web6MetricClass.SalesUpdate, Web6MetricClass.SalesPost,
@@ -137,13 +138,52 @@ internal static class Web6CandidateWorkloadPlan
     internal static readonly IReadOnlyList<Web6MetricClass> RequiredClasses = CriticalClasses.Concat(SupportingClasses).ToArray();
 }
 
+internal sealed class Web6WorkloadHealth
+{
+    internal Web6WorkloadHealth(bool endpointHealthy, bool candidateBound, int workers, bool auditReady)
+    { EndpointHealthy = endpointHealthy; CandidateBound = candidateBound; Workers = workers; AuditReady = auditReady; }
+    internal bool EndpointHealthy { get; }
+    internal bool CandidateBound { get; }
+    internal int Workers { get; }
+    internal bool AuditReady { get; }
+    internal void Require()
+    {
+        if (!EndpointHealthy || !CandidateBound || Workers != 1 || !AuditReady)
+            throw new InvalidDataException("WEB6 workload health degraded; stop and retain candidate resources.");
+    }
+}
+
+internal static class Web6BoundedSampleLoop
+{
+    internal static async Task Execute(int concurrency, int desiredSamples, long frequency, long budgetTicks,
+        Func<long> timestamp, Func<int, Task<int>> batch, Func<Task> guard)
+    {
+        if (concurrency <= 0 || desiredSamples <= 0 || frequency <= 0 || budgetTicks <= 0 || timestamp == null || batch == null || guard == null)
+            throw new InvalidDataException("WEB6 workload sampling budget is invalid.");
+        var started = timestamp(); var last = started; var completed = 0;
+        while (completed < desiredSamples)
+        {
+            var now = timestamp();
+            if (now < last) throw new InvalidDataException("WEB6 workload profile clock moved backwards.");
+            last = now;
+            if (now - started >= budgetTicks) break;
+            var size = Math.Min(concurrency, desiredSamples - completed);
+            var observed = await batch(size);
+            if (observed != size) throw new InvalidDataException("WEB6 workload batch did not produce the requested per-class observations.");
+            completed += observed;
+            await guard();
+        }
+    }
+}
+
 internal interface IWeb6CandidateWorkloadOperations
 {
     Task<Web6WorkloadAdmission> VerifyAdmission(CancellationToken token);
+    Task<Web6WorkloadHealth> Health(CancellationToken token);
     Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Smoke(IReadOnlyList<Web6MetricClass> criticalClasses, CancellationToken token);
     Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Measure(int concurrency, int desiredSamples, CancellationToken token);
     Task<Web6WorkloadObservation> Observe(CancellationToken token);
-    Task Drain(CancellationToken token);
+    Task Drain(bool completed, CancellationToken token);
     Task Complete(IReadOnlyList<Web6WorkloadProfileResult> profiles, CancellationToken token);
 }
 
@@ -170,23 +210,26 @@ internal sealed class Web6CandidateWorkloadRunner
         try
         {
             (await _operations.VerifyAdmission(token)).Require(); admitted = true;
+            (await _operations.Health(token)).Require();
             var smoke = await _operations.Smoke(Web6CandidateWorkloadPlan.RequiredClasses, token);
             RequireComplete(smoke);
             var smokeResources = await _operations.Observe(token); Web6CandidateWorkloadGuard.RequireContinue(smokeResources);
+            (await _operations.Health(token)).Require();
             profiles.Add(new Web6WorkloadProfileResult(0, smoke, smokeResources));
             foreach (var concurrency in Web6CandidateWorkloadPlan.ConcurrencyProfiles)
             {
                 var result = await _operations.Measure(concurrency, Web6CandidateWorkloadPlan.DesiredSamplesPerCriticalClass, token);
                 RequireComplete(result);
                 var resources = await _operations.Observe(token); Web6CandidateWorkloadGuard.RequireContinue(resources);
+                (await _operations.Health(token)).Require();
                 profiles.Add(new Web6WorkloadProfileResult(concurrency, result, resources));
             }
-            await _operations.Drain(token); admitted = false;
+            await _operations.Drain(completed: true, token); admitted = false;
             await _operations.Complete(profiles, token);
         }
         finally
         {
-            if (admitted) await _operations.Drain(CancellationToken.None);
+            if (admitted) await _operations.Drain(completed: false, CancellationToken.None);
         }
     }
 
@@ -195,6 +238,37 @@ internal sealed class Web6CandidateWorkloadRunner
         if (result == null || Web6CandidateWorkloadPlan.RequiredClasses.Any(metricClass => !result.ContainsKey(metricClass)) ||
             result.Values.Any(summary => summary.Disposition != "MEASURED" && summary.Disposition != "INSUFFICIENT_SAMPLE / NOT MEASURED"))
             throw new InvalidDataException("WEB6 workload omitted or mislabeled a required class.");
+    }
+}
+
+internal sealed class Web6RuntimeRootCleanupState
+{
+    internal bool StartAttempted { get; private set; }
+    internal bool WorkerExitVerified { get; private set; }
+    internal bool QueueAbsenceVerified { get; private set; }
+    internal void MarkStartAttempted() => StartAttempted = true;
+    internal void MarkWorkerExitVerified()
+    {
+        if (!StartAttempted) throw new InvalidOperationException("Worker exit cannot precede start attempt.");
+        WorkerExitVerified = true;
+    }
+    internal void MarkQueueAbsenceVerified()
+    {
+        if (!WorkerExitVerified) throw new InvalidOperationException("Queue absence cannot precede verified worker exit.");
+        QueueAbsenceVerified = true;
+    }
+    internal bool CanDelete(bool safetyPoisoned) =>
+        StartAttempted && WorkerExitVerified && QueueAbsenceVerified && !safetyPoisoned;
+
+    internal bool Release(bool safetyPoisoned, Action delete, Action dispose)
+    {
+        if (delete == null || dispose == null) throw new ArgumentNullException();
+        try
+        {
+            if (!CanDelete(safetyPoisoned)) return false;
+            delete(); return true;
+        }
+        finally { dispose(); }
     }
 }
 

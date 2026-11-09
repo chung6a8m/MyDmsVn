@@ -51,7 +51,7 @@ public sealed partial class WebHostIisExpressTests
             var root = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_WORKLOAD_ROOT")!;
             var cohort = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_WORKLOAD_ACTOR_COHORT");
             _workloadRoot = Web6PrivateDirectoryLease.CreateNew(root);
-            _manifest.VerifyForWorkload();
+            _manifest.VerifyForWorkload(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!);
             using (var proof = _manifest.CreatePrivateOutput("workload-admission.json"))
             {
                 proof.Replace(new UTF8Encoding(false, true).GetBytes("{\"admittedWorkers\":1}"));
@@ -72,8 +72,18 @@ public sealed partial class WebHostIisExpressTests
             Require200(signedIn, "workload login");
             _access = "Bearer " + (string)JObject.Parse(signedIn.Body)["data"]!["accessToken"]!;
             _cookie = signedIn.Cookie;
-            return new Web6WorkloadAdmission(!worker.HasExited, 1, File.Exists(_manifest.AuditPath), true,
+            return new Web6WorkloadAdmission(!worker.HasExited, 1, true, true,
                 string.Equals(cohort, "web.smoke", StringComparison.Ordinal), true);
+        }
+
+        public async Task<Web6WorkloadHealth> Health(CancellationToken token)
+        {
+            var expectedCandidate = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!;
+            _manifest.VerifyForWorkload(expectedCandidate);
+            var worker = _process(); worker.Refresh();
+            var reply = await Request(Origin + "/api/v1/health", _thumbprint);
+            var healthy = reply.Status == 200 && reply.Body == "{\"data\":{\"status\":\"ok\"}}";
+            return new Web6WorkloadHealth(healthy, true, worker.HasExited ? 0 : 1, true);
         }
 
         public async Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Smoke(
@@ -98,9 +108,15 @@ public sealed partial class WebHostIisExpressTests
                 throw new InvalidDataException("WEB6 workload concurrency profile is not approved.");
             var started = Stopwatch.GetTimestamp();
             var samples = new List<Web6MetricSample>();
-            var tasks = Enumerable.Range(0, concurrency).Select(_ => CriticalCycle(samples, token)).ToArray();
-            await Task.WhenAll(tasks);
-            await SupportingCycle(samples, token);
+            await Web6BoundedSampleLoop.Execute(concurrency, desiredSamples, Stopwatch.Frequency,
+                checked(Stopwatch.Frequency * Web6CandidateWorkloadPlan.ProfileBudgetSeconds), Stopwatch.GetTimestamp,
+                async size =>
+                {
+                    await Task.WhenAll(Enumerable.Range(0, size).Select(_ => CriticalCycle(samples, token)));
+                    for (var index = 0; index < size; index++) await SupportingCycle(samples, token);
+                    return size;
+                },
+                async () => Web6CandidateWorkloadGuard.RequireContinue(await Observe(token)));
             var elapsed = Math.Max(1, Stopwatch.GetTimestamp() - started);
             return Web6CandidateMetrics.Summarize(samples, Stopwatch.Frequency, elapsed, desiredSamples);
         }
@@ -138,10 +154,10 @@ public sealed partial class WebHostIisExpressTests
                 checked((int)Math.Max(0, deadlocks)), runaway, cpu, worker.PrivateMemorySize64, locks, sessions, journalBytes);
         }
 
-        public Task Drain(CancellationToken token)
+        public Task Drain(bool completed, CancellationToken token)
         {
             var root = Interlocked.Exchange(ref _workloadRoot, null);
-            root?.DeleteTreeVerified();
+            if (completed) root?.DeleteTreeVerified();
             root?.Dispose();
             return Task.CompletedTask;
         }
@@ -154,6 +170,8 @@ public sealed partial class WebHostIisExpressTests
                 ["profiles"] = new JArray(profiles.Select(ProfileJson)),
                 ["criticalClasses"] = new JArray(Web6CandidateWorkloadPlan.CriticalClasses.Select(value => value.ToString())),
                 ["supportingClasses"] = new JArray(Web6CandidateWorkloadPlan.SupportingClasses.Select(value => value.ToString())),
+                ["desiredSamplesPerClass"] = Web6CandidateWorkloadPlan.DesiredSamplesPerCriticalClass,
+                ["profileBudgetSeconds"] = Web6CandidateWorkloadPlan.ProfileBudgetSeconds,
                 ["performanceClaim"] = "NONE; bounded observations only",
             }.ToString(Formatting.None));
             return Task.CompletedTask;

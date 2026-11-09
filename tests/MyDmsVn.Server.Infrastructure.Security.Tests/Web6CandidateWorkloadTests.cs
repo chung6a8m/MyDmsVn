@@ -191,8 +191,8 @@ public sealed class Web6CandidateWorkloadTests
     {
         var operations = new RecordingWorkloadOperations();
         await new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None);
-        Assert.Equal(new[] { "admit", "smoke", "observe", "measure:1", "observe", "measure:4", "observe",
-            "measure:8", "observe", "measure:16", "observe", "drain", "complete" }, operations.Calls);
+        Assert.Equal(new[] { "admit", "health", "smoke", "observe", "health", "measure:1", "observe", "health",
+            "measure:4", "observe", "health", "measure:8", "observe", "health", "measure:16", "observe", "health", "drain", "complete" }, operations.Calls);
         Assert.Equal(new[] { 0, 1, 4, 8, 16 }, operations.CompletedProfiles!.Select(profile => profile.Concurrency));
         Assert.All(operations.CompletedProfiles!, profile => Assert.Equal(10, profile.Metrics.Count));
 
@@ -209,7 +209,66 @@ public sealed class Web6CandidateWorkloadTests
         var error = await Assert.ThrowsAsync<InvalidDataException>(() =>
             new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None));
         Assert.Contains("omitted", error.Message);
-        Assert.Equal(new[] { "admit", "smoke", "drain" }, operations.Calls);
+        Assert.Equal(new[] { "admit", "health", "smoke", "drain" }, operations.Calls);
+    }
+
+    [Fact]
+    public async Task Bounded_sample_loop_attempts_target_in_concurrency_batches_and_stops_on_monotonic_budget()
+    {
+        long now = 0; var batches = new List<int>(); var guards = 0;
+        await Web6BoundedSampleLoop.Execute(4, 10, 1000, 100, () => now,
+            size => { batches.Add(size); now += 20; return Task.FromResult(size); },
+            () => { guards++; return Task.CompletedTask; });
+        Assert.Equal(new[] { 4, 4, 2 }, batches); Assert.Equal(3, guards);
+
+        now = 0; batches.Clear(); guards = 0;
+        await Web6BoundedSampleLoop.Execute(4, 1000, 1000, 50, () => now,
+            size => { batches.Add(size); now += 30; return Task.FromResult(size); },
+            () => { guards++; return Task.CompletedTask; });
+        Assert.Equal(new[] { 4, 4 }, batches); Assert.Equal(2, guards);
+
+        var clock = new Queue<long>(new[] { 10L, 11L, 9L });
+        await Assert.ThrowsAsync<InvalidDataException>(() => Web6BoundedSampleLoop.Execute(1, 2, 1000, 100,
+            () => clock.Dequeue(), _ => Task.FromResult(1), () => Task.CompletedTask));
+    }
+
+    [Fact]
+    public async Task Workload_runner_stops_and_drains_when_health_flips_between_profiles()
+    {
+        var operations = new RecordingWorkloadOperations { UnhealthyAtHealthCall = 3 };
+        await Assert.ThrowsAsync<InvalidDataException>(() => new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None));
+        Assert.Equal(new[] { "admit", "health", "smoke", "observe", "health", "measure:1", "observe", "health", "drain" }, operations.Calls);
+        Assert.Null(operations.CompletedProfiles);
+    }
+
+    [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, true, true, true)]
+    public void Runtime_root_cleanup_requires_start_exit_and_queue_absence(bool started, bool exited, bool absent, bool expected)
+    {
+        var state = new Web6RuntimeRootCleanupState();
+        if (started) state.MarkStartAttempted();
+        if (exited) state.MarkWorkerExitVerified();
+        if (absent) state.MarkQueueAbsenceVerified();
+        Assert.Equal(expected, state.CanDelete(safetyPoisoned: false));
+        Assert.False(state.CanDelete(safetyPoisoned: true));
+    }
+
+    [Fact]
+    public void Runtime_root_cleanup_failure_injection_retains_path_and_always_releases_handles()
+    {
+        using var fixture = new PrivateParent(); var retained = Path.Combine(fixture.Path, "retained-runtime");
+        var lease = Web6PrivateDirectoryLease.CreateNew(retained);
+        var incomplete = new Web6RuntimeRootCleanupState(); var deleted = false; var disposed = false;
+        Assert.False(incomplete.Release(false, () => { deleted = true; lease.DeleteTreeVerified(); }, () => { disposed = true; lease.Dispose(); }));
+        Assert.False(deleted); Assert.True(disposed); Assert.True(Directory.Exists(retained));
+
+        var complete = new Web6RuntimeRootCleanupState(); complete.MarkStartAttempted();
+        complete.MarkWorkerExitVerified(); complete.MarkQueueAbsenceVerified(); disposed = false;
+        Assert.Throws<IOException>(() => complete.Release(false, () => throw new IOException("delete injected"), () => disposed = true));
+        Assert.True(disposed); Assert.True(complete.CanDelete(false));
     }
 
     [Fact]
@@ -245,9 +304,16 @@ public sealed class Web6CandidateWorkloadTests
         internal readonly List<string> Calls = new List<string>();
         internal int FailAtConcurrency { get; set; }
         internal Web6MetricClass? OmitClass { get; set; }
+        internal int UnhealthyAtHealthCall { get; set; }
+        private int _healthCalls;
         internal IReadOnlyList<Web6WorkloadProfileResult>? CompletedProfiles { get; private set; }
         public Task<Web6WorkloadAdmission> VerifyAdmission(CancellationToken token)
         { Calls.Add("admit"); return Task.FromResult(new Web6WorkloadAdmission(true, 1, true, true, true, true)); }
+        public Task<Web6WorkloadHealth> Health(CancellationToken token)
+        {
+            Calls.Add("health"); _healthCalls++;
+            return Task.FromResult(new Web6WorkloadHealth(_healthCalls != UnhealthyAtHealthCall, true, 1, true));
+        }
         public Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Smoke(IReadOnlyList<Web6MetricClass> criticalClasses, CancellationToken token)
         { Calls.Add("smoke"); Assert.Equal(10, criticalClasses.Count); return CompleteMetrics(OmitClass); }
         public Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Measure(int concurrency, int desiredSamples, CancellationToken token)
@@ -257,7 +323,7 @@ public sealed class Web6CandidateWorkloadTests
         }
         public Task<Web6WorkloadObservation> Observe(CancellationToken token)
         { Calls.Add("observe"); return Task.FromResult(new Web6WorkloadObservation(false, 0, false, 10, 1024, 1, 1, 1)); }
-        public Task Drain(CancellationToken token) { Calls.Add("drain"); return Task.CompletedTask; }
+        public Task Drain(bool completed, CancellationToken token) { Calls.Add("drain"); return Task.CompletedTask; }
         public Task Complete(IReadOnlyList<Web6WorkloadProfileResult> profiles, CancellationToken token)
         { Calls.Add("complete"); CompletedProfiles = profiles; return Task.CompletedTask; }
         private static Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> CompleteMetrics(Web6MetricClass? omit = null)
