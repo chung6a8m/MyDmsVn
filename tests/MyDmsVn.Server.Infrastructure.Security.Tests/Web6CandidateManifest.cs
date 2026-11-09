@@ -11,6 +11,7 @@ using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32.SafeHandles;
+using Newtonsoft.Json.Linq;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
@@ -57,6 +58,252 @@ internal sealed class Web6CandidateInputs
 
     private static bool IsSelector(string? value) =>
         Regex.IsMatch(value ?? "", @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,199}\z", RegexOptions.CultureInvariant);
+}
+
+internal sealed class Web6CutoverArchive
+{
+    internal Web6CutoverArchive(string sha, string tree, bool clean, string artifactHash)
+    {
+        Sha = Web6CandidateInputs.RequireHash(sha, 40);
+        Tree = Web6CandidateInputs.RequireHash(tree, 40);
+        ArtifactHash = Web6CandidateInputs.RequireHash(artifactHash);
+        Clean = clean;
+    }
+
+    internal string Sha { get; }
+    internal string Tree { get; }
+    internal bool Clean { get; }
+    internal string ArtifactHash { get; }
+}
+
+internal enum Web6CutoverPair { Current, Old }
+
+internal sealed class Web6CandidateCutoverPlan
+{
+    internal const string FrontendArchiveSha = "ea104582a5aa4bcdf0d04999296a30a3c43e450e";
+    internal const string BackendArchiveSha = "a3f3db16381a38bdf0b76e8ab36cb55bec02bbd2";
+
+    internal Web6CandidateCutoverPlan(string currentPairId, string oldPairId, string restoredPairId,
+        Uri currentOrigin, Uri oldOrigin, string frontendArchiveSha, string frontendArchiveTree,
+        string frontendArtifactHash, string backendArchiveSha, string backendArchiveTree,
+        string backendArtifactHash, string currentArtifactHash, int currentSchema, int oldSchema,
+        string currentDatabaseReceipt, string oldDatabaseReceipt, Guid currentEpoch, Guid restoredEpoch)
+    {
+        CurrentPairId = RequireIdentity(currentPairId);
+        OldPairId = RequireIdentity(oldPairId);
+        RestoredPairId = RequireIdentity(restoredPairId);
+        if (new[] { CurrentPairId, OldPairId, RestoredPairId }.Distinct(StringComparer.Ordinal).Count() != 3)
+            throw new ArgumentException("Cutover pair identities must be distinct.");
+        CurrentOrigin = RequireOrigin(currentOrigin);
+        OldOrigin = RequireOrigin(oldOrigin);
+        if (CurrentOrigin == OldOrigin) throw new ArgumentException("Cutover origins must be distinct.");
+        if (frontendArchiveSha != FrontendArchiveSha || backendArchiveSha != BackendArchiveSha)
+            throw new ArgumentException("Cutover archive source pins changed.");
+        FrontendArchiveTree = Web6CandidateInputs.RequireHash(frontendArchiveTree, 40);
+        BackendArchiveTree = Web6CandidateInputs.RequireHash(backendArchiveTree, 40);
+        FrontendArtifactHash = Web6CandidateInputs.RequireHash(frontendArtifactHash);
+        OldArtifactHash = Web6CandidateInputs.RequireHash(backendArtifactHash);
+        CurrentArtifactHash = Web6CandidateInputs.RequireHash(currentArtifactHash);
+        if (currentSchema != 13 || oldSchema != 12)
+            throw new ArgumentException("Cutover requires current exact13 and old exact12 schemas.");
+        CurrentSchema = currentSchema;
+        OldSchema = oldSchema;
+        CurrentDatabaseReceipt = Web6CandidateInputs.RequireHash(currentDatabaseReceipt);
+        OldDatabaseReceipt = Web6CandidateInputs.RequireHash(oldDatabaseReceipt);
+        if (CurrentDatabaseReceipt == OldDatabaseReceipt)
+            throw new ArgumentException("Cutover database allocations must be distinct.");
+        if (currentEpoch == Guid.Empty || restoredEpoch == Guid.Empty || currentEpoch == restoredEpoch)
+            throw new ArgumentException("Cutover restore must rotate the deployment epoch.");
+        CurrentEpoch = currentEpoch;
+        RestoredEpoch = restoredEpoch;
+    }
+
+    internal string CurrentPairId { get; }
+    internal string OldPairId { get; }
+    internal string RestoredPairId { get; }
+    internal Uri CurrentOrigin { get; }
+    internal Uri OldOrigin { get; }
+    internal string FrontendArchiveTree { get; }
+    internal string BackendArchiveTree { get; }
+    internal string FrontendArtifactHash { get; }
+    internal string OldArtifactHash { get; }
+    internal string CurrentArtifactHash { get; }
+    internal int CurrentSchema { get; }
+    internal int OldSchema { get; }
+    internal string CurrentDatabaseReceipt { get; }
+    internal string OldDatabaseReceipt { get; }
+    internal Guid CurrentEpoch { get; }
+    internal Guid RestoredEpoch { get; }
+
+    internal void VerifyArchives(Web6CutoverArchive frontend, Web6CutoverArchive backend)
+    {
+        if (frontend == null || backend == null || !frontend.Clean || !backend.Clean ||
+            frontend.Sha != FrontendArchiveSha || frontend.Tree != FrontendArchiveTree ||
+            frontend.ArtifactHash != FrontendArtifactHash || backend.Sha != BackendArchiveSha ||
+            backend.Tree != BackendArchiveTree || backend.ArtifactHash != OldArtifactHash)
+            throw new IOException("Cutover archive identity, cleanliness or rebuilt artifact drifted.");
+    }
+
+    internal JObject FrontendHandles() => new JObject
+    {
+        ["version"] = 1,
+        ["currentPairId"] = CurrentPairId,
+        ["oldPairId"] = OldPairId,
+        ["restoredPairId"] = RestoredPairId,
+        ["currentOrigin"] = CurrentOrigin.GetLeftPart(UriPartial.Authority),
+        ["oldOrigin"] = OldOrigin.GetLeftPart(UriPartial.Authority),
+        ["frontendWeb4SourceSha"] = FrontendArchiveSha,
+        ["backendWeb4SourceSha"] = BackendArchiveSha,
+        ["frontendWeb4DistManifestSha256"] = FrontendArtifactHash,
+        ["backendWeb4ArtifactSha256"] = OldArtifactHash,
+        ["currentDatabaseOwnershipReceiptSha256"] = CurrentDatabaseReceipt,
+        ["oldDatabaseOwnershipReceiptSha256"] = OldDatabaseReceipt,
+        ["currentSchema"] = CurrentSchema,
+        ["oldSchema"] = OldSchema,
+        ["currentDeploymentEpoch"] = CurrentEpoch.ToString("D"),
+        ["restoredDeploymentEpoch"] = RestoredEpoch.ToString("D"),
+    };
+
+    private static string RequireIdentity(string value)
+    {
+        if (!Regex.IsMatch(value ?? "", @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z", RegexOptions.CultureInvariant))
+            throw new ArgumentException("Cutover pair identity is invalid.");
+        return value!;
+    }
+
+    private static Uri RequireOrigin(Uri origin)
+    {
+        if (origin == null || !origin.IsAbsoluteUri || origin.Scheme != Uri.UriSchemeHttps || !origin.IsLoopback ||
+            origin.AbsolutePath != "/" || origin.UserInfo.Length != 0 || origin.Query.Length != 0 || origin.Fragment.Length != 0 ||
+            origin.Port < 1024 || origin.Port > 65535)
+            throw new ArgumentException("Cutover origin must be owned loopback HTTPS.");
+        return origin;
+    }
+}
+
+internal sealed class Web6CutoverAdmission
+{
+    internal Web6CutoverAdmission(Uri origin, int schema, string databaseReceipt, string artifactHash, Guid epoch,
+        int controllers, int workers, bool queueOwned)
+    {
+        Origin = origin;
+        Schema = schema;
+        DatabaseReceipt = databaseReceipt;
+        ArtifactHash = artifactHash;
+        Epoch = epoch;
+        Controllers = controllers;
+        Workers = workers;
+        QueueOwned = queueOwned;
+    }
+
+    internal Uri Origin { get; }
+    internal int Schema { get; }
+    internal string DatabaseReceipt { get; }
+    internal string ArtifactHash { get; }
+    internal Guid Epoch { get; }
+    internal int Controllers { get; }
+    internal int Workers { get; }
+    internal bool QueueOwned { get; }
+    internal Web6CutoverAdmission WithArtifact(string value) => new Web6CutoverAdmission(Origin, Schema, DatabaseReceipt, value, Epoch, Controllers, Workers, QueueOwned);
+    internal Web6CutoverAdmission WithSchema(int value) => new Web6CutoverAdmission(Origin, value, DatabaseReceipt, ArtifactHash, Epoch, Controllers, Workers, QueueOwned);
+    internal Web6CutoverAdmission WithReceipt(string value) => new Web6CutoverAdmission(Origin, Schema, value, ArtifactHash, Epoch, Controllers, Workers, QueueOwned);
+    internal Web6CutoverAdmission WithOrigin(Uri value) => new Web6CutoverAdmission(value, Schema, DatabaseReceipt, ArtifactHash, Epoch, Controllers, Workers, QueueOwned);
+    internal Web6CutoverAdmission WithEpoch(Guid value) => new Web6CutoverAdmission(Origin, Schema, DatabaseReceipt, ArtifactHash, value, Controllers, Workers, QueueOwned);
+}
+
+internal sealed class Web6CandidateCutoverCoordinator
+{
+    private readonly Web6CandidateCutoverPlan _plan;
+    private Guid _epoch;
+    internal Web6CandidateCutoverCoordinator(Web6CandidateCutoverPlan plan)
+    {
+        _plan = plan ?? throw new ArgumentNullException(nameof(plan));
+        _epoch = plan.CurrentEpoch;
+    }
+
+    internal Web6CutoverPair? ActivePair { get; private set; }
+    internal bool HasActivePair => ActivePair.HasValue;
+
+    internal void Admit(Web6CutoverPair pair, Web6CutoverAdmission observation)
+    {
+        if (ActivePair.HasValue) throw new InvalidOperationException("Cutover must drain the active pair before switching.");
+        if (observation == null || observation.Controllers != 1 || observation.Workers != 1 || !observation.QueueOwned)
+            throw new IOException("Cutover requires one owned controller, worker and request queue.");
+        var current = pair == Web6CutoverPair.Current;
+        var expectedOrigin = current ? _plan.CurrentOrigin : _plan.OldOrigin;
+        var expectedSchema = current ? _plan.CurrentSchema : _plan.OldSchema;
+        var expectedReceipt = current ? _plan.CurrentDatabaseReceipt : _plan.OldDatabaseReceipt;
+        var expectedArtifact = current ? _plan.CurrentArtifactHash : _plan.OldArtifactHash;
+        var expectedEpoch = current ? _epoch : Guid.Empty;
+        if (observation.Origin != expectedOrigin || observation.Schema != expectedSchema ||
+            observation.DatabaseReceipt != expectedReceipt || observation.ArtifactHash != expectedArtifact ||
+            observation.Epoch != expectedEpoch)
+            throw new IOException("Cutover pair admission evidence does not match its pinned artifact, schema, database or epoch.");
+        ActivePair = pair;
+    }
+
+    internal void Drain(Web6CutoverPair pair, bool workerExited, bool queueAbsent)
+    {
+        if (ActivePair != pair) throw new InvalidOperationException("Cutover drain does not own the active pair.");
+        if (!workerExited || !queueAbsent) throw new IOException("Cutover pair did not drain cleanly.");
+        ActivePair = null;
+    }
+
+    internal void RestartSameEpoch(Guid observedEpoch)
+    {
+        if (ActivePair != Web6CutoverPair.Current || observedEpoch != _epoch)
+            throw new IOException("Code restart must retain the admitted deployment epoch.");
+    }
+
+    internal void Restore(Guid restoredEpoch)
+    {
+        if (ActivePair != Web6CutoverPair.Current || restoredEpoch != _plan.RestoredEpoch || restoredEpoch == _epoch)
+            throw new IOException("Restore must rotate to the pinned fresh deployment epoch.");
+        _epoch = restoredEpoch;
+    }
+
+    internal bool IsEpochCurrent(Guid epoch) => epoch == _epoch;
+}
+
+internal static class Web6CutoverAcceptanceGate
+{
+    private static readonly string[] Required =
+    {
+        "MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY",
+        "MYDMSVN_WEB6_CUTOVER_BACKEND_ARCHIVE_DIRECTORY",
+        "MYDMSVN_WEB6_CUTOVER_FRONTEND_DIST_DIRECTORY",
+        "MYDMSVN_WEB6_CUTOVER_OLD_PUBLISH_DIRECTORY",
+        "MYDMSVN_WEB6_CUTOVER_CURRENT_PUBLISH_DIRECTORY",
+        "MYDMSVN_WEB6_CUTOVER_CURRENT_SQL_CONNECTION_STRING",
+        "MYDMSVN_WEB6_CUTOVER_OLD_SQL_CONNECTION_STRING",
+        "MYDMSVN_WEB6_CUTOVER_CURRENT_SQL_OWNERSHIP_RECEIPT_SHA256",
+        "MYDMSVN_WEB6_CUTOVER_OLD_SQL_OWNERSHIP_RECEIPT_SHA256",
+        "MYDMSVN_WEB6_CUTOVER_CURRENT_EPOCH",
+        "MYDMSVN_WEB6_CUTOVER_RESTORED_EPOCH",
+        "MYDMSVN_WEB6_CANDIDATE_ROOT",
+        "MYDMSVN_WEB_TEST_BROWSER_DIRECTORY",
+        "MYDMSVN_WEB_TEST_TLS_THUMBPRINT",
+    };
+
+    internal static string? OrdinarySkipReason(IReadOnlyDictionary<string, string?> values) =>
+        Value(values, "MYDMSVN_WEB6_CUTOVER_ENABLE") == "1" ? null :
+            "WEB6 cutover requires exact explicit nonproduction opt-in.";
+
+    internal static void RequireLive(IReadOnlyDictionary<string, string?> values)
+    {
+        if (Value(values, "MYDMSVN_WEB6_CUTOVER_ENABLE") != "1")
+            throw new InvalidOperationException("MYDMSVN_WEB6_CUTOVER_ENABLE must equal 1.");
+        var missing = Required.Where(name => string.IsNullOrWhiteSpace(Value(values, name))).ToArray();
+        if (missing.Length != 0)
+            throw new InvalidOperationException("WEB6 cutover BLOCKED: missing " + string.Join(",", missing));
+    }
+
+    internal static IReadOnlyDictionary<string, string?> EnvironmentValues() => Environment.GetEnvironmentVariables().Keys.Cast<object>()
+        .Select(key => key.ToString()!).Where(key => key.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase))
+        .ToDictionary(key => key, Environment.GetEnvironmentVariable, StringComparer.OrdinalIgnoreCase);
+
+    private static string? Value(IReadOnlyDictionary<string, string?> values, string name) =>
+        values.TryGetValue(name, out var value) ? value : null;
 }
 
 internal sealed class Web6CandidateFileSet
