@@ -126,6 +126,11 @@ internal sealed class Web6ResendReceiptCodec
             var parts = compactReceipt.Split('.');
             if (parts.Length != 3 || parts.Any(part => part.Length == 0 || part.Any(c => !char.IsLetterOrDigit(c) && c != '-' && c != '_')))
                 throw new WireInputException();
+            foreach (var part in parts)
+            {
+                var decoded = Base64UrlEncoder.DecodeBytes(part);
+                if (Base64UrlEncoder.Encode(decoded) != part) throw new WireInputException();
+            }
             var header = ReadObject(parts[0]);
             var payload = ReadObject(parts[1]);
             ExactProperties(header, HeaderNames);
@@ -151,6 +156,7 @@ internal sealed class Web6ResendReceiptCodec
                 }, out _);
 
             var actor = CanonicalPositiveInt(payload["sub"]);
+            var candidate = CanonicalCandidate(payload["candidate"]);
             var epoch = CanonicalGuid(payload["epoch"], false);
             var operation = CanonicalGuid(payload["operation"], true);
             var fingerprint = CanonicalFingerprint(payload["fingerprint"]);
@@ -161,13 +167,13 @@ internal sealed class Web6ResendReceiptCodec
             var expiry = NumericDate(payload["exp"]);
             var now = NumericNow();
             if (issued != notBefore || expiry - issued != LifetimeSeconds || issued > now + _options.ClockSkewSeconds ||
-                (string?)payload["candidate"] != _options.Web6CandidateId || (string?)payload["iss"] != _options.Issuer ||
+                (string?)payload["iss"] != _options.Issuer ||
                 (string?)payload["aud"] != Audience() || (string?)payload["method"] != WebOperationWireInput.Method(kind) ||
                 (string?)payload["route"] != WebOperationWireInput.RouteScope(kind))
                 throw new WireInputException();
 
             if (actor != expected.ActorUserId) throw new WebOperationException("Auth.Unauthorized");
-            if ((string?)payload["candidate"] != expected.CandidateId || operation != expected.OperationId || kind != expected.Kind || target != expected.RequestTargetId)
+            if (candidate != expected.CandidateId || operation != expected.OperationId || kind != expected.Kind || target != expected.RequestTargetId)
                 throw new WebOperationException("Idempotency.KeyConflict");
             if (epoch != expected.DeploymentEpoch) throw new WebOperationException("Deployment.EpochMismatch");
             if (!fingerprint.SequenceEqual(expected.Fingerprint)) throw new WebOperationException("Idempotency.FingerprintMismatch");
@@ -213,6 +219,14 @@ internal sealed class Web6ResendReceiptCodec
         if (text == null || !int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var result) || result <= 0 || text != result.ToString(CultureInfo.InvariantCulture))
             throw new WireInputException();
         return result;
+    }
+
+    private static string CanonicalCandidate(JToken? value)
+    {
+        var text = value?.Type == JTokenType.String ? (string?)value : null;
+        if (text == null || !Regex.IsMatch(text, "\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\z", RegexOptions.CultureInvariant))
+            throw new WireInputException();
+        return text;
     }
 
     private static Guid CanonicalGuid(JToken? value, bool v4)

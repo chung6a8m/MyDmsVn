@@ -50,7 +50,7 @@ internal static class Web6ResendEligibilityWire
     {
         string decision;
         string reason;
-        if (receipt.IsExpired)
+        if (receipt.IsExpired || serverUtc >= receipt.EligibleUntilUtc)
         {
             if (resolution != null) throw new WebOperationException("Operation.Unavailable");
             decision = "DENY";

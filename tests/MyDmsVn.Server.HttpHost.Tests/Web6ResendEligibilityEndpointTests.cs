@@ -145,6 +145,18 @@ public sealed class Web6ResendEligibilityEndpointTests
         Assert.Contains(WebOperationKind.SalesCreate, probe.AuthorizedKinds);
     }
 
+    [Fact]
+    public async Task Receipt_expiring_while_waiting_on_protected_state_cannot_return_allow()
+    {
+        using var probe = new Probe { ExpireDuringEligibilityRead = true };
+        var receipt = await probe.Receipt();
+        using var response = await probe.Eligibility(receipt);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(Compact(Corpus("eligibility-expired-during-read.json")),
+            Compact(await response.Content.ReadAsStringAsync()));
+        Assert.Equal(1, probe.EligibilityReads);
+    }
+
     [Theory]
     [InlineData("missing")]
     [InlineData("duplicate")]
@@ -164,6 +176,19 @@ public sealed class Web6ResendEligibilityEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(probe.AuthorizedKinds);
         Assert.Empty(probe.EligibilityKinds);
+    }
+
+    [Fact]
+    public async Task Signed_receipt_from_another_candidate_conflicts_without_protected_state_disclosure()
+    {
+        using var source = new Probe("candidate-2");
+        var receipt = await source.Receipt();
+        using var target = new Probe();
+        using var response = await target.Eligibility(receipt);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("Idempotency.KeyConflict", (string)JObject.Parse(await response.Content.ReadAsStringAsync())["error"]!["code"]!);
+        Assert.Empty(target.AuthorizedKinds);
+        Assert.Empty(target.EligibilityKinds);
     }
 
     private static WebOperationResolution Resolution(string state, bool result = false, bool terminal = false)
@@ -197,13 +222,14 @@ public sealed class Web6ResendEligibilityEndpointTests
         internal readonly List<WebOperationKind> EligibilityKinds = new List<WebOperationKind>();
         internal WebOperationResolution? Resolution;
         internal int EligibilityReads;
+        internal bool ExpireDuringEligibilityRead;
         internal AuthClock Clock => _host.Clock;
         internal void ResetAccess() => _token = null;
 
-        internal Probe()
+        internal Probe(string candidate = "candidate-1")
         {
             _host = new AuthFixture(services => services.AddSingleton<IUnitOfWorkFactory>(this), web5Enabled: true,
-                web6ResendEligibilityEnabled: true, web6CandidateId: "candidate-1");
+                web6ResendEligibilityEnabled: true, web6CandidateId: candidate);
         }
 
         internal async Task<HttpResponseMessage> Get(string route, Action<HttpRequestMessage>? configure = null)
@@ -251,7 +277,12 @@ public sealed class Web6ResendEligibilityEndpointTests
         { AuthorizedKinds.Add(kind); return Task.CompletedTask; }
         public Task<WebOperationResolution?> ReadEligibilityAsync(int actorUserId, Guid sessionId, Guid deploymentEpoch,
             Guid operationId, WebOperationKind expectedKind, long? expectedTargetId, byte[] expectedFingerprint, CancellationToken cancellationToken)
-        { EligibilityReads++; EligibilityKinds.Add(expectedKind); return Task.FromResult(Resolution); }
+        {
+            EligibilityReads++;
+            EligibilityKinds.Add(expectedKind);
+            if (ExpireDuringEligibilityRead) Clock.Now = Clock.Now.AddSeconds(Web6ResendReceiptCodec.LifetimeSeconds);
+            return Task.FromResult(Resolution);
+        }
         public void Dispose() => _host.Dispose();
 
         private sealed class Uow : IUnitOfWork

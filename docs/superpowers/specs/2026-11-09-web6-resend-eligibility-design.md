@@ -216,4 +216,3 @@ The delivery evidence records source SHA, exact test selection/counts, feature O
 - Stable internal enum/type names, provided the public wire strings above remain exact.
 - The receipt request header is fixed as `X-MyDmsVn-Resend-Receipt`.
 
-

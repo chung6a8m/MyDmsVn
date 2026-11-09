@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using MyDmsVn.Server.Application.Identity;
@@ -124,7 +125,9 @@ public sealed class Web6ResendReceiptTests
             "target" => Identity(WebOperationKind.SalesUpdate, 5),
             _ => throw new InvalidOperationException()
         };
-        Assert.Throws<WebOperationException>(() => Codec(Issued).Validate(token, expected));
+        var error = Assert.Throws<WebOperationException>(() => Codec(Issued).Validate(token, expected));
+        Assert.Equal(mismatch == "actor" ? "Auth.Unauthorized" : mismatch == "epoch" ? "Deployment.EpochMismatch" :
+            mismatch == "fingerprint" ? "Idempotency.FingerprintMismatch" : "Idempotency.KeyConflict", error.Code);
     }
 
     [Fact]
@@ -134,6 +137,31 @@ public sealed class Web6ResendReceiptTests
         Assert.Throws<WireInputException>(() => Codec(Issued).Validate(token + "é", Identity()));
         Assert.Throws<WireInputException>(() => Codec(Issued).Validate(new string('a', 4097), Identity()));
         Assert.Throws<WireInputException>(() => Codec(Issued).Validate(token.Substring(0, token.Length - 1) + "a", Identity()));
+    }
+
+    [Fact]
+    public void A_base64url_trailing_bit_alias_is_not_a_canonical_receipt()
+    {
+        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        var token = Codec(Issued).Issue(Identity()).Token;
+        var canonical = alphabet.IndexOf(token[token.Length - 1]);
+        Assert.Equal(0, canonical & 3);
+        var alias = token.Substring(0, token.Length - 1) + alphabet[canonical + 1];
+        Assert.Throws<WireInputException>(() => Codec(Issued).Validate(alias, Identity()));
+    }
+
+    [Theory]
+    [InlineData("extra-header")]
+    [InlineData("duplicate-claim")]
+    public void Even_a_correctly_signed_receipt_requires_exact_unique_members(string defect)
+    {
+        var token = Codec(Issued).Issue(Identity()).Token;
+        var parts = token.Split('.');
+        var header = Encoding.UTF8.GetString(Base64UrlEncoder.DecodeBytes(parts[0]));
+        var payload = Encoding.UTF8.GetString(Base64UrlEncoder.DecodeBytes(parts[1]));
+        if (defect == "extra-header") header = header.Insert(1, "\"extra\":true,");
+        else payload = payload.Insert(1, "\"candidate\":\"candidate-1\",");
+        Assert.Throws<WireInputException>(() => Codec(Issued).Validate(Sign(header, payload), Identity()));
     }
 
     [Fact]
@@ -160,6 +188,18 @@ public sealed class Web6ResendReceiptTests
         ["active"] = Encoding.UTF8.GetBytes("active-test-key-at-least-32-bytes-long"),
         ["previous"] = Encoding.UTF8.GetBytes("previous-test-key-at-least-32-bytes-long")
     };
+
+    private static string Sign(string header, string payload)
+    {
+        var encodedHeader = Base64UrlEncoder.Encode(Encoding.UTF8.GetBytes(header));
+        var encodedPayload = Base64UrlEncoder.Encode(Encoding.UTF8.GetBytes(payload));
+        var signingInput = encodedHeader + "." + encodedPayload;
+        byte[] derived;
+        using (var derivation = new HMACSHA256(Keys()["active"]))
+            derived = derivation.ComputeHash(Encoding.UTF8.GetBytes("MyDmsVn.Web6.ResendEligibility.SigningKey.v1"));
+        using var signer = new HMACSHA256(derived);
+        return signingInput + "." + Base64UrlEncoder.Encode(signer.ComputeHash(Encoding.ASCII.GetBytes(signingInput)));
+    }
 
     private static JObject Read(string encoded)
     {

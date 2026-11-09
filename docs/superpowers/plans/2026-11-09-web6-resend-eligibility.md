@@ -294,4 +294,3 @@ git commit -m "docs(web6): record resend eligibility evidence"
 
 Review security boundaries, public wire compatibility, fail-closed errors, no-auto-retry, SQL authorization ordering and evidence accuracy. Any behavioral correction starts with a focused failing regression test and repeats the applicable verification before the final commit.
 
-
