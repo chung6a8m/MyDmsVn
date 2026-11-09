@@ -30,5 +30,39 @@ public sealed class ConfigurationTests
         Array.Clear(key, 0, key.Length); keys.Clear();
         Assert.NotNull(new BearerTokenValidator(options, new FixedClock()).Validate(token));
     }
+
+    [Fact]
+    public void Resend_eligibility_is_disabled_by_default()
+    {
+        var options = Options();
+        Assert.False(options.Web6ResendEligibilityEnabled);
+        Assert.Null(options.Web6CandidateId);
+    }
+
+    [Fact]
+    public void Receipt_v1_requires_exact_web5_mode_and_bounded_candidate()
+    {
+        var enabled = Options(web5: true, resend: true, candidate: "candidate-20261109.1");
+        Assert.True(enabled.Web6ResendEligibilityEnabled);
+        Assert.Equal("candidate-20261109.1", enabled.Web6CandidateId);
+
+        Assert.Throws<ArgumentException>(() => Options(web5: false, resend: true, candidate: "candidate-1"));
+        Assert.Throws<ArgumentException>(() => Options(web5: true, resend: true, candidate: null));
+        Assert.Throws<ArgumentException>(() => Options(web5: true, resend: false, candidate: "candidate-1"));
+    }
+
+    [Theory]
+    [InlineData("")][InlineData(" candidate")][InlineData("candidate/")][InlineData("-candidate")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    public void Resend_candidate_rejects_noncanonical_values(string candidate)
+    {
+        Assert.Throws<ArgumentException>(() => Options(web5: true, resend: true, candidate: candidate));
+    }
+
+    private static WebHostOptions Options(bool web5 = false, bool resend = false, string? candidate = null) =>
+        new WebHostOptions(HostFixture.Origin, HostFixture.Origin, "web2-tests", "test",
+            new Dictionary<string, byte[]> { ["test"] = new byte[32] }, web5Enabled: web5,
+            web6ResendEligibilityEnabled: resend, web6CandidateId: candidate);
+
     private sealed class FixedClock : MyDmsVn.Server.Application.Identity.IUtcClock { public DateTime UtcNow => HostFixture.Now; }
 }

@@ -38,6 +38,8 @@ Use a CLR v4 Integrated IIS app pool with ASP.NET 4.8 enabled; disable Windows/F
 | `MYDMSVN_WEB_REFRESH_ABSOLUTE_DAYS` | Optional integer 1–30; default30; must be >= idle |
 | `MYDMSVN_WEB_SQL_CONNECTION_STRING` | Separate provisioned restricted web runtime principal, never maintenance/Desktop credentials |
 | `MYDMSVN_WEB_SUPERUSER_USERNAME` | Existing protected database binding; no user bootstrap |
+| `MYDMSVN_WEB6_RESEND_ELIGIBILITY` | Optional; absent/`disabled` keeps the additive routes hidden. `receipt-v1` is accepted only with exact `web5` mode and a valid candidate pin. |
+| `MYDMSVN_WEB6_CANDIDATE_ID` | Required only with `receipt-v1`; 1–64 ASCII characters matching `[A-Za-z0-9][A-Za-z0-9._-]*`. Do not set while disabled. |
 
 Access lifetime defaults to 10 minutes (supported 1–15), skew 30 seconds (supported 0–30); API request body cap 1 MiB. Options are validated and copied at startup. Provision secrets outside source, SPA and deployment output. Do not log tokens, passwords, connection strings, key material or raw exception text. Trusted proxy allowlist is empty: any Forwarded/X-Forwarded-* API or SPA request is rejected, even over HTTPS. Proxy deployment needs a separately implemented/tested allowlist. Unsafe API requests require exact Origin; supplied Fetch Metadata must say same-origin. Login/refresh/logout additionally require exactly `X-Requested-With: XMLHttpRequest` before any auth side effect. Missing or cross-origin Origin is denied.
 
@@ -76,6 +78,14 @@ The status `data` object has exactly nine fields: `deploymentEpoch`, `operationI
 ## WEB5 additive exact13 candidate
 
 The explicit `web5` mode preserves all six frozen WEB4 keyed mutation contracts, original v1 context/status and outcomes. New `GET /api/v2/operations/context` and `GET /api/v2/operations/{operationId}/resolution` use the separate [web5-resolution-v1 contract/corpus](../../docs/contracts/web5-resolution-v1/README.md). The original kind determines current Write/Post authorization even when ordinary Read is denied. Only an exact committed CANCELLED plus immutable matched audit may return NOT_EXECUTED; unavailable/expired/absent/error states never authorize recovery or retry. Same-key browser resend remains disabled.
+
+## WEB6 read-only resend eligibility contract
+
+When exact `web5` mode is explicitly configured with `MYDMSVN_WEB6_RESEND_ELIGIBILITY=receipt-v1` and a pinned candidate ID, `/api/v3/operations` exposes three authenticated, no-store GET routes: `resend-context`, `{operationId}/resend-receipt`, and `{operationId}/resend-eligibility`. Their additive [web6-resend-eligibility-v1 corpus](../../docs/contracts/web6-resend-eligibility-v1/README.md) is independent of the frozen v1/v2 contracts.
+
+The pre-dispatch receipt is a bounded, domain-separated signed identity receipt; it contains no command body, result, credential or consent. Eligibility rechecks the current session, original Write/Post grant, epoch and immutable operation identity under the existing SQL fence, then returns only `ALLOW`, `DENY` or `INDETERMINATE` with a stable reason and server-owned expiry. An absent journal row can produce `ALLOW` only with a valid bound receipt and current authorization. A 404, timeout, cancellation or expired receipt never proves `NOT_EXECUTED`.
+
+These routes do not mutate or retry a business request and do not add a privileged resend endpoint. Existing POST/PUT routes neither require nor accept the receipt. The feature defaults OFF; frontend F02/F03 verification, paired candidate acceptance and explicit nonproduction approval are still required before any Resend action can be exposed. Production remains NO-GO.
 
 For a separately authorized candidate install/upgrade, pin matched artifacts, establish the existing supported restricted/drained maintenance window, and invoke the separate migrator with `--web5` using its protected migration configuration. It admits fresh13 and validated exact10/11/12 sources; it preserves existing epoch/journal bytes and refuses drift, partial/too-new histories or undrained writers. The default migrator remains exact10; `--web` remains exact12. An old server binary or environment-mode change cannot roll13 back; rollback requires a separately verified matched binary/database restoration and epoch policy.
 

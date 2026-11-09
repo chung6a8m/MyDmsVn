@@ -85,6 +85,7 @@ namespace MyDmsVn.Server.Infrastructure
                 .AddRepository<IWebOperationJournal, SqlWebOperationJournal>()
                 .AddRepository<IWebOperationReadRepository, SqlWebOperationReadRepository>()
                 .AddRepository<IWebOperationResolutionRepository, SqlWebOperationResolutionRepository>()
+                .AddRepository<IWebOperationResendEligibilityRepository, SqlWebOperationResendEligibilityRepository>()
                 .AddRepository<ICatalogWriteRepository, SqlCatalogWriteRepository>()
                 .AddRepository<IGoodsReceiptWriteRepository, SqlGoodsReceiptWriteRepository>()
                 .AddRepository<ISalesReceiptWriteRepository, SqlSalesReceiptWriteRepository>()

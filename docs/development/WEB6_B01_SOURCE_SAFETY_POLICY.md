@@ -124,3 +124,9 @@ Until Owner chooses an age source and B04 proves it, the endpoint design returns
 - Confirm the explicit warning that a resend after `UNKNOWN`/`NOT_OBSERVED` can execute the original business action for the first time.
 
 No later checkpoint may interpret this proposal as approval. B04 must add real SQL proof for all six commands and both original/resend orders before F02/F03 can expose an action.
+
+## 2026-11-09 additive contract follow-up
+
+Owner approved the separate receipt-based direction, original-key-only semantics, seven-day maximum and explicit first-execution warning for backend implementation. The resulting `web6-resend-eligibility-v1` contract is additive and default OFF. It uses a server-signed pre-dispatch receipt bound to actor/candidate/epoch/operation/fingerprint/kind/method/route/target, and a read-only eligibility route that returns only `ALLOW`, `DENY` or `INDETERMINATE`. Frozen `/api/v1` and `/api/v2` payloads are unchanged.
+
+This closes the backend contract implementation decision only. Receipt possession is not consent or authorization; each read rechecks the current active session and original Write/Post grant, and the later business mutation still relies on the existing journal fence. Frontend one-shot IDB claim, accessible user approval, real paired browser/SQL acceptance and explicit nonproduction enablement remain separate gates. Same-key Resend remains OFF; staging is not accepted and production remains NO-GO. See [2026-11-09 B04 evidence](../evidence/web6/20261109-b04-resend-eligibility.md).
