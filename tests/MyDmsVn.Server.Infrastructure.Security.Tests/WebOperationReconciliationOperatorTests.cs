@@ -132,6 +132,42 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@op,@epoch,1,1,2,41,@hash,NULL,'CAN
                 });
     }
 
+    [SqlServerTheory(SqlTestCategory.SecurityProvisioning)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    public Task Sales_revenue_amount_or_price_contradiction_refuses_current_and_superseded_proof(int baselineKind, bool changePrice) =>
+        WebOperationResolutionScenario.Owned(async s =>
+        {
+            await Seed(s);
+            await Journal(s, (byte)baselineKind, Operation, 1, expired: true);
+            if (baselineKind == 1) await Journal(s, 2, Guid.NewGuid(), 2);
+            if (baselineKind != 3) await Journal(s, 3, Guid.NewGuid(), 3);
+            Assert.Equal(baselineKind == 3 ? WebOperationReconciliationOutcome.Committed : WebOperationReconciliationOutcome.Superseded,
+                (await Check(s)).Outcome);
+
+            // Each independent arrangement changes exactly one normal-line revenue field.
+            // Ledger, valuation, source quantity and COGS remain the original coherent values.
+            await s.Observer.ExecuteAsync(changePrice
+                ? "UPDATE dbo.SalesReceiptLines SET UnitPrice=UnitPrice+1 WHERE [LineNo]=1;"
+                : "UPDATE dbo.SalesReceiptLines SET LineAmount=LineAmount+1 WHERE [LineNo]=1;");
+            Assert.Equal(WebOperationReconciliationOutcome.Unknown, (await Check(s)).Outcome);
+        });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Sales_revenue_uses_exact_half_up_rounding_and_preserves_gift_zero() => WebOperationResolutionScenario.Owned(async s =>
+    {
+        await Seed(s, fractional: true);
+        // 0.0001 * 1.5000 = 0.00015, rounded at four places to 0.0002.
+        // The independent gift row keeps nonzero UnitPrice=3 and zero revenue.
+        await s.Observer.ExecuteAsync("UPDATE dbo.SalesReceiptLines SET UnitPrice=1.5000,LineAmount=0.0002 WHERE [LineNo]=1;");
+        await Journal(s, 3, Operation, 1, expired: true);
+        Assert.Equal(WebOperationReconciliationOutcome.Committed, (await Check(s)).Outcome);
+    });
+
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Identity_retention_and_missing_row_are_fail_closed() => WebOperationResolutionScenario.Owned(async s =>
     {

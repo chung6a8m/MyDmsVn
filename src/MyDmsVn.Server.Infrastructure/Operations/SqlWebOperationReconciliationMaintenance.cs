@@ -137,6 +137,19 @@ ORDER BY CompletedAtUtc,OperationId;",
             while (await reader.ReadAsync(token).ConfigureAwait(false))
             {
                 if (movements.Count >= 100000 || reader.GetInt32(8) != 1 || reader.IsDBNull(4) || reader.IsDBNull(5) || reader.IsDBNull(6) || reader.IsDBNull(7)) return false;
+                if (reader.GetString(1) == "SalesReceipt")
+                {
+                    if (reader.IsDBNull(9) || reader.IsDBNull(10) || reader.IsDBNull(11) || reader.IsDBNull(12)) return false;
+                    var sourceQuantity = reader.GetDecimal(9);
+                    var unitPrice = reader.GetDecimal(10);
+                    var lineAmount = reader.GetDecimal(12);
+                    if (sourceQuantity <= 0 || unitPrice < 0 || lineAmount < 0) return false;
+                    // Independent four-place revenue proof; no production calculator or
+                    // rounded decimal multiplication, and no business fields leave this read.
+                    var revenue = reader.GetBoolean(11) ? BigInteger.Zero
+                        : Round(Units(sourceQuantity, 4) * Units(unitPrice, 4), 10000);
+                    if (Units(lineAmount, 4) != revenue) return false;
+                }
                 movements.Add(new Movement { Ledger = reader.GetInt64(0), Type = reader.GetString(1), Document = reader.GetInt64(2),
                     Quantity = reader.GetDecimal(3), Value = reader.GetDecimal(4), Number = reader.GetInt32(5), Price = reader.GetDecimal(6),
                     Cost = reader.GetDecimal(7) });
@@ -232,7 +245,8 @@ CASE WHEN l.DocumentType='GoodsReceipt' AND DATALENGTH(l.DocumentType)=12 AND r.
 AND rh.Status='Posted' AND DATALENGTH(rh.Status)=6 AND rh.WarehouseId=l.WarehouseId AND rh.PostedAtUtc=l.PostedAtUtc AND rh.PostedByUserId=l.PostedByUserId THEN 1
 WHEN l.DocumentType='SalesReceipt' AND DATALENGTH(l.DocumentType)=12 AND s.SaleId=l.DocumentId AND s.ProductId=l.ProductId AND -s.Qty=l.QuantityChange
 AND sh.Status='Posted' AND DATALENGTH(sh.Status)=6 AND sh.WarehouseId=l.WarehouseId AND sh.PostedAtUtc=l.PostedAtUtc AND sh.PostedByUserId=l.PostedByUserId
-AND s.CostAmount>=0 AND s.PostedUnitCost>=0 AND (s.IsGift=0 OR s.LineAmount=0) THEN 1 ELSE 0 END
+AND s.CostAmount>=0 AND s.PostedUnitCost>=0 AND (s.IsGift=0 OR s.LineAmount=0) THEN 1 ELSE 0 END,
+s.Qty,s.UnitPrice,s.IsGift,s.LineAmount
 FROM dbo.StockLedger l WITH(HOLDLOCK)
 LEFT JOIN dbo.StockValuationEntries v WITH(HOLDLOCK) ON v.LedgerId=l.LedgerId
 LEFT JOIN dbo.GoodsReceiptLines r WITH(HOLDLOCK) ON l.DocumentType='GoodsReceipt' AND r.ReceiptLineId=l.DocumentLineId
