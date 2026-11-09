@@ -5,8 +5,8 @@
 ## Candidate and scope
 
 - Branch: `codex/web6-b04-resend-eligibility`; base `743a56b`; approved design/plan commit `4f48edd`.
-- Runtime/test implementation tested at `5bcf103d1c2c975986e919031bbc4a376cee7c7f`; documentation follows without changing runtime behavior.
-- Runtime commits: configuration `5baec38`, receipt codec `9cece0b`, SQL authorization/read `eb6a0d2`, context/receipt routes `266824b`, eligibility decision route `5bcf103`.
+- Final runtime/test head `1f0f1353db6e5cdc24f5ee259d1d497b5d293635`; documentation follows without changing runtime behavior.
+- Runtime commits: configuration `5baec38`, receipt codec `9cece0b`, SQL authorization/read `eb6a0d2`, context/receipt routes `266824b`, eligibility decision route `5bcf103`, independent-review expiry/canonical-binding fixes `1f0f135`.
 - Windows NT `10.0.26300.0`; .NET SDK `8.0.427`; net48 Release target; installed .NET Framework release `534296`; VSTest `17.11.1` x64.
 - No schema migration, new SQL state, business mutation route, automatic retry, frontend change, IIS/IIS Express run, browser run, staging action or production action is included.
 
@@ -24,16 +24,16 @@ Locked restore passed for both affected project graphs. Tests ran directly, once
 
 | Command / artifact | Executed | Pass | Fail | Skip/other | Result / SHA-256 |
 |---|---:|---:|---:|---:|---|
-| Complete `MyDmsVn.Server.HttpHost.Tests` — `web6-http-complete.trx` | 612 | 612 | 0 | 0 | PASS in 4s; `0d626c70d5ec78f53ac871eb3f0c33410719ac7f1366d0f77f3927ee8410154a` |
+| Final complete `MyDmsVn.Server.HttpHost.Tests` — `web6-http-complete-final.trx` | 617 | 617 | 0 | 0 | PASS in 4s at `1f0f135`; `677750b35f5d8ad06e6db365b884f0ad7c8d16985c3b42a0bb40b4623354d414` |
 | Owned SQL selection: `WebOperationResendEligibilityTests`, `WebOperationResolutionTests`, `WebOperationReadTests` — `web6-eligibility-sql.trx` | 52 | 52 | 0 | 0 | PASS in 3m13s; timeout/abort/not-executed 0; `b40fbb6d1f4920addce3b3bb0948f4eb1fa8dfa46d221c10cb8bfbba55f7d14a` |
 
-The SQL selection uses the existing owned disposable fixture and asserts current epoch/session/original grant, absent row, retained/unavailable/expired results, terminal audit distinctions, identity conflicts and read-only behavior. All 52 completed and the owned fixture cleanup path completed; no allocation was quarantined or adopted by this task. Historical quarantines were not queried or changed.
+The SQL selection uses the existing owned disposable fixture and asserts current epoch/session/original grant, absent row, retained/unavailable/expired results, terminal audit distinctions, identity conflicts and read-only behavior. All 52 completed and the owned fixture cleanup path completed; no allocation was quarantined or adopted by this task. It ran at `5bcf103`; the later `1f0f135` review correction changes only HttpHost receipt/wire/tests/corpus and leaves the SQL repository/interface/registration byte-identical. Historical quarantines were not queried or changed.
 
-TDD records: configuration 54/54; receipt/auth 81/81; SQL repository 4/4; context/receipt endpoint 14/14; eligibility endpoint 25/25; focused frozen-wire regression 132/132. The final complete/SQL rows above are the acceptance results, not a sum of overlapping focused runs.
+TDD records before independent review: configuration 54/54; receipt/auth 81/81; SQL repository 4/4; context/receipt endpoint 14/14; eligibility endpoint 25/25; focused frozen-wire regression 132/132. Review corrections added RED→GREEN coverage for expiry during the SQL wait, cross-candidate conflict, canonical Base64URL and signed extra/duplicate claims; the final WEB6-focused selection passed 49/49. The final complete/SQL rows above are the acceptance results, not a sum of overlapping focused runs.
 
 ## Corpus and hygiene
 
-- New additive corpus: `docs/contracts/web6-resend-eligibility-v1`, with context, six receipt and seven eligibility fixtures.
+- New additive corpus: `docs/contracts/web6-resend-eligibility-v1`, with context, six receipt and eight eligibility fixtures.
 - Frozen `docs/contracts/web4-v1`: 48 files; no diff from base `743a56b`.
 - Frozen `docs/contracts/web5-resolution-v1`: 41 files; no diff from base `743a56b`.
 - `git diff --check` passed. New contract blobs are tracked as LF; no dependency or lock-file change.
