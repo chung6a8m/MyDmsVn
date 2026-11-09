@@ -9,6 +9,32 @@ using MyDmsVn.Server.Infrastructure.Persistence;
 
 namespace MyDmsVn.Server.Infrastructure.Operations;
 
+public sealed class WebOperationTerminalIdentity
+{
+    private readonly byte[] _fingerprint;
+    public WebOperationTerminalIdentity(Guid operationId, Guid deploymentEpoch, WebOperationKind kind,
+        long? requestTargetId, byte[] fingerprint)
+    {
+        if (!Regex.IsMatch(operationId.ToString("D"), "\\A[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\z") ||
+            deploymentEpoch == Guid.Empty)
+            throw new ArgumentException("Exact original operation and deployment identities are required.");
+        if (!Enum.IsDefined(typeof(WebOperationKind), kind) ||
+            ((kind == WebOperationKind.SalesCreate || kind == WebOperationKind.ReceiptCreate)
+                ? requestTargetId.HasValue
+                : !requestTargetId.HasValue || requestTargetId <= 0))
+            throw new ArgumentException("Operation kind and target are inconsistent.");
+        if (fingerprint == null || fingerprint.Length != 32)
+            throw new ArgumentException("A SHA256 fingerprint is required.");
+        OperationId = operationId; DeploymentEpoch = deploymentEpoch; Kind = kind; RequestTargetId = requestTargetId;
+        _fingerprint = (byte[])fingerprint.Clone();
+    }
+    public Guid OperationId { get; }
+    public Guid DeploymentEpoch { get; }
+    public WebOperationKind Kind { get; }
+    public long? RequestTargetId { get; }
+    public byte[] Fingerprint => (byte[])_fingerprint.Clone();
+}
+
 // Explicit operator construction only; never registered in the application runtime container.
 // Success means commands completed in the caller's transaction, not that Commit succeeded.
 public sealed class SqlWebOperationResolutionMaintenance
@@ -48,15 +74,26 @@ public sealed class SqlWebOperationResolutionMaintenance
         catch (SqlException error)
         {
             throw new WebOperationException(error.Number == 51307 ? "Idempotency.FingerprintMismatch"
+                : error.Number == 51306 ? "Operation.FenceUnavailable"
                 : error.Number == 51305 ? "Deployment.EpochMismatch" : error.Number == 51302 || error.Number == 229 ? "Auth.Forbidden" : "Operation.Unavailable");
         }
     }
 
-    public async Task RecordNotExecutedAsync(WebOperationContext operation, int actorUserId, Guid decisionId,
+    public Task RecordNotExecutedAsync(WebOperationContext operation, int actorUserId, Guid decisionId,
+        string caseId, string reasonCode, string evidenceReference, CancellationToken cancellationToken)
+    {
+        if (operation == null) throw new ArgumentNullException(nameof(operation));
+        return RecordNotExecutedAsync(new WebOperationTerminalIdentity(operation.OperationId, operation.DeploymentEpoch,
+            operation.Kind, operation.RequestTargetId, operation.Fingerprint), actorUserId, decisionId,
+            caseId, reasonCode, evidenceReference, cancellationToken);
+    }
+
+    public async Task RecordNotExecutedAsync(WebOperationTerminalIdentity operation, int actorUserId, Guid decisionId,
         string caseId, string reasonCode, string evidenceReference, CancellationToken cancellationToken)
     {
         if (_context.Transaction == null) throw new InvalidOperationException("An explicit maintenance transaction is required.");
-        if (operation == null || actorUserId <= 0 || !Regex.IsMatch(decisionId.ToString("D"), "\\A[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\z")
+        if (operation == null || actorUserId <= 0 || decisionId == operation.OperationId ||
+            !Regex.IsMatch(decisionId.ToString("D"), "\\A[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\z")
             || caseId == null || !Regex.IsMatch(caseId, "\\A[A-Za-z0-9_-]{1,128}\\z")
             || reasonCode == null || !Regex.IsMatch(reasonCode, "\\A[A-Za-z0-9_-]{1,64}\\z")
             || evidenceReference == null || !Regex.IsMatch(evidenceReference, "\\A[A-Za-z0-9_.:/-]{1,256}\\z"))
@@ -72,6 +109,7 @@ public sealed class SqlWebOperationResolutionMaintenance
         catch (SqlException error) when (error.Number >= 51301 && error.Number <= 51306)
         {
             throw new WebOperationException(error.Number == 51303 ? "Operation.ResolutionConflict" : error.Number == 51302 ? "Auth.Forbidden"
+                : error.Number == 51306 ? "Operation.FenceUnavailable"
                 : error.Number == 51305 ? "Deployment.EpochMismatch" : "Operation.Unavailable");
         }
     }

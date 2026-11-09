@@ -42,6 +42,10 @@ try {
     Case 'known-oracle-red' $failedCounts $failure @($oracle) $false 'Failed' $true $true
     Case 'unrelated-red' $failedCounts ($failure.Replace('Assert.Equal() Failure','Connection failed')) @($oracle) $false 'Failed' $true $false
     Case 'wrong-value-red' $failedCounts ($failure.Replace('Expected: 25','Expected: 250')) @($oracle) $false 'Failed' $true $false
+    $b02bWorkflow=Get-Content (Join-Path (Split-Path $PSScriptRoot -Parent) 'workflows/backend-web6-b02b-sql-candidate.yml') -Raw
+    $safeLifecycleCheck='powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check'
+    if (-not $b02bWorkflow.Contains($safeLifecycleCheck)) { throw 'B02b lifecycle Check must preserve JSON identity strings through Windows PowerShell.' }
+    $passed++
     Write-Output "Evidence guard checks passed: $passed"
 }
 finally {

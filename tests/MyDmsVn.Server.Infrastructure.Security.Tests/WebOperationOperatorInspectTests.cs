@@ -552,7 +552,7 @@ CREATE USER Web6CliRuntime WITHOUT LOGIN;");
             _connectionString = connectionString;
             _databaseUser = databaseUser;
         }
-        public async Task<SqlConnection> OpenAsync(InspectOptions options, CancellationToken cancellationToken)
+        public async Task<SqlConnection> OpenAsync(IOperatorTargetOptions options, CancellationToken cancellationToken)
         {
             var connection = new SqlConnection(new SqlConnectionStringBuilder(_connectionString) { Pooling = false }.ConnectionString);
             await connection.OpenAsync(cancellationToken);

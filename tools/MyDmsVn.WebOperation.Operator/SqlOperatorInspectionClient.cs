@@ -11,7 +11,7 @@ namespace MyDmsVn.WebOperation.Operator;
 
 public interface IOperatorSqlConnectionFactory
 {
-    Task<SqlConnection> OpenAsync(InspectOptions options, CancellationToken cancellationToken);
+    Task<SqlConnection> OpenAsync(IOperatorTargetOptions options, CancellationToken cancellationToken);
 }
 
 public sealed class OperatorSqlConnectionFactory : IOperatorSqlConnectionFactory
@@ -37,7 +37,7 @@ public sealed class OperatorSqlConnectionFactory : IOperatorSqlConnectionFactory
         _expectedLogin = expectedLogin!;
     }
 
-    public async Task<SqlConnection> OpenAsync(InspectOptions options, CancellationToken cancellationToken)
+    public async Task<SqlConnection> OpenAsync(IOperatorTargetOptions options, CancellationToken cancellationToken)
     {
         var builder = new SqlConnectionStringBuilder(_connectionString);
         if (!builder.InitialCatalog.Equals(options.DatabaseName, StringComparison.OrdinalIgnoreCase))
@@ -59,7 +59,7 @@ public sealed class OperatorSqlConnectionFactory : IOperatorSqlConnectionFactory
         }
     }
 
-    private async Task VerifyPrincipalAsync(SqlConnection connection, InspectOptions options, CancellationToken cancellationToken)
+    private async Task VerifyPrincipalAsync(SqlConnection connection, IOperatorTargetOptions options, CancellationToken cancellationToken)
     {
         using var command = connection.CreateCommand();
         command.CommandTimeout = options.TimeoutSeconds;
@@ -93,7 +93,7 @@ ISNULL(IS_SRVROLEMEMBER(N'dbcreator'),0)+ISNULL(IS_SRVROLEMEMBER(N'bulkadmin'),0
         await VerifyEffectivePermissionsAsync(connection, options, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task VerifyEffectivePermissionsAsync(SqlConnection connection, InspectOptions options,
+    private static async Task VerifyEffectivePermissionsAsync(SqlConnection connection, IOperatorTargetOptions options,
         CancellationToken cancellationToken)
     {
         using var command = connection.CreateCommand();
