@@ -11,15 +11,16 @@ internal static class Program
         var inspectParsed = InspectOptions.TryParse(args, out var inspectOptions, out _) && !inspectOptions!.HelpRequested;
         var decisionParsed = RecordNotExecutedOptions.TryParse(args, out var decisionOptions, out _) && !decisionOptions!.HelpRequested;
         var compactParsed = CompactOptions.TryParse(args, out var compactOptions, out _) && !compactOptions!.HelpRequested;
+        var reconcileParsed = ReconcileCommittedOptions.TryParse(args, out var reconcileOptions, out _) && !reconcileOptions!.HelpRequested;
         var timeoutSeconds = inspectParsed ? inspectOptions!.TimeoutSeconds : decisionParsed ? decisionOptions!.TimeoutSeconds
-            : compactParsed ? compactOptions!.TimeoutSeconds : 0;
+            : compactParsed ? compactOptions!.TimeoutSeconds : reconcileParsed ? reconcileOptions!.TimeoutSeconds : 0;
         if (timeoutSeconds > 0)
         {
             hardDeadline = new OperatorProcessDeadline(TimeSpan.FromSeconds(timeoutSeconds), () =>
             {
                 try
                 {
-                    Console.Error.WriteLine(compactParsed ? "status=UNKNOWN/ESCALATE" :
+                    Console.Error.WriteLine(compactParsed || reconcileParsed ? "status=UNKNOWN/ESCALATE" :
                         "Operator.Timeout: the process deadline expired; SQL outcome is unknown.");
                 }
                 finally { Environment.Exit((int)OperatorExitCode.Timeout); }
@@ -34,6 +35,14 @@ internal static class Program
         Console.CancelKeyPress += handler;
         try
         {
+            if (args.Length > 0 && args[0] == ReconcileCommittedOptions.CommandName)
+                return OperatorReconciliationApplication.RunAsync(args,
+                    _ => new SqlOperatorReconciliationClient(new MaintenanceSqlConnectionFactory(
+                        Environment.GetEnvironmentVariable(OperatorCompactionApplication.ConnectionStringEnvironmentVariable),
+                        Environment.GetEnvironmentVariable(OperatorCompactionApplication.DatabaseUserEnvironmentVariable),
+                        Environment.GetEnvironmentVariable(OperatorCompactionApplication.LoginEnvironmentVariable),
+                        Environment.GetEnvironmentVariable(OperatorCompactionApplication.TargetIdentityEnvironmentVariable))),
+                    Console.Out, Console.Error, stop.Token).GetAwaiter().GetResult();
             if (args.Length > 0 && (args[0] == CompactOptions.PreviewCommand || args[0] == CompactOptions.ExecuteCommand))
                 return OperatorCompactionApplication.RunAsync(args,
                     _ => new SqlOperatorCompactionClient(new MaintenanceSqlConnectionFactory(
