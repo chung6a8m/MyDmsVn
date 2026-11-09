@@ -73,3 +73,7 @@ Round-2 final review findings: P0 0, P1 0, P2 0. Owner accepted the bounded exac
 ## F02 handoff
 
 The existing `/api/v1` journal/write and `/api/v2` resolution contracts are now SQL-proven for the six commands: same actor/key/epoch/fingerprint serializes every order, retained COMMITTED replays the original result, EXPIRED/RESULT_UNAVAILABLE/CANCELLED never re-executes, and an absent row/404 is not rollback proof. No eligibility API exists; `sameKeyResendEnabled` remains false. F02 must therefore keep **Gửi lại đúng thao tác** disabled until the Owner selects the additive contract, authoritative age source, window and one-claim/consent policy, and F02/F03 receive their own verification and explicit nonproduction approval.
+
+## 2026-11-09 additive follow-up
+
+The later [B6-RPL-05 evidence](20261109-b04-resend-eligibility.md) implements and locally verifies the separate default-OFF `web6-resend-eligibility-v1` read contract. It does not rewrite this accepted 2026-11-03 proof, authorize any historical quarantine cleanup, or enable the frontend action. The original `sameKeyResendEnabled` field remains false; F02/F03, paired B05 and explicit nonproduction approval remain required.
