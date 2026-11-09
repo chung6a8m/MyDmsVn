@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Abstractions;
@@ -142,6 +144,7 @@ public sealed class Web6CandidateSafetyTests
     {
         using var fixture = new CandidateFixture();
         fixture.Seal();
+        fixture.Verify();
         var extra = Path.Combine(fixture.ControlPath, "foreign-field.txt");
         if (drift == "extra-child")
         {
@@ -168,7 +171,9 @@ public sealed class Web6CandidateSafetyTests
             if (isRoot) Directory.SetAccessControl(fixture.ControlPath, SqlTestPrivateRecord.RestoreDirectory(original.GetSecurityDescriptorBinaryForm()));
             else File.SetAccessControl(fixture.ManifestPath, SqlTestPrivateRecord.RestoreFile(original.GetSecurityDescriptorBinaryForm()));
         }
-        fixture.Verify();
+        // Restoring a newly created directory may normalize NTFS descriptor flags. Retain
+        // the exact descriptor pin and do not reuse a control root after the ACL experiment.
+        if (!isRoot) fixture.Verify();
     }
 
     [Fact]
@@ -203,6 +208,31 @@ public sealed class Web6CandidateSafetyTests
     }
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Candidate_create_new_refuses_an_ancestor_with_an_outstanding_delete_handle(bool directParent)
+    {
+        using var fixture = new CandidateFixture();
+        var grandparent = Directory.CreateDirectory(Path.Combine(fixture.WorkPath, "ancestor")).FullName;
+        var parent = Directory.CreateDirectory(Path.Combine(grandparent, "parent")).FullName;
+        var candidate = Path.Combine(parent, "candidate");
+        const uint deleteAndListDirectory = 0x10001, shareAll = 7, openExisting = 3, openDirectory = 0x02000000;
+        using (var conflicting = OpenTestDirectory(directParent ? parent : grandparent,
+            deleteAndListDirectory, shareAll, IntPtr.Zero, openExisting, openDirectory, IntPtr.Zero))
+        {
+            Assert.False(conflicting.IsInvalid);
+            Assert.Throws<IOException>(() => Web6CandidateManifest.CreateNew(candidate, fixture.Inputs).Dispose());
+            Assert.False(Directory.Exists(candidate));
+        }
+
+        using var manifest = Web6CandidateManifest.CreateNew(candidate, fixture.Inputs);
+        Assert.True(Directory.Exists(candidate));
+    }
+
+    [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    private static extern SafeFileHandle OpenTestDirectory(string path, uint access, uint share, IntPtr security, uint creation, uint flags, IntPtr template);
+
+    [Theory]
     [InlineData("backend-head")]
     [InlineData("frontend-tree")]
     [InlineData("backend-dirty")]
@@ -216,6 +246,12 @@ public sealed class Web6CandidateSafetyTests
     [InlineData("wrong-controller")]
     [InlineData("wrong-queue")]
     [InlineData("second-queue")]
+    [InlineData("unknown-audit-launch")]
+    [InlineData("wrong-audit-process")]
+    [InlineData("wrong-audit-start")]
+    [InlineData("wrong-audit-root")]
+    [InlineData("wrong-audit-path")]
+    [InlineData("wrong-audit-candidate")]
     public void Candidate_preflight_refuses_changed_or_unproven_live_identity(string drift)
     {
         using var fixture = new CandidateFixture();
@@ -252,10 +288,30 @@ public sealed class Web6CandidateSafetyTests
         Assert.False(File.Exists(fixture.ManifestPath));
     }
 
+    [Theory]
+    [InlineData("audit-deleted")]
+    [InlineData("dll-changed")]
+    [InlineData("extra-child")]
+    public void Candidate_preflight_refuses_filesystem_drift_during_observation(string drift)
+    {
+        using var fixture = new CandidateFixture();
+        fixture.Seal();
+        var observed = false;
+        Assert.ThrowsAny<IOException>(() => fixture.Verify(duringObservation: () =>
+        {
+            observed = true;
+            if (drift == "audit-deleted") File.Delete(fixture.Manifest.AuditPath);
+            else if (drift == "dll-changed") File.WriteAllText(fixture.ArtifactPaths["dll"], "changed during observation");
+            else File.WriteAllText(Path.Combine(fixture.ControlPath, "foreign.record"), "created during observation");
+        }));
+        Assert.True(observed);
+    }
+
     private sealed class CandidateFixture : IDisposable
     {
         private const int ProcessId = 17242;
         private const string QueueName = "owned-queue";
+        private static readonly DateTime ProcessStartUtc = new DateTime(2026, 11, 10, 1, 2, 3, DateTimeKind.Utc);
         private static readonly Uri Origin = new Uri("https://localhost:44321/");
         private static readonly string SqlReceipt = new string('8', 64);
         private readonly Web6CandidateFileSet _files;
@@ -291,18 +347,26 @@ public sealed class Web6CandidateSafetyTests
 
         internal void Seal() => Manifest.SealArtifacts(_files, SqlReceipt);
 
-        internal void Verify(string? drift = null) => Manifest.VerifyBeforeAdmission(ProcessId, QueueName, () =>
+        internal void Verify(string? drift = null, Action? duringObservation = null) =>
+            Manifest.VerifyBeforeAdmission(ProcessId, ProcessStartUtc, QueueName, () =>
         {
+            duringObservation?.Invoke();
             var queues = new List<Web5HttpRequestQueue> { Queue(
                 drift == "wrong-queue" ? "other-queue" : QueueName,
                 drift == "wrong-controller" ? ProcessId + 1 : ProcessId,
                 drift == "second-worker" ? new[] { ProcessId, ProcessId + 1 } : new[] { drift == "wrong-worker" ? ProcessId + 1 : ProcessId }) };
             if (drift == "second-queue") queues.Add(Queue("other-queue", ProcessId + 1, new[] { ProcessId + 1 }));
+            var auditLaunch = drift == "unknown-audit-launch" ? null : new Web6CandidateAuditLaunch(
+                drift == "wrong-audit-process" ? ProcessId + 1 : ProcessId,
+                drift == "wrong-audit-start" ? ProcessStartUtc.AddSeconds(1) : ProcessStartUtc,
+                drift == "wrong-audit-root" ? WorkPath : ControlPath,
+                drift == "wrong-audit-path" ? Path.Combine(ControlPath, "foreign.log") : Manifest.AuditPath,
+                drift == "wrong-audit-candidate" ? "other-candidate" : Inputs.CandidateId);
             return new Web6CandidateObservation(
                 (drift == "backend-head" ? new string('9', 40) : new string('1', 40), new string('2', 40), drift != "backend-dirty"),
                 (new string('3', 40), drift == "frontend-tree" ? new string('9', 40) : new string('4', 40), drift != "frontend-dirty"),
                 new string(drift == "schema" ? '9' : '5', 64), new string(drift == "certificate" ? '9' : '6', 64),
-                drift == "unknown-sql-owner" ? null : drift == "wrong-sql-receipt" ? new string('9', 64) : SqlReceipt, queues);
+                drift == "unknown-sql-owner" ? null : drift == "wrong-sql-receipt" ? new string('9', 64) : SqlReceipt, queues, auditLaunch);
         });
 
         private static Web5HttpRequestQueue Queue(string name, int controller, int[] workers) => new Web5HttpRequestQueue(name, true,

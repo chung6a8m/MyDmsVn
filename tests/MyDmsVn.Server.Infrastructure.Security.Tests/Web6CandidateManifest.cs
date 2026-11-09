@@ -187,24 +187,89 @@ internal static class Web6CandidateFileSystem
             throw new IOException("Candidate requires a regular file.");
     }
 
-    internal static void CreateNewDirectory(string path, DirectorySecurity acl)
+    internal sealed class ParentChain : IDisposable
     {
-        var bytes = acl.GetSecurityDescriptorBinaryForm();
-        var descriptor = Marshal.AllocHGlobal(bytes.Length);
-        try
+        private readonly List<SafeFileHandle> _leases = new List<SafeFileHandle>();
+
+        internal ParentChain(string path)
         {
-            Marshal.Copy(bytes, 0, descriptor, bytes.Length);
-            var attributes = new SecurityAttributes { Size = Marshal.SizeOf<SecurityAttributes>(), Descriptor = descriptor };
-            if (!CreateDirectory(path, ref attributes))
-                throw new IOException("Candidate control root must be created exactly once.");
+            var volume = Path.GetPathRoot(path)!;
+            try
+            {
+                Pin(OpenDirectory(volume, pin: true));
+                if (path.Length > volume.Length)
+                    foreach (var component in path.Substring(volume.Length).Split(Path.DirectorySeparatorChar))
+                        Pin(OpenRelativeDirectory(_leases[_leases.Count - 1], component, acl: null));
+            }
+            catch { Dispose(); throw; }
         }
-        finally { Marshal.FreeHGlobal(descriptor); }
+
+        internal SafeFileHandle CreateRoot(string name, DirectorySecurity acl) =>
+            OpenRelativeDirectory(_leases[_leases.Count - 1], name, acl);
+
+        private void Pin(SafeFileHandle handle)
+        {
+            _leases.Add(handle);
+            Identity(handle, directory: true);
+        }
+
+        public void Dispose()
+        {
+            for (var index = _leases.Count - 1; index >= 0; index--) _leases[index].Dispose();
+        }
     }
 
-    internal static SafeFileHandle OpenDirectory(string path)
+    // Open each child relative to the already pinned parent. Create-new returns the original root handle
+    // with the private descriptor already applied, without another lookup through the absolute path.
+    private static SafeFileHandle OpenRelativeDirectory(SafeFileHandle parent, string name, DirectorySecurity? acl)
     {
-        const uint readAttributes = 0x80, shareReadWrite = 3, openExisting = 3, openDirectoryWithoutFollowing = 0x02200000;
-        var handle = CreateFile(path, readAttributes, shareReadWrite, IntPtr.Zero, openExisting, openDirectoryWithoutFollowing, IntPtr.Zero);
+        const uint caseInsensitive = 0x40, dontReparse = 0x1000, readAndListAttributes = 0x81, shareRead = 1;
+        const uint openExisting = 1, createNew = 2, directoryWithoutFollowing = 0x00200001;
+        var buffer = IntPtr.Zero;
+        var objectName = IntPtr.Zero;
+        var descriptor = default(GCHandle);
+        var retained = false;
+        try
+        {
+            parent.DangerousAddRef(ref retained);
+            buffer = Marshal.StringToHGlobalUni(name);
+            objectName = Marshal.AllocHGlobal(Marshal.SizeOf<NativeUnicodeString>());
+            Marshal.StructureToPtr(new NativeUnicodeString
+            {
+                Length = checked((ushort)(name.Length * sizeof(char))),
+                MaximumLength = checked((ushort)((name.Length + 1) * sizeof(char))),
+                Buffer = buffer
+            }, objectName, fDeleteOld: false);
+            if (acl != null) descriptor = GCHandle.Alloc(acl.GetSecurityDescriptorBinaryForm(), GCHandleType.Pinned);
+            var attributes = new NativeObjectAttributes
+            {
+                Size = Marshal.SizeOf<NativeObjectAttributes>(),
+                RootDirectory = parent.DangerousGetHandle(),
+                ObjectName = objectName,
+                Attributes = caseInsensitive | dontReparse,
+                SecurityDescriptor = descriptor.IsAllocated ? descriptor.AddrOfPinnedObject() : IntPtr.Zero
+            };
+            var status = NtCreateFile(out var handle, readAndListAttributes, ref attributes, out _, IntPtr.Zero,
+                FileAttributes.Normal, shareRead, acl == null ? openExisting : createNew, directoryWithoutFollowing, IntPtr.Zero, 0);
+            if (status >= 0 && handle != null && !handle.IsInvalid) return handle;
+            handle?.Dispose();
+            throw new IOException("Candidate directory could not be pinned or created through its owned parent.");
+        }
+        finally
+        {
+            if (descriptor.IsAllocated) descriptor.Free();
+            Marshal.FreeHGlobal(objectName);
+            Marshal.FreeHGlobal(buffer);
+            if (retained) parent.DangerousRelease();
+        }
+    }
+
+    internal static SafeFileHandle OpenDirectory(string path, bool pin = false)
+    {
+        const uint readAttributes = 0x80, listDirectory = 1, shareRead = 1, shareReadWrite = 3;
+        const uint openExisting = 3, openDirectoryWithoutFollowing = 0x02200000;
+        var handle = CreateFile(path, pin ? readAttributes | listDirectory : readAttributes, pin ? shareRead : shareReadWrite,
+            IntPtr.Zero, openExisting, openDirectoryWithoutFollowing, IntPtr.Zero);
         if (!handle.IsInvalid) return handle;
         handle.Dispose();
         throw new IOException("Candidate control directory could not be pinned.");
@@ -221,11 +286,26 @@ internal static class Web6CandidateFileSystem
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct SecurityAttributes
+    private struct NativeUnicodeString
+    {
+        internal ushort Length, MaximumLength;
+        internal IntPtr Buffer;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeObjectAttributes
     {
         internal int Size;
-        internal IntPtr Descriptor;
-        [MarshalAs(UnmanagedType.Bool)] internal bool Inherit;
+        internal IntPtr RootDirectory, ObjectName;
+        internal uint Attributes;
+        internal IntPtr SecurityDescriptor, SecurityQualityOfService;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeIoStatus
+    {
+        internal IntPtr Status;
+        internal UIntPtr Information;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -236,9 +316,10 @@ internal static class Web6CandidateFileSystem
         internal uint Volume, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
     }
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool CreateDirectory(string path, ref SecurityAttributes attributes);
+    [DllImport("ntdll.dll", ExactSpelling = true)]
+    private static extern int NtCreateFile(out SafeFileHandle handle, uint access, ref NativeObjectAttributes attributes,
+        out NativeIoStatus status, IntPtr allocationSize, FileAttributes fileAttributes, uint share, uint disposition,
+        uint options, IntPtr extendedAttributes, uint extendedAttributesLength);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFile(string path, uint access, uint share, IntPtr security, uint creation, uint flags, IntPtr template);
@@ -251,7 +332,8 @@ internal static class Web6CandidateFileSystem
 internal sealed class Web6CandidateObservation
 {
     internal Web6CandidateObservation((string Sha, string Tree, bool Clean) backend, (string Sha, string Tree, bool Clean) frontend,
-        string schema13Fingerprint, string certificateHash, string? verifiedSqlReceiptHash, IEnumerable<Web5HttpRequestQueue> queues)
+        string schema13Fingerprint, string certificateHash, string? verifiedSqlReceiptHash, IEnumerable<Web5HttpRequestQueue> queues,
+        Web6CandidateAuditLaunch? auditLaunch)
     {
         Backend = backend;
         Frontend = frontend;
@@ -259,6 +341,7 @@ internal sealed class Web6CandidateObservation
         CertificateHash = certificateHash;
         VerifiedSqlReceiptHash = verifiedSqlReceiptHash;
         Queues = queues.ToArray();
+        AuditLaunch = auditLaunch;
     }
 
     internal (string Sha, string Tree, bool Clean) Backend { get; }
@@ -267,6 +350,26 @@ internal sealed class Web6CandidateObservation
     internal string CertificateHash { get; }
     internal string? VerifiedSqlReceiptHash { get; }
     internal IReadOnlyList<Web5HttpRequestQueue> Queues { get; }
+    internal Web6CandidateAuditLaunch? AuditLaunch { get; }
+}
+
+// The owned launcher binds its effective candidate audit configuration to the verified process.
+internal sealed class Web6CandidateAuditLaunch
+{
+    internal Web6CandidateAuditLaunch(int processId, DateTime startTimeUtc, string root, string auditPath, string candidateId)
+    {
+        ProcessId = processId;
+        StartTimeUtc = startTimeUtc;
+        Root = root;
+        AuditPath = auditPath;
+        CandidateId = candidateId;
+    }
+
+    internal int ProcessId { get; }
+    internal DateTime StartTimeUtc { get; }
+    internal string Root { get; }
+    internal string AuditPath { get; }
+    internal string CandidateId { get; }
 }
 
 internal enum Web6CandidateStage { Chromium, Edge, Cutover, Workload, Recovery, Cleanup }
@@ -278,6 +381,7 @@ internal sealed class Web6CandidateManifest : IDisposable
     private readonly object _gate = new object();
     private readonly Web6CandidateInputs _inputs;
     private readonly SecurityIdentifier _owner;
+    private readonly Web6CandidateFileSystem.ParentChain _parents;
     private readonly SafeFileHandle _rootLease;
     private readonly string _rootId;
     private readonly string _rootAcl;
@@ -292,11 +396,13 @@ internal sealed class Web6CandidateManifest : IDisposable
     internal string AuditPath => Path.Combine(Root, "security-audit.log");
     private string ManifestPath => Path.Combine(Root, "candidate.manifest");
 
-    private Web6CandidateManifest(string root, Web6CandidateInputs inputs, SecurityIdentifier owner, SafeFileHandle rootLease)
+    private Web6CandidateManifest(string root, Web6CandidateInputs inputs, SecurityIdentifier owner,
+        Web6CandidateFileSystem.ParentChain parents, SafeFileHandle rootLease)
     {
         Root = root;
         _inputs = inputs;
         _owner = owner;
+        _parents = parents;
         _rootLease = rootLease;
         _rootId = Web6CandidateFileSystem.Identity(rootLease, directory: true);
         _rootAcl = DirectoryAcl();
@@ -310,15 +416,17 @@ internal sealed class Web6CandidateManifest : IDisposable
         root = Web6CandidateFileSystem.CanonicalPath(root);
         if (root.Length + 30 > 240 || Path.GetDirectoryName(root) is not string parent)
             throw new IOException("Candidate control root exceeds its path budget.");
-        Web6CandidateFileSystem.RequireDirectories(parent);
         using var current = WindowsIdentity.GetCurrent();
         var owner = current.User ?? throw new IOException("Candidate owner is unavailable.");
         var acl = SqlTestPrivateRecord.DirectoryAcl(owner);
-        Web6CandidateFileSystem.CreateNewDirectory(root, acl);
-        Directory.SetAccessControl(root, acl);
-        var lease = Web6CandidateFileSystem.OpenDirectory(root);
-        try { return new Web6CandidateManifest(root, inputs, owner, lease); }
-        catch { lease.Dispose(); throw; }
+        var parents = new Web6CandidateFileSystem.ParentChain(parent);
+        SafeFileHandle? lease = null;
+        try
+        {
+            lease = parents.CreateRoot(Path.GetFileName(root), acl);
+            return new Web6CandidateManifest(root, inputs, owner, parents, lease);
+        }
+        catch { lease?.Dispose(); parents.Dispose(); throw; }
     }
 
     internal void SealArtifacts(Web6CandidateFileSet files, string sqlOwnershipReceiptHash)
@@ -353,14 +461,16 @@ internal sealed class Web6CandidateManifest : IDisposable
         }
     }
 
-    internal void VerifyBeforeAdmission(int expectedProcessId, string expectedQueueName, Func<Web6CandidateObservation> observe)
+    internal void VerifyBeforeAdmission(int expectedProcessId, DateTime expectedProcessStartUtc, string expectedQueueName,
+        Func<Web6CandidateObservation> observe)
     {
         lock (_gate)
         {
             RequireState(State.Sealed);
-            VerifyRecords();
-            if (_files!.Measure() != _artifacts || ReadAudit() != (_auditId, _auditAcl))
-                throw new IOException("Candidate artifacts or protected audit destination changed.");
+            if (expectedProcessId <= 0 || expectedProcessStartUtc.Kind != DateTimeKind.Utc || expectedProcessStartUtc == default ||
+                string.IsNullOrWhiteSpace(expectedQueueName))
+                throw new IOException("Candidate requires an expected IIS Express process identity and HTTP queue.");
+            VerifyAdmissionFiles();
 
             var current = observe();
             if (current == null || current.Backend != (_inputs.Backend.Sha, _inputs.Backend.Tree, true) ||
@@ -369,14 +479,26 @@ internal sealed class Web6CandidateManifest : IDisposable
                 current.VerifiedSqlReceiptHash != _sqlReceipt)
                 throw new IOException("Candidate source, schema, certificate or SQL ownership could not be verified.");
 
-            if (expectedProcessId <= 0 || string.IsNullOrWhiteSpace(expectedQueueName))
-                throw new IOException("Candidate requires an expected IIS Express process and HTTP queue.");
+            var launch = current.AuditLaunch;
+            if (launch == null || launch.ProcessId != expectedProcessId || launch.StartTimeUtc.Kind != DateTimeKind.Utc ||
+                launch.StartTimeUtc != expectedProcessStartUtc || launch.Root != Root || launch.AuditPath != AuditPath ||
+                launch.CandidateId != _inputs.CandidateId)
+                throw new IOException("Candidate audit configuration was not verified for the admitted process.");
+
             Web5HttpRequestQueue queue;
             try { queue = Web5HttpServiceState.RequireOwnedQueue(current.Queues, _inputs.Origin, expectedProcessId); }
             catch (InvalidDataException) { throw new IOException("Candidate does not have exactly one owned worker and controller."); }
             if (!string.Equals(queue.Name, expectedQueueName, StringComparison.Ordinal))
                 throw new IOException("Candidate HTTP queue changed.");
+            VerifyAdmissionFiles();
         }
+    }
+
+    private void VerifyAdmissionFiles()
+    {
+        VerifyRecords();
+        if (_files!.Measure() != _artifacts || ReadAudit() != (_auditId, _auditAcl))
+            throw new IOException("Candidate artifacts or protected audit destination changed.");
     }
 
     internal void RecordDisposition(Web6CandidateStage stage, Web6CandidateOutcome outcome)
@@ -490,6 +612,7 @@ internal sealed class Web6CandidateManifest : IDisposable
             _state = State.Disposed;
             foreach (var record in _records.Values) record.Reader.Dispose();
             _rootLease.Dispose();
+            _parents.Dispose();
         }
     }
 
