@@ -1,4 +1,4 @@
-namespace MyDmsVn.WebOperation.Operator;
+﻿namespace MyDmsVn.WebOperation.Operator;
 
 public enum OperatorExitCode
 {
@@ -10,5 +10,6 @@ public enum OperatorExitCode
     Timeout = 6,
     Preview = 7,
     Unknown = 8,
+    AuditDeliveryFailed = 9,
     Cancelled = 130
 }
