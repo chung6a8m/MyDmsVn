@@ -24,6 +24,120 @@ public sealed class WebRecoveryPilotResultTests
     private static void Verify(JObject result, JArray? physical = null) => WebHostIisExpressTests.VerifyRecoveryResult(result,
         physical ?? new JArray(Operation()), Array.Empty<long>(), Array.Empty<long>(), new[] { Epoch });
 
+    private static readonly Web6CandidateExpected Web6Expected = new Web6CandidateExpected(
+        "web6-candidate-plan", new string('a', 40), new string('b', 40), new string('c', 64));
+
+    private static JObject Web6Result()
+    {
+        var kinds = new[] { "Sales.Create", "Sales.Update", "Sales.Post", "Receipt.Create", "Receipt.Update", "Receipt.Post" };
+        return new JObject
+        {
+            ["version"] = 2, ["mode"] = "web6-candidate", ["candidateId"] = Web6Expected.CandidateId,
+            ["frontendSourceSha"] = Web6Expected.FrontendSourceSha, ["backendSourceSha"] = Web6Expected.BackendSourceSha,
+            ["frontendDistManifestSha256"] = Web6Expected.FrontendDistManifestSha256,
+            ["operations"] = new JArray(kinds.Select((kind, index) => new JObject
+            {
+                ["operationKind"] = kind, ["operationId"] = $"0000000{index + 1}-0000-4000-8000-00000000000{index + 1}",
+                ["requestFingerprint"] = new string((char)('a' + index), 64), ["consentDispatches"] = 1,
+                ["candidateId"] = Web6Expected.CandidateId, ["checkId"] = "web6-" + kind.Replace('.', '-').ToLowerInvariant(),
+            })),
+            ["checks"] = new JArray("web6-six-kinds-one-consent", "web6-committed-loss-no-resend",
+                "web6-two-tab-one-claim", "web6-fail-closed-boundaries", "web6-ime-double-click"),
+        };
+    }
+
+    [Fact]
+    public void Web6_candidate_result_requires_exact_six_unique_kinds_and_one_consent()
+    {
+        Web6CandidateOracle.ValidateResult(Web6Result(), Web6Expected);
+        var missing = Web6Result(); ((JArray)missing["operations"]!).RemoveAt(0);
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(missing, Web6Expected));
+        var duplicate = Web6Result(); duplicate["operations"]![5]!["operationKind"] = "Sales.Create";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(duplicate, Web6Expected));
+        var dispatch = Web6Result(); dispatch["operations"]![0]!["consentDispatches"] = 2;
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(dispatch, Web6Expected));
+    }
+
+    [Theory]
+    [InlineData("candidateId", "other-candidate")]
+    [InlineData("frontendSourceSha", "dddddddddddddddddddddddddddddddddddddddd")]
+    [InlineData("backendSourceSha", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")]
+    [InlineData("frontendDistManifestSha256", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
+    public void Web6_candidate_result_refuses_wrong_pins(string property, string value)
+    {
+        var result = Web6Result(); result[property] = value;
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(result, Web6Expected));
+    }
+
+    [Theory]
+    [InlineData("token")]
+    [InlineData("cookie")]
+    [InlineData("connectionString")]
+    [InlineData("receipt")]
+    [InlineData("payload")]
+    public void Web6_candidate_result_refuses_extra_secret_or_raw_fields(string property)
+    {
+        var result = Web6Result(); result[property] = "secret";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(result, Web6Expected));
+    }
+
+    [Fact]
+    public void Web6_browser_count_requires_three_real_passes_without_skip_retry_or_extra_fields()
+    {
+        var count = JObject.Parse("{\"version\":2,\"discovered\":3,\"passed\":3,\"failed\":0,\"skipped\":0,\"interrupted\":0,\"retries\":0}");
+        Web6CandidateOracle.ValidateBrowserCount(count);
+        foreach (var name in new[] { "failed", "skipped", "interrupted", "retries" })
+        {
+            var changed = (JObject)count.DeepClone(); changed[name] = 1;
+            Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateBrowserCount(changed));
+        }
+        var secret = (JObject)count.DeepClone(); secret["token"] = "secret";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateBrowserCount(secret));
+    }
+
+    [Fact]
+    public void Web6_network_summary_is_strict_and_contains_no_raw_request_material()
+    {
+        var summary = JArray.Parse("[{\"method\":\"GET\",\"routeClass\":\"resend-eligibility\",\"status\":200,\"count\":1},{\"method\":\"POST\",\"routeClass\":\"sales-write\",\"status\":0,\"count\":1}]");
+        Web6CandidateOracle.ValidateNetwork(summary);
+        var secret = (JArray)summary.DeepClone(); secret[0]!["headers"] = "Bearer secret";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateNetwork(secret));
+        var raw = (JArray)summary.DeepClone(); raw[0]!["routeClass"] = "/api/v3/operations/secret-id/resend-eligibility";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateNetwork(raw));
+    }
+
+    [Fact]
+    public void Web6_candidate_disposition_requires_healthy_audit_and_unambiguous_cleanup()
+    {
+        Web6CandidateOracle.ValidateDisposition(auditHealthy: true, browserDrained: true, hostDrained: true, cleanupVerified: true);
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDisposition(false, true, true, true));
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDisposition(true, false, true, true));
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDisposition(true, true, false, true));
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDisposition(true, true, true, false));
+    }
+
+    [Theory]
+    [InlineData("verifyNotObserved", true)]
+    [InlineData("verifyCommitted", true)]
+    [InlineData("verifyOneEffect", true)]
+    [InlineData("candidateMismatchOn", true)]
+    [InlineData("candidateMismatchOff", true)]
+    [InlineData("eligibility401", true)]
+    [InlineData("eligibility500", true)]
+    [InlineData("eligibilityNormal", true)]
+    public void Web6_control_contract_accepts_only_fixed_candidate_actions(string action, bool requiresOperation)
+    {
+        var frame = new JObject { ["id"] = 1, ["token"] = "token", ["action"] = action };
+        if (requiresOperation)
+        {
+            frame["operation"] = new JObject { ["schemaVersion"] = 1 };
+            frame["operationId"] = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+        }
+        Assert.Equal(action, WebRecoveryPilotControl.Validate(frame, "token", web6: true));
+        frame["extra"] = true;
+        Assert.Throws<InvalidDataException>(() => WebRecoveryPilotControl.Validate(frame, "token", web6: true));
+    }
+
     [Fact]
     public void Committed_draft_create_matches_original_null_target_and_physical_journal() => Verify(Result());
 

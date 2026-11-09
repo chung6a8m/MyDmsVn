@@ -100,6 +100,8 @@ internal sealed class Web6CandidateFileSet
             "\ndistRootSha256=" + distHash + "\npublishedRootSha256=" + publishedHash + "\n";
     }
 
+    internal static string MeasureTree(string root) => HashTree(root);
+
     private static string HashTree(string root)
     {
         root = Web6CandidateFileSystem.CanonicalPath(root);

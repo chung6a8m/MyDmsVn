@@ -35,7 +35,14 @@ internal sealed class WebRecoveryPilotControl
     private readonly Web5NegativeSequence _raceSequence = new Web5NegativeSequence();
     private readonly List<(Guid Key, Web5OriginalFirstRace Race)> _races = new List<(Guid, Web5OriginalFirstRace)>();
     private Guid? _pendingRace;
-    private WebRecoveryPilotControl(string connectionString, bool web5) { _connectionString = connectionString; _web5 = web5; }
+    private readonly bool _web6;
+    private readonly string? _runtimeUser;
+    private readonly Dictionary<Guid, WebOperationHttpSqlTests.Intent> _web6Operations = new Dictionary<Guid, WebOperationHttpSqlTests.Intent>();
+    private Guid? _candidateMismatchOriginalEpoch;
+    private bool _eligibilityUserDisabled;
+    private bool _eligibilityJournalDenied;
+    private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null)
+    { _connectionString = connectionString; _web5 = web5; _web6 = web6; _runtimeUser = runtimeUser; }
     public Guid[] Epochs => _epochs.ToArray();
     public bool NegativeVerified => _negativeSequence.Complete && _negativeIdentities.Count == 6;
     public Web5NegativePilot.Identity[] NegativeIdentities => _negativeIdentities.ToArray();
@@ -51,6 +58,17 @@ internal sealed class WebRecoveryPilotControl
     public static async Task<WebRecoveryPilotControl> Start(string connectionString, bool web5 = false)
     {
         var control = new WebRecoveryPilotControl(connectionString, web5);
+        using (var sql = new SqlConnection(connectionString))
+            control._epochs.Add(await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;"));
+        control._serving = control.Serve();
+        return control;
+    }
+
+    public static async Task<WebRecoveryPilotControl> StartCandidate(string connectionString, string runtimeUser)
+    {
+        if (string.IsNullOrEmpty(runtimeUser) || !runtimeUser.All(character => char.IsLetterOrDigit(character) || character == '_'))
+            throw new ArgumentException("Candidate runtime identity is invalid.", nameof(runtimeUser));
+        var control = new WebRecoveryPilotControl(connectionString, web5: true, web6: true, runtimeUser: runtimeUser);
         using (var sql = new SqlConnection(connectionString))
             control._epochs.Add(await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;"));
         control._serving = control.Serve();
@@ -74,6 +92,22 @@ internal sealed class WebRecoveryPilotControl
         _stopped = true; _stop.Cancel();
         var failures = new List<Exception>();
         try { await _serving.ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+        if (_web6 && (_candidateMismatchOriginalEpoch.HasValue || _eligibilityUserDisabled || _eligibilityJournalDenied))
+        {
+            try
+            {
+                using var sql = new SqlConnection(_connectionString);
+                await sql.OpenAsync().ConfigureAwait(false);
+                if (_candidateMismatchOriginalEpoch.HasValue)
+                    await sql.ExecuteAsync("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@epoch WHERE Id=1;", new { epoch = _candidateMismatchOriginalEpoch.Value }).ConfigureAwait(false);
+                if (_eligibilityUserDisabled)
+                    await sql.ExecuteAsync("UPDATE dbo.Users SET IsActive=1 WHERE Username=N'integratedEditor' AND IsActive=0;").ConfigureAwait(false);
+                if (_eligibilityJournalDenied && _runtimeUser != null)
+                    await sql.ExecuteAsync("REVOKE SELECT ON dbo.WebOperationJournal TO [" + _runtimeUser + "];").ConfigureAwait(false);
+                _candidateMismatchOriginalEpoch = null; _eligibilityUserDisabled = false; _eligibilityJournalDenied = false;
+            }
+            catch (Exception error) { failures.Add(error); }
+        }
         if (_raceManifest != null)
         {
             var cleanup = Enumerable.Reverse(_races).Select(entry => (Func<Task>)(async () =>
@@ -92,7 +126,7 @@ internal sealed class WebRecoveryPilotControl
     {
         try
         {
-            for (var count = 0; count < (_raceManifest == null ? 32 : 64) && !_stop.IsCancellationRequested; count++)
+            for (var count = 0; count < (_web6 || _raceManifest != null ? 64 : 32) && !_stop.IsCancellationRequested; count++)
             {
                 using var identity = WindowsIdentity.GetCurrent();
                 var security = new PipeSecurity();
@@ -103,11 +137,94 @@ internal sealed class WebRecoveryPilotControl
                 using var close = _stop.Token.Register(() => pipe.Dispose());
                 await pipe.WaitForConnectionAsync(_stop.Token).ConfigureAwait(false);
                 var frame = await WebFrontendPortBridge.ReadFrame(pipe, _stop.Token).ConfigureAwait(false);
-                var action = Validate(frame, _token);
+                var action = Validate(frame, _token, _web6);
                 using var sql = new SqlConnection(_connectionString);
                 await sql.OpenAsync(_stop.Token).ConfigureAwait(false);
                 var reply = new JObject { ["id"] = frame["id"]!.DeepClone(), ["ok"] = true };
-                if (action == "rotateEpoch")
+                if (action == "verifyNotObserved" || action == "verifyCommitted" || action == "verifyOneEffect")
+                {
+                    if (!_web6) throw new InvalidDataException("Candidate control is not enabled.");
+                    var frozen = (JObject)frame["operation"]!;
+                    var actor = await sql.QuerySingleAsync<int>(new SqlTestCommand("SELECT UserId FROM dbo.Users WHERE Username=N'integratedEditor';", cancellationToken: _stop.Token));
+                    var epoch = await sql.QuerySingleAsync<Guid>(new SqlTestCommand("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;", cancellationToken: _stop.Token));
+                    var candidateIntent = Web5NegativePilot.Validate(frozen, actor, action == "verifyNotObserved" ? epoch : _epochs[0]);
+                    var operationId = Guid.ParseExact((string)frame["operationId"]!, "D");
+                    if (candidateIntent.Key != operationId) throw new InvalidDataException("Candidate operation identity changed.");
+                    var journal = await sql.QuerySingleAsync<int>(new SqlTestCommand(
+                        "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE ActorUserId=@actor AND OperationId=@operation;",
+                        new { actor, operation = operationId }, cancellationToken: _stop.Token));
+                    if (action == "verifyNotObserved")
+                    {
+                        if (journal != 0 || _web6Operations.ContainsKey(operationId)) throw new InvalidDataException("Candidate pre-observation cut is not empty.");
+                        _web6Operations.Add(operationId, candidateIntent);
+                    }
+                    else if (action == "verifyCommitted")
+                    {
+                        if (journal != 1 || (_web6Operations.TryGetValue(operationId, out var previous) && previous.Kind != candidateIntent.Kind))
+                            throw new InvalidDataException("Candidate committed identity is missing or duplicated.");
+                        if (!_web6Operations.ContainsKey(operationId)) _web6Operations.Add(operationId, candidateIntent);
+                        await Web6CandidateOracle.VerifyOneEffectAsync(sql, operationId, _stop.Token);
+                    }
+                    else
+                    {
+                        if (!_web6Operations.TryGetValue(operationId, out var expected) || expected.Kind != candidateIntent.Kind || journal != 1)
+                            throw new InvalidDataException("Candidate committed identity is missing or duplicated.");
+                        await Web6CandidateOracle.VerifyOneEffectAsync(sql, operationId, _stop.Token);
+                    }
+                }
+                else if (action == "candidateMismatchOn" || action == "candidateMismatchOff")
+                {
+                    if (!_web6) throw new InvalidDataException("Candidate control is not enabled.");
+                    if (action == "candidateMismatchOn")
+                    {
+                        if (_candidateMismatchOriginalEpoch.HasValue) throw new InvalidDataException("Candidate mismatch is already armed.");
+                        var previous = await sql.QuerySingleAsync<Guid>(new SqlTestCommand("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;", cancellationToken: _stop.Token));
+                        var next = Guid.NewGuid();
+                        if (await sql.ExecuteAsync(new SqlTestCommand("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@next WHERE Id=1 AND DeploymentEpoch=@previous;",
+                            new { next, previous }, cancellationToken: _stop.Token)) != 1) throw new InvalidDataException("Candidate mismatch fence changed.");
+                        _candidateMismatchOriginalEpoch = previous;
+                    }
+                    else
+                    {
+                        if (!_candidateMismatchOriginalEpoch.HasValue) throw new InvalidDataException("Candidate mismatch is not armed.");
+                        if (await sql.ExecuteAsync(new SqlTestCommand("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@previous WHERE Id=1;",
+                            new { previous = _candidateMismatchOriginalEpoch.Value }, cancellationToken: _stop.Token)) != 1)
+                            throw new InvalidDataException("Candidate mismatch fence could not be restored.");
+                        _candidateMismatchOriginalEpoch = null;
+                    }
+                }
+                else if (action == "eligibility401" || action == "eligibility500" || action == "eligibilityNormal")
+                {
+                    if (!_web6 || _runtimeUser == null) throw new InvalidDataException("Candidate control is not enabled.");
+                    if (action == "eligibility401")
+                    {
+                        if (_eligibilityUserDisabled || await sql.ExecuteAsync(new SqlTestCommand(
+                            "UPDATE dbo.Users SET IsActive=0 WHERE Username=N'integratedEditor' AND IsActive=1;", cancellationToken: _stop.Token)) != 1)
+                            throw new InvalidDataException("Candidate user state changed.");
+                        _eligibilityUserDisabled = true;
+                    }
+                    else if (action == "eligibility500")
+                    {
+                        if (_eligibilityJournalDenied) throw new InvalidDataException("Candidate SQL failure is already armed.");
+                        await sql.ExecuteAsync(new SqlTestCommand("DENY SELECT ON dbo.WebOperationJournal TO [" + _runtimeUser + "];", cancellationToken: _stop.Token));
+                        _eligibilityJournalDenied = true;
+                    }
+                    else
+                    {
+                        if (_eligibilityUserDisabled)
+                        {
+                            if (await sql.ExecuteAsync(new SqlTestCommand("UPDATE dbo.Users SET IsActive=1 WHERE Username=N'integratedEditor' AND IsActive=0;", cancellationToken: _stop.Token)) != 1)
+                                throw new InvalidDataException("Candidate user state could not be restored.");
+                            _eligibilityUserDisabled = false;
+                        }
+                        if (_eligibilityJournalDenied)
+                        {
+                            await sql.ExecuteAsync(new SqlTestCommand("REVOKE SELECT ON dbo.WebOperationJournal TO [" + _runtimeUser + "];", cancellationToken: _stop.Token));
+                            _eligibilityJournalDenied = false;
+                        }
+                    }
+                }
+                else if (action == "rotateEpoch")
                 {
                     if (_epochs.Count != 1) throw new InvalidDataException("Recovery fixture permits one epoch rotation.");
                     var next = Guid.NewGuid();
@@ -162,9 +279,11 @@ internal sealed class WebRecoveryPilotControl
                 else
                 {
                     var changed = await sql.ExecuteAsync(new SqlTestCommand(
-                        "UPDATE p SET Granted=@granted FROM dbo.UserPermissions p JOIN dbo.Users u ON u.UserId=p.UserId WHERE u.Username=N'integratedEditor' AND p.PermissionKey=N'Sales.Receipts.Write';",
+                        _web6
+                            ? "UPDATE p SET Granted=@granted FROM dbo.UserPermissions p JOIN dbo.Users u ON u.UserId=p.UserId WHERE u.Username=N'integratedEditor' AND p.PermissionKey IN (N'Sales.Receipts.Write',N'Inventory.GoodsReceipts.Write');"
+                            : "UPDATE p SET Granted=@granted FROM dbo.UserPermissions p JOIN dbo.Users u ON u.UserId=p.UserId WHERE u.Username=N'integratedEditor' AND p.PermissionKey=N'Sales.Receipts.Write';",
                         new { granted = (bool)frame["granted"]! }, cancellationToken: _stop.Token));
-                    if (changed != 1) throw new InvalidDataException("Recovery fixture permission owner missing.");
+                    if (changed != (_web6 ? 2 : 1)) throw new InvalidDataException("Recovery fixture permission owner missing.");
                 }
                 await WebFrontendPortBridge.WriteFrame(pipe, reply, _stop.Token).ConfigureAwait(false);
                 if (action == "armOriginal") Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ArmReplySent);
@@ -177,16 +296,25 @@ internal sealed class WebRecoveryPilotControl
         catch { if (_raceManifest != null) Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ControlFailed); throw; }
     }
 
-    internal static string Validate(JObject frame, string token)
+    internal static string Validate(JObject frame, string token, bool web6 = false)
     {
         var action = frame["action"]?.Type == JTokenType.String ? (string)frame["action"]! : "";
-        var keys = action == "setWritePermission" ? new[] { "id", "token", "action", "granted" } : action == "resolveNegative" || action == "armOriginal" ? new[] { "id", "token", "action", "operation" } : action == "verifyNegative" || action == "waitOriginal" || action == "releaseOriginal" ? new[] { "id", "token", "action", "operationId" } : new[] { "id", "token", "action" };
+        var web6Action = action == "verifyNotObserved" || action == "verifyCommitted" || action == "verifyOneEffect" ||
+            action == "candidateMismatchOn" || action == "candidateMismatchOff" || action == "eligibility401" ||
+            action == "eligibility500" || action == "eligibilityNormal";
+        var keys = web6Action ? new[] { "id", "token", "action", "operation", "operationId" } :
+            action == "setWritePermission" ? new[] { "id", "token", "action", "granted" } :
+            action == "resolveNegative" || action == "armOriginal" ? new[] { "id", "token", "action", "operation" } :
+            action == "verifyNegative" || action == "waitOriginal" || action == "releaseOriginal" ? new[] { "id", "token", "action", "operationId" } :
+            new[] { "id", "token", "action" };
         if (!frame.Properties().Select(p => p.Name).OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(keys.OrderBy(x => x, StringComparer.Ordinal)) ||
             frame["id"]?.Type != JTokenType.Integer || (long)frame["id"]! <= 0 ||
             frame["token"]?.Type != JTokenType.String || (string)frame["token"]! != token ||
-            (action != "rotateEpoch" && action != "setWritePermission" && action != "resolveNegative" && action != "verifyNegative" && action != "armOriginal" && action != "waitOriginal" && action != "releaseOriginal") ||
+            (action != "rotateEpoch" && action != "setWritePermission" && action != "resolveNegative" && action != "verifyNegative" && action != "armOriginal" && action != "waitOriginal" && action != "releaseOriginal" && !(web6 && web6Action)) ||
             ((action == "resolveNegative" || action == "armOriginal") && frame["operation"] is not JObject) ||
             ((action == "verifyNegative" || action == "waitOriginal" || action == "releaseOriginal") && (frame["operationId"]?.Type != JTokenType.String || !Guid.TryParseExact((string?)frame["operationId"], "D", out var operationId) || operationId.ToString("D") != (string?)frame["operationId"])) ||
+            (web6Action && (frame["operation"] is not JObject || frame["operationId"]?.Type != JTokenType.String ||
+                !Guid.TryParseExact((string?)frame["operationId"], "D", out var web6OperationId) || web6OperationId.ToString("D") != (string?)frame["operationId"])) ||
             (action == "setWritePermission" && frame["granted"]?.Type != JTokenType.Boolean))
             throw new InvalidDataException("Invalid recovery fixture control request.");
         return action;

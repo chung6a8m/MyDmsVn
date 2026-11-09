@@ -8,6 +8,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.AccessControl;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,6 +18,7 @@ using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.DbMigrator;
 using MyDmsVn.Server.Application.Identity;
 using MyDmsVn.Server.Infrastructure.Identity;
+using MyDmsVn.Server.Infrastructure.Operations;
 using MyDmsVn.Server.Infrastructure.Persistence;
 using MyDmsVn.Testing.Sql;
 using MyDmsVn.Desktop.Tests;
@@ -59,11 +61,17 @@ public sealed partial class WebHostIisExpressTests
     [WebAttendedSqlFact, Trait("Category", "WebAttendedFixture")]
     public Task WEB5_attended_local_fixture() => Run(true, integratedPilot: true, web5Pilot: true, attended: true);
 
+    [Web6CandidateSqlFact, Trait("Category", "Web6PairedCandidate")]
+    public Task Web6_paired_candidate_runs_six_manual_resends_in_real_browsers_and_SQL() =>
+        Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true, web5Pilot: true, web6Candidate: true);
+
     private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false,
-        bool web5Pilot = false, bool attended = false, bool originalFirstPilot = false, bool admissionOnly = false)
+        bool web5Pilot = false, bool attended = false, bool originalFirstPilot = false, bool admissionOnly = false, bool web6Candidate = false)
     {
         GuiTestSafety.ThrowIfPoisoned();
-        if (browser && !attended) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
+        if (web6Candidate && (!browser || !receiptPilot || !integratedPilot || !recoveryPilot || !web5Pilot || attended || originalFirstPilot || admissionOnly))
+            throw new InvalidOperationException("WEB6 candidate requires the exact paired browser fixture.");
+        if (browser && !attended && !web6Candidate) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
         var published = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY");
         var thumbprint = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_TLS_THUMBPRINT");
         Assert.False(string.IsNullOrWhiteSpace(published));
@@ -81,8 +89,12 @@ public sealed partial class WebHostIisExpressTests
         var login = new OwnedLogin(admin);
         Process? process = null;
         Web5IisExpressIdentity? hostIdentity = null;
+        Web6CandidateManifest? candidateManifest = null;
+        Web6CandidateInputs? candidateInputs = null;
+        string? candidateSqlReceipt = null;
         var failures = new List<Exception>();
         var drained = true;
+        var candidateBrowserValidated = false;
         int customer = 0, warehouse = 0, employee = 0, product = 0, receiptProduct = 0;
         IntegratedCatalog? integrated = null;
         try
@@ -115,6 +127,42 @@ public sealed partial class WebHostIisExpressTests
             var runDirectory = Path.Combine(Path.GetDirectoryName(published!)!, "iis-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(runDirectory);
             var configuration = CreateConfiguration(runDirectory, published!);
+            if (web6Candidate)
+            {
+                var backendRoot = Path.GetDirectoryName(FindRootFile("CleanArchitecture.sln"))!;
+                var frontendRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
+                var backendIdentity = GitIdentity(backendRoot);
+                var frontendIdentity = GitIdentity(frontendRoot);
+                var certificateHash = CertificateHash(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_TLS_THUMBPRINT")!);
+                candidateInputs = new Web6CandidateInputs(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!,
+                    backendIdentity, frontendIdentity, SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(),
+                    new Uri("https://localhost:44321/"), certificateHash, "Web6PairedCandidate", 600, 60);
+                var candidateRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ROOT")!);
+                if (Directory.Exists(candidateRoot) || File.Exists(candidateRoot)) throw new InvalidOperationException("WEB6 candidate root must be create-new.");
+                candidateManifest = Web6CandidateManifest.CreateNew(candidateRoot, candidateInputs);
+                using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+                using (new FileStream(candidateManifest.AuditPath, FileMode.CreateNew, FileSystemRights.FullControl, FileShare.Read,
+                    4096, FileOptions.WriteThrough, SqlTestPrivateRecord.FileAcl(identity.User!))) { }
+                using (var ownership = new SqlConnection(database.ConnectionString))
+                {
+                    await ownership.OpenAsync();
+                    await database.VerifyOwnershipAsync(ownership, CancellationToken.None);
+                    Assert.Equal(SqlSchemaDefinitionFingerprint.Schema13,
+                        await SqlSchemaDefinitionFingerprint.ReadAsync(ownership, CancellationToken.None));
+                    var server = await ownership.QuerySingleAsync<string>("SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName'));");
+                    candidateSqlReceipt = HashText(database.DatabaseName + "\n" + server + "\n" + SqlSchemaDefinitionFingerprint.Schema13);
+                }
+                var backendLocks = Directory.GetFiles(backendRoot, "packages.lock.json", SearchOption.AllDirectories)
+                    .Where(path => !path.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj" or ".git"))
+                    .Select(path => path.Substring(backendRoot.Length + 1)).ToArray();
+                var files = new Web6CandidateFileSet(Path.Combine(published!, "bin", "MyDmsVn.Server.HttpHost.dll"),
+                    Path.Combine(published!, "Web.config"), configuration, backendRoot, backendLocks,
+                    Path.Combine(frontendRoot, "package-lock.json"), Path.Combine(backendRoot, "docs", "contracts", "web4-v1"),
+                    Path.Combine(backendRoot, "docs", "contracts", "web5-resolution-v1"),
+                    Path.Combine(backendRoot, "docs", "contracts", "web6-resend-eligibility-v1"),
+                    Path.Combine(frontendRoot, "dist"), Path.Combine(published!, "wwwroot"));
+                candidateManifest.SealArtifacts(files, candidateSqlReceipt);
+            }
             var start = new ProcessStartInfo(executable, "/config:\"" + configuration + "\" /site:Web2Smoke /systray:false")
             {
                 UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
@@ -132,6 +180,16 @@ public sealed partial class WebHostIisExpressTests
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_KEYS"] = "smoke:" + Convert.ToBase64String(key);
             start.EnvironmentVariables["MYDMSVN_WEB_SQL_CONNECTION_STRING"] = login.ConnectionString(database.DatabaseName);
             start.EnvironmentVariables["MYDMSVN_WEB_SUPERUSER_USERNAME"] = "web.smoke";
+            if (web6Candidate)
+            {
+                var candidateRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ROOT")!);
+                var auditPath = Path.Combine(candidateRoot, "security-audit.log");
+                Assert.True(Directory.Exists(candidateRoot) && File.Exists(auditPath), "WEB6 candidate audit storage must be pre-provisioned.");
+                start.EnvironmentVariables["MYDMSVN_WEB6_RESEND_ELIGIBILITY"] = "receipt-v1";
+                start.EnvironmentVariables["MYDMSVN_WEB6_CANDIDATE_ID"] = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!;
+                start.EnvironmentVariables["MYDMSVN_WEB6_CANDIDATE_ROOT"] = candidateRoot;
+                start.EnvironmentVariables["MYDMSVN_WEB_SECURITY_AUDIT_PATH"] = auditPath;
+            }
             process = new Process { StartInfo = start };
             process.OutputDataReceived += (_, _) => { }; process.ErrorDataReceived += (_, _) => { };
             Assert.True(process.Start()); drained = false;
@@ -139,6 +197,17 @@ public sealed partial class WebHostIisExpressTests
             hostIdentity = Web5IisExpressHostAdmission.Capture(process, configuration, "Web2Smoke", new Uri("https://localhost:44321/"));
             await Web5IisExpressHostAdmission.WaitForAdmissionAsync(
                 hostIdentity, process, TimeSpan.FromSeconds(45), CancellationToken.None);
+            if (web6Candidate)
+            {
+                var queue = await Web5IisExpressHostAdmission.VerifyAsync(hostIdentity, CancellationToken.None);
+                candidateManifest!.VerifyBeforeAdmission(process.Id, process.StartTime.ToUniversalTime(), queue.Name, () =>
+                    new Web6CandidateObservation((candidateInputs!.Backend.Sha, candidateInputs.Backend.Tree, true),
+                        (candidateInputs.Frontend.Sha, candidateInputs.Frontend.Tree, true),
+                        SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(), candidateInputs.CertificateHash,
+                        candidateSqlReceipt, new[] { queue }, new Web6CandidateAuditLaunch(process.Id,
+                            process.StartTime.ToUniversalTime(), Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ROOT")!),
+                            candidateManifest.AuditPath, candidateInputs.CandidateId)));
+            }
             Reply? health = null;
             var deadline = DateTime.UtcNow.AddSeconds(45);
             while (DateTime.UtcNow < deadline && !process.HasExited)
@@ -171,7 +240,9 @@ public sealed partial class WebHostIisExpressTests
                 if (attended)
                     await Web5AttendedLease.Wait(process, attendedDirectory!, attendedPassword!, TimeSpan.FromMinutes(30), CancellationToken.None);
                 else
-                    await RunBrowser(database, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated, recoveryPilot, web5Pilot, originalFirstPilot);
+                    await RunBrowser(database, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated,
+                        recoveryPilot, web5Pilot, originalFirstPilot, web6Candidate, login.Name,
+                        web6Candidate ? () => candidateBrowserValidated = true : null);
             }
             else
             {
@@ -311,7 +382,23 @@ public sealed partial class WebHostIisExpressTests
             }
             else if (failures.Count == 0)
                 failures.Add(new InvalidOperationException("Fixture cleanup was not admitted; resources retained."));
+            if (candidateManifest != null)
+            {
+                try
+                {
+                    candidateManifest.RecordDisposition(Web6CandidateStage.Chromium,
+                        failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
+                    candidateManifest.RecordDisposition(Web6CandidateStage.Edge,
+                        failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
+                    candidateManifest.RecordDisposition(Web6CandidateStage.Cleanup,
+                        failures.Count == 0 && drained ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Quarantined);
+                }
+                catch (Exception error) { failures.Add(error); }
+                finally { candidateManifest.Dispose(); }
+            }
         }
+        if (web6Candidate && failures.Count == 0)
+            Web6CandidateOracle.ValidateDisposition(candidateBrowserValidated, browserDrained: true, hostDrained: drained, cleanupVerified: true);
         if (failures.Count > 0) throw new AggregateException("Packaged host scenario or owned cleanup failed.", failures);
     }
 
@@ -377,6 +464,18 @@ public sealed partial class WebHostIisExpressTests
                 Skip = "Original-first fixture requires explicit opt-in, private parent directory and browser checkout.";
         }
     }
+    private sealed class Web6CandidateSqlFactAttribute : WebHostSqlFactAttribute
+    {
+        public Web6CandidateSqlFactAttribute()
+        {
+            foreach (var variable in new[] { "MYDMSVN_WEB6_CANDIDATE_ENABLE", "MYDMSVN_WEB6_CANDIDATE_ROOT",
+                "MYDMSVN_WEB6_CANDIDATE_ID", "MYDMSVN_WEB_TEST_BROWSER_DIRECTORY" })
+                if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(variable)))
+                    Skip = "WEB6 paired candidate requires explicit frontend, candidate root/identity, browser and owned IIS Express/SQL opt-in.";
+            if (Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ENABLE") != "1")
+                Skip = "WEB6 paired candidate requires exact explicit nonproduction opt-in.";
+        }
+    }
 
     private const string BrowserPassword = "BrowserPilot_test-only-password_2026!";
     private static async Task SeedBrowserActors(SqlConnection connection)
@@ -408,7 +507,8 @@ public sealed partial class WebHostIisExpressTests
         }
     }
 
-    private static async Task RunBrowser(SqlTestDatabase database, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot, bool web5Pilot, bool originalFirstPilot)
+    private static async Task RunBrowser(SqlTestDatabase database, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot, bool web5Pilot, bool originalFirstPilot,
+        bool web6Candidate = false, string? runtimeUser = null, Action? candidateValidated = null)
     {
         var connectionString = database.ConnectionString;
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
@@ -422,6 +522,7 @@ public sealed partial class WebHostIisExpressTests
         object Actor(string username) => new { username, password = BrowserPassword };
         var manifest = new { origin = "https://localhost:44321", actors = new { alice = Actor("alice"), bob = Actor("bob"), poster = Actor("poster") }, catalog = new { customerId = customer, warehouseId = warehouse, employeeId = employee, productId = product }, resultPath };
         var manifestJson = JObject.FromObject(manifest);
+        Web6CandidateExpected? web6Expected = null;
         if (receiptProduct != 0)
         {
             Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web3-receipt-live.spec.ts")));
@@ -441,13 +542,58 @@ public sealed partial class WebHostIisExpressTests
         {
             Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web4-recovery-live.spec.ts")));
             if (web5Pilot) Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web5-resolution-live.spec.ts")));
-            recovery = originalFirstPilot ? await WebRecoveryPilotControl.StartOriginalFirst(database, Environment.GetEnvironmentVariable("MYDMSVN_WEB5_RACE_PARENT_DIRECTORY")!) : await WebRecoveryPilotControl.Start(connectionString, web5Pilot);
+            recovery = web6Candidate ? await WebRecoveryPilotControl.StartCandidate(connectionString, runtimeUser!) :
+                originalFirstPilot ? await WebRecoveryPilotControl.StartOriginalFirst(database, Environment.GetEnvironmentVariable("MYDMSVN_WEB5_RACE_PARENT_DIRECTORY")!) :
+                await WebRecoveryPilotControl.Start(connectionString, web5Pilot);
             manifestJson["mode"] = web5Pilot ? "web5-recovery" : "web4-recovery";
             manifestJson["recovery"] = recovery.Manifest;
             if (originalFirstPilot) manifestJson["recovery"]!["originalFirst"] = true;
         }
+        if (web6Candidate)
+        {
+            Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web6-manual-resend-live.spec.ts")));
+            var frontendSha = GitHead(checkout);
+            var backendSha = GitHead(FindRootFile("CleanArchitecture.sln"), fileIsRootMarker: true);
+            var sourceDist = Path.Combine(checkout, "dist");
+            var publishedDist = Path.Combine(Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY")!), "wwwroot");
+            var sourceHash = Web6CandidateFileSet.MeasureTree(sourceDist);
+            var publishedHash = Web6CandidateFileSet.MeasureTree(publishedDist);
+            Assert.Equal(sourceHash, publishedHash);
+            web6Expected = new Web6CandidateExpected(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!,
+                frontendSha, backendSha, sourceHash);
+            manifestJson["version"] = 2;
+            manifestJson["mode"] = "web6-candidate";
+            manifestJson["candidateId"] = web6Expected.CandidateId;
+            manifestJson["frontendSourceSha"] = web6Expected.FrontendSourceSha;
+            manifestJson["backendSourceSha"] = web6Expected.BackendSourceSha;
+            manifestJson["frontendDistManifestSha256"] = web6Expected.FrontendDistManifestSha256;
+        }
         Exception? browserFailure = null;
         var browserDrained = true;
+        async Task<GuiProcessResult> ExecuteBrowser(string project, string outputName)
+        {
+            var start = new ProcessStartInfo(node, "\"" + cli + "\" test --config playwright.pilot.config.ts --workers=1 --max-failures=1 --project=" + project)
+            { WorkingDirectory = checkout, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
+            foreach (var name in start.EnvironmentVariables.Keys.Cast<string>().Where(name => name.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase)).ToArray())
+                start.EnvironmentVariables.Remove(name);
+            start.EnvironmentVariables["MYDMSVN_WEB_PILOT_MANIFEST"] = manifestPath;
+            start.EnvironmentVariables["NODE_EXTRA_CA_CERTS"] = certificatePath;
+            try
+            {
+                browserDrained = false;
+                var executed = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5));
+                browserDrained = true;
+                File.WriteAllText(Path.Combine(runDirectory, outputName), Sanitize(recovery?.Redact(executed.StandardOutput + executed.StandardError) ?? executed.StandardOutput + executed.StandardError), new UTF8Encoding(false));
+                Assert.True(executed.ExitCode == 0, "Browser pilot failed; inspect the sanitized local browser output (redact before sharing).");
+                return executed;
+            }
+            catch (GuiProcessException error)
+            {
+                browserDrained = error.CleanupVerified;
+                File.WriteAllText(Path.Combine(runDirectory, outputName), Sanitize(recovery?.Redact(error.StandardOutput + error.StandardError) ?? error.StandardOutput + error.StandardError), new UTF8Encoding(false));
+                throw new InvalidOperationException("Browser process failed; cleanup verified=" + error.CleanupVerified + ". Inspect the sanitized local browser output.");
+            }
+        }
         try
         {
             File.WriteAllText(manifestPath, manifestJson.ToString(Formatting.None), new UTF8Encoding(false));
@@ -460,26 +606,33 @@ public sealed partial class WebHostIisExpressTests
                 Assert.True(chain.Build(certificate), "The explicitly pinned local certificate must already be OS-trusted.");
                 File.WriteAllText(certificatePath, "-----BEGIN CERTIFICATE-----\n" + Convert.ToBase64String(certificate.Export(X509ContentType.Cert), Base64FormattingOptions.InsertLineBreaks) + "\n-----END CERTIFICATE-----\n", new UTF8Encoding(false));
             }
-            var project = Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT");
-            Assert.Contains(project, new[] { "chromium", "edge" });
-            var start = new ProcessStartInfo(node, "\"" + cli + "\" test --config playwright.pilot.config.ts --workers=1 --max-failures=1 --project=" + project)
-            { WorkingDirectory = checkout, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
-            foreach (var name in start.EnvironmentVariables.Keys.Cast<string>().Where(name => name.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase)).ToArray())
-                start.EnvironmentVariables.Remove(name);
-            start.EnvironmentVariables["MYDMSVN_WEB_PILOT_MANIFEST"] = manifestPath;
-            // Node uses its own CA set; add only the already trusted explicit fixture cert.
-            // The real browser keeps ordinary platform TLS verification; neither ignores errors.
-            start.EnvironmentVariables["NODE_EXTRA_CA_CERTS"] = certificatePath;
-            GuiProcessResult result;
-            try { browserDrained = false; result = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5)); browserDrained = true; }
-            catch (GuiProcessException error)
+            if (web6Candidate)
             {
-                browserDrained = error.CleanupVerified;
-                File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(recovery?.Redact(error.StandardOutput + error.StandardError) ?? error.StandardOutput + error.StandardError), new UTF8Encoding(false));
-                throw new InvalidOperationException("Browser process failed; cleanup verified=" + error.CleanupVerified + ". Inspect the sanitized local browser-output.log.");
+                foreach (var project in new[] { "chromium", "edge" })
+                {
+                    foreach (var path in new[] { resultPath, Path.Combine(runDirectory, "browser-count.json"), Path.Combine(runDirectory, "browser-network.json") })
+                        if (File.Exists(path)) File.Delete(path);
+                    await ExecuteBrowser(project, "browser-output-" + project + ".log");
+                    var countPath = Path.Combine(runDirectory, "browser-count.json");
+                    if (!File.Exists(countPath) || new FileInfo(countPath).Length > 1024) throw new InvalidDataException("Missing or oversized WEB6 browser count.");
+                    var count = JObject.Parse(File.ReadAllText(countPath), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+                    Web6CandidateOracle.ValidateBrowserCount(count);
+                    var candidateResult = JObject.Parse(File.ReadAllText(resultPath), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+                    await Web6CandidateOracle.VerifySqlAsync(connectionString, candidateResult, web6Expected!, CancellationToken.None);
+                    var networkPath = Path.Combine(runDirectory, "browser-network.json");
+                    if (!File.Exists(networkPath) || new FileInfo(networkPath).Length > 16384) throw new InvalidDataException("Missing or oversized WEB6 network summary.");
+                    Web6CandidateOracle.ValidateNetwork(JArray.Parse(File.ReadAllText(networkPath), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error }));
+                    Console.WriteLine("WEB6_BROWSER_COUNT browser=" + project + " " + count.ToString(Formatting.None));
+                }
+                await recovery!.Stop(browserDrained);
+                var health = await Request("https://localhost:44321/api/v1/health", Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_TLS_THUMBPRINT")!);
+                if (health.Status != 200 || !browserDrained) throw new InvalidDataException("WEB6 audit readiness or browser drain failed.");
+                candidateValidated?.Invoke();
+                return;
             }
-            File.WriteAllText(Path.Combine(runDirectory, "browser-output.log"), Sanitize(recovery?.Redact(result.StandardOutput + result.StandardError) ?? result.StandardOutput + result.StandardError), new UTF8Encoding(false));
-            Assert.True(result.ExitCode == 0, "Browser pilot failed; inspect the local browser-output.log (redact before sharing).");
+            var selectedProject = Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT");
+            Assert.Contains(selectedProject, new[] { "chromium", "edge" });
+            await ExecuteBrowser(selectedProject!, "browser-output.log");
             if (recovery != null)
             {
                 await recovery.Stop(browserDrained);
@@ -605,6 +758,42 @@ public sealed partial class WebHostIisExpressTests
     private static string Sanitize(string output) => Regex.Replace(
         Regex.Replace(output.Replace(BrowserPassword, "<redacted>"), "(?i)(authorization: Bearer )[^\\s]+", "$1<redacted>"),
         "(?i)(__Host-mydmsvn-rt=)[^;\\s]+", "$1<redacted>");
+    private static string GitHead(string path, bool fileIsRootMarker = false)
+    {
+        var root = fileIsRootMarker ? Path.GetDirectoryName(path)! : path;
+        if (Git(root, "status --porcelain").Length != 0) throw new InvalidOperationException("Candidate source tree must be clean.");
+        var sha = Git(root, "rev-parse HEAD");
+        return Web6CandidateInputs.RequireHash(sha, 40);
+    }
+    private static (string Sha, string Tree) GitIdentity(string root) =>
+        (GitHead(root), Web6CandidateInputs.RequireHash(Git(root, "rev-parse HEAD^{tree}"), 40));
+    private static string Git(string root, string arguments)
+    {
+        var start = new ProcessStartInfo("git", "-C \"" + root + "\" " + arguments)
+        {
+            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardOutput = true, RedirectStandardError = true,
+        };
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Git source proof could not start.");
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
+        if (!process.WaitForExit(10000) || process.ExitCode != 0 || error.Length != 0)
+            throw new InvalidOperationException("Git source proof failed.");
+        return output.Trim();
+    }
+    private static string CertificateHash(string thumbprint)
+    {
+        using var certificates = new X509Store(StoreName.My, StoreLocation.LocalMachine);
+        certificates.Open(OpenFlags.ReadOnly);
+        using var certificate = certificates.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false).Cast<X509Certificate2>().Single();
+        using var sha = SHA256.Create();
+        return BitConverter.ToString(sha.ComputeHash(certificate.Export(X509ContentType.Cert))).Replace("-", "").ToLowerInvariant();
+    }
+    private static string HashText(string value)
+    {
+        using var sha = SHA256.Create();
+        return BitConverter.ToString(sha.ComputeHash(new UTF8Encoding(false, true).GetBytes(value))).Replace("-", "").ToLowerInvariant();
+    }
     private static void AssertRefreshCookie(Reply reply, bool cleared)
     {
         Assert.NotNull(reply.SetCookie);
