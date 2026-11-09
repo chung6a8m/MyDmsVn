@@ -39,7 +39,7 @@ internal sealed class WebRecoveryPilotControl
     private readonly string? _runtimeUser;
     private readonly Dictionary<Guid, WebOperationHttpSqlTests.Intent> _web6Operations = new Dictionary<Guid, WebOperationHttpSqlTests.Intent>();
     private readonly Web6CandidateHostMismatch? _candidateMismatch;
-    private Func<string, Guid?, Task<JObject>>? _cutover;
+    private Func<string, Guid?, JObject?, Task<JObject>>? _cutover;
     private bool _eligibilityUserDisabled;
     private bool _eligibilityJournalDenied;
     private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null, Web6CandidateHostMismatch? candidateMismatch = null)
@@ -77,7 +77,7 @@ internal sealed class WebRecoveryPilotControl
         return control;
     }
 
-    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<string, Guid?, Task<JObject>> handler)
+    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<string, Guid?, JObject?, Task<JObject>> handler)
     {
         var control = new WebRecoveryPilotControl("", web5: true, web6: true);
         control._cutover = handler ?? throw new ArgumentNullException(nameof(handler));
@@ -150,7 +150,7 @@ internal sealed class WebRecoveryPilotControl
                 if (_cutover != null)
                 {
                     var cutoverAction = Web6CutoverControl.Validate(frame, _token);
-                    var cutoverReply = await _cutover(cutoverAction, frame["operationId"] == null ? (Guid?)null : Guid.ParseExact((string)frame["operationId"]!, "D")).ConfigureAwait(false);
+                    var cutoverReply = await _cutover(cutoverAction, frame["operationId"] == null ? (Guid?)null : Guid.ParseExact((string)frame["operationId"]!, "D"), frame["committedSetup"] as JObject).ConfigureAwait(false);
                     cutoverReply["id"] = frame["id"]!.DeepClone(); cutoverReply["ok"] = true;
                     await WebFrontendPortBridge.WriteFrame(pipe, cutoverReply, _stop.Token).ConfigureAwait(false);
                     continue;

@@ -80,7 +80,7 @@ internal sealed class Web6CutoverArchive
     internal string ArtifactHash { get; }
 }
 
-internal enum Web6CutoverPair { Current, Old }
+internal enum Web6CutoverPair { Current, Old, Restored }
 
 internal sealed class Web6CandidateCutoverPlan
 {
@@ -91,7 +91,7 @@ internal sealed class Web6CandidateCutoverPlan
         Uri currentOrigin, Uri oldOrigin, string frontendArchiveSha, string frontendArchiveTree,
         string frontendArtifactHash, string backendArchiveSha, string backendArchiveTree,
         string backendArtifactHash, string currentArtifactHash, int currentSchema, int oldSchema,
-        string currentDatabaseReceipt, string oldDatabaseReceipt, Guid currentEpoch, Guid restoredEpoch)
+        string currentDatabaseReceipt, string oldDatabaseReceipt, string restoredDatabaseReceipt, Guid currentEpoch, Guid restoredEpoch)
     {
         CurrentPairId = RequireIdentity(currentPairId);
         OldPairId = RequireIdentity(oldPairId);
@@ -114,7 +114,8 @@ internal sealed class Web6CandidateCutoverPlan
         OldSchema = oldSchema;
         CurrentDatabaseReceipt = Web6CandidateInputs.RequireHash(currentDatabaseReceipt);
         OldDatabaseReceipt = Web6CandidateInputs.RequireHash(oldDatabaseReceipt);
-        if (CurrentDatabaseReceipt == OldDatabaseReceipt)
+        RestoredDatabaseReceipt = Web6CandidateInputs.RequireHash(restoredDatabaseReceipt);
+        if (new[] { CurrentDatabaseReceipt, OldDatabaseReceipt, RestoredDatabaseReceipt }.Distinct(StringComparer.Ordinal).Count() != 3)
             throw new ArgumentException("Cutover database allocations must be distinct.");
         if (currentEpoch == Guid.Empty || restoredEpoch == Guid.Empty || currentEpoch == restoredEpoch)
             throw new ArgumentException("Cutover restore must rotate the deployment epoch.");
@@ -136,6 +137,7 @@ internal sealed class Web6CandidateCutoverPlan
     internal int OldSchema { get; }
     internal string CurrentDatabaseReceipt { get; }
     internal string OldDatabaseReceipt { get; }
+    internal string RestoredDatabaseReceipt { get; }
     internal Guid CurrentEpoch { get; }
     internal Guid RestoredEpoch { get; }
     internal string CurrentCandidateId => CurrentPairId;
@@ -165,6 +167,7 @@ internal sealed class Web6CandidateCutoverPlan
         ["backendWeb4ArtifactSha256"] = OldArtifactHash,
         ["currentDatabaseOwnershipReceiptSha256"] = CurrentDatabaseReceipt,
         ["oldDatabaseOwnershipReceiptSha256"] = OldDatabaseReceipt,
+        ["restoredDatabaseOwnershipReceiptSha256"] = RestoredDatabaseReceipt,
         ["currentSchema"] = CurrentSchema,
         ["oldSchema"] = OldSchema,
         ["currentDeploymentEpoch"] = CurrentEpoch.ToString("D"),
@@ -236,17 +239,18 @@ internal sealed class Web6CandidateCutoverCoordinator
         if (ActivePair.HasValue) throw new InvalidOperationException("Cutover must drain the active pair before switching.");
         if (observation == null || observation.Controllers != 1 || observation.Workers != 1 || !observation.QueueOwned)
             throw new IOException("Cutover requires one owned controller, worker and request queue.");
-        var current = pair == Web6CutoverPair.Current;
+        var current = pair != Web6CutoverPair.Old;
         var expectedOrigin = current ? _plan.CurrentOrigin : _plan.OldOrigin;
         var expectedSchema = current ? _plan.CurrentSchema : _plan.OldSchema;
-        var expectedReceipt = current ? _plan.CurrentDatabaseReceipt : _plan.OldDatabaseReceipt;
+        var expectedReceipt = pair == Web6CutoverPair.Restored ? _plan.RestoredDatabaseReceipt : current ? _plan.CurrentDatabaseReceipt : _plan.OldDatabaseReceipt;
         var expectedArtifact = current ? _plan.CurrentArtifactHash : _plan.OldArtifactHash;
-        var expectedEpoch = current ? _epoch : Guid.Empty;
+        var expectedEpoch = pair == Web6CutoverPair.Restored ? _plan.RestoredEpoch : current ? _plan.CurrentEpoch : Guid.Empty;
         if (observation.Origin != expectedOrigin || observation.Schema != expectedSchema ||
             observation.DatabaseReceipt != expectedReceipt || observation.ArtifactHash != expectedArtifact ||
             observation.Epoch != expectedEpoch)
             throw new IOException("Cutover pair admission evidence does not match its pinned artifact, schema, database or epoch.");
         ActivePair = pair;
+        _epoch = expectedEpoch;
     }
 
     internal void Drain(Web6CutoverPair pair, bool workerExited, bool queueAbsent)
@@ -264,9 +268,9 @@ internal sealed class Web6CandidateCutoverCoordinator
 
     internal void Restore(Guid restoredEpoch)
     {
-        if (ActivePair != Web6CutoverPair.Current || restoredEpoch != _plan.RestoredEpoch || restoredEpoch == _epoch)
+        if (ActivePair != Web6CutoverPair.Restored || restoredEpoch != _plan.RestoredEpoch || restoredEpoch != _epoch)
             throw new IOException("Restore must rotate to the pinned fresh deployment epoch.");
-        _epoch = restoredEpoch;
+        // Epoch belongs to the admitted allocation; never mutate current authority.
     }
 
     internal bool IsEpochCurrent(Guid epoch) => epoch == _epoch;
@@ -468,6 +472,7 @@ internal static class Web6CutoverControl
         var cleanupGrant = action == "revokeGrantOff" && frame["operationId"] == null;
         var expected = PairActions.Contains(action) || cleanupGrant
             ? new[] { "id", "token", "action" }
+            : action == "committedUnavailable" ? new[] { "id", "token", "action", "operationId", "committedSetup" }
             : OperationActions.Contains(action) ? new[] { "id", "token", "action", "operationId" } : Array.Empty<string>();
         if (expected.Length == 0 || !frame.Properties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
             .SequenceEqual(expected.OrderBy(name => name, StringComparer.Ordinal)))
@@ -475,6 +480,7 @@ internal static class Web6CutoverControl
         if (OperationActions.Contains(action) && !cleanupGrant && (frame["operationId"]?.Type != JTokenType.String ||
             !Guid.TryParseExact((string)frame["operationId"]!, "D", out var operation) || operation == Guid.Empty))
             throw new InvalidDataException("Invalid WEB6 cutover control frame.");
+        if (action == "committedUnavailable") Web6CommittedSetup.Parse(frame["committedSetup"] as JObject, Guid.ParseExact((string)frame["operationId"]!, "D"));
         return action;
     }
 }

@@ -525,26 +525,33 @@ public sealed partial class WebHostIisExpressTests
         var controlParent = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_SQL_CONTROL_PARENT"));
         await Web6CutoverSqlApproval.VerifyFileAsync(Path.GetFullPath(Required("MYDMSVN_SQL_TEST_APPROVAL_FILE")),
             admin, CancellationToken.None).ConfigureAwait(false);
-        SqlTestDatabase? currentDatabase = null, oldDatabase = null;
-        SqlTestOwnershipManifest? currentControl = null, oldControl = null;
+        SqlTestDatabase? currentDatabase = null, oldDatabase = null, restoredDatabase = null;
+        SqlTestOwnershipManifest? currentControl = null, oldControl = null, restoredControl = null;
         var complete = false;
         LiveCutoverOperations? operations = null;
-        var currentRecorded = false; var oldRecorded = false;
+        var currentRecorded = false; var oldRecorded = false; var restoredRecorded = false;
         try
         {
             await Web6CutoverLifetime.Run(async () =>
             {
             currentControl = SqlTestOwnershipManifest.Create(controlParent);
             oldControl = SqlTestOwnershipManifest.Create(controlParent);
+            restoredControl = SqlTestOwnershipManifest.Create(controlParent);
             currentDatabase = await SqlTestDatabase.CreateAsync(admin).ConfigureAwait(false);
             oldDatabase = await SqlTestDatabase.CreateAsync(admin).ConfigureAwait(false);
-            if (currentDatabase.DatabaseName == oldDatabase.DatabaseName) throw new InvalidOperationException("Cutover SQL allocations collided.");
+            restoredDatabase = await SqlTestDatabase.CreateAsync(admin).ConfigureAwait(false);
+            if (new[] { currentDatabase.DatabaseName, oldDatabase.DatabaseName, restoredDatabase.DatabaseName }.Distinct(StringComparer.OrdinalIgnoreCase).Count() != 3) throw new InvalidOperationException("Cutover SQL allocations collided.");
             if (!new DatabaseMigrationRunner().MigrateWeb5(currentDatabase.ConnectionString).Successful ||
-                !new DatabaseMigrationRunner().MigrateWeb(oldDatabase.ConnectionString).Successful)
+                !new DatabaseMigrationRunner().MigrateWeb(oldDatabase.ConnectionString).Successful ||
+                !new DatabaseMigrationRunner().MigrateWeb5(restoredDatabase.ConnectionString).Successful)
                 throw new InvalidOperationException("Cutover SQL migrations failed.");
             using (var currentSql = new SqlConnection(currentDatabase.ConnectionString))
             using (var oldSql = new SqlConnection(oldDatabase.ConnectionString))
+            using (var restoredSql = new SqlConnection(restoredDatabase.ConnectionString))
             {
+                await restoredSql.OpenAsync().ConfigureAwait(false);
+                await restoredDatabase.VerifyOwnershipAsync(restoredSql, CancellationToken.None).ConfigureAwait(false);
+                Web6CutoverSqlApproval.RequireSchema(await SqlSchemaDefinitionFingerprint.ReadAsync(restoredSql, CancellationToken.None).ConfigureAwait(false), SqlSchemaDefinitionFingerprint.Schema13);
                 await currentSql.OpenAsync().ConfigureAwait(false); await oldSql.OpenAsync().ConfigureAwait(false);
                 await currentDatabase.VerifyOwnershipAsync(currentSql, CancellationToken.None).ConfigureAwait(false);
                 await oldDatabase.VerifyOwnershipAsync(oldSql, CancellationToken.None).ConfigureAwait(false);
@@ -559,6 +566,10 @@ public sealed partial class WebHostIisExpressTests
             currentRecorded = true;
             await oldDatabase.WriteOwnershipManifestAsync(oldControl, CancellationToken.None).ConfigureAwait(false);
             oldRecorded = true;
+            await restoredDatabase.WriteOwnershipManifestAsync(restoredControl, CancellationToken.None).ConfigureAwait(false);
+            restoredRecorded = true;
+            var restoredReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(restoredControl, restoredControl.VerifiedDigest(),
+                SqlSchemaDefinitionFingerprint.Schema13, "restored-allocation").Digest;
             var currentReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(currentControl, currentControl.VerifiedDigest(),
                 SqlSchemaDefinitionFingerprint.Schema13, "current-allocation").Digest;
             var oldReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(oldControl, oldControl.VerifiedDigest(),
@@ -567,10 +578,10 @@ public sealed partial class WebHostIisExpressTests
                 new Uri("https://localhost:44321/"), new Uri("https://localhost:44322/"),
                 frontendIdentity.Sha, frontendIdentity.Tree, frontendArtifact,
                 backendIdentity.Sha, backendIdentity.Tree, oldArtifact, currentArtifact,
-                13, 12, currentReceipt, oldReceipt, currentEpoch, restoredEpoch);
+                13, 12, currentReceipt, oldReceipt, restoredReceipt, currentEpoch, restoredEpoch);
             plan.VerifyArchives(new Web6CutoverArchive(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact),
                 new Web6CutoverArchive(backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact));
-            operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, currentControl, oldControl);
+            operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl);
             await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None).ConfigureAwait(false);
             complete = true;
             }, async () => operations == null || await operations.Cleanup().ConfigureAwait(false), new Func<Task>[]
@@ -587,10 +598,16 @@ public sealed partial class WebHostIisExpressTests
                     await oldDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
                     if (oldRecorded) await oldDatabase.CompleteOwnershipManifestAsync(oldControl!, CancellationToken.None).ConfigureAwait(false);
                 },
+                async () =>
+                {
+                    if (restoredDatabase == null) return;
+                    await restoredDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
+                    if (restoredRecorded) await restoredDatabase.CompleteOwnershipManifestAsync(restoredControl!, CancellationToken.None).ConfigureAwait(false);
+                },
             }).ConfigureAwait(false);
             if (complete) operations!.VerifyFinalDisposition();
         }
-        finally { currentControl?.Dispose(); oldControl?.Dispose(); operations?.DisposeManifests(); }
+        finally { currentControl?.Dispose(); oldControl?.Dispose(); restoredControl?.Dispose(); operations?.DisposeManifests(); }
     }
     private static async Task SeedBrowserActors(SqlConnection connection)
     {

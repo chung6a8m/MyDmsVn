@@ -10,6 +10,8 @@ internal interface IWeb6CutoverRuntime
 {
     Task Switch(Web6CutoverPair pair, bool cached, Guid epoch);
     Task VerifyOperation(Guid operation, bool committed);
+    Task VerifyCommittedSetup(Web6CommittedSetup proof);
+    Task VerifyLifecycle();
     Task SetGrant(bool granted);
     Task MakeCommittedUnavailable(Guid operation);
     Task VerifyZeroMutation(Guid operation);
@@ -28,10 +30,17 @@ internal sealed class Web6CutoverSession
     { _plan = plan; _runtime = runtime; _epoch = plan.CurrentEpoch; }
     internal Task Begin() => _runtime.Switch(Web6CutoverPair.Current, false, _epoch);
 
-    internal async Task<JObject> Handle(string action, Guid? operation)
+    internal Web6CommittedSetup? CommittedSetup { get; private set; }
+
+    internal async Task<JObject> Handle(string action, Guid? operation, JObject? committedSetup = null)
     {
         var reply = new JObject();
         Guid Required() => operation.HasValue && operation != Guid.Empty ? operation.Value : throw new InvalidDataException("Cutover operation is required.");
+        if (action != "committedUnavailable")
+        {
+            if (committedSetup != null) throw new InvalidDataException("Unexpected committed proof.");
+            await _runtime.VerifyLifecycle();
+        }
         switch (action)
         {
             case "oldClientNewHostOn":
@@ -61,25 +70,28 @@ internal sealed class Web6CutoverSession
                 if (_revoked) { await _runtime.SetGrant(true); _revoked = false; _observed.Add("grant-restored"); }
                 break;
             case "committedUnavailable":
-                // Never manufacture COMMITTED for the frontend's pre-dispatch aborted operation.
-                await _runtime.VerifyOperation(Required(), true);
-                await _runtime.MakeCommittedUnavailable(Required()); _observed.Add("unavailable"); break;
+                if (CommittedSetup != null || _cached || _old || _protectedOperation.HasValue) throw new InvalidDataException("Committed setup order changed.");
+                var proof = Web6CommittedSetup.Parse(committedSetup, Required());
+                await _runtime.VerifyCommittedSetup(proof);
+                await _runtime.MakeCommittedUnavailable(Required());
+                CommittedSetup = proof; _observed.Add("unavailable"); reply["marker"] = "committed-unavailable"; break;
             case "restoreEpoch":
                 if (_protectedOperation != Required() || !_observed.Contains("restart") || _epoch != _plan.CurrentEpoch)
                     throw new InvalidDataException("Cutover restore order or identity changed.");
-                await _runtime.Switch(Web6CutoverPair.Current, false, _plan.RestoredEpoch);
+                await _runtime.Switch(Web6CutoverPair.Restored, false, _plan.RestoredEpoch);
                 _epoch = _plan.RestoredEpoch; _observed.Add("restore"); reply["deploymentEpoch"] = _epoch.ToString("D"); break;
             case "verifyNoCutoverMutation":
                 await _runtime.VerifyZeroMutation(Required());
-                _observed.Add(_cached ? "old-client" : _old ? "old-host" : _protectedOperation == operation && _epoch == _plan.RestoredEpoch ? "protected" : "invalid"); break;
+                _observed.Add(_cached ? "old-client" : _old ? "old-host" : CommittedSetup?.Operation == operation ? "committed" : _protectedOperation == operation && _epoch == _plan.RestoredEpoch ? "protected" : "invalid"); break;
             default: throw new InvalidDataException("Unknown cutover action.");
         }
+        await _runtime.VerifyLifecycle();
         return reply;
     }
 
     internal void VerifyComplete()
     {
-        if (_revoked || _cached || _old || !_observed.SetEquals(new[] { "old-client", "old-host", "restart", "revoke", "grant-restored", "unavailable", "restore", "protected" }))
+        if (CommittedSetup == null || _revoked || _cached || _old || !_observed.SetEquals(new[] { "old-client", "old-host", "restart", "revoke", "grant-restored", "unavailable", "committed", "restore", "protected" }))
             throw new InvalidDataException("Cutover admissions, transitions and zero-mutation evidence are incomplete.");
     }
 }
@@ -97,7 +109,7 @@ internal static class Web6CutoverLifetime
         try
         {
             drained = await drain().ConfigureAwait(false);
-            if (!drained) throw new IOException("Cutover drain is uncertain; both allocations remain quarantined.");
+            if (!drained) throw new IOException("Cutover drain is uncertain; all allocations remain quarantined.");
         }
         catch (Exception failure) { failures.Add(failure); }
         if (drained)

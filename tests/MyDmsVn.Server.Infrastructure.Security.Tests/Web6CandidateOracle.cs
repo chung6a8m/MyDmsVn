@@ -220,7 +220,7 @@ WHERE j.OperationId=@operation;", new { operation = operationId }, cancellationT
         }
     }
 
-    internal static async Task VerifyOneEffectAsync(SqlConnection sql, Guid operationId, CancellationToken cancellationToken)
+    internal static async Task VerifyOneEffectAsync(SqlConnection sql, Guid operationId, CancellationToken cancellationToken, byte[]? retainedCanonicalResult = null)
     {
         var count = await sql.QuerySingleAsync<int>(new SqlTestCommand(
             "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE OperationId=@operation AND Disposition='COMMITTED';",
@@ -231,8 +231,24 @@ SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.Res
 FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation;",
             new { operation = operationId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         await VerifyPhysicalEffect(sql, row, null, cancellationToken).ConfigureAwait(false);
-        var envelope = ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes);
+        var envelope = ValidateCanonicalResultBytes(row.OperationKind, retainedCanonicalResult ?? row.ResultBytes);
         await VerifyResultProjection(sql, row, envelope, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static async Task<long> VerifyCommittedSetupAsync(SqlConnection sql, Web6CommittedSetup proof, Guid epoch)
+    {
+        var rows = (await sql.QueryAsync<JournalRow>(@"
+SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes
+FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation;",
+            new { operation = proof.Operation })).ToArray();
+        if (rows.Length != 1) throw Invalid();
+        var row = rows[0];
+        proof.VerifyJournal(row.OperationId, row.OperationKind, ToHex(row.RequestFingerprint), row.DeploymentEpoch, epoch,
+            row.Disposition, row.Actor, row.RequestTargetId, row.ResultDocumentId);
+        var envelope = ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes);
+        await VerifyPhysicalEffect(sql, row, null, CancellationToken.None);
+        await VerifyResultProjection(sql, row, envelope, CancellationToken.None);
+        return row.ResultDocumentId;
     }
 
     private static async Task VerifyResultProjection(SqlConnection sql, JournalRow row, JObject envelope, CancellationToken cancellationToken)
@@ -393,6 +409,21 @@ internal static class Web6CutoverOracle
         var markers = checks.Select(token => token.Type == JTokenType.String ? (string?)token : null).ToArray();
         if (markers.Length != Checks.Length || markers.Any(marker => marker == null) || markers.Distinct(StringComparer.Ordinal).Count() != Checks.Length ||
             !new HashSet<string>(markers!, StringComparer.Ordinal).SetEquals(Checks))
+            throw Invalid();
+    }
+
+    internal static void ValidateSetupEvidence(Web6CommittedSetup? browserProof, Web6CommittedSetup? sqlProof, bool restoredAdmitted)
+    {
+        if (browserProof == null || sqlProof == null || browserProof.Operation != sqlProof.Operation ||
+            browserProof.Fingerprint != sqlProof.Fingerprint || !restoredAdmitted) throw Invalid();
+    }
+
+    internal static void ValidateAllocationDisposition(Web6CandidateCutoverPlan plan,
+        IReadOnlyCollection<Web6CommittedSetup> verifiedSetups, int restoredAdmissions, int currentReadmissions)
+    {
+        if (verifiedSetups.Count != 2 || verifiedSetups.Select(p => p.Operation).Distinct().Count() != 2 ||
+            restoredAdmissions != 2 || currentReadmissions != 1 ||
+            new[] { plan.CurrentDatabaseReceipt, plan.OldDatabaseReceipt, plan.RestoredDatabaseReceipt }.Distinct(StringComparer.Ordinal).Count() != 3)
             throw Invalid();
     }
 
