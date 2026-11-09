@@ -157,6 +157,22 @@ public sealed class Web6ResendEligibilityEndpointTests
         Assert.Equal(1, probe.EligibilityReads);
     }
 
+    [Fact]
+    public async Task Receipt_expiring_during_protected_read_denies_even_when_resolution_is_returned()
+    {
+        using var probe = new Probe
+        {
+            ExpireDuringEligibilityRead = true,
+            Resolution = Resolution("COMMITTED", result: true)
+        };
+        var receipt = await probe.Receipt();
+        using var response = await probe.Eligibility(receipt);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(Compact(Corpus("eligibility-expired-during-read.json")),
+            Compact(await response.Content.ReadAsStringAsync()));
+        Assert.Equal(1, probe.EligibilityReads);
+    }
+
     [Theory]
     [InlineData("missing")]
     [InlineData("duplicate")]
