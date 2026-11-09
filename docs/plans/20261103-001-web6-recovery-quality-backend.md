@@ -59,7 +59,7 @@ Implement a **separate executable operator CLI**, preferably a small `net48` con
 
 **Exit:** executable help, deterministic testable results, protected SQL tests and attended simulated operator run; capability is not an operator production release.
 
-**B02b candidate checkpoint (2026-11-03):** guarded dry-run/typed execute, restricted-principal Release EXE, transaction/readback and focused six-kind/race/oracle tests are implemented and locally SQL-verified at the source recorded in [B02b evidence](../evidence/web6/20261103-b02b-operator-decision.md). B6-OPS-03/04 remain **BLOCKED** because protected exact-HEAD SQL CI and Owner acceptance are NOT RUN; the actual CLI provider Commit-ambiguity fault was not injected through an unsafe production test hook. This checkpoint does not enable resend or complete B02/B03.
+**B02b candidate checkpoint (2026-11-03; hosted follow-up 2026-11-09):** guarded dry-run/typed execute, restricted-principal Release EXE, transaction/readback and focused six-kind/race/oracle tests are implemented and locally SQL-verified at the source recorded in [B02b evidence](../evidence/web6/20261103-b02b-operator-decision.md). The protected `40630d6` run passed exact 59+40+26+2 hosted tests with zero fail/skip/retry, but PowerShell 7 JSON identity conversion quarantined the owned instance before verified removal; the workflow-only fix awaits a newly authorized exact-HEAD rerun. B6-OPS-03/04 remain **BLOCKED**. The actual CLI provider Commit-ambiguity fault was not injected through an unsafe production test hook; evidence recommends a bounded Owner-accepted gap, not provider-specific PASS. This checkpoint does not enable resend or complete B02/B03.
 
 ## 4. B03 — Maintenance, recovery, audit and restoration (WEB6-03)
 

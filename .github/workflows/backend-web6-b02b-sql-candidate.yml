@@ -152,7 +152,8 @@ jobs:
           $summary | Add-Member -NotePropertyName retry -NotePropertyValue 0; [IO.File]::WriteAllText("$env:WEB6_SAFE/races.json",($summary|ConvertTo-Json -Depth 5 -Compress)+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
           if ($testExit -ne 0) { throw 'Race test process failed.' }
           Remove-Item -LiteralPath ($env:WEB6_STATE+'.active')
-          & ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+          powershell -NoProfile -File ../control/.github/scripts/Web5SqlInstance.ps1 -Action Check -StatePath $env:WEB6_STATE -SummaryPath "$env:WEB6_SAFE/instance.json" -TestSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'B02b SQL/process owners did not drain.' }
       - name: Verify exact candidate source remained unchanged
         run: |
           git -C candidate diff --exit-code --quiet
