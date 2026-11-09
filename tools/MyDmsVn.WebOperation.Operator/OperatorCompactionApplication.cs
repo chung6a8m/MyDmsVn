@@ -12,6 +12,7 @@ public static class OperatorCompactionApplication
     public const string ConnectionStringEnvironmentVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_CONNECTION_STRING";
     public const string DatabaseUserEnvironmentVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_DATABASE_USER";
     public const string LoginEnvironmentVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_LOGIN";
+    public const string TargetIdentityEnvironmentVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_TARGET_IDENTITY";
     private const string TargetUsage = " --environment <label> --database <name> --current-epoch <guid> --stored-epoch <guid> --actor <id> --operation <guid-v4> --fingerprint <sha256> --correlation <guid-v4> --case <id> [--timeout-seconds <1..25>]";
 
     public static async Task<int> RunAsync(string[] args, Func<CompactOptions, IOperatorCompactionClient> clientFactory,
@@ -32,6 +33,7 @@ public static class OperatorCompactionApplication
             stdout.WriteLine("Use lowercase GUIDs and SHA-256.");
             stdout.WriteLine("Dedicated connection: " + ConnectionStringEnvironmentVariable);
             stdout.WriteLine("Expected identity: " + DatabaseUserEnvironmentVariable + " and " + LoginEnvironmentVariable);
+            stdout.WriteLine("Expected owned target: " + TargetIdentityEnvironmentVariable);
             return (int)OperatorExitCode.Completed;
         }
         if (options.Execute)

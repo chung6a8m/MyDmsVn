@@ -39,7 +39,8 @@ internal static class Program
                     _ => new SqlOperatorCompactionClient(new MaintenanceSqlConnectionFactory(
                         Environment.GetEnvironmentVariable(OperatorCompactionApplication.ConnectionStringEnvironmentVariable),
                         Environment.GetEnvironmentVariable(OperatorCompactionApplication.DatabaseUserEnvironmentVariable),
-                        Environment.GetEnvironmentVariable(OperatorCompactionApplication.LoginEnvironmentVariable))),
+                        Environment.GetEnvironmentVariable(OperatorCompactionApplication.LoginEnvironmentVariable),
+                        Environment.GetEnvironmentVariable(OperatorCompactionApplication.TargetIdentityEnvironmentVariable))),
                     Console.Out, Console.Error, stop.Token).GetAwaiter().GetResult();
             if (args.Length > 0 && args[0] == "record-not-executed")
                 return OperatorDecisionApplication.RunAsync(args,

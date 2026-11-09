@@ -42,7 +42,7 @@ END;
 SELECT COALESCE((
     SELECT CASE
         WHEN Disposition='COMMITTED' AND ResultBytes IS NOT NULL AND ResultExpiresAtUtc<=SYSUTCDATETIME() THEN 1
-        WHEN Disposition='EXPIRED' AND ResultBytes IS NULL AND ResultExpiresAtUtc IS NOT NULL THEN 2
+        WHEN Disposition='EXPIRED' AND ResultBytes IS NULL AND ResultExpiresAtUtc<=SYSUTCDATETIME() THEN 2
         ELSE 0 END
     FROM dbo.WebOperationJournal
     WHERE ActorUserId=@actor AND OperationId=@operation AND DeploymentEpoch=@storedEpoch AND RequestFingerprint=@fingerprint

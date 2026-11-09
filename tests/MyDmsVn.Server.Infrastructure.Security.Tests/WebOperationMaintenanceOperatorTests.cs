@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -23,6 +25,7 @@ public sealed class WebOperationMaintenanceOperatorTests
     private const string Operation = "c23e4567-e89b-42d3-a456-426614174000";
     private const string Correlation = "d23e4567-e89b-42d3-a456-426614174000";
     private const string Fingerprint = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    private const string TargetIdentityVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_TARGET_IDENTITY";
     private const string Confirmation = "compact-execute|environment=owned-test|database=MyDmsVn_Test_Maintenance" +
         "|current-epoch=" + CurrentEpoch + "|stored-epoch=" + StoredEpoch + "|actor=42|operation=" + Operation +
         "|fingerprint=" + Fingerprint + "|correlation=" + Correlation + "|case=case-123|timeout-seconds=15";
@@ -270,6 +273,102 @@ public sealed class WebOperationMaintenanceOperatorTests
             Assert.Equal((int)OperatorExitCode.Denied, (await RunReleaseAsync(args, scenario, maintenance)).ExitCode);
         });
 
+    [Fact]
+    public void Maintenance_target_digest_has_a_canonical_vector()
+    {
+        const string expected = "8b53d905d15b0d0ac0855a6428d8934ab17e14bfff8a832123a5bdf8679a2a6e";
+        var owner = (Server: @"NODE-Å\SQL", Id: 42, CreatedAt: new DateTime(2026, 11, 9, 1, 23, 45).AddTicks(6789012),
+            Token: "0123456789abcdef0123456789abcdef");
+        Assert.Equal(expected, OwnerTargetDigest("MyDmsVn_Test_Vector", owner));
+        Assert.Equal(expected, Hex(MaintenanceSqlConnectionFactory.ComputeTargetIdentity("owned-test", "MyDmsVn_Test_Vector",
+            owner.Server, owner.Id, owner.CreatedAt, owner.Token)));
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Maintenance_factory_rejects_same_names_with_wrong_owned_target_identity() =>
+        OwnedPrincipals(async (scenario, principals) =>
+        {
+            await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+            var operation = await SeedAsync(scenario, scenario.Epoch, elapsed: true);
+            var args = SqlArguments(scenario, scenario.Epoch, operation);
+            var maintenance = principals.Maintenance;
+            var before = await SnapshotAsync(scenario.Observer);
+            Assert.Equal((int)OperatorExitCode.Preview, (await RunReleaseAsync(args, scenario, maintenance)).ExitCode);
+
+            var owner = principals.Allocation;
+            var wrongIdentities = new[]
+            {
+                OwnerTargetDigest(scenario.Database.DatabaseName, (owner.Server + "-other", owner.Id, owner.CreatedAt, owner.Token)),
+                OwnerTargetDigest(scenario.Database.DatabaseName, (owner.Server, owner.Id + 1, owner.CreatedAt, owner.Token)),
+                OwnerTargetDigest(scenario.Database.DatabaseName, (owner.Server, owner.Id, owner.CreatedAt.AddSeconds(1), owner.Token)),
+                OwnerTargetDigest(scenario.Database.DatabaseName, (owner.Server, owner.Id, owner.CreatedAt, Guid.NewGuid().ToString("N"))),
+                string.Empty,
+                new string('A', 64),
+                new string('a', 63)
+            };
+            foreach (var wrongIdentity in wrongIdentities)
+            {
+                var denied = await RunReleaseAsync(args, scenario, maintenance, expectedTargetIdentity: wrongIdentity);
+                Assert.Equal((int)OperatorExitCode.Denied, denied.ExitCode);
+                Assert.Empty(denied.StandardOutput);
+                Assert.Equal("status=DENIED" + Environment.NewLine, denied.StandardError);
+            }
+            Assert.Equal((int)OperatorExitCode.Denied,
+                (await RunReleaseAsync(Replace(args, "--environment", "other-test"), scenario, maintenance)).ExitCode);
+            Assert.Equal(before, await SnapshotAsync(scenario.Observer));
+        });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Release_preview_denies_impersonate_permission_on_another_owned_login() =>
+        OwnedPrincipals(async (scenario, principals) =>
+        {
+            await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+            var operation = await SeedAsync(scenario, scenario.Epoch, elapsed: true);
+            var args = SqlArguments(scenario, scenario.Epoch, operation);
+            var maintenance = principals.Maintenance;
+            Assert.Equal((int)OperatorExitCode.Preview, (await RunReleaseAsync(args, scenario, maintenance)).ExitCode);
+            using var master = new SqlConnection(new SqlConnectionStringBuilder(scenario.Database.ConnectionString)
+            {
+                InitialCatalog = "master",
+                Pooling = false
+            }.ConnectionString);
+            await master.OpenAsync(scenario.Stop.Token);
+            var securable = "IMPERSONATE ON LOGIN::" + principals.Migration.Identifier;
+            await master.ExecuteAsync("GRANT " + securable + " TO " + maintenance.Identifier + ";");
+            try
+            {
+                using (var granted = await maintenance.OpenAsync(scenario))
+                    Assert.Equal(1, await granted.QuerySingleAsync<int>("SELECT HAS_PERMS_BY_NAME(@name,N'LOGIN',N'IMPERSONATE');",
+                        new { name = principals.Migration.Name }));
+                var denied = await RunReleaseAsync(args, scenario, maintenance);
+                Assert.Equal((int)OperatorExitCode.Denied, denied.ExitCode);
+                Assert.Equal("status=DENIED" + Environment.NewLine, denied.StandardError);
+                Assert.Empty(denied.StandardOutput);
+            }
+            finally
+            {
+                await master.ExecuteAsync("REVOKE " + securable + " FROM " + maintenance.Identifier + ";");
+            }
+        });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Compact_preview_denies_future_expired_tombstone() =>
+        OwnedPrincipals(async (scenario, principals) =>
+        {
+            await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+            var operation = Guid.NewGuid();
+            await scenario.Observer.ExecuteAsync(
+                "DECLARE @now datetime2(7)=SYSUTCDATETIME(); " +
+                "INSERT dbo.WebOperationJournal VALUES(@actor,@operation,@epoch,1,1,1,NULL,@hash,41,'EXPIRED',NULL,@now,@now,DATEADD(day,7,@now));",
+                new { scenario.Actor, operation, scenario.Epoch, hash = FingerprintBytes() });
+            var before = await SnapshotAsync(scenario.Observer);
+            var denied = await RunReleaseAsync(SqlArguments(scenario, scenario.Epoch, operation), scenario, principals.Maintenance);
+            Assert.Equal((int)OperatorExitCode.Denied, denied.ExitCode);
+            Assert.Equal("status=DENIED" + Environment.NewLine, denied.StandardError);
+            Assert.Empty(denied.StandardOutput);
+            Assert.Equal(before, await SnapshotAsync(scenario.Observer));
+        });
+
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Release_preview_uses_only_the_dedicated_maintenance_environment() =>
         OwnedPrincipals(async (scenario, principals) =>
@@ -288,7 +387,10 @@ public sealed class WebOperationMaintenanceOperatorTests
             var before = await SnapshotAsync(scenario.Observer);
             var args = SqlArguments(scenario, storedEpoch, operation);
 
-            var missing = await RunReleaseAsync(args, scenario, maintenance: null, operatorOnly: principals.Maintenance);
+            var missingTarget = await RunReleaseAsync(args, scenario, maintenance: null, operatorOnly: principals.Maintenance);
+            Assert.Equal((int)OperatorExitCode.Denied, missingTarget.ExitCode);
+            var missing = await RunReleaseAsync(args, scenario, maintenance: null, operatorOnly: principals.Maintenance,
+                expectedTargetIdentity: principals.Maintenance.TargetIdentity);
             Assert.Equal((int)OperatorExitCode.EnvironmentFailure, missing.ExitCode);
             Assert.Empty(missing.StandardOutput);
             var preview = await RunReleaseAsync(args, scenario, principals.Maintenance, principals.Operator);
@@ -385,6 +487,24 @@ public sealed class WebOperationMaintenanceOperatorTests
 
     private static string Hex(byte[] bytes) => string.Concat(bytes.Select(value => value.ToString("x2", CultureInfo.InvariantCulture)));
 
+    private static string OwnerTargetDigest(string database, (string Server, int Id, DateTime CreatedAt, string Token) owner)
+    {
+        var fields = new[]
+        {
+            "mydmsvn-maintenance-target-v1", "owned-test", database, owner.Server,
+            owner.Id.ToString(CultureInfo.InvariantCulture), owner.CreatedAt.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff", CultureInfo.InvariantCulture),
+            owner.Token
+        };
+        var canonical = fields.SelectMany(field =>
+        {
+            var bytes = Encoding.UTF8.GetBytes(field);
+            var length = bytes.Length;
+            return new[] { (byte)(length >> 24), (byte)(length >> 16), (byte)(length >> 8), (byte)length }.Concat(bytes);
+        }).ToArray();
+        using var sha256 = SHA256.Create();
+        return Hex(sha256.ComputeHash(canonical));
+    }
+
     private static string[] SqlArguments(Scenario scenario, Guid storedEpoch, Guid operation)
     {
         var args = Replace(Valid(), "--database", scenario.Database.DatabaseName);
@@ -410,7 +530,7 @@ public sealed class WebOperationMaintenanceOperatorTests
     }
 
     private static async Task<GuiProcessResult> RunReleaseAsync(string[] args, Scenario scenario, TestPrincipal? maintenance,
-        TestPrincipal? operatorOnly = null, string? expectedUser = null, string? expectedLogin = null)
+        TestPrincipal? operatorOnly = null, string? expectedUser = null, string? expectedLogin = null, string? expectedTargetIdentity = null)
     {
         var executable = Path.Combine(AppContext.BaseDirectory, "MyDmsVn.WebOperation.Operator.exe");
         Assert.True(File.Exists(executable));
@@ -427,6 +547,7 @@ public sealed class WebOperationMaintenanceOperatorTests
             OperatorCompactionApplication.ConnectionStringEnvironmentVariable,
             OperatorCompactionApplication.DatabaseUserEnvironmentVariable,
             OperatorCompactionApplication.LoginEnvironmentVariable,
+            TargetIdentityVariable,
             OperatorInspectApplication.ConnectionStringEnvironmentVariable,
             OperatorInspectApplication.DatabaseUserEnvironmentVariable,
             OperatorInspectApplication.LoginEnvironmentVariable
@@ -438,6 +559,9 @@ public sealed class WebOperationMaintenanceOperatorTests
             environment[OperatorCompactionApplication.DatabaseUserEnvironmentVariable] = expectedUser ?? maintenance.Name;
             environment[OperatorCompactionApplication.LoginEnvironmentVariable] = expectedLogin ?? maintenance.Name;
         }
+        var targetIdentity = expectedTargetIdentity ?? maintenance?.TargetIdentity;
+        if (!string.IsNullOrEmpty(targetIdentity))
+            environment[TargetIdentityVariable] = targetIdentity;
         if (operatorOnly != null)
         {
             environment[OperatorInspectApplication.ConnectionStringEnvironmentVariable] = operatorOnly.ConnectionString(scenario);
@@ -452,13 +576,19 @@ public sealed class WebOperationMaintenanceOperatorTests
         public TestPrincipal Maintenance { get; } = new TestPrincipal();
         public TestPrincipal Operator { get; } = new TestPrincipal();
         public TestPrincipal Runtime { get; } = new TestPrincipal();
-        private TestPrincipal Migration { get; } = new TestPrincipal();
+        public TestPrincipal Migration { get; } = new TestPrincipal();
+        public (string Server, int Id, DateTime CreatedAt, string Token) Allocation { get; private set; }
 
         public async Task CreateAsync(Scenario scenario)
         {
             await scenario.Database.VerifyOwnershipAsync(scenario.Observer, scenario.Stop.Token);
+            Allocation = await scenario.Observer.QuerySingleAsync<(string, int, DateTime, string)>(
+                "SELECT CONVERT(nvarchar(128),SERVERPROPERTY(N'ServerName')), database_id, create_date, " +
+                "(SELECT CONVERT(nvarchar(128),value) FROM sys.extended_properties WHERE class=0 AND name=N'MyDmsVn.TestOwnership') " +
+                "FROM sys.databases WHERE name=@database;", new { database = scenario.Database.DatabaseName });
+            var ownerDigest = OwnerTargetDigest(scenario.Database.DatabaseName, Allocation);
             foreach (var principal in new[] { Maintenance, Operator, Runtime, Migration })
-                await principal.CreateAsync(scenario.Observer);
+                await principal.CreateAsync(scenario.Observer, ownerDigest);
             await scenario.Observer.ExecuteAsync(ReadProvisionScript("Provision-MyDmsVnWebPrincipals.sql")
                 .Replace("$(WebRuntimeUser)", Runtime.Name).Replace("$(MigrationUser)", Migration.Name));
             await scenario.Observer.ExecuteAsync(ReadProvisionScript("Provision-MyDmsVnWebOperationOperator.sql")
@@ -505,9 +635,11 @@ public sealed class WebOperationMaintenanceOperatorTests
 
         public string Name { get; } = "WEB6_Mnt_" + Guid.NewGuid().ToString("N");
         public string Identifier => "[" + Name + "]";
+        public string TargetIdentity { get; private set; } = string.Empty;
 
-        public async Task CreateAsync(SqlConnection connection)
+        public async Task CreateAsync(SqlConnection connection, string targetIdentity)
         {
+            TargetIdentity = targetIdentity;
             _creationAttempted = true;
             await connection.ExecuteAsync("CREATE LOGIN " + Identifier + " WITH PASSWORD=N'" + _password +
                 "', SID=0x" + Hex(_sid) + ", CHECK_POLICY=OFF;");
