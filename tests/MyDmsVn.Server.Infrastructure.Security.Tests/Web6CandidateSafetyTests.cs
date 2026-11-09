@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.AccessControl;
@@ -109,6 +111,216 @@ public sealed class Web6CandidateSafetyTests
         await child.CloseAsync();
         Assert.False(WebOperationCrashProcess.IsPoisoned);
         _output.WriteLine("WEB6_PATH_PREFLIGHT sql=0 graphLoaded=1 childrenDrained=1 projectedFullPathMaximum=240 actualGraphMaximum={0}", maximum);
+    }
+
+    [Fact]
+    public void Candidate_record_is_create_new_and_disposition_cannot_change_the_sealed_bytes()
+    {
+        using var fixture = new CandidateFixture();
+        Assert.Throws<InvalidOperationException>(() => fixture.Verify());
+        fixture.Seal();
+        var original = File.ReadAllBytes(fixture.ManifestPath);
+        Assert.Throws<IOException>(() => Web6CandidateManifest.CreateNew(fixture.ControlPath, fixture.Inputs));
+        Assert.Throws<InvalidOperationException>(() => fixture.Seal());
+        Assert.Throws<IOException>(() => File.WriteAllText(fixture.ManifestPath, "foreignField=value"));
+        fixture.Verify();
+        fixture.Manifest.RecordDisposition(Web6CandidateStage.Chromium, Web6CandidateOutcome.Passed);
+        Assert.Throws<InvalidOperationException>(() => fixture.Manifest.RecordDisposition(Web6CandidateStage.Chromium, Web6CandidateOutcome.Failed));
+        Assert.Equal(original, File.ReadAllBytes(fixture.ManifestPath));
+        Assert.Single(Directory.GetFiles(fixture.ControlPath, "disposition-*.record"));
+        fixture.Verify();
+        fixture.Manifest.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => fixture.Manifest.RecordDisposition(Web6CandidateStage.Edge, Web6CandidateOutcome.Passed));
+        Assert.True(File.Exists(fixture.ManifestPath));
+    }
+
+    [Theory]
+    [InlineData("extra-child")]
+    [InlineData("root-acl")]
+    [InlineData("record-acl")]
+    public void Candidate_preflight_refuses_unexpected_private_filesystem_state(string drift)
+    {
+        using var fixture = new CandidateFixture();
+        fixture.Seal();
+        var extra = Path.Combine(fixture.ControlPath, "foreign-field.txt");
+        if (drift == "extra-child")
+        {
+            File.WriteAllText(extra, "test-owned");
+            Assert.Throws<IOException>(() => fixture.Verify());
+            Assert.True(File.Exists(extra));
+            return;
+        }
+
+        var isRoot = drift == "root-acl";
+        var original = isRoot ? (FileSystemSecurity)Directory.GetAccessControl(fixture.ControlPath, SqlTestPrivateRecord.Sections)
+            : File.GetAccessControl(fixture.ManifestPath, SqlTestPrivateRecord.Sections);
+        var changed = isRoot ? (FileSystemSecurity)SqlTestPrivateRecord.RestoreDirectory(original.GetSecurityDescriptorBinaryForm())
+            : SqlTestPrivateRecord.RestoreFile(original.GetSecurityDescriptorBinaryForm());
+        changed.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), FileSystemRights.Read, AccessControlType.Allow));
+        try
+        {
+            if (isRoot) Directory.SetAccessControl(fixture.ControlPath, (DirectorySecurity)changed);
+            else File.SetAccessControl(fixture.ManifestPath, (FileSecurity)changed);
+            Assert.Throws<IOException>(() => fixture.Verify());
+        }
+        finally
+        {
+            if (isRoot) Directory.SetAccessControl(fixture.ControlPath, SqlTestPrivateRecord.RestoreDirectory(original.GetSecurityDescriptorBinaryForm()));
+            else File.SetAccessControl(fixture.ManifestPath, SqlTestPrivateRecord.RestoreFile(original.GetSecurityDescriptorBinaryForm()));
+        }
+        fixture.Verify();
+    }
+
+    [Fact]
+    public void Candidate_filesystem_gate_rejects_wrong_owner_even_with_the_expected_private_DACL()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        var owner = identity.User!;
+        var descriptor = SqlTestPrivateRecord.DirectoryAcl(owner);
+        Web6CandidateManifest.RequirePrivateOwner(descriptor, owner);
+        descriptor.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
+        Assert.Throws<IOException>(() => Web6CandidateManifest.RequirePrivateOwner(descriptor, owner));
+    }
+
+    [Fact]
+    public void Candidate_create_new_rejects_a_reparse_ancestor_before_writing_in_the_target()
+    {
+        using var fixture = new CandidateFixture();
+        var junction = Path.Combine(fixture.WorkPath, "junction");
+        var target = Directory.CreateDirectory(Path.Combine(fixture.WorkPath, "junction-target")).FullName;
+        var nested = Directory.CreateDirectory(Path.Combine(target, "nested")).FullName;
+        using var command = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+            "/d /c mklink /J \"" + junction + "\" \"" + target + "\"") { UseShellExecute = false, CreateNoWindow = true });
+        Assert.NotNull(command);
+        Assert.True(command!.WaitForExit(5000));
+        Assert.Equal(0, command.ExitCode);
+        try
+        {
+            Assert.Throws<IOException>(() => Web6CandidateManifest.CreateNew(Path.Combine(junction, "nested", "refused"), fixture.Inputs));
+            Assert.Empty(Directory.GetFileSystemEntries(nested));
+        }
+        finally { Directory.Delete(junction); }
+    }
+
+    [Theory]
+    [InlineData("backend-head")]
+    [InlineData("frontend-tree")]
+    [InlineData("backend-dirty")]
+    [InlineData("frontend-dirty")]
+    [InlineData("schema")]
+    [InlineData("certificate")]
+    [InlineData("unknown-sql-owner")]
+    [InlineData("wrong-sql-receipt")]
+    [InlineData("second-worker")]
+    [InlineData("wrong-worker")]
+    [InlineData("wrong-controller")]
+    [InlineData("wrong-queue")]
+    [InlineData("second-queue")]
+    public void Candidate_preflight_refuses_changed_or_unproven_live_identity(string drift)
+    {
+        using var fixture = new CandidateFixture();
+        fixture.Seal();
+        Assert.ThrowsAny<IOException>(() => fixture.Verify(drift));
+        fixture.Verify();
+    }
+
+    [Theory]
+    [InlineData("dll")]
+    [InlineData("web-config")]
+    [InlineData("iis-config")]
+    [InlineData("backend-lock")]
+    [InlineData("frontend-lock")]
+    [InlineData("contract")]
+    [InlineData("dist")]
+    [InlineData("published-extra")]
+    [InlineData("audit-missing")]
+    public void Candidate_preflight_refuses_artifact_drift_or_missing_audit(string drift)
+    {
+        using var fixture = new CandidateFixture();
+        fixture.Seal();
+        if (drift == "audit-missing") File.Delete(fixture.Manifest.AuditPath);
+        else File.WriteAllText(fixture.ArtifactPaths[drift], "different artifact");
+        Assert.ThrowsAny<IOException>(() => fixture.Verify());
+    }
+
+    [Fact]
+    public void Candidate_seal_refuses_a_published_dist_mismatch_before_writing_the_manifest()
+    {
+        using var fixture = new CandidateFixture();
+        File.WriteAllText(fixture.ArtifactPaths["published-extra"], "extra artifact");
+        Assert.ThrowsAny<IOException>(() => fixture.Seal());
+        Assert.False(File.Exists(fixture.ManifestPath));
+    }
+
+    private sealed class CandidateFixture : IDisposable
+    {
+        private const int ProcessId = 17242;
+        private const string QueueName = "owned-queue";
+        private static readonly Uri Origin = new Uri("https://localhost:44321/");
+        private static readonly string SqlReceipt = new string('8', 64);
+        private readonly Web6CandidateFileSet _files;
+        internal string WorkPath { get; } = Path.Combine(Path.GetTempPath(), "w6m-" + Guid.NewGuid().ToString("N"));
+        internal string ControlPath => Path.Combine(WorkPath, "record");
+        internal string ManifestPath => Path.Combine(ControlPath, "candidate.manifest");
+        internal Dictionary<string, string> ArtifactPaths { get; }
+        internal Web6CandidateInputs Inputs { get; } = new Web6CandidateInputs(
+            "web6-test-01", (new string('1', 40), new string('2', 40)), (new string('3', 40), new string('4', 40)),
+            new string('5', 64), Origin, new string('6', 64), "Web6PairedCandidate", 600, 60);
+        internal Web6CandidateManifest Manifest { get; }
+
+        internal CandidateFixture()
+        {
+            Directory.CreateDirectory(WorkPath);
+            Manifest = Web6CandidateManifest.CreateNew(ControlPath, Inputs);
+            using (var identity = WindowsIdentity.GetCurrent())
+            using (new FileStream(Manifest.AuditPath, FileMode.CreateNew, FileSystemRights.FullControl, FileShare.None,
+                4096, FileOptions.None, SqlTestPrivateRecord.FileAcl(identity.User!))) { }
+            ArtifactPaths = new Dictionary<string, string> {
+                ["dll"] = WriteFile("bin/backend.dll"), ["web-config"] = WriteFile("Web.config"),
+                ["iis-config"] = WriteFile("applicationhost.config"), ["backend-lock"] = WriteFile("backend/a/packages.lock.json"),
+                ["frontend-lock"] = WriteFile("frontend/package-lock.json"), ["contract"] = WriteFile("web4/one.json"),
+                ["dist"] = WriteFile("dist/assets/main.js"), ["published-extra"] = Path.Combine(WorkPath, "wwwroot", "foreign.js")
+            };
+            WriteFile("backend/b/packages.lock.json"); WriteFile("web5/two.json"); WriteFile("web6/three.json");
+            WriteFile("wwwroot/assets/main.js");
+            _files = new Web6CandidateFileSet(ArtifactPaths["dll"], ArtifactPaths["web-config"], ArtifactPaths["iis-config"],
+                Path.Combine(WorkPath, "backend"), new[] { "a/packages.lock.json", "b/packages.lock.json" }, ArtifactPaths["frontend-lock"],
+                Path.Combine(WorkPath, "web4"), Path.Combine(WorkPath, "web5"), Path.Combine(WorkPath, "web6"),
+                Path.Combine(WorkPath, "dist"), Path.Combine(WorkPath, "wwwroot"));
+        }
+
+        internal void Seal() => Manifest.SealArtifacts(_files, SqlReceipt);
+
+        internal void Verify(string? drift = null) => Manifest.VerifyBeforeAdmission(ProcessId, QueueName, () =>
+        {
+            var queues = new List<Web5HttpRequestQueue> { Queue(
+                drift == "wrong-queue" ? "other-queue" : QueueName,
+                drift == "wrong-controller" ? ProcessId + 1 : ProcessId,
+                drift == "second-worker" ? new[] { ProcessId, ProcessId + 1 } : new[] { drift == "wrong-worker" ? ProcessId + 1 : ProcessId }) };
+            if (drift == "second-queue") queues.Add(Queue("other-queue", ProcessId + 1, new[] { ProcessId + 1 }));
+            return new Web6CandidateObservation(
+                (drift == "backend-head" ? new string('9', 40) : new string('1', 40), new string('2', 40), drift != "backend-dirty"),
+                (new string('3', 40), drift == "frontend-tree" ? new string('9', 40) : new string('4', 40), drift != "frontend-dirty"),
+                new string(drift == "schema" ? '9' : '5', 64), new string(drift == "certificate" ? '9' : '6', 64),
+                drift == "unknown-sql-owner" ? null : drift == "wrong-sql-receipt" ? new string('9', 64) : SqlReceipt, queues);
+        });
+
+        private static Web5HttpRequestQueue Queue(string name, int controller, int[] workers) => new Web5HttpRequestQueue(name, true,
+            workers.Length, controller, workers, new[] { new Web5HttpUrlGroup(true, name, new[] { Origin.AbsoluteUri }) });
+
+        private string WriteFile(string relative)
+        {
+            var path = Path.Combine(WorkPath, relative.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "test file");
+            return path;
+        }
+
+        public void Dispose()
+        {
+            Manifest.Dispose();
+            Directory.Delete(WorkPath, recursive: true);
+        }
     }
 
     private static void RequireMatch(bool match) => Assert.True(match, "Evidence environment mismatch.");

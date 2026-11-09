@@ -345,6 +345,57 @@ public sealed class AuthEndpointTests
         using var admitted = await host.Server.HttpClient.SendAsync(independent);
         await Error(admitted, 401, "Auth.InvalidCredentials");
     }
+    [Theory]
+    [InlineData("login", 10, 30)]
+    [InlineData("refresh", 30, 60)]
+    public void Worker_limits_subject_and_ip_independently_through_the_exact_window_boundary(string operation, int subjectLimit, int ipLimit)
+    {
+        var limiter = new AuthAttemptLimiter();
+        var start = new DateTime(2026, 11, 10, 0, 0, 0, DateTimeKind.Utc);
+        for (var attempt = 0; attempt < subjectLimit; attempt++)
+            Assert.True(limiter.TryAdmit(operation, "shared-subject", "ip-" + attempt, start));
+        Assert.False(limiter.TryAdmit(operation, "shared-subject", "unused-ip", start.AddMinutes(5).AddTicks(-1)));
+
+        for (var attempt = 0; attempt < ipLimit; attempt++)
+            Assert.True(limiter.TryAdmit(operation, "subject-" + attempt, "shared-ip", start));
+        Assert.False(limiter.TryAdmit(operation, "unused-subject", "shared-ip", start.AddMinutes(5).AddTicks(-1)));
+        Assert.True(limiter.TryAdmit(operation, "independent", "independent-ip", start));
+        Assert.True(limiter.TryAdmit(operation, "shared-subject", "shared-ip", start.AddMinutes(5)));
+    }
+
+    [Fact]
+    public void Worker_refuses_new_keys_at_4096_entries_without_blocking_existing_keys()
+    {
+        var limiter = new AuthAttemptLimiter();
+        var start = new DateTime(2026, 11, 10, 0, 0, 0, DateTimeKind.Utc);
+        for (var attempt = 0; attempt < 2048; attempt++)
+            Assert.True(limiter.TryAdmit("login", "subject-" + attempt, "ip-" + attempt, start));
+
+        Assert.False(limiter.TryAdmit("login", "subject-2048", "ip-2048", start));
+        Assert.False(limiter.TryAdmit("login", "subject-0", "ip-2048", start));
+        Assert.False(limiter.TryAdmit("login", "subject-2048", "ip-0", start));
+        Assert.True(limiter.TryAdmit("login", "subject-0", "ip-0", start));
+        Assert.True(limiter.TryAdmit("login", "subject-2048", "ip-2048", start.AddMinutes(5)));
+    }
+
+    [Theory]
+    [InlineData(true, 10)]
+    [InlineData(false, 30)]
+    public void Parallel_worker_callers_share_one_atomic_limit(bool sharedSubject, int limit)
+    {
+        var limiter = new AuthAttemptLimiter();
+        var start = new DateTime(2026, 11, 10, 0, 0, 0, DateTimeKind.Utc);
+        var admitted = 0;
+        Parallel.For(0, 120, attempt =>
+        {
+            if (limiter.TryAdmit("login", sharedSubject ? "shared" : "subject-" + attempt,
+                sharedSubject ? "ip-" + attempt : "shared", start))
+                Interlocked.Increment(ref admitted);
+        });
+        Assert.Equal(limit, admitted);
+        Assert.True(limiter.TryAdmit("login", "independent", "independent-ip", start));
+    }
+
     internal static async Task Error(HttpResponseMessage response, int status, string code)
     {
         Assert.Equal(status, (int)response.StatusCode);
