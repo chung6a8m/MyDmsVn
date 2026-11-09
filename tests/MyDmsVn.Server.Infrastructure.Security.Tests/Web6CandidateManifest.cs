@@ -829,6 +829,65 @@ internal static class Web6CandidateFileSystem
         return FormattableString.Invariant($"{info.Volume:X8}:{info.IndexHigh:X8}{info.IndexLow:X8}:{info.CreatedHigh:X8}{info.CreatedLow:X8}");
     }
 
+    internal static void DeleteChildrenRelative(SafeFileHandle parent, string path, Action<string>? beforeOpen = null)
+    {
+        foreach (var entry in Directory.EnumerateFileSystemEntries(path).ToArray())
+        {
+            var name = System.IO.Path.GetFileName(entry);
+            beforeOpen?.Invoke(entry);
+            using var child = OpenRelativeForDelete(parent, name);
+            var directory = IsDirectory(child);
+            _ = Identity(child, directory);
+            if (directory) DeleteChildrenRelative(child, entry, beforeOpen);
+            MarkDirectoryForDeletion(child);
+            child.Dispose();
+            if (Directory.Exists(entry) || File.Exists(entry))
+                throw new IOException("Private child deletion was not observed.");
+        }
+    }
+
+    private static SafeFileHandle OpenRelativeForDelete(SafeFileHandle parent, string name)
+    {
+        const uint caseInsensitive = 0x40, dontReparse = 0x1000, readAttributes = 0x80, listDirectory = 1,
+            delete = 0x10000, shareRead = 1, openExisting = 1, openReparsePoint = 0x00200000;
+        var buffer = IntPtr.Zero; var objectName = IntPtr.Zero; var retained = false;
+        try
+        {
+            parent.DangerousAddRef(ref retained);
+            buffer = Marshal.StringToHGlobalUni(name);
+            objectName = Marshal.AllocHGlobal(Marshal.SizeOf<NativeUnicodeString>());
+            Marshal.StructureToPtr(new NativeUnicodeString
+            {
+                Length = checked((ushort)(name.Length * sizeof(char))),
+                MaximumLength = checked((ushort)((name.Length + 1) * sizeof(char))), Buffer = buffer
+            }, objectName, false);
+            var attributes = new NativeObjectAttributes
+            {
+                Size = Marshal.SizeOf<NativeObjectAttributes>(), RootDirectory = parent.DangerousGetHandle(), ObjectName = objectName,
+                Attributes = caseInsensitive | dontReparse
+            };
+            var status = NtCreateFile(out var handle, readAttributes | listDirectory | delete, ref attributes, out _, IntPtr.Zero,
+                FileAttributes.Normal, shareRead, openExisting, openReparsePoint, IntPtr.Zero, 0);
+            if (status >= 0 && handle != null && !handle.IsInvalid) return handle;
+            handle?.Dispose();
+            throw new IOException("Private child could not be pinned for cleanup.");
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(objectName); Marshal.FreeHGlobal(buffer);
+            if (retained) parent.DangerousRelease();
+        }
+    }
+
+    private static bool IsDirectory(SafeFileHandle handle)
+    {
+        if (!GetFileInformationByHandle(handle, out var info) ||
+            (info.Attributes & (FileAttributes.ReparsePoint | FileAttributes.Device)) != 0 ||
+            (info.Attributes & FileAttributes.Directory) == 0 && info.Links != 1)
+            throw new IOException("Private child identity could not be verified.");
+        return (info.Attributes & FileAttributes.Directory) != 0;
+    }
+
     internal static void MarkDirectoryForDeletion(SafeFileHandle handle)
     {
         var disposition = new NativeFileDispositionInfo { DeleteFile = true };
@@ -959,27 +1018,11 @@ internal sealed class Web6PrivateDirectoryLease : IDisposable
         _parents.Dispose();
     }
 
-    internal void DeleteTreeVerified()
+    internal void DeleteTreeVerified(Action<string>? beforeChildOpen = null)
     {
         Verify();
-        DeleteChildren(Path);
+        Web6CandidateFileSystem.DeleteChildrenRelative(_handle!, Path, beforeChildOpen);
         DeleteVerified();
-    }
-
-    private static void DeleteChildren(string directory)
-    {
-        foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
-        {
-            var attributes = File.GetAttributes(entry);
-            if ((attributes & (FileAttributes.ReparsePoint | FileAttributes.Device)) != 0)
-                throw new IOException("Private directory cleanup refuses a reparse point or device.");
-            if ((attributes & FileAttributes.Directory) != 0)
-            {
-                DeleteChildren(entry);
-                Directory.Delete(entry, false);
-            }
-            else File.Delete(entry);
-        }
     }
 
     public void Dispose()
@@ -1160,6 +1203,15 @@ internal sealed class Web6CandidateManifest : IDisposable
         VerifyRecords();
         if (_files!.Measure() != _artifacts || ReadAudit() != (_auditId, _auditAcl))
             throw new IOException("Candidate artifacts or protected audit destination changed.");
+    }
+
+    internal void VerifyForWorkload()
+    {
+        lock (_gate)
+        {
+            RequireState(State.Sealed);
+            VerifyAdmissionFiles();
+        }
     }
 
     internal void RecordDisposition(Web6CandidateStage stage, Web6CandidateOutcome outcome)

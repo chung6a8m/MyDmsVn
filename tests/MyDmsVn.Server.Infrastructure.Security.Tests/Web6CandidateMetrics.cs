@@ -2,8 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
@@ -57,11 +61,13 @@ internal static class Web6CandidateMetrics
         if (materialized.Any(sample => sample.EndedTimestamp < sample.StartedTimestamp))
             throw new InvalidDataException("WEB6 measurements require a monotonic clock.");
         var elapsedSeconds = (double)elapsedTicks / timestampFrequency;
-        return materialized.GroupBy(sample => sample.MetricClass).ToDictionary(group => group.Key, group =>
+        var groups = materialized.GroupBy(sample => sample.MetricClass).ToDictionary(group => group.Key, group => group.ToArray());
+        return Enum.GetValues(typeof(Web6MetricClass)).Cast<Web6MetricClass>().ToDictionary(metricClass => metricClass, metricClass =>
         {
+            var group = groups.TryGetValue(metricClass, out var present) ? present : Array.Empty<Web6MetricSample>();
             var values = group.Select(sample => (sample.EndedTimestamp - sample.StartedTimestamp) * 1000d / timestampFrequency)
                 .OrderBy(value => value).ToArray();
-            double Rank(double percentile) => values[Math.Max(0, (int)Math.Ceiling(percentile * values.Length) - 1)];
+            double Rank(double percentile) => values.Length == 0 ? 0 : values[Math.Max(0, (int)Math.Ceiling(percentile * values.Length) - 1)];
             var errors = group.Count(sample => sample.Outcome == Web6MetricOutcome.Error);
             var timeouts = group.Count(sample => sample.Outcome == Web6MetricOutcome.Timeout);
             return new Web6MetricSummary(values.Length, Rank(.50), Rank(.95), Rank(.99), errors, timeouts,
@@ -88,13 +94,19 @@ internal sealed class Web6WorkloadAdmission
 
 internal sealed class Web6WorkloadObservation
 {
-    internal Web6WorkloadObservation(bool duplicateEffect, int deadlocks, bool resourceRunaway, long journalBytes)
+    internal Web6WorkloadObservation(bool duplicateEffect, int deadlocks, bool resourceRunaway, double cpuPercent,
+        long privateBytes, int sqlLocks, int poolConnections, long journalBytes)
     {
-        DuplicateEffect = duplicateEffect; Deadlocks = deadlocks; ResourceRunaway = resourceRunaway; JournalBytes = journalBytes;
+        DuplicateEffect = duplicateEffect; Deadlocks = deadlocks; ResourceRunaway = resourceRunaway; CpuPercent = cpuPercent;
+        PrivateBytes = privateBytes; SqlLocks = sqlLocks; PoolConnections = poolConnections; JournalBytes = journalBytes;
     }
     internal bool DuplicateEffect { get; }
     internal int Deadlocks { get; }
     internal bool ResourceRunaway { get; }
+    internal double CpuPercent { get; }
+    internal long PrivateBytes { get; }
+    internal int SqlLocks { get; }
+    internal int PoolConnections { get; }
     internal long JournalBytes { get; }
 }
 
@@ -102,7 +114,9 @@ internal static class Web6CandidateWorkloadGuard
 {
     internal static void RequireContinue(Web6WorkloadObservation observation)
     {
-        if (observation == null || observation.DuplicateEffect || observation.Deadlocks != 0 || observation.ResourceRunaway || observation.JournalBytes < 0)
+        if (observation == null || observation.DuplicateEffect || observation.Deadlocks != 0 || observation.ResourceRunaway ||
+            double.IsNaN(observation.CpuPercent) || double.IsInfinity(observation.CpuPercent) || observation.CpuPercent < 0 ||
+            observation.PrivateBytes < 0 || observation.SqlLocks < 0 || observation.PoolConnections < 0 || observation.JournalBytes < 0)
             throw new InvalidDataException("WEB6 workload stop rule fired.");
     }
 }
@@ -116,16 +130,31 @@ internal static class Web6CandidateWorkloadPlan
         Web6MetricClass.SalesCreate, Web6MetricClass.SalesUpdate, Web6MetricClass.SalesPost,
         Web6MetricClass.ReceiptCreate, Web6MetricClass.ReceiptUpdate, Web6MetricClass.ReceiptPost,
     };
+    internal static readonly IReadOnlyList<Web6MetricClass> SupportingClasses = new[]
+    {
+        Web6MetricClass.AuthRefresh, Web6MetricClass.ProtectedStatus, Web6MetricClass.ProtectedEligibility, Web6MetricClass.StockRead,
+    };
+    internal static readonly IReadOnlyList<Web6MetricClass> RequiredClasses = CriticalClasses.Concat(SupportingClasses).ToArray();
 }
 
 internal interface IWeb6CandidateWorkloadOperations
 {
     Task<Web6WorkloadAdmission> VerifyAdmission(CancellationToken token);
-    Task Smoke(IReadOnlyList<Web6MetricClass> criticalClasses, CancellationToken token);
+    Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Smoke(IReadOnlyList<Web6MetricClass> criticalClasses, CancellationToken token);
     Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Measure(int concurrency, int desiredSamples, CancellationToken token);
     Task<Web6WorkloadObservation> Observe(CancellationToken token);
     Task Drain(CancellationToken token);
-    Task Complete(CancellationToken token);
+    Task Complete(IReadOnlyList<Web6WorkloadProfileResult> profiles, CancellationToken token);
+}
+
+internal sealed class Web6WorkloadProfileResult
+{
+    internal Web6WorkloadProfileResult(int concurrency, IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary> metrics,
+        Web6WorkloadObservation resources)
+    { Concurrency = concurrency; Metrics = metrics; Resources = resources; }
+    internal int Concurrency { get; }
+    internal IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary> Metrics { get; }
+    internal Web6WorkloadObservation Resources { get; }
 }
 
 internal sealed class Web6CandidateWorkloadRunner
@@ -137,25 +166,35 @@ internal sealed class Web6CandidateWorkloadRunner
     internal async Task Execute(CancellationToken token)
     {
         var admitted = false;
+        var profiles = new List<Web6WorkloadProfileResult>();
         try
         {
             (await _operations.VerifyAdmission(token)).Require(); admitted = true;
-            await _operations.Smoke(Web6CandidateWorkloadPlan.CriticalClasses, token);
-            Web6CandidateWorkloadGuard.RequireContinue(await _operations.Observe(token));
+            var smoke = await _operations.Smoke(Web6CandidateWorkloadPlan.RequiredClasses, token);
+            RequireComplete(smoke);
+            var smokeResources = await _operations.Observe(token); Web6CandidateWorkloadGuard.RequireContinue(smokeResources);
+            profiles.Add(new Web6WorkloadProfileResult(0, smoke, smokeResources));
             foreach (var concurrency in Web6CandidateWorkloadPlan.ConcurrencyProfiles)
             {
                 var result = await _operations.Measure(concurrency, Web6CandidateWorkloadPlan.DesiredSamplesPerCriticalClass, token);
-                if (result == null || Web6CandidateWorkloadPlan.CriticalClasses.Any(metricClass => !result.ContainsKey(metricClass)))
-                    throw new InvalidDataException("WEB6 workload omitted a critical class.");
-                Web6CandidateWorkloadGuard.RequireContinue(await _operations.Observe(token));
+                RequireComplete(result);
+                var resources = await _operations.Observe(token); Web6CandidateWorkloadGuard.RequireContinue(resources);
+                profiles.Add(new Web6WorkloadProfileResult(concurrency, result, resources));
             }
             await _operations.Drain(token); admitted = false;
-            await _operations.Complete(token);
+            await _operations.Complete(profiles, token);
         }
         finally
         {
             if (admitted) await _operations.Drain(CancellationToken.None);
         }
+    }
+
+    private static void RequireComplete(IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary> result)
+    {
+        if (result == null || Web6CandidateWorkloadPlan.RequiredClasses.Any(metricClass => !result.ContainsKey(metricClass)) ||
+            result.Values.Any(summary => summary.Disposition != "MEASURED" && summary.Disposition != "INSUFFICIENT_SAMPLE / NOT MEASURED"))
+            throw new InvalidDataException("WEB6 workload omitted or mislabeled a required class.");
     }
 }
 
@@ -165,9 +204,10 @@ internal static class Web6WorkloadAcceptanceGate
     {
         "MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY", "MYDMSVN_WEB_TEST_TLS_THUMBPRINT",
         "MYDMSVN_WEB_TEST_BROWSER_DIRECTORY", "MYDMSVN_WEB_PILOT_PROJECT",
-        "MYDMSVN_WEB6_CANDIDATE_ROOT", "MYDMSVN_WEB6_CANDIDATE_ID",
+        "MYDMSVN_WEB6_CANDIDATE_ENABLE", "MYDMSVN_WEB6_CANDIDATE_ROOT", "MYDMSVN_WEB6_CANDIDATE_ID",
         "MYDMSVN_WEB6_WORKLOAD_ROOT", "MYDMSVN_WEB6_WORKLOAD_ACTOR_COHORT",
-        "MYDMSVN_WEB6_TASK4_ACCEPTANCE_PATH", "MYDMSVN_SQL_TEST_APPROVAL_FILE",
+        "MYDMSVN_WEB6_TASK4_ACCEPTANCE_PATH", "MYDMSVN_WEB6_TASK4_ACCEPTANCE_SHA256",
+        "MYDMSVN_SQL_TEST_APPROVAL_FILE", "MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING",
     };
 
     internal static IReadOnlyDictionary<string, string?> EnvironmentValues() => Required
@@ -185,5 +225,51 @@ internal static class Web6WorkloadAcceptanceGate
         var missing = Required.Where(name => !values.TryGetValue(name, out var value) || string.IsNullOrWhiteSpace(value)).ToArray();
         if (missing.Length != 0)
             throw new InvalidOperationException("BLOCKED: WEB6 workload prerequisites are absent: " + string.Join(", ", missing));
+    }
+}
+
+internal sealed class Web6WorkloadTask4Receipt
+{
+    private Web6WorkloadTask4Receipt(string candidateId, string backendSha, string frontendSha,
+        string frontendDistHash, string sqlReceiptHash, string manifestHash)
+    {
+        CandidateId = candidateId; BackendSha = backendSha; FrontendSha = frontendSha; FrontendDistHash = frontendDistHash;
+        SqlReceiptHash = sqlReceiptHash; ManifestHash = manifestHash;
+    }
+    internal string CandidateId { get; }
+    internal string BackendSha { get; }
+    internal string FrontendSha { get; }
+    internal string FrontendDistHash { get; }
+    internal string SqlReceiptHash { get; }
+    internal string ManifestHash { get; }
+
+    internal static Web6WorkloadTask4Receipt ReadProtected(string path, string expectedDigest)
+    {
+        path = Web6CandidateFileSystem.CanonicalPath(path);
+        Web6CandidateFileSystem.RequireRegularFile(path);
+        using var identity = WindowsIdentity.GetCurrent();
+        var acl = File.GetAccessControl(path, SqlTestPrivateRecord.Sections);
+        Web6CandidateManifest.RequirePrivateOwner(acl, identity.User!);
+        var bytes = File.ReadAllBytes(path);
+        if (SqlTestPrivateRecord.Hash(bytes) != Web6CandidateInputs.RequireHash(expectedDigest))
+            throw new InvalidDataException("Task4 acceptance receipt digest changed.");
+        var json = JObject.Parse(new UTF8Encoding(false, true).GetString(bytes));
+        var expected = new[] { "version", "mode", "status", "candidateId", "backendSha", "frontendSha",
+            "frontendDistManifestSha256", "sqlOwnershipReceiptSha256", "manifestSha256", "completedAtUtc" };
+        if (!json.Properties().Select(property => property.Name).OrderBy(value => value, StringComparer.Ordinal)
+                .SequenceEqual(expected.OrderBy(value => value, StringComparer.Ordinal), StringComparer.Ordinal) ||
+            (int?)json["version"] != 1 || (string?)json["mode"] != "web6-cutover" || (string?)json["status"] != "ACCEPTED" ||
+            !DateTimeOffset.TryParse((string?)json["completedAtUtc"], out var completed) || completed > DateTimeOffset.UtcNow ||
+            completed < DateTimeOffset.UtcNow.AddDays(-7))
+            throw new InvalidDataException("Task4 acceptance receipt is not a recent exact accepted record.");
+        var candidate = (string?)json["candidateId"];
+        if (candidate == null || candidate.Length is < 1 or > 64 || candidate.Any(c => !(char.IsLetterOrDigit(c) || c is '.' or '_' or '-')))
+            throw new InvalidDataException("Task4 candidate identity is invalid.");
+        return new Web6WorkloadTask4Receipt(candidate,
+            Web6CandidateInputs.RequireHash((string?)json["backendSha"] ?? "", 40),
+            Web6CandidateInputs.RequireHash((string?)json["frontendSha"] ?? "", 40),
+            Web6CandidateInputs.RequireHash((string?)json["frontendDistManifestSha256"] ?? ""),
+            Web6CandidateInputs.RequireHash((string?)json["sqlOwnershipReceiptSha256"] ?? ""),
+            Web6CandidateInputs.RequireHash((string?)json["manifestSha256"] ?? ""));
     }
 }

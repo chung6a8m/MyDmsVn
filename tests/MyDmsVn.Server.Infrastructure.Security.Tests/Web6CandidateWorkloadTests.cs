@@ -100,6 +100,27 @@ public sealed class Web6CandidateWorkloadTests
     }
 
     [Fact]
+    public void Private_directory_cleanup_refuses_child_swapped_to_junction_between_enumeration_and_open()
+    {
+        using var fixture = new PrivateParent();
+        var path = Path.Combine(fixture.Path, "leased");
+        var outside = Directory.CreateDirectory(Path.Combine(fixture.Path, "outside-race")).FullName;
+        using var lease = Web6PrivateDirectoryLease.CreateNew(path);
+        var victim = Directory.CreateDirectory(Path.Combine(path, "victim")).FullName;
+        var swapped = false;
+        Assert.Throws<IOException>(() => lease.DeleteTreeVerified(entry =>
+        {
+            if (swapped || !string.Equals(entry, victim, StringComparison.OrdinalIgnoreCase)) return;
+            Directory.Delete(victim); swapped = true;
+            using var command = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+                "/d /c mklink /J \"" + victim + "\" \"" + outside + "\"") { UseShellExecute = false, CreateNoWindow = true });
+            Assert.NotNull(command); Assert.True(command!.WaitForExit(5000)); Assert.Equal(0, command.ExitCode);
+        }));
+        Assert.True(swapped); Assert.True(Directory.Exists(path)); Assert.Empty(Directory.GetFileSystemEntries(outside));
+        Directory.Delete(victim);
+    }
+
+    [Fact]
     public void Metrics_use_nearest_rank_and_keep_classes_isolated()
     {
         var samples = new[] { 1L, 2, 3, 4, 100 }.Select(value => Sample(Web6MetricClass.SalesCreate, value)).ToList();
@@ -111,6 +132,8 @@ public sealed class Web6CandidateWorkloadTests
         Assert.Equal(50, result[Web6MetricClass.SalesUpdate].P50Ms);
         Assert.Equal("MEASURED", result[Web6MetricClass.SalesCreate].Disposition);
         Assert.Equal("INSUFFICIENT_SAMPLE / NOT MEASURED", result[Web6MetricClass.SalesUpdate].Disposition);
+        Assert.Equal(0, result[Web6MetricClass.AuthRefresh].Count);
+        Assert.Equal("INSUFFICIENT_SAMPLE / NOT MEASURED", result[Web6MetricClass.AuthRefresh].Disposition);
     }
 
     [Fact]
@@ -148,7 +171,7 @@ public sealed class Web6CandidateWorkloadTests
     public void Workload_stops_on_duplicate_deadlock_or_resource_runaway(bool duplicate, int deadlocks, bool runaway)
     {
         Assert.Throws<InvalidDataException>(() => Web6CandidateWorkloadGuard.RequireContinue(
-            new Web6WorkloadObservation(duplicate, deadlocks, runaway, journalBytes: 1)));
+            new Web6WorkloadObservation(duplicate, deadlocks, runaway, 10, 1024, 1, 1, journalBytes: 1)));
     }
 
     [Fact]
@@ -158,6 +181,8 @@ public sealed class Web6CandidateWorkloadTests
         Assert.Equal(1000, Web6CandidateWorkloadPlan.DesiredSamplesPerCriticalClass);
         Assert.Equal(6, Web6CandidateWorkloadPlan.CriticalClasses.Count);
         Assert.Equal(6, Web6CandidateWorkloadPlan.CriticalClasses.Distinct().Count());
+        Assert.Equal(4, Web6CandidateWorkloadPlan.SupportingClasses.Count);
+        Assert.Equal(10, Web6CandidateWorkloadPlan.RequiredClasses.Distinct().Count());
         Assert.DoesNotContain(Web6MetricClass.AuthRefresh, Web6CandidateWorkloadPlan.CriticalClasses);
     }
 
@@ -168,11 +193,23 @@ public sealed class Web6CandidateWorkloadTests
         await new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None);
         Assert.Equal(new[] { "admit", "smoke", "observe", "measure:1", "observe", "measure:4", "observe",
             "measure:8", "observe", "measure:16", "observe", "drain", "complete" }, operations.Calls);
+        Assert.Equal(new[] { 0, 1, 4, 8, 16 }, operations.CompletedProfiles!.Select(profile => profile.Concurrency));
+        Assert.All(operations.CompletedProfiles!, profile => Assert.Equal(10, profile.Metrics.Count));
 
         operations = new RecordingWorkloadOperations { FailAtConcurrency = 4 };
         await Assert.ThrowsAsync<IOException>(() => new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None));
         Assert.Equal(1, operations.Calls.Count(call => call == "drain"));
         Assert.DoesNotContain("complete", operations.Calls);
+    }
+
+    [Fact]
+    public async Task Workload_runner_refuses_omitted_supporting_class_and_drains()
+    {
+        var operations = new RecordingWorkloadOperations { OmitClass = Web6MetricClass.ProtectedEligibility };
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            new Web6CandidateWorkloadRunner(operations).Execute(CancellationToken.None));
+        Assert.Contains("omitted", error.Message);
+        Assert.Equal(new[] { "admit", "smoke", "drain" }, operations.Calls);
     }
 
     [Fact]
@@ -207,20 +244,28 @@ public sealed class Web6CandidateWorkloadTests
     {
         internal readonly List<string> Calls = new List<string>();
         internal int FailAtConcurrency { get; set; }
+        internal Web6MetricClass? OmitClass { get; set; }
+        internal IReadOnlyList<Web6WorkloadProfileResult>? CompletedProfiles { get; private set; }
         public Task<Web6WorkloadAdmission> VerifyAdmission(CancellationToken token)
         { Calls.Add("admit"); return Task.FromResult(new Web6WorkloadAdmission(true, 1, true, true, true, true)); }
-        public Task Smoke(IReadOnlyList<Web6MetricClass> criticalClasses, CancellationToken token)
-        { Calls.Add("smoke"); Assert.Equal(6, criticalClasses.Count); return Task.CompletedTask; }
+        public Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Smoke(IReadOnlyList<Web6MetricClass> criticalClasses, CancellationToken token)
+        { Calls.Add("smoke"); Assert.Equal(10, criticalClasses.Count); return CompleteMetrics(OmitClass); }
         public Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> Measure(int concurrency, int desiredSamples, CancellationToken token)
         {
             Calls.Add("measure:" + concurrency); if (concurrency == FailAtConcurrency) throw new IOException("measurement failed");
-            IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary> result = Web6CandidateWorkloadPlan.CriticalClasses.ToDictionary(
+            return CompleteMetrics(OmitClass);
+        }
+        public Task<Web6WorkloadObservation> Observe(CancellationToken token)
+        { Calls.Add("observe"); return Task.FromResult(new Web6WorkloadObservation(false, 0, false, 10, 1024, 1, 1, 1)); }
+        public Task Drain(CancellationToken token) { Calls.Add("drain"); return Task.CompletedTask; }
+        public Task Complete(IReadOnlyList<Web6WorkloadProfileResult> profiles, CancellationToken token)
+        { Calls.Add("complete"); CompletedProfiles = profiles; return Task.CompletedTask; }
+        private static Task<IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary>> CompleteMetrics(Web6MetricClass? omit = null)
+        {
+            IReadOnlyDictionary<Web6MetricClass, Web6MetricSummary> result = Web6CandidateWorkloadPlan.RequiredClasses
+                .Where(metricClass => metricClass != omit).ToDictionary(
                 metricClass => metricClass, _ => new Web6MetricSummary(1, 1, 1, 1, 0, 0, 1, "INSUFFICIENT_SAMPLE / NOT MEASURED"));
             return Task.FromResult(result);
         }
-        public Task<Web6WorkloadObservation> Observe(CancellationToken token)
-        { Calls.Add("observe"); return Task.FromResult(new Web6WorkloadObservation(false, 0, false, 1)); }
-        public Task Drain(CancellationToken token) { Calls.Add("drain"); return Task.CompletedTask; }
-        public Task Complete(CancellationToken token) { Calls.Add("complete"); return Task.CompletedTask; }
     }
 }

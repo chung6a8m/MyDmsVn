@@ -69,11 +69,25 @@ public sealed partial class WebHostIisExpressTests
     public Task Web6_pinned_cutover_runs_protected_IIS_and_browser_lifecycle() =>
         RunCutoverCandidate();
 
+    [Web6WorkloadSqlFact, Trait("Category", "Web6BoundedWorkload")]
+    public Task Web6_paired_candidate_runs_bounded_workload_profiles() =>
+        Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true, web5Pilot: true,
+            web6Candidate: true, web6Workload: true);
+
     private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false,
         bool web5Pilot = false, bool attended = false, bool originalFirstPilot = false, bool admissionOnly = false,
-        bool web6Candidate = false, bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null)
+        bool web6Candidate = false, bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null,
+        bool web6Workload = false)
     {
         GuiTestSafety.ThrowIfPoisoned();
+        Web6WorkloadTask4Receipt? workloadReceipt = null;
+        if (web6Workload)
+        {
+            var workloadValues = Web6WorkloadAcceptanceGate.EnvironmentValues();
+            Web6WorkloadAcceptanceGate.RequireLive(workloadValues);
+            workloadReceipt = Web6WorkloadTask4Receipt.ReadProtected(workloadValues["MYDMSVN_WEB6_TASK4_ACCEPTANCE_PATH"]!,
+                workloadValues["MYDMSVN_WEB6_TASK4_ACCEPTANCE_SHA256"]!);
+        }
         if (web6Candidate) Web6CandidateAcceptanceGate.RequireLive(Web6CandidateAcceptanceGate.EnvironmentValues());
         if (web6Cutover) Web6CutoverAcceptanceGate.RequireLive(Web6CutoverAcceptanceGate.EnvironmentValues());
         if (web6Cutover && (!web6Candidate || cutoverPlan == null)) throw new InvalidOperationException("WEB6 cutover requires the protected paired candidate fixture and exact handles.");
@@ -100,10 +114,12 @@ public sealed partial class WebHostIisExpressTests
         Web6CandidateManifest? candidateManifest = null;
         Web6CandidateInputs? candidateInputs = null;
         Web6CandidateHostMismatch? candidateMismatch = null;
+        Web6PrivateDirectoryLease? runDirectoryLease = null;
         string? candidateSqlReceipt = null;
         var failures = new List<Exception>();
         var drained = true;
         var candidateBrowserValidated = false;
+        var workloadValidated = false;
         int customer = 0, warehouse = 0, employee = 0, product = 0, receiptProduct = 0;
         IntegratedCatalog? integrated = null;
         try
@@ -133,8 +149,11 @@ public sealed partial class WebHostIisExpressTests
                 }
                 if (integratedPilot) integrated = await SeedIntegratedActorsAndCatalog(connection, attendedPassword);
             }
-            var runDirectory = Path.Combine(Path.GetDirectoryName(published!)!, "iis-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(runDirectory);
+            var runDirectory = web6Candidate
+                ? Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ROOT")!) + "-host-runtime"
+                : Path.Combine(Path.GetDirectoryName(published!)!, "iis-" + Guid.NewGuid().ToString("N"));
+            if (web6Candidate) runDirectoryLease = Web6PrivateDirectoryLease.CreateNew(runDirectory);
+            else Directory.CreateDirectory(runDirectory);
             var configuration = CreateConfiguration(runDirectory, published!);
             if (web6Candidate)
             {
@@ -142,10 +161,14 @@ public sealed partial class WebHostIisExpressTests
                 var frontendRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
                 var backendIdentity = GitIdentity(backendRoot);
                 var frontendIdentity = GitIdentity(frontendRoot);
+                if (web6Workload && (workloadReceipt!.CandidateId != Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID") ||
+                    workloadReceipt.BackendSha != backendIdentity.Sha || workloadReceipt.FrontendSha != frontendIdentity.Sha ||
+                    workloadReceipt.FrontendDistHash != Web6CandidateFileSet.MeasureTree(Path.Combine(frontendRoot, "dist"))))
+                    throw new InvalidOperationException("Accepted Task4 receipt does not bind this workload source/artifact candidate.");
                 var certificateHash = CertificateHash(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_TLS_THUMBPRINT")!);
                 candidateInputs = new Web6CandidateInputs(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!,
                     backendIdentity, frontendIdentity, SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(),
-                    new Uri("https://localhost:44321/"), certificateHash, "Web6PairedCandidate", 600, 60);
+                    new Uri("https://localhost:44321/"), certificateHash, web6Workload ? "Web6BoundedWorkload" : "Web6PairedCandidate", 600, 60);
                 var candidateRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ROOT")!);
                 if (Directory.Exists(candidateRoot) || File.Exists(candidateRoot)) throw new InvalidOperationException("WEB6 candidate root must be create-new.");
                 candidateManifest = Web6CandidateManifest.CreateNew(candidateRoot, candidateInputs);
@@ -257,7 +280,13 @@ public sealed partial class WebHostIisExpressTests
                 foreach (var deniedPath in new[] { "/assets/missing.js", "/Web.config", "/bin/MyDmsVn.Server.HttpHost.dll" })
                     Assert.Equal(404, (await Request("https://localhost:44321" + deniedPath, thumbprint!)).Status);
                 Assert.Equal(401, (await Request("https://localhost:44321/api/v1/missing", thumbprint!)).Status);
-                if (attended)
+                if (web6Workload)
+                {
+                    await RunCandidateWorkload(database, candidateManifest!, thumbprint!, customer, warehouse, employee,
+                        product, receiptProduct, () => process ?? throw new InvalidOperationException("Workload host is absent."));
+                    workloadValidated = true;
+                }
+                else if (attended)
                     await Web5AttendedLease.Wait(process, attendedDirectory!, attendedPassword!, TimeSpan.FromMinutes(30), CancellationToken.None);
                 else
                     await RunBrowser(database, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated,
@@ -402,14 +431,26 @@ public sealed partial class WebHostIisExpressTests
             }
             else if (failures.Count == 0)
                 failures.Add(new InvalidOperationException("Fixture cleanup was not admitted; resources retained."));
+            if (runDirectoryLease != null)
+            {
+                try { runDirectoryLease.DeleteTreeVerified(); }
+                catch (Exception error) { failures.Add(error); }
+                finally { runDirectoryLease.Dispose(); }
+            }
             if (candidateManifest != null)
             {
                 try
                 {
-                    candidateManifest.RecordDisposition(Web6CandidateStage.Chromium,
-                        failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
-                    candidateManifest.RecordDisposition(Web6CandidateStage.Edge,
-                        failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
+                    if (web6Workload)
+                        candidateManifest.RecordDisposition(Web6CandidateStage.Workload,
+                            failures.Count == 0 && workloadValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
+                    else
+                    {
+                        candidateManifest.RecordDisposition(Web6CandidateStage.Chromium,
+                            failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
+                        candidateManifest.RecordDisposition(Web6CandidateStage.Edge,
+                            failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
+                    }
                     candidateManifest.RecordDisposition(Web6CandidateStage.Cleanup,
                         failures.Count == 0 && drained ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Quarantined);
                 }
@@ -417,7 +458,7 @@ public sealed partial class WebHostIisExpressTests
                 finally { candidateManifest.Dispose(); }
             }
         }
-        if (web6Candidate && failures.Count == 0)
+        if (web6Candidate && !web6Workload && failures.Count == 0)
             Web6CandidateOracle.ValidateDisposition(candidateBrowserValidated, browserDrained: true, hostDrained: drained, cleanupVerified: true);
         if (failures.Count > 0) throw new AggregateException("Packaged host scenario or owned cleanup failed.", failures);
     }
@@ -496,6 +537,13 @@ public sealed partial class WebHostIisExpressTests
         public Web6CutoverSqlFactAttribute()
         {
             Skip = Web6CutoverAcceptanceGate.OrdinarySkipReason(Web6CutoverAcceptanceGate.EnvironmentValues());
+        }
+    }
+    private sealed class Web6WorkloadSqlFactAttribute : WebHostSqlFactAttribute
+    {
+        public Web6WorkloadSqlFactAttribute()
+        {
+            Skip = Web6WorkloadAcceptanceGate.OrdinarySkipReason(Web6WorkloadAcceptanceGate.EnvironmentValues());
         }
     }
 
@@ -994,7 +1042,8 @@ public sealed partial class WebHostIisExpressTests
         var path = Path.Combine(runDirectory, "applicationhost.config"); xml.Save(path); return path;
     }
     private static async Task<Reply> Request(string url, string thumbprint, string? authorization = null, string? origin = null,
-        string method = "GET", string? body = null, string? cookie = null, bool csrf = false, bool insecureRejectionProbe = false)
+        string method = "GET", string? body = null, string? cookie = null, bool csrf = false, bool insecureRejectionProbe = false,
+        IReadOnlyDictionary<string, string>? headers = null)
     {
         var uri = new Uri(url);
         var request = insecureRejectionProbe
@@ -1007,6 +1056,7 @@ public sealed partial class WebHostIisExpressTests
         if (authorization != null) request.Headers["Authorization"] = authorization;
         if (origin != null) request.Headers["Origin"] = origin;
         if (cookie != null) request.Headers["Cookie"] = "__Host-mydmsvn-rt=" + cookie;
+        if (headers != null) foreach (var header in headers) request.Headers[header.Key] = header.Value;
         if (csrf) { request.Headers["X-Requested-With"] = "XMLHttpRequest"; request.Headers["Sec-Fetch-Site"] = "same-origin"; }
         // Test-only pin for the explicit existing localhost TLS certificate; no runtime callback.
         request.ServerCertificateValidationCallback = (_, certificate, _, _) => certificate != null &&
