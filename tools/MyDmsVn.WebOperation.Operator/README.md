@@ -1,6 +1,6 @@
 # WEB6 guarded Web operation operator CLI
 
-This isolated net48 console application uses the schema13 restricted operator procedures. It can inspect one exact Web operation, preview a terminal-negative decision without mutation, or record one audited `NOT_EXECUTED` decision as a matched `CANCELLED` journal/audit pair. It is not part of HttpHost, does not create a support case or new client intent, and does not enable manual resend.
+This isolated net48 console application separates schema13 restricted operator procedures from guarded maintenance commands. It can inspect one exact Web operation, record one audited `NOT_EXECUTED` decision as a matched `CANCELLED` journal/audit pair, or compact one elapsed COMMITTED result under a dedicated maintenance identity. Both mutating commands have separate read-only previews. It is not part of HttpHost, does not create a support case or new client intent, and does not enable manual resend.
 
 ## Restricted connection
 
@@ -88,7 +88,7 @@ For either outcome:
 
 | Code | Meaning |
 |---:|---|
-| 0 | Help, authoritative inspect state, or known-Commit terminal decision with matched readback |
+| 0 | Help, authoritative inspect state, or known Commit with matched readback and required evidence delivery |
 | 2 | Invalid, missing, duplicate, unknown or confirmation-mismatched arguments; SQL is not opened |
 | 3 | Denied authority, identity, durable conflict, epoch or fingerprint |
 | 4 | Inspect-only `INDETERMINATE` |
@@ -96,6 +96,30 @@ For either outcome:
 | 6 | Bounded timeout; outcome unknown, inspect independently |
 | 7 | Completed read-only dry-run preview; still not proof of `NOT_EXECUTED` |
 | 8 | `UNKNOWN/ESCALATE` for unverified pre-Commit rollback/session cleanup, uncertain Commit, or failed post-Commit verification |
+| 9 | Known compaction Commit with failed outcome/manifest/backup delivery; independent inspection required |
 | 130 | Caller cancellation; inspect independently before further action |
 
 Output is bounded and sanitized. It never prints the connection string, credential, JWT/cookie, fingerprint, original request/result bytes or business payload. `environmentLabelSource=operator-supplied` explicitly states that the label itself is not authoritative environment identity.
+
+
+## B03 bounded result compaction
+
+`compact-preview` and `compact-execute` operate on one exact owned nonproduction schema13 allocation. The maintenance identity has database `CONTROL` for that allocation only; it remains distinct from runtime, migration and the B02 procedure operator. Provision it using [the maintenance script](../../deployment/sql/Provision-MyDmsVnWebOperationMaintenance.sql). This rehearsal does not authorize a production principal or deployment.
+
+The dedicated environment settings are `MYDMSVN_WEB_OPERATION_MAINTENANCE_CONNECTION_STRING`, `MYDMSVN_WEB_OPERATION_MAINTENANCE_DATABASE_USER`, `MYDMSVN_WEB_OPERATION_MAINTENANCE_LOGIN` and `MYDMSVN_WEB_OPERATION_MAINTENANCE_TARGET_IDENTITY`. The target identity binds the environment, live server/database creation tuple and owned allocation token, as documented in the provisioning script. The connection factory verifies that identity, exact schema13 and the restricted maintenance principal on every connection. There is no fallback to B02 credentials.
+
+Both commands require `--environment`, `--database`, `--current-epoch`, `--stored-epoch`, `--actor`, `--operation`, `--fingerprint`, `--correlation` and `--case`. `--timeout-seconds` accepts 1–25 and defaults to 15. GUIDs and SHA-256 must be lowercase; operation/correlation must be distinct GUIDv4 values. Execute additionally requires this exact composite, including the resolved timeout:
+
+```text
+compact-execute|environment=<environment>|database=<database>|current-epoch=<guid>|stored-epoch=<guid>|actor=<id>|operation=<guid-v4>|fingerprint=<sha256>|correlation=<guid-v4>|case=<id>|timeout-seconds=<seconds>
+```
+
+Preview is read-only and returns `ELIGIBLE` for an elapsed COMMITTED result or `NO_CHANGE` for its exact EXPIRED tombstone. Execute re-previews, records the verified effective login as a hash in durable attempt evidence, and then opens one ReadCommitted mutation transaction. The existing maintenance primitive acquires the canonical epoch/key fence; its callback checks the exact fingerprint/eligibility and captures immutable journal metadata before the single compaction call updates the row. Exactly one changed row and a final cancellation check are required before Commit. No path retries mutation.
+
+Before execute, the operator must provision two distinct, non-nested private local fixed-NTFS directories with the exact protected current-operator/Administrators ACL required by `MaintenanceEvidencePolicy`. Set their canonical absolute paths through `MYDMSVN_WEB_OPERATION_MAINTENANCE_EVIDENCE_ROOT` and `MYDMSVN_WEB_OPERATION_MAINTENANCE_EVIDENCE_BACKUP_ROOT`. The CLI never creates or hardens these roots. The evidence policy retains both copies for exactly 90 days; this command does not purge them. A new case directory is create-new, so evidence from an earlier attempted mutation cannot be overwritten.
+
+Known Commit is followed by a fresh, factory-verified connection checking exact EXPIRED/NULL result storage and every immutable journal field, including document ID and timestamps. Only verified readback plus durable transaction/readback evidence and a verified primary/backup manifest pair produces `status=COMPLETED` (exit 0). An already compacted exact tombstone produces `status=NO_CHANGE` (exit 7), without mutation or a second evidence case.
+
+Pre-Commit rollback/close/dispose uncertainty and Commit-started exceptions produce `UNKNOWN/ESCALATE` (exit 8); cleanup is attempted without retry. Known Commit with failed fresh readback also remains `UNKNOWN/ESCALATE`. If transaction/readback event delivery or final manifest/backup delivery fails after known Commit, output explicitly reports `COMMITTED/AUDIT_DELIVERY_FAILED/ESCALATE; inspect independently` (exit 9). This does not mean rollback. Cancellation/deadline can prevent evidence delivery; retained attempt/partial files are escalation evidence, not success markers. Independently inspect the exact operation and drain the owned session before any attended follow-up. No missing response, partial file or process exit authorizes compaction retry or business command resend.
+
+The immutable EXPIRED tombstone is the canonical SQL mutation record. External files own effective-login/correlation/delivery evidence; no terminal-negative audit row is created. Payload/result bytes and connection credentials never enter the bounded output or evidence envelope. Real-SQL tests independently compare business/source/terminal-audit bytes; the CLI does not run a broad business-table hashing operation.

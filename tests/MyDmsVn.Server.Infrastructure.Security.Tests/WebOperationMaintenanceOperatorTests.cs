@@ -160,6 +160,214 @@ public sealed class WebOperationMaintenanceOperatorTests
         Assert.Equal(1, client.PreviewCalls);
     }
 
+    [Theory]
+    [InlineData(OperatorCompactionOutcome.Completed, OperatorExitCode.Completed, "COMPLETED")]
+    [InlineData(OperatorCompactionOutcome.AuditDeliveryFailed, OperatorExitCode.AuditDeliveryFailed,
+        "COMMITTED/AUDIT_DELIVERY_FAILED/ESCALATE; inspect independently")]
+    [InlineData(OperatorCompactionOutcome.Unknown, OperatorExitCode.Unknown, "UNKNOWN/ESCALATE")]
+    public async Task Compact_execute_preserves_returned_certainty_when_cancellation_arrives_after_execution(
+        OperatorCompactionOutcome outcome, OperatorExitCode expected, string label)
+    {
+        using var stop = new CancellationTokenSource();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var client = new ExecuteResultClient(outcome, stop);
+        var result = await OperatorCompactionApplication.RunAsync(Valid("compact-execute", Confirmation), _ => client,
+            stdout, stderr, stop.Token);
+        Assert.Equal((int)expected, result);
+        Assert.Equal(1, client.Calls);
+        Assert.Equal("status=" + label + Environment.NewLine, stdout.ToString() + stderr.ToString());
+    }
+
+    private sealed class ExecuteResultClient(OperatorCompactionOutcome outcome, CancellationTokenSource stop) : IOperatorCompactionClient
+    {
+        internal int Calls;
+        public Task<OperatorCompactionResult> PreviewAsync(CompactOptions options, CancellationToken token) => throw new NotSupportedException();
+        public Task<OperatorCompactionResult> ExecuteAsync(CompactOptions options, CancellationToken token)
+        {
+            Calls++;
+            stop.Cancel();
+            return Task.FromResult(new OperatorCompactionResult(outcome));
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(10)]
+    [InlineData(11)]
+    [InlineData(12)]
+    [InlineData(13)]
+    [InlineData(14)]
+    [InlineData(15)]
+    public async Task Compaction_mutation_failure_attempts_every_cleanup_and_preserves_certainty(int failures)
+    {
+        var calls = new List<string>();
+        var primary = new IOException("mutation failed");
+        Action Cleanup(string name, int flag) => () =>
+        {
+            calls.Add(name);
+            if ((failures & flag) != 0) throw new IOException(name);
+        };
+        var result = await OperatorCompactionCommitBoundary.RunAsync(
+            _ => throw primary, () => calls.Add("commit"), Cleanup("rollback", 1), Cleanup("close", 2),
+            Cleanup("transaction", 4), Cleanup("connection", 8), CancellationToken.None);
+        Assert.Equal(new[] { "rollback", "close", "transaction", "connection" }, calls);
+        Assert.Same(primary, result.PrimaryFailure);
+        Assert.False(result.CommitStarted);
+        Assert.Equal(failures == 0 ? MaintenanceTransactionCertainty.RolledBack : MaintenanceTransactionCertainty.Unknown, result.Certainty);
+        Assert.Equal(failures, (int)result.CleanupFailures);
+    }
+
+    [Fact]
+    public async Task Compaction_cancellation_after_mutation_rolls_back_without_commit()
+    {
+        using var stop = new CancellationTokenSource();
+        var calls = new List<string>();
+        var result = await OperatorCompactionCommitBoundary.RunAsync(_ =>
+        {
+            calls.Add("compact"); stop.Cancel(); return Task.FromResult(1);
+        }, () => calls.Add("commit"), () => calls.Add("rollback"), () => calls.Add("close"),
+            () => calls.Add("transaction"), () => calls.Add("connection"), stop.Token);
+        Assert.Equal(MaintenanceTransactionCertainty.RolledBack, result.Certainty);
+        Assert.IsType<OperationCanceledException>(result.PrimaryFailure);
+        Assert.Equal(new[] { "compact", "rollback", "close", "transaction", "connection" }, calls);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public async Task Compaction_requires_exactly_one_changed_row(int changed)
+    {
+        var committed = false;
+        var rolledBack = false;
+        var result = await OperatorCompactionCommitBoundary.RunAsync(_ => Task.FromResult(changed),
+            () => committed = true, () => rolledBack = true, () => { }, () => { }, () => { }, CancellationToken.None);
+        Assert.False(committed);
+        Assert.True(rolledBack);
+        Assert.Equal(MaintenanceTransactionCertainty.RolledBack, result.Certainty);
+        Assert.IsType<MyDmsVn.Server.Application.Operations.WebOperationException>(result.PrimaryFailure);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Compaction_commit_throw_is_unknown_and_never_rollback_or_retry(bool cleanupFails)
+    {
+        var calls = new List<string>();
+        Action Cleanup(string name) => () => { calls.Add(name); if (cleanupFails) throw new IOException(name); };
+        var result = await OperatorCompactionCommitBoundary.RunAsync(_ => { calls.Add("compact"); return Task.FromResult(1); },
+            () => { calls.Add("commit"); throw new IOException("commit"); }, () => calls.Add("rollback"),
+            Cleanup("close"), Cleanup("transaction"), Cleanup("connection"), CancellationToken.None);
+        Assert.Equal(MaintenanceTransactionCertainty.Unknown, result.Certainty);
+        Assert.True(result.CommitStarted);
+        Assert.Equal(new[] { "compact", "commit", "close", "transaction", "connection" }, calls);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(14)]
+    public async Task Compaction_known_commit_survives_all_cleanup_failures(int failures)
+    {
+        var calls = new List<string>();
+        Action Cleanup(string name, int flag) => () => { calls.Add(name); if ((failures & flag) != 0) throw new IOException(name); };
+        var result = await OperatorCompactionCommitBoundary.RunAsync(_ => Task.FromResult(1),
+            () => calls.Add("commit"), () => calls.Add("rollback"), Cleanup("close", 2), Cleanup("transaction", 4),
+            Cleanup("connection", 8), CancellationToken.None);
+        Assert.True(result.CommitStarted);
+        Assert.Equal(MaintenanceTransactionCertainty.Committed, result.Certainty);
+        Assert.Equal(failures, (int)result.CleanupFailures);
+        Assert.Equal(new[] { "commit", "close", "transaction", "connection" }, calls);
+    }
+
+    [Fact]
+    public async Task Known_commit_with_failed_outcome_delivery_requires_escalation_without_second_compaction()
+    {
+        var run = new ExecutionProbe { FailOutcome = true };
+        Assert.Equal(OperatorCompactionOutcome.AuditDeliveryFailed, (await run.RunAsync()).Outcome);
+        Assert.Equal(1, run.Mutations);
+        Assert.Equal(1, run.Readbacks);
+        Assert.Equal(1, run.Finalizations);
+    }
+
+    [Theory]
+    [InlineData("attempt", OperatorCompactionOutcome.Unknown, 0, 0)]
+    [InlineData("commit", OperatorCompactionOutcome.Unknown, 1, 0)]
+    [InlineData("mismatch", OperatorCompactionOutcome.Unknown, 1, 1)]
+    [InlineData("readback", OperatorCompactionOutcome.Unknown, 1, 1)]
+    [InlineData("finalize", OperatorCompactionOutcome.AuditDeliveryFailed, 1, 1)]
+    [InlineData("partial", OperatorCompactionOutcome.AuditDeliveryFailed, 1, 1)]
+    [InlineData("none", OperatorCompactionOutcome.Completed, 1, 1)]
+    public async Task Compaction_execution_preserves_phase_certainty_and_single_attempt(string failure,
+        OperatorCompactionOutcome expected, int mutations, int readbacks)
+    {
+        var run = new ExecutionProbe { Failure = failure };
+        var result = await run.RunAsync();
+        Assert.Equal(expected, result.Outcome);
+        Assert.Equal(mutations, run.Mutations);
+        Assert.Equal(readbacks, run.Readbacks);
+        if (failure == "none")
+            Assert.Equal(new[] { "preview", "login", "attempt", "mutate", "readback", "Transaction", "Readback", "finalize" }, run.Calls);
+    }
+
+    private sealed class ExecutionProbe : IMaintenanceEvidenceStore
+    {
+        internal string Failure = "none";
+        internal bool FailOutcome;
+        internal int Mutations, Readbacks, Finalizations;
+        internal readonly List<string> Calls = new List<string>();
+        internal Task<OperatorCompactionResult> RunAsync()
+        {
+            Assert.True(CompactOptions.TryParse(Valid("compact-execute", Confirmation), out var options, out _));
+            return OperatorCompactionExecution.RunAsync(options!, this,
+                _ => { Calls.Add("preview"); return Task.FromResult(new OperatorCompactionResult(OperatorCompactionOutcome.Eligible)); },
+                _ => { Calls.Add("login"); return Task.FromResult("maintenance"); },
+                (receipt, login, token) =>
+                {
+                    Assert.Equal("case-123", receipt.CaseId);
+                    Assert.Equal("maintenance", login);
+                    Calls.Add("mutate"); Mutations++;
+                    return OperatorCompactionCommitBoundary.RunAsync(_ => Task.FromResult(1),
+                        () => { if (Failure == "commit") throw new IOException("commit"); },
+                        () => { }, () => { }, () => { }, () => { }, token);
+                },
+                _ => { Calls.Add("readback"); Readbacks++; if (Failure == "readback") throw new IOException("readback"); return Task.FromResult(Failure != "mismatch"); },
+                CancellationToken.None);
+        }
+        public Task<MaintenanceEvidenceReceipt> WriteAttemptAsync(MaintenanceEvidenceRecord record, CancellationToken token)
+        {
+            Calls.Add("attempt");
+            if (Failure == "attempt") throw new IOException("attempt");
+            return Task.FromResult(new MaintenanceEvidenceReceipt(record.CaseId, new[] { new string('a', 64) }, MaintenanceEvidenceDelivery.PrimaryOnly));
+        }
+        public Task<MaintenanceEvidenceReceipt> WriteOutcomeAsync(MaintenanceEvidenceRecord record, CancellationToken token)
+        {
+            Calls.Add(record.Phase.ToString());
+            if (FailOutcome) throw new IOException("outcome");
+            return Task.FromResult(new MaintenanceEvidenceReceipt(record.CaseId, new[] { new string('b', 64) }, MaintenanceEvidenceDelivery.PrimaryOnly));
+        }
+        public Task<MaintenanceEvidenceReceipt> FinalizeAndBackupAsync(string caseId, CancellationToken token)
+        {
+            Calls.Add("finalize"); Finalizations++;
+            if (Failure == "finalize") throw new IOException("finalize");
+            return Task.FromResult(new MaintenanceEvidenceReceipt(caseId, new[] { new string('b', 64) },
+                Failure == "partial" ? MaintenanceEvidenceDelivery.Escalate : MaintenanceEvidenceDelivery.Delivered,
+                new string('c', 64), new string('d', 64)));
+        }
+        public Task<MaintenanceEvidencePurge> PurgeExpiredAsync(string a, string b, string c, string d, string e, CancellationToken token) => throw new NotSupportedException();
+    }
+
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Maintenance_provisioning_is_exact_database_control_and_distinct_from_runtime_and_operator() =>
         OwnedPrincipals(async (scenario, principals) =>
@@ -468,6 +676,343 @@ public sealed class WebOperationMaintenanceOperatorTests
             Assert.Equal(before, await SnapshotAsync(scenario.Observer));
         });
 
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Compact_execute_release_changes_only_result_storage_and_second_attempt_is_no_change() =>
+        OwnedPrincipals(async (scenario, principals) =>
+        {
+            await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+            await SeedBusinessSentinelsAsync(scenario);
+            var operation = await SeedAsync(scenario, scenario.Epoch, true);
+            var before = await SnapshotAsync(scenario.Observer);
+            var immutable = await ImmutableAsync(scenario.Observer, operation);
+            using var roots = new ExecutionEvidenceRoots();
+            var args = ExecuteArguments(SqlArguments(scenario, scenario.Epoch, operation));
+            var result = await RunReleaseAsync(args, scenario, principals.Maintenance, roots: roots);
+            Assert.Equal((int)OperatorExitCode.Completed, result.ExitCode);
+            Assert.Equal("status=COMPLETED" + Environment.NewLine, result.StandardOutput);
+            Assert.Empty(result.StandardError);
+            Assert.Equal(immutable, await ImmutableAsync(scenario.Observer, operation));
+            Assert.Equal(("EXPIRED", 1), await scenario.Observer.QuerySingleAsync<(string, int)>(
+                "SELECT Disposition,CASE WHEN ResultBytes IS NULL THEN 1 ELSE 0 END FROM dbo.WebOperationJournal WHERE OperationId=@operation;", new { operation }));
+            var after = await SnapshotAsync(scenario.Observer);
+            Assert.Equal(before.Split('|').Where((_, index) => index != 1), after.Split('|').Where((_, index) => index != 1));
+            Assert.Equal(0, await scenario.Observer.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationTerminalAudit;"));
+            var repeat = await RunReleaseAsync(args, scenario, principals.Maintenance, roots: roots);
+            Assert.Equal((int)OperatorExitCode.Preview, repeat.ExitCode);
+            Assert.Equal("status=NO_CHANGE" + Environment.NewLine, repeat.StandardOutput);
+            Assert.Equal(after, await SnapshotAsync(scenario.Observer));
+            await Assert.ThrowsAsync<SqlException>(() => scenario.Observer.ExecuteAsync(
+                "DELETE dbo.WebOperationJournal WHERE OperationId=@operation;", new { operation }));
+            await Assert.ThrowsAsync<SqlException>(() => scenario.Observer.ExecuteAsync(
+                "UPDATE dbo.WebOperationJournal SET ResultDocumentId=42 WHERE OperationId=@operation;", new { operation }));
+            roots.AssertDelivered("case-123");
+        });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public async Task Compact_execute_rejects_noneligible_targets_without_changing_any_table()
+    {
+        foreach (var invalid in new[] { "retained", "actor", "operation", "current", "stored", "fingerprint", "cancelled" })
+            await OwnedPrincipals(async (scenario, principals) =>
+            {
+                await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+                var operation = await SeedAsync(scenario, scenario.Epoch, invalid != "retained");
+                var args = SqlArguments(scenario, scenario.Epoch, operation);
+                if (invalid == "actor") args = Replace(args, "--actor", (scenario.Actor + 1).ToString(CultureInfo.InvariantCulture));
+                if (invalid == "operation") args = Replace(args, "--operation", Guid.NewGuid().ToString("D"));
+                if (invalid == "current") args = Replace(args, "--current-epoch", Guid.NewGuid().ToString("D"));
+                if (invalid == "stored") args = Replace(args, "--stored-epoch", Guid.NewGuid().ToString("D"));
+                if (invalid == "fingerprint") args = Replace(args, "--fingerprint", new string('0', 64));
+                if (invalid == "cancelled")
+                {
+                    var cancelled = WebOperationResolutionScenario.Operation(scenario);
+                    var decision = await scenario.Transaction();
+                    await WebOperationResolutionScenario.Record(scenario, decision, cancelled);
+                    decision.Tx.Commit();
+                    args = Replace(SqlArguments(scenario, scenario.Epoch, cancelled.OperationId), "--fingerprint", Hex(cancelled.Fingerprint));
+                }
+                var before = await SnapshotAsync(scenario.Observer);
+                using var roots = new ExecutionEvidenceRoots();
+                var result = await RunReleaseAsync(ExecuteArguments(args), scenario, principals.Maintenance, roots: roots);
+                Assert.Equal((int)OperatorExitCode.Denied, result.ExitCode);
+                Assert.Equal(before, await SnapshotAsync(scenario.Observer));
+                Assert.Empty(Directory.GetFileSystemEntries(roots.Primary));
+            });
+    }
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Compact_execute_missing_private_evidence_prevents_mutation() =>
+        OwnedPrincipals(async (scenario, principals) =>
+        {
+            await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+            var operation = await SeedAsync(scenario, scenario.Epoch, true);
+            var before = await SnapshotAsync(scenario.Observer);
+            var result = await RunReleaseAsync(ExecuteArguments(SqlArguments(scenario, scenario.Epoch, operation)), scenario, principals.Maintenance);
+            Assert.Equal((int)OperatorExitCode.EnvironmentFailure, result.ExitCode);
+            Assert.Equal(before, await SnapshotAsync(scenario.Observer));
+        });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Compact_execute_attempt_evidence_failure_never_opens_mutation_transaction() =>
+        OwnedPrincipals(async (scenario, principals) =>
+        {
+            await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+            var operation = await SeedAsync(scenario, scenario.Epoch, true);
+            var before = await SnapshotAsync(scenario.Observer);
+            using var roots = new ExecutionEvidenceRoots();
+            var factory = new TrackingMaintenanceFactory(scenario, principals.Maintenance);
+            var evidence = new InterceptEvidence(roots) { FailAttempt = true };
+            var client = new SqlOperatorCompactionClient(factory, evidence);
+            var result = await client.ExecuteAsync(ParseExecute(scenario, operation), scenario.Stop.Token);
+            Assert.Equal(OperatorCompactionOutcome.Unknown, result.Outcome);
+            Assert.Equal(2, factory.Opens);
+            Assert.Equal(1, evidence.Attempts);
+            Assert.Equal(before, await SnapshotAsync(scenario.Observer));
+            Assert.Empty(Directory.GetFileSystemEntries(roots.Primary));
+        });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Compact_execute_fresh_readback_detects_epoch_change_after_known_commit() =>
+        OwnedPrincipals(async (scenario, principals) =>
+        {
+            await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+            var operation = await SeedAsync(scenario, scenario.Epoch, true);
+            using var roots = new ExecutionEvidenceRoots();
+            var factory = new TrackingMaintenanceFactory(scenario, principals.Maintenance)
+            {
+                BeforeOpen = async number =>
+                {
+                    if (number == 4)
+                        await scenario.Observer.ExecuteAsync("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=NEWID(),RotatedAtUtc=SYSUTCDATETIME();");
+                }
+            };
+            var result = await new SqlOperatorCompactionClient(factory, new InterceptEvidence(roots))
+                .ExecuteAsync(ParseExecute(scenario, operation), scenario.Stop.Token);
+            Assert.Equal(OperatorCompactionOutcome.Unknown, result.Outcome);
+            Assert.Equal(4, factory.Opens);
+            Assert.Equal("EXPIRED", await scenario.Observer.QuerySingleAsync<string>(
+                "SELECT Disposition FROM dbo.WebOperationJournal WHERE OperationId=@operation;", new { operation }));
+            Assert.Contains("\"transactionCertainty\":\"Committed\"", File.ReadAllText(Path.Combine(roots.Primary, "case-123", "02-transaction.json")));
+            Assert.Contains("\"readback\":\"Unknown\"", File.ReadAllText(Path.Combine(roots.Primary, "case-123", "03-readback.json")));
+            roots.AssertDelivered("case-123");
+        });
+
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
+    public Task Compact_execute_serializes_with_original_writer_before_mutation() => ExecuteWhileWriterHoldsFence("release");
+
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
+    public Task Compact_execute_cancelled_while_waiting_for_original_writer_does_not_mutate() => ExecuteWhileWriterHoldsFence("cancel");
+
+    [SqlServerFact(SqlTestCategory.SqlConcurrency)]
+    public Task Compact_execute_lock_timeout_does_not_mutate_or_retry() => ExecuteWhileWriterHoldsFence("timeout");
+
+    private static Task ExecuteWhileWriterHoldsFence(string mode) => OwnedPrincipals(async (scenario, principals) =>
+    {
+        await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+        var operation = await SeedAsync(scenario, scenario.Epoch, true);
+        var before = await SnapshotAsync(scenario.Observer);
+        using var roots = new ExecutionEvidenceRoots();
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(scenario.Stop.Token);
+        var factory = new TrackingMaintenanceFactory(scenario, principals.Maintenance);
+        var holder = await scenario.Transaction();
+        var holderSession = await holder.Sql.QuerySingleAsync<int>(new SqlTestCommand("SELECT @@SPID;", transaction: holder.Tx));
+        var evidence = new InterceptEvidence(roots)
+        {
+            AfterAttempt = async () =>
+            {
+                // The original runtime writer takes the exact lock through the journal, not a test-created lock spelling.
+                var expired = await Assert.ThrowsAsync<MyDmsVn.Server.Application.Operations.WebOperationException>(() =>
+                    scenario.Journal(holder).AdmitAsync(scenario.Operation(operation, FingerprintBytes()), scenario.Actor, scenario.Stop.Token));
+                Assert.Equal("Operation.ResultExpired", expired.Code);
+            }
+        };
+        var client = new SqlOperatorCompactionClient(factory, evidence);
+        var worker = scenario.Track(client.ExecuteAsync(ParseExecute(scenario, operation), stop.Token));
+        try
+        {
+            Assert.Same(factory.MutationSession.Task,
+                await Task.WhenAny(factory.MutationSession.Task, worker, Task.Delay(TimeSpan.FromSeconds(10), scenario.Stop.Token)));
+            var session = await factory.MutationSession.Task;
+            await scenario.Blocked(session, holderSession);
+            Assert.False(worker.IsCompleted);
+            if (mode == "release")
+            {
+                holder.Tx.Commit();
+                Assert.Equal(OperatorCompactionOutcome.Completed, (await worker).Outcome);
+                Assert.Equal(4, factory.Opens);
+                roots.AssertDelivered("case-123");
+            }
+            else
+            {
+                if (mode == "cancel") stop.Cancel();
+                if (mode == "timeout")
+                {
+                    var error = await Assert.ThrowsAsync<MyDmsVn.Server.Application.Operations.WebOperationException>(() => worker);
+                    Assert.Equal("Operation.Unavailable", error.Code);
+                }
+                else Assert.Equal(OperatorCompactionOutcome.Unknown, (await worker).Outcome);
+                holder.Tx.Rollback();
+                Assert.Equal(3, factory.Opens);
+                Assert.Equal(before, await SnapshotAsync(scenario.Observer));
+            }
+        }
+        finally
+        {
+            if (holder.Tx.Connection != null) holder.Tx.Rollback();
+            stop.Cancel();
+            try { await worker; } catch { /* Asserted above; ensure actual worker drain before principal cleanup. */ }
+        }
+        Assert.Equal(1, evidence.Attempts);
+    });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Compact_explicit_rollback_preserves_result_and_business_bytes() =>
+        OwnedPrincipals(async (scenario, principals) =>
+        {
+            await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+            var operation = await SeedAsync(scenario, scenario.Epoch, true);
+            var before = await SnapshotAsync(scenario.Observer);
+            using var connection = await principals.Maintenance.OpenAsync(scenario);
+            using var transaction = connection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted);
+            var context = new WebOperationJournalTests.Context(connection) { Tx = transaction };
+            var attempts = 0;
+            Assert.Equal(1, await new SqlWebOperationMaintenance(context).CompactAsync(scenario.Epoch, scenario.Epoch,
+                scenario.Actor, operation, Guid.NewGuid(), (_, _, _, _, _, _) => { attempts++; return Task.CompletedTask; }, scenario.Stop.Token));
+            Assert.Equal("EXPIRED", await connection.QuerySingleAsync<string>(new SqlTestCommand(
+                "SELECT Disposition FROM dbo.WebOperationJournal WHERE OperationId=@operation;", new { operation }, transaction: transaction)));
+            transaction.Rollback();
+            Assert.Equal(1, attempts);
+            Assert.Equal(before, await SnapshotAsync(scenario.Observer));
+        });
+
+    private static CompactOptions ParseExecute(Scenario scenario, Guid operation)
+    {
+        Assert.True(CompactOptions.TryParse(ExecuteArguments(SqlArguments(scenario, scenario.Epoch, operation)), out var options, out _));
+        return options!;
+    }
+
+    private sealed class TrackingMaintenanceFactory : IMaintenanceSqlConnectionFactory
+    {
+        private readonly MaintenanceSqlConnectionFactory _inner;
+        internal int Opens;
+        internal Func<int, Task>? BeforeOpen;
+        internal readonly TaskCompletionSource<int> MutationSession = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TrackingMaintenanceFactory(Scenario scenario, TestPrincipal principal) =>
+            _inner = new MaintenanceSqlConnectionFactory(principal.ConnectionString(scenario), principal.Name, principal.Name, principal.TargetIdentity);
+        public async Task<SqlConnection> OpenAsync(IOperatorTargetOptions options, CancellationToken token)
+        {
+            var number = ++Opens;
+            if (BeforeOpen != null) await BeforeOpen(number);
+            var connection = await _inner.OpenAsync(options, token);
+            if (number == 3)
+                MutationSession.TrySetResult(await connection.QuerySingleAsync<int>("SELECT @@SPID;"));
+            return connection;
+        }
+    }
+
+    private sealed class InterceptEvidence : IMaintenanceEvidenceStore
+    {
+        private readonly MaintenanceEvidenceStore _inner;
+        internal bool FailAttempt;
+        internal int Attempts;
+        internal Func<Task>? AfterAttempt;
+        internal InterceptEvidence(ExecutionEvidenceRoots roots) => _inner = new MaintenanceEvidenceStore(
+            new MaintenanceEvidencePolicy(roots.Primary, roots.Backup, TimeSpan.FromDays(90)));
+        public async Task<MaintenanceEvidenceReceipt> WriteAttemptAsync(MaintenanceEvidenceRecord record, CancellationToken token)
+        {
+            Attempts++;
+            if (FailAttempt) throw new IOException("attempt unavailable");
+            var receipt = await _inner.WriteAttemptAsync(record, token);
+            if (AfterAttempt != null) await AfterAttempt();
+            return receipt;
+        }
+        public Task<MaintenanceEvidenceReceipt> WriteOutcomeAsync(MaintenanceEvidenceRecord record, CancellationToken token) => _inner.WriteOutcomeAsync(record, token);
+        public Task<MaintenanceEvidenceReceipt> FinalizeAndBackupAsync(string caseId, CancellationToken token) => _inner.FinalizeAndBackupAsync(caseId, token);
+        public Task<MaintenanceEvidencePurge> PurgeExpiredAsync(string a, string b, string c, string d, string e, CancellationToken token) => throw new NotSupportedException();
+    }
+
+    private static Task SeedBusinessSentinelsAsync(Scenario scenario) => scenario.Observer.ExecuteAsync(@"
+INSERT dbo.Products(Code,Name,Unit) VALUES(N'B03',N'Private business sentinel',N'ea');
+DECLARE @product int=SCOPE_IDENTITY();
+INSERT dbo.Warehouses(Code,Name) VALUES(N'B03',N'Sentinel warehouse');
+DECLARE @warehouse int=SCOPE_IDENTITY();
+INSERT dbo.Employees(Code,Name) VALUES(N'B03',N'Sentinel employee');
+DECLARE @employee int=SCOPE_IDENTITY();
+INSERT dbo.Customers(Code,Name) VALUES(N'B03',N'Sentinel customer');
+DECLARE @customer int=SCOPE_IDENTITY();
+INSERT dbo.GoodsReceipts(ReceiptNo,ReceiptDate,WarehouseId,EmployeeId,Status,CreatedByUserId,PostedAtUtc,PostedByUserId)
+VALUES(N'B03-R','20260101',@warehouse,@employee,'Posted',@actor,SYSUTCDATETIME(),@actor);
+DECLARE @receipt bigint=SCOPE_IDENTITY();
+INSERT dbo.GoodsReceiptLines(ReceiptId,[LineNo],ProductId,Quantity,UnitCost,CreatedByUserId)
+VALUES(@receipt,1,@product,2,7,@actor);
+DECLARE @receiptLine bigint=SCOPE_IDENTITY();
+INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId)
+VALUES(@warehouse,@product,'GoodsReceipt',@receipt,@receiptLine,2,SYSUTCDATETIME(),@actor);
+DECLARE @ledger bigint=SCOPE_IDENTITY();
+INSERT dbo.StockValuationEntries(LedgerId,ValueChange) VALUES(@ledger,14);
+INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@warehouse,@product,2,14);
+SET IDENTITY_INSERT dbo.SalesReceipts ON;
+INSERT dbo.SalesReceipts(SaleId,SaleNo,SaleDate,WarehouseId,EmployeeId,CustomerId,CreatedByUserId)
+VALUES(41,N'B03-S','20260102',@warehouse,@employee,@customer,@actor);
+SET IDENTITY_INSERT dbo.SalesReceipts OFF;
+INSERT dbo.SalesReceiptLines(SaleId,[LineNo],ProductId,Qty,Unit,IsGift,LineAmount,UnitPrice,CreatedByUserId)
+VALUES(41,1,@product,1,N'ea',0,9,9,@actor);", new { actor = scenario.Actor });
+
+    private static Task<string> ImmutableAsync(SqlConnection connection, Guid operation) => connection.QuerySingleAsync<string>(
+        "SELECT (SELECT ActorUserId,OperationId,DeploymentEpoch,ContractVersion,CodecVersion,OperationKind,RequestTargetId,RequestFingerprint," +
+        "ResultDocumentId,CreatedAtUtc,CompletedAtUtc,ResultExpiresAtUtc FROM dbo.WebOperationJournal WHERE OperationId=@operation FOR JSON PATH,INCLUDE_NULL_VALUES);", new { operation });
+
+    private static string[] ExecuteArguments(string[] preview)
+    {
+        Assert.True(CompactOptions.TryParse(preview, out var parsed, out _));
+        var args = (string[])preview.Clone();
+        args[0] = "compact-execute";
+        return args.Concat(new[] { "--confirm", parsed!.ConfirmationText.Replace("compact-preview|", "compact-execute|") }).ToArray();
+    }
+
+    private sealed class ExecutionEvidenceRoots : IDisposable
+    {
+        private readonly string _workspace = Path.Combine(Path.GetTempPath(), "b03-execute-" + Guid.NewGuid().ToString("N"));
+        internal string Primary => Path.Combine(_workspace, "primary");
+        internal string Backup => Path.Combine(_workspace, "backup");
+        internal ExecutionEvidenceRoots()
+        {
+            Directory.CreateDirectory(_workspace);
+            using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+            foreach (var path in new[] { Primary, Backup })
+            {
+                var acl = new System.Security.AccessControl.DirectorySecurity();
+                acl.SetOwner(identity.User!);
+                acl.SetAccessRuleProtection(true, false);
+                acl.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(identity.User!,
+                    System.Security.AccessControl.FileSystemRights.FullControl, System.Security.AccessControl.AccessControlType.Allow));
+                acl.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                    new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid, null),
+                    System.Security.AccessControl.FileSystemRights.FullControl, System.Security.AccessControl.AccessControlType.Allow));
+                Directory.CreateDirectory(path, acl);
+            }
+        }
+        internal void AssertDelivered(string caseId)
+        {
+            foreach (var root in new[] { Primary, Backup })
+            {
+                Assert.Equal(4, Directory.GetFiles(Path.Combine(root, caseId)).Length);
+                var manifest = File.ReadAllText(Path.Combine(root, caseId, "manifest.json"));
+                Assert.Contains("Delivered", manifest);
+                Assert.DoesNotContain("private-payload", manifest);
+            }
+            foreach (var name in new[] { "01-attempt.json", "02-transaction.json", "03-readback.json" })
+                Assert.Equal(File.ReadAllBytes(Path.Combine(Primary, caseId, name)), File.ReadAllBytes(Path.Combine(Backup, caseId, name)));
+        }
+        public void Dispose()
+        {
+            Assert.Equal(Path.Combine(Path.GetFullPath(Path.GetTempPath()), Path.GetFileName(_workspace)), Path.GetFullPath(_workspace));
+            Assert.All(Directory.GetDirectories(_workspace, "*", SearchOption.AllDirectories), path =>
+                Assert.Equal((FileAttributes)0, File.GetAttributes(path) & FileAttributes.ReparsePoint));
+            Directory.Delete(_workspace, true);
+            Assert.False(Directory.Exists(_workspace));
+        }
+    }
+
     private static Task OwnedPrincipals(Func<Scenario, TestPrincipals, Task> body) =>
         WebOperationResolutionScenario.Owned(async scenario =>
         {
@@ -546,7 +1091,8 @@ public sealed class WebOperationMaintenanceOperatorTests
             "WebDeploymentState ORDER BY Id", "WebOperationJournal ORDER BY ActorUserId,OperationId",
             "WebOperationTerminalAudit ORDER BY ActorUserId,OperationId", "SalesReceipts ORDER BY SaleId",
             "SalesReceiptLines ORDER BY SaleLineId", "GoodsReceipts ORDER BY ReceiptId", "GoodsReceiptLines ORDER BY ReceiptLineId",
-            "StockBalances ORDER BY WarehouseId,ProductId", "StockLedger ORDER BY LedgerId", "StockValuationEntries ORDER BY LedgerId"
+            "StockBalances ORDER BY WarehouseId,ProductId", "StockLedger ORDER BY LedgerId", "StockValuationEntries ORDER BY LedgerId",
+            "Products ORDER BY ProductId", "Warehouses ORDER BY WarehouseId", "Employees ORDER BY EmployeeId", "Customers ORDER BY CustomerId"
         })
             snapshot.Add(await connection.QuerySingleAsync<string>(
                 "SELECT COALESCE((SELECT * FROM dbo." + source + " FOR JSON PATH,INCLUDE_NULL_VALUES),N'[]');"));
@@ -554,7 +1100,7 @@ public sealed class WebOperationMaintenanceOperatorTests
     }
 
     private static async Task<GuiProcessResult> RunReleaseAsync(string[] args, Scenario scenario, TestPrincipal? maintenance,
-        TestPrincipal? operatorOnly = null, string? expectedUser = null, string? expectedLogin = null, string? expectedTargetIdentity = null)
+        TestPrincipal? operatorOnly = null, string? expectedUser = null, string? expectedLogin = null, string? expectedTargetIdentity = null, ExecutionEvidenceRoots? roots = null)
     {
         var executable = Path.Combine(AppContext.BaseDirectory, "MyDmsVn.WebOperation.Operator.exe");
         Assert.True(File.Exists(executable));
@@ -582,6 +1128,13 @@ public sealed class WebOperationMaintenanceOperatorTests
             environment[OperatorCompactionApplication.ConnectionStringEnvironmentVariable] = maintenance.ConnectionString(scenario);
             environment[OperatorCompactionApplication.DatabaseUserEnvironmentVariable] = expectedUser ?? maintenance.Name;
             environment[OperatorCompactionApplication.LoginEnvironmentVariable] = expectedLogin ?? maintenance.Name;
+        }
+        environment.Remove("MYDMSVN_WEB_OPERATION_MAINTENANCE_EVIDENCE_ROOT");
+        environment.Remove("MYDMSVN_WEB_OPERATION_MAINTENANCE_EVIDENCE_BACKUP_ROOT");
+        if (roots != null)
+        {
+            environment["MYDMSVN_WEB_OPERATION_MAINTENANCE_EVIDENCE_ROOT"] = roots.Primary;
+            environment["MYDMSVN_WEB_OPERATION_MAINTENANCE_EVIDENCE_BACKUP_ROOT"] = roots.Backup;
         }
         var targetIdentity = expectedTargetIdentity ?? maintenance?.TargetIdentity;
         if (!string.IsNullOrEmpty(targetIdentity))
@@ -736,6 +1289,8 @@ public sealed class WebOperationMaintenanceOperatorTests
         private readonly OperatorCompactionOutcome _outcome;
 
         public PreviewClient(OperatorCompactionOutcome outcome) => _outcome = outcome;
+
+        public Task<OperatorCompactionResult> ExecuteAsync(CompactOptions options, CancellationToken token) => throw new Xunit.Sdk.XunitException("Preview reached execute.");
 
         public int PreviewCalls { get; private set; }
 

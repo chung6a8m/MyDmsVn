@@ -13,6 +13,8 @@ public static class OperatorCompactionApplication
     public const string DatabaseUserEnvironmentVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_DATABASE_USER";
     public const string LoginEnvironmentVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_LOGIN";
     public const string TargetIdentityEnvironmentVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_TARGET_IDENTITY";
+    public const string EvidenceRootEnvironmentVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_EVIDENCE_ROOT";
+    public const string EvidenceBackupRootEnvironmentVariable = "MYDMSVN_WEB_OPERATION_MAINTENANCE_EVIDENCE_BACKUP_ROOT";
     private const string TargetUsage = " --environment <label> --database <name> --current-epoch <guid> --stored-epoch <guid> --actor <id> --operation <guid-v4> --fingerprint <sha256> --correlation <guid-v4> --case <id> [--timeout-seconds <1..25>]";
 
     public static async Task<int> RunAsync(string[] args, Func<CompactOptions, IOperatorCompactionClient> clientFactory,
@@ -36,8 +38,6 @@ public static class OperatorCompactionApplication
             stdout.WriteLine("Expected owned target: " + TargetIdentityEnvironmentVariable);
             return (int)OperatorExitCode.Completed;
         }
-        if (options.Execute)
-            return WriteStatus(stderr, "DENIED", OperatorExitCode.Denied);
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(options.TimeoutSeconds));
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
@@ -45,8 +45,20 @@ public static class OperatorCompactionApplication
         {
             linked.Token.ThrowIfCancellationRequested();
             var client = clientFactory(options);
-            var result = await client.PreviewAsync(options, linked.Token).ConfigureAwait(false);
-            linked.Token.ThrowIfCancellationRequested();
+            var result = options.Execute
+                ? await client.ExecuteAsync(options, linked.Token).ConfigureAwait(false)
+                : await client.PreviewAsync(options, linked.Token).ConfigureAwait(false);
+            // A cancellation observed after execution cannot erase known Commit or audit-delivery status.
+            if (!options.Execute) linked.Token.ThrowIfCancellationRequested();
+            if (options.Execute)
+                return result?.Outcome switch
+                {
+                    OperatorCompactionOutcome.Completed => WriteStatus(stdout, "COMPLETED", OperatorExitCode.Completed),
+                    OperatorCompactionOutcome.NoChange => WriteStatus(stdout, "NO_CHANGE", OperatorExitCode.Preview),
+                    OperatorCompactionOutcome.AuditDeliveryFailed => WriteStatus(stderr,
+                        "COMMITTED/AUDIT_DELIVERY_FAILED/ESCALATE; inspect independently", OperatorExitCode.AuditDeliveryFailed),
+                    _ => WriteStatus(stderr, "UNKNOWN/ESCALATE", OperatorExitCode.Unknown)
+                };
             return result?.Outcome switch
             {
                 OperatorCompactionOutcome.Eligible => WriteStatus(stdout, "ELIGIBLE", OperatorExitCode.Preview),

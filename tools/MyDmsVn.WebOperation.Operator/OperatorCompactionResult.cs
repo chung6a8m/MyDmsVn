@@ -21,5 +21,6 @@ public sealed class OperatorCompactionResult
 
 public interface IOperatorCompactionClient
 {
+    Task<OperatorCompactionResult> ExecuteAsync(CompactOptions options, CancellationToken cancellationToken);
     Task<OperatorCompactionResult> PreviewAsync(CompactOptions options, CancellationToken cancellationToken);
 }
