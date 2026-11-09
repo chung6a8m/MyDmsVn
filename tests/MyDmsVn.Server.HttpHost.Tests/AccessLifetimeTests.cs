@@ -51,7 +51,33 @@ public sealed class AccessLifetimeTests
         WithEnvironment(null, () => Assert.Equal(enabled, WebHostOptions.FromEnvironment().Web4Enabled), mode);
     }
 
-    private static void WithEnvironment(string? lifetime, Action check, string? mode = "legacy-web11")
+    [Theory]
+    [InlineData(null, null, false)]
+    [InlineData("disabled", null, false)]
+    [InlineData("receipt-v1", "candidate-1", true)]
+    public void Resend_environment_is_explicit_and_fail_closed(string? feature, string? candidate, bool enabled)
+    {
+        WithEnvironment(null, () =>
+        {
+            var options = WebHostOptions.FromEnvironment();
+            Assert.Equal(enabled, options.Web6ResendEligibilityEnabled);
+            Assert.Equal(candidate, options.Web6CandidateId);
+        }, "web5", feature, candidate);
+    }
+
+    [Theory]
+    [InlineData("receipt-v1", null, "web5")]
+    [InlineData("receipt-v1", "candidate-1", "web4")]
+    [InlineData("disabled", "candidate-1", "web5")]
+    [InlineData("unknown", null, "web5")]
+    public void Invalid_resend_environment_refuses_startup(string feature, string? candidate, string mode)
+    {
+        WithEnvironment(null, () => Assert.Throws<InvalidOperationException>(() => WebHostOptions.FromEnvironment()),
+            mode, feature, candidate);
+    }
+
+    private static void WithEnvironment(string? lifetime, Action check, string? mode = "legacy-web11",
+        string? resend = null, string? candidate = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -62,6 +88,8 @@ public sealed class AccessLifetimeTests
             ["MYDMSVN_WEB_JWT_KEYS"] = "active:" + Convert.ToBase64String(Encoding.UTF8.GetBytes("test-only-access-lifetime-key-32-bytes-minimum")),
             ["MYDMSVN_WEB_ACCESS_LIFETIME_MINUTES"] = lifetime,
             ["MYDMSVN_WEB_OPERATION_MODE"] = mode,
+            ["MYDMSVN_WEB6_RESEND_ELIGIBILITY"] = resend,
+            ["MYDMSVN_WEB6_CANDIDATE_ID"] = candidate,
         };
         var previous = new Dictionary<string, string?>();
         foreach (var name in settings.Keys) previous[name] = Environment.GetEnvironmentVariable(name);
