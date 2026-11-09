@@ -1,6 +1,6 @@
 # WEB6 B03 Maintenance & Recovery Rehearsal Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION — Owner 2026-11-09.** This is a historical implementation record, not an active execution queue. [Owner closeout](../../evidence/web6/20261109-b03-maintenance-recovery.md#owner-bounded-closeout-20261109) retains historical 342/344 FAIL, full 12-selection candidate NOT ACCEPTED and protected hosted SQL NOT RUN with explicitly accepted bounded exceptions. R2e 9/9 and R2f ATTEMPT_05 1/1 remain bounded PASS only. Self-hosted encrypted witness infrastructure is DEFERRED / UNSCHEDULED. The original steps/checkboxes below are retained for provenance; they do not authorize implementation, rerun, cleanup, tags or dispatch. B05 needs a separately selected prerequisite audit, explicit B03 dependency waiver and paired frontend F02/F03 readiness. Manual resend OFF; staging NOT ACCEPTED; production NO-GO.
 
 **Goal:** Deliver a guarded schema13 compaction CLI, durable sanitized audit/case evidence, COMMITTED-result-unavailable reconciliation, and an owned backup/restore/epoch rehearsal without widening runtime or B02 operator authority.
 

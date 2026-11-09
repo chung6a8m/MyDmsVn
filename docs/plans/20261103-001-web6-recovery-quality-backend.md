@@ -27,12 +27,12 @@
 |---|---|---|---|---|
 | WEB6-01 | **B01** source/contract and threat gate | **F01** frozen request and UX source gate | Main/archived WEB5 evidence | Contract and risk/eligibility matrix, no runtime |
 | WEB6-02 | **B02** separate operator CLI: inspect, preview, verified negative command | F01 reviews support wording | B01; exact schema13 SQL fixture/operator role | Read-only CLI PR then explicit destructive-command PR |
-| WEB6-03 | **B03** audited compaction, retention, epoch/restore and support reconciliation | **F02** persist manual resend claim | B01 + B04 primary SQL eligibility; B02 for full operator workflow | Separate backend and frontend PRs |
+| WEB6-03 | **B03** audited compaction, retention, epoch/restore and support reconciliation | **F02** persist manual resend claim | Historical dependencies: B01/B04 primary SQL eligibility and B02 operator workflow | Backend CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION; frontend remains separately owned |
 | WEB6-04 | **B04** live same-key resend/fence and security evidence | **F03** user-confirmed resend UI and native browser proof | B01 baseline; F02 admission can begin only after B04 proof | Six-command race matrix, no automatic retry |
-| WEB6-05 | **B05** one-candidate host/cutover/workload/operational pilot | **F04** paired real-browser/SQL acceptance | B02/B03/B04 + F02/F03 merged, current source pinned | Nonproduction admission/measurements |
+| WEB6-05 | **B05** one-candidate host/cutover/workload/operational pilot | **F04** paired real-browser/SQL acceptance | B02/B04 merged; B03 bounded closure plus explicit dependency waiver; separately selected prerequisite audit and F02/F03 readiness; current pair pinned | Nonproduction admission/measurements |
 | WEB6-06 | **B06** dossier/Owner decision and closeout | **F05** support handoff and frontend candidate record | B05/F04 evidence; known deferred register | Explicit bounded/GO-NO-GO decision, no implied production |
 
-B02 read-only CLI and B04 SQL-only resend proofs can proceed in parallel after B01, but **F02's enabled resend path is downstream of B04 SQL proof**. The bounded B03 rehearsal may be independent of F02 implementation. Integration is pair-locked; never cite a passing old compiled host as proof for changed runtime bits.
+The original ordering allowed B02 read-only CLI and B04 SQL-only proof in parallel after B01, with B03 rehearsal independent of F02. B02/B04 are now merged and B03 is closed bounded. **F02's enabled resend path remains downstream of B04 SQL proof and its own frontend/Owner admission**. Integration is pair-locked; never cite a passing old compiled host as proof for changed runtime bits.
 
 ## 2. B01 — Source and policy contract (WEB6-01)
 
@@ -59,9 +59,11 @@ Implement a **separate executable operator CLI**, preferably a small `net48` con
 
 **Exit:** executable help, deterministic testable results, protected SQL tests and attended simulated operator run; capability is not an operator production release.
 
-**B02b Owner acceptance (2026-11-09):** guarded dry-run/typed execute, restricted-principal Release EXE, transaction/readback and focused six-kind/race/oracle tests are implemented and verified at the source recorded in [B02b evidence](../evidence/web6/20261103-b02b-operator-decision.md). Exact `2d47687` protected run `42543717784` passed 59+40+26+2 with zero fail/skip/retry, unchanged source, restricted SQL-login capability and verified owned instance removal. B6-OPS-03/04 are **PASS / OWNER ACCEPTED BOUNDED NONPRODUCTION**. The unperformed actual-provider Commit/cleanup fault is `OWNER_ACCEPTED_BOUNDED_GAP` for B02 only; it is not provider-specific or production PASS. B02 is complete within scope and B03 may begin separately. This does not enable resend, staging acceptance or production release.
+**B02b Owner acceptance (2026-11-09):** guarded dry-run/typed execute, restricted-principal Release EXE, transaction/readback and focused six-kind/race/oracle tests are implemented and verified at the source recorded in [B02b evidence](../evidence/web6/20261103-b02b-operator-decision.md). Exact `2d47687` protected run `42543717784` passed 59+40+26+2 with zero fail/skip/retry, unchanged source, restricted SQL-login capability and verified owned instance removal. B6-OPS-03/04 are **PASS / OWNER ACCEPTED BOUNDED NONPRODUCTION**. The unperformed actual-provider Commit/cleanup fault is `OWNER_ACCEPTED_BOUNDED_GAP` for B02 only; it is not provider-specific or production PASS. B02 is complete within scope; [PR #102](https://github.com/chung6a8m/MyDmsVn/pull/102) is MERGED. B03 has the separate bounded closeout below. This does not enable resend, staging acceptance or production release.
 
 ## 4. B03 — Maintenance, recovery, audit and restoration (WEB6-03)
+
+**Closed execution scope:** CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION, Owner 2026-11-09. The requirements below remain reference requirements; they are not an active queue. See the checkpoint and retained exceptions below.
 
 Extend CLI with independent `compact-preview`/`compact-execute` (exact actor/operation/epoch, result expiry only) through `SqlWebOperationMaintenance.CompactAsync`. **Current source explicitly requires database-level `CONTROL` inside `CompactAsync`; the B02 restricted operator role has no such grant.** B03 must select an explicit *separate* short-lived privileged maintenance identity for an owned test database with Owner-approved scope, or introduce a reviewed narrow stored procedure/permission model under a separately versioned SQL migration. Never elevate web runtime or the ordinary B02 operator role merely to pass compaction. Preserve immutable actor/key/fingerprint/epoch tombstones; never bulk DELETE operation journal or original terminal audit. Seven days is **original-result retention**, not an automatic deletion or SLA. Manual retention/compaction is acceptable; automatic scheduler is out-of-scope unless independently selected.
 
@@ -73,11 +75,13 @@ Implement a **positive-case operator reconciliation** for `COMMITTED/RESULT_UNAV
 
 **Exit:** six-case operator decision tree, one attended dry-run/execute positive and negative rehearsal with independent SQL oracle, recovery fail-closed testing, bounded logs, trusted cleanup; mark any OS-dependent gate NOT RUN, never fake a full IIS PASS.
 
-**B03 checkpoint (2026-11-09):** [IMPLEMENTED / FULL CANDIDATE BLOCKED; PROTECTED CI NOT RUN / BLOCKED](../evidence/web6/20261109-b03-maintenance-recovery.md). The historical 342/344 candidate remains failed; subsequent R2e NativeSafety and R2f ATTEMPT_05 focused manifest gates are independently accepted within their recorded scopes. The selected [implementation plan](../superpowers/plans/2026-11-09-web6-b03-maintenance-recovery.md) supplies separate maintenance authority, private 90-day evidence, compaction, reconciliation and owned restore tests. Durable private witness storage across runner loss blocks full workflow integration; a persistent encrypted self-hosted evidence volume is Owner-authorized for design only. B6-OPS-05 and B6-MNT-01..03 remain BLOCKED pending full-candidate/protected evidence and Owner acceptance; no attended operator acceptance is claimed.
+**B03 checkpoint (Owner 2026-11-09): CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION.** [Owner closeout and retained evidence](../evidence/web6/20261109-b03-maintenance-recovery.md#owner-bounded-closeout-20261109) close the B03 execution queue in [PR #103](https://github.com/chung6a8m/MyDmsVn/pull/103). Historical 342/344 remains FAIL; full 12-selection candidate NOT ACCEPTED and protected hosted SQL NOT RUN are explicitly accepted exceptions for this bounded closure only. R2e 9/9 and R2f ATTEMPT_05 1/1 remain bounded PASS. The [implementation plan](../superpowers/plans/2026-11-09-web6-b03-maintenance-recovery.md) is now a historical implementation record. Self-hosted encrypted witness infrastructure is DEFERRED / UNSCHEDULED. B6-OPS-05 and B6-MNT-01..03 have the same bounded-exception disposition; no attended, full-candidate, staging or production acceptance is claimed.
 
 Current positive proof is only SalesPost/ReceiptPost; all four current Draft Create/Update kinds are UNKNOWN without original rowversion/line witnesses. Superseded Draft proof needs complete unambiguous retained-committed lineage ending in immutable Post and cannot exclude unjournaled Local/admin delete-recreate. Restored current operation is a restricted-runtime journal Admit+Complete probe; full HTTP/business handlers and service RPO/RTO are NOT RUN. Provider/network/process-crash compaction proof is NOT RUN, not PASS. Task 2 retains the deferred Minor to reject default DateTimeOffset before evidence creation. TEST_CLEANUP_ONLY is capability-gated hygiene and never workflow success. Manual resend OFF; staging NOT ACCEPTED; production NO-GO.
 
 ## 5. B04 — SQL replay proof and readiness for frontend resend (WEB6-04)
+
+**Merged bounded checkpoint:** [PR #100](https://github.com/chung6a8m/MyDmsVn/pull/100) is MERGED; [B04 evidence](../evidence/web6/20261103-b04-same-key-sql-replay.md) retains its accepted scope and limits, including B6-RPL-05 PARTIAL / OWNER DECISION PENDING. Merge does not enable manual resend or complete frontend F02/F03.
 
 This milestone proves the **existing HTTP mutation path**, not an unreviewed new privileged "resend" endpoint. Expand SQL concurrency/integration tests on `SqlWebOperationJournal`, `WebOperationCrashSqlTests`, `WebOperationResolutionTests`, `WebOperationHttpSqlTests.Web5Resolution` and `WebHostIisExpressTests.Recovery`. Use one original immutable operation ID, method, route, target, fingerprint/body and original actor/epoch.
 
@@ -88,6 +92,8 @@ Audit the HTTP transport/server code for middleware retries, redirect, 401/refre
 **Exit:** protected Windows/net48 SQL CI with nonzero discovery, real OS-death/fence proof, locally owned IIS Express/SQL tests where permitted, no unresolved P0/P1, provenance TRX/counts/hash and independent cleanup. Without B04 PASS, frontend can implement gated code but cannot enable manual resend even in a pilot.
 
 ## 6. B05 — One-candidate production-like integration and operational hardening (WEB6-05)
+
+**Not automatically activated by B03 closure.** B02 PR #102 and B04 PR #100 are MERGED. B05 first requires a **separately Owner-selected prerequisite audit**, an **explicit B03 dependency waiver** for the unaccepted full candidate/unrun hosted proof, and **paired frontend F02/F03 readiness** with exact source/evidence pins. The B03 closure itself grants no dependency waiver or pilot authority.
 
 Use [candidate runbook](../development/WEB6_CANDIDATE_RUNBOOK.md). Freeze exact backend head and **published binaries**, frontend head and **compiled dist**, lockfiles, JSON contracts, SQL schema13 fingerprint, `web5` mode, separate runtime/operator principals, process/config/TLS origin and hash manifest. PR #95's `VerifyHost → Admit` must execute **before any HTTPS scenario**, with exclusive queue/worker route precedence proof, and process/queue absence **before owned SQL cleanup**. No PID4, foreign listener, proxy, localhost health alone or netsh parser fallback as proof. Reverify on process restart/cutover.
 
@@ -114,7 +120,7 @@ Archive **WEB6 only** after a new named Owner disposition; do not edit WEB5 froz
 | B01 `codex/web6-b01-source-policy` | docs/design, contract vector inventory, no runtime | Owner accept eligibility/risk matrix |
 | B02a `codex/web6-b02-operator-inspect` | isolated operator console help/read-only inspect + SQL tests | runtime operator denial, no DML, SQL CI |
 | B02b `codex/web6-b02-operator-decision` | bounded dry-run/execute terminal command, audit tests | operator-first/writer-first + rollback |
-| B03 `codex/web6-b03-maintenance-rehearsal` | controlled compaction, case reconciliation, restore/epoch drill | independent SQL oracle and fail-closed cleanup |
+| B03 `codex/web6-b03-maintenance-recovery` | closed bounded implementation record, PR #103 | CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION; retained full-candidate/hosted gaps, no active queue |
 | B04 `codex/web6-b04-same-key-proof` | SQL/HTTP crash/race gate, optional additive read-only admission | all six kinds, no double business effect |
 | B05a `codex/web6-b05-operations` | audit/limiter, leak/negative hardening and tests | Windows/SQL-free + live owned evidence |
 | B05b `codex/web6-b05-paired-candidate` | paired IIS Express/SQL/browser workload/cutover and metrics | exact hashes, no foreign or quarantined resources |
@@ -126,13 +132,13 @@ Every PR: source and test baseline; scoped RED→GREEN and focused full gates; i
 
 Record existing accepted constraints rather than accumulating repeated debt: full IIS W3SVC/WAS and remaining attended Narrator NOT RUN, trusted reverse-proxy topology N/A only on direct host, two historical SQL allocations quarantined, no Docker Desktop/Windows VM required for B01–B04, and CI/runner rights require explicit grants. An environment limitation is **not** a substitute for code/SQL safety gates that can execute on the existing test machine.
 
-**Initial checklist** (no item is implied done by this document):
+**Current closure checklist** (checked bounded dispositions are not full acceptance):
 
 - [ ] B01 source/eligibility/risk freeze.
-- [ ] B02a read-only operator CLI.
-- [ ] B02b guarded operator decision/SQL audit.
-- [ ] B03 retention/compaction/support/restore drill.
-- [ ] B04 six-command same-key crash/fence/negative SQL proof.
+- [x] B02a read-only operator CLI — bounded merged scope.
+- [x] B02b guarded operator decision/SQL audit — PR #102 MERGED, bounded acceptance.
+- [x] B03 — CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION; full candidate NOT ACCEPTED, hosted SQL NOT RUN; no active execution queue.
+- [x] B04 six-command same-key crash/fence/negative SQL proof — PR #100 MERGED, retained bounded scope.
 - [ ] F02/F03 gated consent/durable dispatch/UI/browser proof in frontend repository.
 - [ ] B05/F04 pinned-pair IIS Express/SQL/Chromium/Edge/cutover/workload/recovery evidence.
 - [ ] B06/F05 final readiness dossier and Owner disposition.
@@ -145,6 +151,6 @@ Three earlier SQL-free 8/9 safety attempts retained synthetic ACL-drift cases wi
 
 [Subsequent bounded evidence](../evidence/web6/20261109-b03-maintenance-recovery.md#subsequent-remediation-20261109) independently accepted **R2e NativeSafety: 9/9, 60 ordered ACL markers and seven immutable checkpoints**, with verified candidate/checkpoint removal and process drain; and **R2f ATTEMPT_05: focused SQL ownership-manifest 1/1**, with bound Intent/Original/Complete, native receipt, fresh independent SQL absence, subject-control absence, exact candidate-root removal and process drain. R2f's administrative master allocator preflight remains **not restricted-runtime/operator proof**. Its three witness records/private controls remain retained. Neither gate replaces the failed full candidate or makes seven NativeSafety phases interchangeable with 28 B03Candidate phases.
 
-**Full 12-selection / 28-checkpoint candidate and protected workflow remain BLOCKED.** Current GitHub-hosted ephemeral storage has no reviewed durable private Intent/Original destination and acknowledgment before SQL side effects; final sanitized hashes cannot replace that witness, and raw private identifiers must not be uploaded. Exact-Fact supervision, full reconciliation and pre-SQL preflight wiring remain incomplete. The Owner authorized **design only** for a self-hosted runner with a persistent encrypted evidence volume: **NOT IMPLEMENTED / NOT VERIFIED**, with no provisioning, runtime, cleanup or dispatch authority.
+**Owner closeout (2026-11-09): CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION.** The full 12-selection / 28-checkpoint candidate remains **NOT ACCEPTED / OWNER_ACCEPTED_EXCEPTION**; protected hosted SQL remains **NOT RUN / OWNER_ACCEPTED_EXCEPTION**, because ephemeral runners have no reviewed durable private Intent/Original witness outside the runner or acknowledged delivery before SQL side effects. These exceptions close B03 only; they do not make a failed or unexecuted gate PASS. Exact-Fact supervision, reconciliation and pre-SQL wiring remain incomplete. Self-hosted runner/encrypted witness infrastructure is **DEFERRED / UNSCHEDULED**, not an active design or implementation queue. The protected workflow remains blocked in source and must not be dispatched.
 
-B6-OPS-05 and B6-MNT-01..03 remain BLOCKED. Provider/network/process-crash compaction proof, deferred Minors and existing recovery/attended acceptance limits remain unchanged; all quarantine/no-cleanup dispositions stand. Manual resend OFF; staging NOT ACCEPTED; production NO-GO.
+B6-OPS-05 and B6-MNT-01..03 are closed for B03 as **CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION**, without full acceptance or PASS. Provider/network/process-crash compaction, complete-candidate restricted-runtime/operator proof, full restored HTTP/business service and attended rehearsal remain **NOT RUN**; prior restricted CLI/journal-only probes retain their exact limited scopes. Deferred Minors and all quarantine/no-cleanup dispositions stand. B03 is no longer an active execution queue. Manual resend OFF; staging NOT ACCEPTED; production NO-GO.

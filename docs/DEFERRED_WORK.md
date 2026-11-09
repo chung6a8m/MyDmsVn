@@ -6,6 +6,17 @@
 
 **Routing updated:** 2026-10-24; the prior scope record used merged PR #43 baseline `7ef3aa0887528e19d7e2b45bb3b61cb5f4d53639`. This page remains non-executable. Use the [execution index](plans/README.md) for current work; there are no tasks to execute from this page.
 
+## WEB6 B03 bounded-closeout exceptions — 2026-11-09
+
+[Owner decision](evidence/web6/20261109-b03-maintenance-recovery.md#owner-bounded-closeout-20261109): **CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION**. B03 is no longer an active execution queue. This register preserves missing proof and infrastructure as **DEFERRED / UNSCHEDULED**, not PASS or an automatic follow-up assignment:
+
+- The historical 342/344 full run remains FAIL; the full 12-selection / 28-checkpoint candidate remains NOT ACCEPTED, with the incomplete full-candidate exception accepted for bounded B03 closure.
+- Protected hosted SQL remains NOT RUN / OWNER_ACCEPTED_EXCEPTION because no reviewed durable private Intent/Original witness survives outside the ephemeral runner. Self-hosted runner/encrypted witness infrastructure and its implementation/verification are DEFERRED / UNSCHEDULED; no ongoing B03 design task remains selected.
+- Provider/network/process-crash compaction, complete-candidate restricted-runtime/operator proof, full restored HTTP/business service and attended rehearsal remain NOT RUN. R2e 9/9 and R2f ATTEMPT_05 1/1 remain bounded PASS only; historical restricted CLI/journal-only probes retain their narrow scopes. Service RPO/RTO, deferred Minors and separately owned frontend/IIS/Narrator limits remain unchanged.
+- All quarantines, failed-attempt resources and retained private witnesses keep their original dispositions; no cleanup or adoption authority is granted.
+
+B02 PR #102 and B04 PR #100 are MERGED. B05 requires a separately selected prerequisite audit, explicit B03 dependency waiver and paired frontend F02/F03 readiness. The B03 closeout grants none of those admissions. Manual resend OFF; staging NOT ACCEPTED; production NO-GO.
+
 ## Active scope is recorded elsewhere
 
 UI-NEXT's workspace feedback, validation, tab close/busy and theme work remains recorded in its [historical reference index](ui-next/README.md). The [execution index](plans/README.md) selects current scope. The [archive boundary](archive/20261023-pre-ui-next/README.md) retires prior queues and excludes their unfinished work, including SAL native125/attended/Owner acceptance and complete integration repeats. Exclusion does not complete or waive those gaps. Current Sales/schema10 and other business contracts remain implemented source behavior.
