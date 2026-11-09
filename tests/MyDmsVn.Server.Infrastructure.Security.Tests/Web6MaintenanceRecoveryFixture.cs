@@ -26,6 +26,71 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 internal sealed class Web6MaintenanceRecoveryFixture
 {
     internal enum Failure { None, Checksum, Restore, PrincipalProvisioning, EpochCas }
+    internal enum TestCleanupOutcome { RemovedExactInjectedResources }
+    internal interface ITestCleanupCapability { }
+    internal sealed class TestCleanupAuthorization
+    {
+        private readonly object _sync = new object();
+        private readonly Failure _requested;
+        private int _observations;
+        private Failure _observed;
+        private bool _unexpected, _issued, _consumed;
+        private Capability? _capability;
+
+        internal TestCleanupAuthorization(Failure requested) => _requested = requested;
+        internal void ObserveFailure(Failure observed)
+        {
+            lock (_sync)
+            {
+                _observations++;
+                _observed = observed;
+                if (_observations != 1 || _requested == Failure.None || observed == Failure.None || observed != _requested)
+                    _unexpected = true;
+            }
+        }
+        private void RequireExactFault()
+        {
+            if (_unexpected || _observations != 1 || _requested == Failure.None || _observed != _requested)
+                throw new InvalidOperationException("Only the exact identified injected fault can authorize test cleanup.");
+        }
+        internal ITestCleanupCapability AuthorizeAfterAssertions(Action assertions)
+        {
+            lock (_sync)
+            {
+                RequireExactFault();
+                if (_issued || _consumed) throw new InvalidOperationException("Test cleanup capability was already issued or consumed.");
+                _issued = true; // Reserve before invoking assertions; failed/reentrant assertions cannot reissue.
+                try
+                {
+                    assertions();
+                    RequireExactFault();
+                    _capability = new Capability();
+                    return _capability;
+                }
+                catch { _unexpected = true; throw; }
+            }
+        }
+        internal void Consume(ITestCleanupCapability capability, Failure fault)
+        {
+            lock (_sync)
+            {
+                RequireExactFault();
+                if (!_issued || _consumed || fault != _requested || _capability == null || !ReferenceEquals(capability, _capability))
+                    throw new InvalidOperationException("An unused capability for this exact run and fault is required.");
+                // Consumed before any I/O. Failed fresh verification never grants another attempt.
+                _consumed = true;
+                _capability = null;
+            }
+        }
+        // No serialization attribute/data contract or public concrete type. Deserializing or
+        // implementing the marker interface cannot reproduce the issuer's reference identity.
+        private sealed class Capability : ITestCleanupCapability { }
+    }
+    private sealed class InjectedRecoveryFault : Exception
+    {
+        internal InjectedRecoveryFault(Failure fault, Exception? cause = null) : base("Exact injected recovery fault.", cause) => Fault = fault;
+        internal Failure Fault { get; }
+    }
     internal sealed class Result
     {
         internal Failure ObservedFailure = Failure.None;
@@ -96,7 +161,9 @@ internal sealed class Web6MaintenanceRecoveryFixture
     private string[] _sourcePaths = Array.Empty<string>();
     private readonly Guid _compactionCorrelation = Guid.NewGuid(), _currentOperation = Guid.NewGuid();
     private (int Id, DateTime Created) _sourceIdentity, _cloneIdentity;
-    private bool _cloneCreated, _done, _started, _injected;
+    private bool _cloneCreated, _done, _started, _failureReturned;
+    private Failure _requestedFailure;
+    private TestCleanupAuthorization? _testCleanup;
     private int _actor;
     private Guid _oldEpoch, _newEpoch;
     private Principal? _runtime, _maintenance;
@@ -145,8 +212,13 @@ internal sealed class Web6MaintenanceRecoveryFixture
     }
     internal async Task<Result> RunAsync(Failure failure)
     {
-        if (_started) throw new InvalidOperationException("One recovery attempt only.");
-        _started = true;
+        if (_started)
+        {
+            _testCleanup?.ObserveFailure(Failure.None);
+            throw new InvalidOperationException("One recovery attempt only.");
+        }
+        _started = true; _requestedFailure = failure;
+        _testCleanup = new TestCleanupAuthorization(failure);
         try
         {
             _source = await SqlTestDatabase.CreateForSupervisorAsync(_admin, name => { _sourceName = name; EnsureDistinctNames(name, _clone); Record("source-create-intent"); });
@@ -182,9 +254,13 @@ internal sealed class Web6MaintenanceRecoveryFixture
                 Assert.Equal(_sourceOracle, await Snapshot(clone));
                 _result.PhysicalOracleMatched = true; _admission.OracleVerified(); Record("clone-oracle-verified");
                 _newEpoch = Guid.NewGuid();
-                _injected = failure == Failure.EpochCas;
                 var changed = await clone.ExecuteAsync("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@next,RotatedAtUtc=SYSUTCDATETIME() WHERE Id=1 AND DeploymentEpoch=@previous;",
                     new { next = _newEpoch, previous = failure == Failure.EpochCas ? Guid.NewGuid() : _oldEpoch });
+                if (failure == Failure.EpochCas)
+                {
+                    if (changed != 0) throw new InvalidOperationException("Injected epoch CAS unexpectedly changed state.");
+                    throw new InjectedRecoveryFault(Failure.EpochCas);
+                }
                 _admission.Rotated(changed); _result.EpochRotations++; Record("clone-epoch-rotated");
                 await clone.ExecuteAsync("UPDATE dbo.WebAuthSessions SET RevokedAtUtc=SYSUTCDATETIME() WHERE SessionId=@oldSession; DELETE dbo.RolePermissions WHERE RoleId IN(SELECT RoleId FROM dbo.UserRoles WHERE UserId=@actor); DECLARE @n datetime2(7)=SYSUTCDATETIME(); INSERT dbo.WebAuthSessions VALUES(@session,@actor,@n,DATEADD(day,1,@n),DATEADD(day,1,@n),NULL);",
                     new { oldSession = _oldSession, actor = _actor, session = _newSession });
@@ -201,17 +277,19 @@ internal sealed class Web6MaintenanceRecoveryFixture
         catch (Exception error)
         {
             _admission.Quarantine(error.GetType().Name); _result.Quarantined = true; _result.WriterAdmission = false;
-            if (_injected)
+            var observed = error is InjectedRecoveryFault injected && injected.Fault == failure ? injected.Fault : Failure.None;
+            _testCleanup.ObserveFailure(observed);
+            if (observed != Failure.None)
             {
-                _result.ObservedFailure = failure;
-                if (error is SqlException injectedSql) Console.WriteLine("WEB6_RECOVERY injectedSqlErrors=" + string.Join(",", injectedSql.Errors.Cast<SqlError>().Select(item => item.Number)));
-                _result.ChecksumRejected = failure == Failure.Checksum && _result.CopyOnlyChecksummed && error is SqlException checksumError &&
-                    checksumError.Errors.Cast<SqlError>().Any(item => item.Number == 3189 || item.Number == 3183);
+                _result.ObservedFailure = observed;
+                if (error.InnerException is SqlException injectedSql) Console.WriteLine("WEB6_RECOVERY injectedSqlErrors=" + string.Join(",", injectedSql.Errors.Cast<SqlError>().Select(item => item.Number)));
+                _result.ChecksumRejected = observed == Failure.Checksum && _result.CopyOnlyChecksummed;
             }
             _result.QuarantineManifest = ManifestPath;
             Record("QUARANTINED-" + _result.Phase + "-" + error.GetType().Name);
             Console.WriteLine("WEB6_RECOVERY quarantine=1 phase=" + _result.Phase);
-            if (failure == Failure.None || !_injected) throw;
+            if (observed == Failure.None) throw;
+            _failureReturned = true;
         }
         return _result;
     }
@@ -239,13 +317,15 @@ internal sealed class Web6MaintenanceRecoveryFixture
         {
             // Corrupt an owned backup data block while keeping the media header intact.
             // Resealing supports TEST_CLEANUP_ONLY, never a successful recovery claim.
-            _injected = true; VerifySealed(Backup);
+            VerifySealed(Backup);
             using (var file = new FileStream(Backup, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             { file.Position = file.Length / 2; var position = file.Position; var value = file.ReadByte(); file.Position = position; file.WriteByte((byte)(value ^ 0xff)); file.Flush(true); }
             Seal(Backup); Record("injected-checksum-data-corruption");
         }
         if (failure == Failure.Checksum)
-            await master.ExecuteAsync(new SqlTestCommand("RESTORE VERIFYONLY FROM DISK=@backup WITH CHECKSUM;", new { backup = Backup }, commandTimeout: 120));
+            await ExpectInjectedSqlFault(Failure.Checksum,
+                () => master.ExecuteAsync(new SqlTestCommand("RESTORE VERIFYONLY FROM DISK=@backup WITH CHECKSUM;", new { backup = Backup }, commandTimeout: 120)),
+                new[] { 3189, 3013 }, new[] { 3183, 3013 });
         var files = new List<(string Name, string Type)>();
         using (var list = master.CreateCommand())
         {
@@ -258,11 +338,11 @@ internal sealed class Web6MaintenanceRecoveryFixture
         VerifyDirectory(); VerifySealed(Backup); EnsureNewPath("data", Data); EnsureNewPath("log", Log); Record("restore-start");
         if (failure == Failure.Restore)
         {
-            _injected = true;
             // A nonexistent backup-set position fails before allocation. Any unexpected
             // partial allocation is unverified and cannot enter TEST_CLEANUP_ONLY deletion.
-            await master.ExecuteAsync(new SqlTestCommand("RESTORE DATABASE [" + _clone + "] FROM DISK=@backup WITH FILE=2147483647,CHECKSUM;",
-                new { backup = Backup }, commandTimeout: 120));
+            await ExpectInjectedSqlFault(Failure.Restore,
+                () => master.ExecuteAsync(new SqlTestCommand("RESTORE DATABASE [" + _clone + "] FROM DISK=@backup WITH FILE=2147483647,CHECKSUM;",
+                    new { backup = Backup }, commandTimeout: 120)), new[] { 3287, 3013 });
         }
         await master.ExecuteAsync(new SqlTestCommand("RESTORE DATABASE [" + _clone + "] FROM DISK=@backup WITH CHECKSUM,MOVE @dataName TO @data,MOVE @logName TO @log;",
             new { backup = Backup, dataName = files.Single(x => x.Type == "D").Name, data = Data, logName = files.Single(x => x.Type == "L").Name, log = Log }, commandTimeout: 120));
@@ -309,7 +389,8 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
         {
             await principal.Create(sql); Record("principal-created");
             if (failure == Failure.PrincipalProvisioning)
-            { _injected = true; await sql.ExecuteAsync("THROW 51997,'Injected provisioning refusal after owned login.',1;"); }
+                await ExpectInjectedSqlFault(Failure.PrincipalProvisioning,
+                    () => sql.ExecuteAsync("THROW 51997,'Injected provisioning refusal after owned login.',1;"), new[] { 51997 });
         }
         // Inert database-only migration user has no login or usable runtime credential.
         await sql.ExecuteAsync("CREATE USER [Web6RecoveryMigration] WITHOUT LOGIN;");
@@ -427,13 +508,51 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
             _admission.CheckDrain(true, await master.QuerySingleAsync<int>("SELECT (SELECT COUNT(*) FROM sys.dm_exec_sessions WHERE database_id=DB_ID(@name))+(SELECT COUNT(*) FROM sys.dm_tran_locks WHERE resource_database_id=DB_ID(@name));", new { name }));
         foreach (var principal in _principals) await principal.VerifyNoSessions(master);
     }
-    internal async Task TestCleanupOnlyAsync()
+    internal ITestCleanupCapability AuthorizeTestCleanupAfterAssertions(Result result, Failure fault, Action assertions)
     {
-        if (_done) { TestCleanupResourcesAbsent = true; return; }
-        // Quarantine is not success; fresh independent verification can fail and retain it.
-        Record("TEST_CLEANUP_ONLY-start");
-        await CleanupOwned(); TestCleanupResourcesAbsent = true;
-        Console.WriteLine("WEB6_RECOVERY TEST_CLEANUP_ONLY resourcesAbsent=1 workflowSuccess=0");
+        if (_testCleanup == null || !_failureReturned || _done || !ReferenceEquals(result, _result) || fault != _requestedFailure)
+            throw new InvalidOperationException("This run has not returned the exact authorized injected fault.");
+        return _testCleanup.AuthorizeAfterAssertions(() =>
+        {
+            // Mandatory assertions cannot be omitted by a caller-supplied no-op callback.
+            Assert.False(result.Succeeded);
+            Assert.True(result.Quarantined);
+            Assert.False(result.WriterAdmission);
+            Assert.False(_admission.WriterAdmission);
+            Assert.False(result.ResourcesAbsent);
+            Assert.Equal(ManifestPath, result.QuarantineManifest);
+            Assert.Equal(ManifestPath, _admission.QuarantineManifest);
+            Assert.Equal(0, result.NormalCleanupCommands);
+            Assert.Equal(fault, result.ObservedFailure);
+            if (fault == Failure.Checksum) Assert.True(result.ChecksumRejected);
+            VerifyManifest();
+            assertions();
+        });
+    }
+    internal async Task<TestCleanupOutcome> TestCleanupOnlyAsync(ITestCleanupCapability capability)
+    {
+        if (_testCleanup == null) throw new InvalidOperationException("No injected fault authorization exists.");
+        _testCleanup.Consume(capability, _requestedFailure);
+        try
+        {
+            Record("TEST_CLEANUP_ONLY-start");
+            await CleanupOwned(); TestCleanupResourcesAbsent = true;
+            Console.WriteLine("WEB6_RECOVERY TEST_CLEANUP_ONLY resourcesAbsent=1 workflowSuccess=0");
+            return TestCleanupOutcome.RemovedExactInjectedResources;
+        }
+        catch
+        {
+            _testCleanup.ObserveFailure(Failure.None);
+            throw;
+        }
+    }
+    private static async Task ExpectInjectedSqlFault(Failure fault, Func<Task> command, params int[][] expectedErrors)
+    {
+        try { await command(); }
+        catch (SqlException error) when (expectedErrors.Any(expected =>
+            expected.OrderBy(number => number).SequenceEqual(error.Errors.Cast<SqlError>().Select(item => item.Number).OrderBy(number => number))))
+        { throw new InjectedRecoveryFault(fault, error); }
+        throw new InvalidOperationException("The exact injected SQL fault was not observed.");
     }
     private async Task CleanupOwned()
     {

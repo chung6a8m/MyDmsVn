@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -8,6 +9,97 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web6MaintenanceRecoveryTests
 {
+    [Fact]
+    public void Test_cleanup_has_no_parameterless_entry_or_capability_in_workflow_result()
+    {
+        var cleanup = typeof(Web6MaintenanceRecoveryFixture).GetMethod("TestCleanupOnlyAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.NotEmpty(cleanup.GetParameters());
+        Assert.DoesNotContain(typeof(Web6MaintenanceRecoveryFixture.Result).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic),
+            field => field.FieldType.Name.Contains("Capability"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Test_cleanup_unexpected_uncertainty_stays_quarantined_after_later_drain(bool ownershipFailure)
+    {
+        var gate = new Web6MaintenanceRecoveryFixture.Admission("exact-run");
+        var authority = new Web6MaintenanceRecoveryFixture.TestCleanupAuthorization(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            if (ownershipFailure) gate.CheckOwnership(false, FileAttributes.Normal);
+            else gate.CheckDrain(false, 1);
+        });
+        authority.ObserveFailure(Web6MaintenanceRecoveryFixture.Failure.None);
+        gate.CheckOwnership(true, FileAttributes.Normal);
+        gate.CheckDrain(true, 0);
+        Assert.False(gate.WriterAdmission);
+        Assert.Equal("exact-run", gate.QuarantineManifest);
+        var assertions = 0;
+        Assert.Throws<InvalidOperationException>(() => authority.AuthorizeAfterAssertions(() => assertions++));
+        Assert.Equal(0, assertions);
+        Assert.Throws<InvalidOperationException>(() => authority.Consume(null!, Web6MaintenanceRecoveryFixture.Failure.Restore));
+        Assert.Throws<InvalidOperationException>(() => gate.Cleanup("exact-run", () => throw new Xunit.Sdk.XunitException("Cleanup reached.")));
+    }
+
+    [Fact]
+    public void Test_cleanup_cannot_issue_before_exact_injected_fault_is_observed()
+    {
+        var authority = new Web6MaintenanceRecoveryFixture.TestCleanupAuthorization(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        Assert.Throws<InvalidOperationException>(() => authority.AuthorizeAfterAssertions(() => { }));
+        var mismatched = new Web6MaintenanceRecoveryFixture.TestCleanupAuthorization(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        mismatched.ObserveFailure(Web6MaintenanceRecoveryFixture.Failure.Checksum);
+        Assert.Throws<InvalidOperationException>(() => mismatched.AuthorizeAfterAssertions(() => { }));
+        var normal = new Web6MaintenanceRecoveryFixture.TestCleanupAuthorization(Web6MaintenanceRecoveryFixture.Failure.None);
+        normal.ObserveFailure(Web6MaintenanceRecoveryFixture.Failure.None);
+        Assert.Throws<InvalidOperationException>(() => normal.AuthorizeAfterAssertions(() => { }));
+    }
+
+    [Fact]
+    public void Test_cleanup_assertion_failure_never_issues_or_reissues_capability()
+    {
+        var authority = new Web6MaintenanceRecoveryFixture.TestCleanupAuthorization(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        authority.ObserveFailure(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        var assertionFailure = new InvalidDataException("Quarantine assertion failed.");
+        Assert.Same(assertionFailure, Assert.Throws<InvalidDataException>(() => authority.AuthorizeAfterAssertions(() => throw assertionFailure)));
+        Assert.Throws<InvalidOperationException>(() => authority.AuthorizeAfterAssertions(() => { }));
+        Assert.Throws<InvalidOperationException>(() => authority.Consume(null!, Web6MaintenanceRecoveryFixture.Failure.Restore));
+    }
+
+    [Fact]
+    public void Test_cleanup_capability_is_exact_run_exact_fault_nonserializable_and_single_use()
+    {
+        var first = new Web6MaintenanceRecoveryFixture.TestCleanupAuthorization(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        var otherRun = new Web6MaintenanceRecoveryFixture.TestCleanupAuthorization(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        first.ObserveFailure(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        otherRun.ObserveFailure(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        var assertionCalls = 0;
+        var capability = first.AuthorizeAfterAssertions(() => assertionCalls++);
+        var otherCapability = otherRun.AuthorizeAfterAssertions(() => { });
+        Assert.Equal(1, assertionCalls);
+        Assert.False(capability.GetType().IsSerializable);
+        Assert.True(capability.GetType().IsNestedPrivate);
+        Assert.Throws<InvalidOperationException>(() => first.AuthorizeAfterAssertions(() => { }));
+        Assert.Throws<InvalidOperationException>(() => otherRun.Consume(capability, Web6MaintenanceRecoveryFixture.Failure.Restore));
+        otherRun.Consume(otherCapability, Web6MaintenanceRecoveryFixture.Failure.Restore);
+        Assert.Throws<InvalidOperationException>(() => first.Consume(new ForgedCleanupCapability(), Web6MaintenanceRecoveryFixture.Failure.Restore));
+        Assert.Throws<InvalidOperationException>(() => first.Consume(capability, Web6MaintenanceRecoveryFixture.Failure.EpochCas));
+        first.Consume(capability, Web6MaintenanceRecoveryFixture.Failure.Restore);
+        Assert.Throws<InvalidOperationException>(() => first.Consume(capability, Web6MaintenanceRecoveryFixture.Failure.Restore));
+    }
+
+    [Fact]
+    public void Test_cleanup_later_unexpected_failure_revokes_already_issued_capability()
+    {
+        var authority = new Web6MaintenanceRecoveryFixture.TestCleanupAuthorization(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        authority.ObserveFailure(Web6MaintenanceRecoveryFixture.Failure.Restore);
+        var capability = authority.AuthorizeAfterAssertions(() => { });
+        authority.ObserveFailure(Web6MaintenanceRecoveryFixture.Failure.None);
+        Assert.Throws<InvalidOperationException>(() => authority.Consume(capability, Web6MaintenanceRecoveryFixture.Failure.Restore));
+    }
+
+    private sealed class ForgedCleanupCapability : Web6MaintenanceRecoveryFixture.ITestCleanupCapability { }
+
     [Theory]
     [InlineData("master")]
     [InlineData("tempdb")]
@@ -119,19 +211,15 @@ public sealed class Web6MaintenanceRecoveryTests
     public async Task Copy_only_backup_restores_B03_source_to_distinct_owned_clone_and_rotates_epoch_before_admission()
     {
         var fixture = await Web6MaintenanceRecoveryFixture.CreateAsync();
-        try
-        {
-            var result = await fixture.RunAsync(Web6MaintenanceRecoveryFixture.Failure.None);
-            Assert.True(result.Succeeded, result.Phase);
-            Assert.False(result.Quarantined);
-            Assert.True(result.PhysicalOracleMatched);
-            Assert.True(result.CopyOnlyChecksummed);
-            Assert.Equal(1, result.EpochRotations);
-            Assert.Equal(3, result.StaleDenials);
-            Assert.Equal(1, result.CurrentOperations);
-            Assert.True(result.ResourcesAbsent);
-        }
-        finally { await fixture.TestCleanupOnlyAsync(); }
+        var result = await fixture.RunAsync(Web6MaintenanceRecoveryFixture.Failure.None);
+        Assert.True(result.Succeeded, result.Phase);
+        Assert.False(result.Quarantined);
+        Assert.True(result.PhysicalOracleMatched);
+        Assert.True(result.CopyOnlyChecksummed);
+        Assert.Equal(1, result.EpochRotations);
+        Assert.Equal(3, result.StaleDenials);
+        Assert.Equal(1, result.CurrentOperations);
+        Assert.True(result.ResourcesAbsent);
     }
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
@@ -141,9 +229,9 @@ public sealed class Web6MaintenanceRecoveryTests
             Web6MaintenanceRecoveryFixture.Failure.PrincipalProvisioning, Web6MaintenanceRecoveryFixture.Failure.EpochCas })
         {
             var fixture = await Web6MaintenanceRecoveryFixture.CreateAsync();
-            try
+            var result = await fixture.RunAsync(failure);
+            var capability = fixture.AuthorizeTestCleanupAfterAssertions(result, failure, () =>
             {
-                var result = await fixture.RunAsync(failure);
                 Assert.False(result.Succeeded);
                 Assert.True(result.Quarantined);
                 Assert.False(result.WriterAdmission);
@@ -153,12 +241,13 @@ public sealed class Web6MaintenanceRecoveryTests
                 Assert.Equal(0, result.NormalCleanupCommands);
                 Assert.Equal(failure, result.ObservedFailure);
                 if (failure == Web6MaintenanceRecoveryFixture.Failure.Checksum) Assert.True(result.ChecksumRejected);
-            }
-            finally
-            {
-                await fixture.TestCleanupOnlyAsync();
-                Assert.True(fixture.TestCleanupResourcesAbsent);
-            }
+            });
+            Assert.Equal(Web6MaintenanceRecoveryFixture.TestCleanupOutcome.RemovedExactInjectedResources,
+                await fixture.TestCleanupOnlyAsync(capability));
+            Assert.True(fixture.TestCleanupResourcesAbsent);
+            Assert.False(result.Succeeded);
+            Assert.True(result.Quarantined);
+            Assert.False(result.ResourcesAbsent);
         }
     }
 }
