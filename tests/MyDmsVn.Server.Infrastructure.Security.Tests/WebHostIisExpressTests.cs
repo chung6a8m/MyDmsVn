@@ -510,37 +510,57 @@ public sealed partial class WebHostIisExpressTests
         var frontendArtifact = Web6CandidateFileSet.MeasureTree(Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_DIST_DIRECTORY")));
         var oldArtifact = Web6CandidateFileSet.MeasureTree(Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_OLD_PUBLISH_DIRECTORY")));
         var currentArtifact = Web6CandidateFileSet.MeasureTree(Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_PUBLISH_DIRECTORY")));
-        var currentSql = await CutoverSqlProof(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_SQL_CONNECTION_STRING"),
-            SqlSchemaDefinitionFingerprint.Schema13).ConfigureAwait(false);
-        var oldSql = await CutoverSqlProof(Required("MYDMSVN_WEB6_CUTOVER_OLD_SQL_CONNECTION_STRING"),
-            SqlSchemaDefinitionFingerprint.Schema12).ConfigureAwait(false);
-        if (currentSql.Identity == oldSql.Identity)
-            throw new InvalidOperationException("Cutover current and exact12 SQL allocations must be physically distinct.");
-        var currentReceipt = Web6CandidateInputs.RequireHash(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_SQL_OWNERSHIP_RECEIPT_SHA256"));
-        var oldReceipt = Web6CandidateInputs.RequireHash(Required("MYDMSVN_WEB6_CUTOVER_OLD_SQL_OWNERSHIP_RECEIPT_SHA256"));
-        if (currentReceipt != currentSql.Receipt || oldReceipt != oldSql.Receipt)
-            throw new InvalidOperationException("Cutover SQL ownership receipt did not match the selected allocation.");
+        var buildAuthority = Web6CutoverBuildAuthority.ReadProtected(
+            Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_PATH")),
+            Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_SHA256"));
+        buildAuthority.Verify(new Web6CutoverBuildObservation(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact,
+            backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact, currentArtifact, oldArtifact));
         if (!Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_EPOCH"), "D", out var currentEpoch) ||
             !Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_RESTORED_EPOCH"), "D", out var restoredEpoch))
             throw new InvalidOperationException("Cutover deployment epochs are invalid.");
-        var plan = new Web6CandidateCutoverPlan("web6-current", "web4-old", "web6-restored",
-            new Uri("https://localhost:44321/"), new Uri("https://localhost:44322/"),
-            frontendIdentity.Sha, frontendIdentity.Tree, frontendArtifact,
-            backendIdentity.Sha, backendIdentity.Tree, oldArtifact, currentArtifact,
-            13, 12, currentReceipt, oldReceipt, currentEpoch, restoredEpoch);
-        plan.VerifyArchives(new Web6CutoverArchive(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact),
-            new Web6CutoverArchive(backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact));
-        _ = plan.FrontendHandles();
-    }
-
-    private static async Task<(string Identity, string Receipt)> CutoverSqlProof(string connectionString, string expectedFingerprint)
-    {
-        using var connection = new SqlConnection(connectionString);
-        await connection.OpenAsync().ConfigureAwait(false);
-        var fingerprint = await SqlSchemaDefinitionFingerprint.ReadAsync(connection, CancellationToken.None).ConfigureAwait(false);
-        if (fingerprint != expectedFingerprint) throw new InvalidOperationException("Cutover SQL schema fingerprint is incompatible.");
-        var identity = await connection.QuerySingleAsync<string>("SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName'))+N'|'+DB_NAME();").ConfigureAwait(false);
-        return (identity, HashText(identity + "\n" + fingerprint));
+        var admin = Required("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING");
+        var controlParent = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_SQL_CONTROL_PARENT"));
+        SqlTestDatabase? currentDatabase = null, oldDatabase = null;
+        SqlTestOwnershipManifest? currentControl = null, oldControl = null;
+        var complete = false;
+        try
+        {
+            currentControl = SqlTestOwnershipManifest.Create(controlParent);
+            oldControl = SqlTestOwnershipManifest.Create(controlParent);
+            currentDatabase = await SqlTestDatabase.CreateAsync(admin).ConfigureAwait(false);
+            oldDatabase = await SqlTestDatabase.CreateAsync(admin).ConfigureAwait(false);
+            if (currentDatabase.DatabaseName == oldDatabase.DatabaseName) throw new InvalidOperationException("Cutover SQL allocations collided.");
+            if (!new DatabaseMigrationRunner().MigrateWeb5(currentDatabase.ConnectionString).Successful ||
+                !new DatabaseMigrationRunner().MigrateWeb(oldDatabase.ConnectionString).Successful)
+                throw new InvalidOperationException("Cutover SQL migrations failed.");
+            await currentDatabase.WriteOwnershipManifestAsync(currentControl, CancellationToken.None).ConfigureAwait(false);
+            await oldDatabase.WriteOwnershipManifestAsync(oldControl, CancellationToken.None).ConfigureAwait(false);
+            var currentReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(currentControl, currentControl.VerifiedDigest(),
+                SqlSchemaDefinitionFingerprint.Schema13, "current-allocation").Digest;
+            var oldReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(oldControl, oldControl.VerifiedDigest(),
+                SqlSchemaDefinitionFingerprint.Schema12, "old-allocation").Digest;
+            var plan = new Web6CandidateCutoverPlan("web6-current", "web4-old", "web6-restored",
+                new Uri("https://localhost:44321/"), new Uri("https://localhost:44322/"),
+                frontendIdentity.Sha, frontendIdentity.Tree, frontendArtifact,
+                backendIdentity.Sha, backendIdentity.Tree, oldArtifact, currentArtifact,
+                13, 12, currentReceipt, oldReceipt, currentEpoch, restoredEpoch);
+            plan.VerifyArchives(new Web6CutoverArchive(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact),
+                new Web6CutoverArchive(backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact));
+            _ = plan.FrontendHandles();
+            complete = true;
+            throw new InvalidOperationException("WEB6 cutover BLOCKED: protected live host/browser lifecycle has not produced Chromium and Edge evidence.");
+        }
+        finally
+        {
+            if (complete && currentDatabase != null && oldDatabase != null && currentControl != null && oldControl != null)
+            {
+                await currentDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
+                await oldDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
+                await currentDatabase.CompleteOwnershipManifestAsync(currentControl, CancellationToken.None).ConfigureAwait(false);
+                await oldDatabase.CompleteOwnershipManifestAsync(oldControl, CancellationToken.None).ConfigureAwait(false);
+            }
+            currentControl?.Dispose(); oldControl?.Dispose();
+        }
     }
     private static async Task SeedBrowserActors(SqlConnection connection)
     {

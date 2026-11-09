@@ -1,5 +1,9 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using MyDmsVn.Server.Infrastructure.Operations;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -28,7 +32,49 @@ public sealed class Web6CandidateCutoverTests
         var failure = Assert.Throws<InvalidOperationException>(() => Web6CutoverAcceptanceGate.RequireLive(ordinary));
         Assert.Contains("BLOCKED", failure.Message);
         Assert.Contains("MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY", failure.Message);
-        Assert.Contains("MYDMSVN_WEB6_CUTOVER_OLD_SQL_CONNECTION_STRING", failure.Message);
+        Assert.Contains("MYDMSVN_WEB6_CUTOVER_SQL_CONTROL_PARENT", failure.Message);
+    }
+
+    [Fact]
+    public async Task Owning_cutover_orchestrator_requires_protected_manifest_serial_pairs_and_both_browser_results()
+    {
+        var operations = new RecordingCutoverOperations(Plan());
+        await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None);
+        Assert.Equal(new[]
+        {
+            "authority", "manifest", "chromium:current:start", "chromium:current:validate", "chromium:current:drain",
+            "chromium:old:start", "chromium:old:validate", "chromium:old:drain", "chromium:restore",
+            "edge:current:start", "edge:current:validate", "edge:current:drain",
+            "edge:old:start", "edge:old:validate", "edge:old:drain", "edge:restore", "complete"
+        }, operations.Calls);
+        await Assert.ThrowsAsync<IOException>(() => new Web6CandidateCutoverOrchestrator(
+            new RecordingCutoverOperations(Plan()) { SkipChromium = true }).Execute(CancellationToken.None));
+    }
+
+    [Fact]
+    public void Independently_sealed_build_authority_rejects_arbitrary_published_artifact()
+    {
+        var authority = new Web6CutoverBuildAuthority(FrontendArchive, FrontendTree, FrontendArtifact,
+            BackendArchive, BackendTree, BackendArtifact, FrontendArtifact, BackendArtifact);
+        authority.Verify(new Web6CutoverBuildObservation(FrontendArchive, FrontendTree, true, FrontendArtifact,
+            BackendArchive, BackendTree, true, BackendArtifact, FrontendArtifact, BackendArtifact));
+        Assert.Throws<IOException>(() => authority.Verify(new Web6CutoverBuildObservation(FrontendArchive, FrontendTree, true,
+            new string('7', 64), BackendArchive, BackendTree, true, BackendArtifact, FrontendArtifact, BackendArtifact)));
+    }
+
+    [Fact]
+    public void SQL_receipt_requires_the_original_verified_protected_allocation_record()
+    {
+        using var control = SqlTestOwnershipManifest.Create(Path.GetTempPath());
+        control.WriteVerifiedRecord("MyDmsVn_Test_11111111111141118111111111111111", "test-server", 17,
+            new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc), "22222222222242228222222222222222", false,
+            new DateTimeOffset(2026, 11, 10, 12, 0, 1, TimeSpan.Zero));
+        var digest = control.VerifiedDigest();
+        var receipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(control, digest,
+            SqlSchemaDefinitionFingerprint.Schema13, "current-allocation");
+        Assert.Matches("^[0-9a-f]{64}$", receipt.Digest);
+        Assert.Throws<IOException>(() => Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(control,
+            new string('0', 64), SqlSchemaDefinitionFingerprint.Schema13, "current-allocation"));
     }
 
     [Fact]
@@ -158,4 +204,28 @@ public sealed class Web6CandidateCutoverTests
                 plan.CurrentArtifactHash, CurrentEpoch, controllers, workers, queueOwned: true)
             : new Web6CutoverAdmission(plan.OldOrigin, plan.OldSchema, plan.OldDatabaseReceipt,
                 plan.OldArtifactHash, Guid.Empty, controllers, workers, queueOwned: true);
+
+    private sealed class RecordingCutoverOperations : IWeb6CandidateCutoverOperations
+    {
+        private readonly Web6CandidateCutoverPlan _plan;
+        internal RecordingCutoverOperations(Web6CandidateCutoverPlan plan) => _plan = plan;
+        internal List<string> Calls { get; } = new List<string>();
+        internal bool SkipChromium { get; set; }
+        public Task<Web6CandidateCutoverPlan> VerifyAuthority(CancellationToken token) { Calls.Add("authority"); return Task.FromResult(_plan); }
+        public Task SealProtectedManifest(JObject handles, CancellationToken token) { Calls.Add("manifest"); return Task.CompletedTask; }
+        public Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token)
+        {
+            Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":start");
+            return Task.FromResult(Admission(_plan, pair));
+        }
+        public Task<Web6CutoverBrowserResult> RunAndValidate(string browser, Web6CutoverPair pair, CancellationToken token)
+        {
+            Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":validate");
+            return Task.FromResult(new Web6CutoverBrowserResult(3, SkipChromium && browser == "chromium" ? 2 : 3,
+                0, SkipChromium && browser == "chromium" ? 1 : 0, 0, new[] { "old-client-new-host", "new-client-old-host", "restored-epoch-rejected" }));
+        }
+        public Task<Web6CutoverDrain> Drain(string browser, Web6CutoverPair pair, CancellationToken token) { Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":drain"); return Task.FromResult(new Web6CutoverDrain(true, true)); }
+        public Task VerifyRestore(string browser, CancellationToken token) { Calls.Add(browser + ":restore"); return Task.CompletedTask; }
+        public Task Complete(CancellationToken token) { Calls.Add("complete"); return Task.CompletedTask; }
+    }
 }

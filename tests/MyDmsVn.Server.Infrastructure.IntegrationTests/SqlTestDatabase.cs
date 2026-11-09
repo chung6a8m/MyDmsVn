@@ -729,6 +729,12 @@ internal sealed class SqlTestOwnershipManifest : IDisposable
         catch { throw new IOException("Private allocation manifest identity or content changed; retain control root."); }
     }
 
+    internal string VerifiedDigest()
+    {
+        Verify();
+        return SqlTestPrivateRecord.Hash(_sealed!);
+    }
+
     private void VerifyCore()
     {
         if (_removed || _sealed == null) throw new IOException();

@@ -10,7 +10,10 @@ using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
+using MyDmsVn.Server.Infrastructure.Operations;
 using Newtonsoft.Json.Linq;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -265,6 +268,185 @@ internal sealed class Web6CandidateCutoverCoordinator
     internal bool IsEpochCurrent(Guid epoch) => epoch == _epoch;
 }
 
+internal sealed class Web6CutoverBuildObservation
+{
+    internal Web6CutoverBuildObservation(string frontendSha, string frontendTree, bool frontendClean, string frontendBuildHash,
+        string backendSha, string backendTree, bool backendClean, string backendBuildHash,
+        string currentPublishedHash, string oldPublishedHash)
+    {
+        Frontend = new Web6CutoverArchive(frontendSha, frontendTree, frontendClean, frontendBuildHash);
+        Backend = new Web6CutoverArchive(backendSha, backendTree, backendClean, backendBuildHash);
+        CurrentPublishedHash = Web6CandidateInputs.RequireHash(currentPublishedHash);
+        OldPublishedHash = Web6CandidateInputs.RequireHash(oldPublishedHash);
+    }
+    internal Web6CutoverArchive Frontend { get; }
+    internal Web6CutoverArchive Backend { get; }
+    internal string CurrentPublishedHash { get; }
+    internal string OldPublishedHash { get; }
+}
+
+// Expected build hashes are sealed before copying into either published root. Verification
+// consumes a fresh measurement and therefore cannot bless an arbitrary directory by measuring
+// it and reusing that same value as its expectation.
+internal sealed class Web6CutoverBuildAuthority
+{
+    private readonly Web6CutoverBuildObservation _expected;
+    internal Web6CutoverBuildAuthority(string frontendSha, string frontendTree, string frontendBuildHash,
+        string backendSha, string backendTree, string backendBuildHash, string currentPublishedHash, string oldPublishedHash)
+    {
+        _expected = new Web6CutoverBuildObservation(frontendSha, frontendTree, true, frontendBuildHash,
+            backendSha, backendTree, true, backendBuildHash, currentPublishedHash, oldPublishedHash);
+        if (_expected.Frontend.Sha != Web6CandidateCutoverPlan.FrontendArchiveSha ||
+            _expected.Backend.Sha != Web6CandidateCutoverPlan.BackendArchiveSha)
+            throw new ArgumentException("Cutover build authority source pin changed.");
+    }
+
+    internal static Web6CutoverBuildAuthority ReadProtected(string path, string expectedFileDigest)
+    {
+        path = Web6CandidateFileSystem.CanonicalPath(path);
+        Web6CandidateFileSystem.RequireDirectories(Path.GetDirectoryName(path)!);
+        Web6CandidateFileSystem.RequireRegularFile(path);
+        using var identity = WindowsIdentity.GetCurrent();
+        Web6CandidateManifest.RequirePrivateOwner(File.GetAccessControl(path, SqlTestPrivateRecord.Sections), identity.User!);
+        byte[] bytes;
+        using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            Web6CandidateFileSystem.Identity(file.SafeFileHandle, directory: false);
+            if (file.Length is < 2 or > 4096) throw new IOException("Cutover build authority size is invalid.");
+            bytes = new byte[file.Length];
+            var offset = 0;
+            while (offset < bytes.Length) { var read = file.Read(bytes, offset, bytes.Length - offset); if (read == 0) throw new IOException(); offset += read; }
+        }
+        if (SqlTestPrivateRecord.Hash(bytes) != Web6CandidateInputs.RequireHash(expectedFileDigest))
+            throw new IOException("Cutover build authority digest changed.");
+        var json = JObject.Parse(new UTF8Encoding(false, true).GetString(bytes),
+            new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+        var keys = new[] { "version", "frontendSha", "frontendTree", "frontendBuildSha256", "backendSha", "backendTree", "backendBuildSha256", "currentPublishedSha256", "oldPublishedSha256" };
+        if (!json.Properties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
+            .SequenceEqual(keys.OrderBy(name => name, StringComparer.Ordinal)) || (int?)json["version"] != 1)
+            throw new IOException("Cutover build authority shape is invalid.");
+        try
+        {
+            return new Web6CutoverBuildAuthority((string)json["frontendSha"]!, (string)json["frontendTree"]!,
+                (string)json["frontendBuildSha256"]!, (string)json["backendSha"]!, (string)json["backendTree"]!,
+                (string)json["backendBuildSha256"]!, (string)json["currentPublishedSha256"]!, (string)json["oldPublishedSha256"]!);
+        }
+        catch (Exception error) when (error is ArgumentException || error is InvalidCastException)
+        { throw new IOException("Cutover build authority values are invalid.", error); }
+    }
+
+    internal void Verify(Web6CutoverBuildObservation actual)
+    {
+        if (actual == null || !actual.Frontend.Clean || !actual.Backend.Clean ||
+            actual.Frontend.Sha != _expected.Frontend.Sha || actual.Frontend.Tree != _expected.Frontend.Tree ||
+            actual.Frontend.ArtifactHash != _expected.Frontend.ArtifactHash ||
+            actual.Backend.Sha != _expected.Backend.Sha || actual.Backend.Tree != _expected.Backend.Tree ||
+            actual.Backend.ArtifactHash != _expected.Backend.ArtifactHash ||
+            actual.CurrentPublishedHash != _expected.CurrentPublishedHash ||
+            actual.OldPublishedHash != _expected.OldPublishedHash ||
+            actual.Frontend.ArtifactHash != actual.CurrentPublishedHash ||
+            actual.Backend.ArtifactHash != actual.OldPublishedHash)
+            throw new IOException("Cutover sealed build authority or published artifact drifted.");
+    }
+}
+
+internal sealed class Web6CutoverSqlOwnershipReceipt
+{
+    private Web6CutoverSqlOwnershipReceipt(string digest) => Digest = digest;
+    internal string Digest { get; }
+
+    internal static Web6CutoverSqlOwnershipReceipt FromProtectedRecord(SqlTestOwnershipManifest control,
+        string sealedRecordDigest, string schemaFingerprint, string allocationIdentity)
+    {
+        if (control == null) throw new ArgumentNullException(nameof(control));
+        var expected = Web6CandidateInputs.RequireHash(sealedRecordDigest);
+        var actual = control.VerifiedDigest();
+        if (actual != expected) throw new IOException("Cutover SQL ownership record is not the protected original.");
+        var schema = Web6CandidateInputs.RequireHash(schemaFingerprint?.ToLowerInvariant());
+        if (schema != SqlSchemaDefinitionFingerprint.Schema12.ToLowerInvariant() &&
+            schema != SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant())
+            throw new IOException("Cutover SQL ownership schema is unsupported.");
+        if (!Regex.IsMatch(allocationIdentity ?? "", @"\A[A-Za-z0-9][A-Za-z0-9._|:-]{0,255}\z", RegexOptions.CultureInvariant))
+            throw new IOException("Cutover SQL allocation identity is invalid.");
+        var body = Encoding.UTF8.GetBytes(actual + "\n" + schema + "\n" + allocationIdentity);
+        return new Web6CutoverSqlOwnershipReceipt(SqlTestPrivateRecord.Hash(body));
+    }
+}
+
+internal sealed class Web6CutoverBrowserResult
+{
+    internal Web6CutoverBrowserResult(int discovered, int passed, int failed, int skipped, int retries, IEnumerable<string> markers)
+    { Discovered = discovered; Passed = passed; Failed = failed; Skipped = skipped; Retries = retries; Markers = markers.ToArray(); }
+    internal int Discovered { get; }
+    internal int Passed { get; }
+    internal int Failed { get; }
+    internal int Skipped { get; }
+    internal int Retries { get; }
+    internal IReadOnlyList<string> Markers { get; }
+}
+
+internal sealed class Web6CutoverDrain
+{
+    internal Web6CutoverDrain(bool workerExited, bool queueAbsent) { WorkerExited = workerExited; QueueAbsent = queueAbsent; }
+    internal bool WorkerExited { get; }
+    internal bool QueueAbsent { get; }
+}
+
+internal interface IWeb6CandidateCutoverOperations
+{
+    Task<Web6CandidateCutoverPlan> VerifyAuthority(CancellationToken token);
+    Task SealProtectedManifest(JObject handles, CancellationToken token);
+    Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token);
+    Task<Web6CutoverBrowserResult> RunAndValidate(string browser, Web6CutoverPair pair, CancellationToken token);
+    Task<Web6CutoverDrain> Drain(string browser, Web6CutoverPair pair, CancellationToken token);
+    Task VerifyRestore(string browser, CancellationToken token);
+    Task Complete(CancellationToken token);
+}
+
+internal sealed class Web6CandidateCutoverOrchestrator
+{
+    private static readonly string[] RequiredMarkers = { "new-client-old-host", "old-client-new-host", "restored-epoch-rejected" };
+    private readonly IWeb6CandidateCutoverOperations _operations;
+    internal Web6CandidateCutoverOrchestrator(IWeb6CandidateCutoverOperations operations) =>
+        _operations = operations ?? throw new ArgumentNullException(nameof(operations));
+
+    internal async Task Execute(CancellationToken token)
+    {
+        var plan = await _operations.VerifyAuthority(token).ConfigureAwait(false);
+        await _operations.SealProtectedManifest(plan.FrontendHandles(), token).ConfigureAwait(false);
+        foreach (var browser in new[] { "chromium", "edge" })
+        {
+            var coordinator = new Web6CandidateCutoverCoordinator(plan);
+            foreach (var pair in new[] { Web6CutoverPair.Current, Web6CutoverPair.Old })
+            {
+                var admission = await _operations.StartAndObserve(browser, pair, token).ConfigureAwait(false);
+                coordinator.Admit(pair, admission);
+                Exception? failure = null;
+                try
+                {
+                    var result = await _operations.RunAndValidate(browser, pair, token).ConfigureAwait(false);
+                    if (result.Discovered != 3 || result.Passed != 3 || result.Failed != 0 || result.Skipped != 0 || result.Retries != 0 ||
+                        !new HashSet<string>(result.Markers, StringComparer.Ordinal).SetEquals(RequiredMarkers))
+                        throw new IOException("Cutover browser result did not prove every mandatory zero-skip/retry marker.");
+                }
+                catch (Exception error) { failure = error; throw; }
+                finally
+                {
+                    try
+                    {
+                        var drain = await _operations.Drain(browser, pair, token).ConfigureAwait(false);
+                        coordinator.Drain(pair, drain.WorkerExited, drain.QueueAbsent);
+                    }
+                    catch (Exception cleanup) when (failure != null)
+                    { throw new AggregateException("Cutover browser result and pair drain both failed.", failure, cleanup); }
+                }
+            }
+            await _operations.VerifyRestore(browser, token).ConfigureAwait(false);
+        }
+        await _operations.Complete(token).ConfigureAwait(false);
+    }
+}
+
 internal static class Web6CutoverAcceptanceGate
 {
     private static readonly string[] Required =
@@ -274,10 +456,11 @@ internal static class Web6CutoverAcceptanceGate
         "MYDMSVN_WEB6_CUTOVER_FRONTEND_DIST_DIRECTORY",
         "MYDMSVN_WEB6_CUTOVER_OLD_PUBLISH_DIRECTORY",
         "MYDMSVN_WEB6_CUTOVER_CURRENT_PUBLISH_DIRECTORY",
-        "MYDMSVN_WEB6_CUTOVER_CURRENT_SQL_CONNECTION_STRING",
-        "MYDMSVN_WEB6_CUTOVER_OLD_SQL_CONNECTION_STRING",
-        "MYDMSVN_WEB6_CUTOVER_CURRENT_SQL_OWNERSHIP_RECEIPT_SHA256",
-        "MYDMSVN_WEB6_CUTOVER_OLD_SQL_OWNERSHIP_RECEIPT_SHA256",
+        "MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_PATH",
+        "MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_SHA256",
+        "MYDMSVN_WEB6_CUTOVER_SQL_CONTROL_PARENT",
+        "MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING",
+        "MYDMSVN_SQL_TEST_APPROVAL_FILE",
         "MYDMSVN_WEB6_CUTOVER_CURRENT_EPOCH",
         "MYDMSVN_WEB6_CUTOVER_RESTORED_EPOCH",
         "MYDMSVN_WEB6_CANDIDATE_ROOT",
