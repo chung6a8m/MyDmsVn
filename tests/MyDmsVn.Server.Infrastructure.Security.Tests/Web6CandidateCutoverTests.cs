@@ -49,6 +49,9 @@ public sealed class Web6CandidateCutoverTests
         }, operations.Calls);
         await Assert.ThrowsAsync<IOException>(() => new Web6CandidateCutoverOrchestrator(
             new RecordingCutoverOperations(Plan()) { SkipChromium = true }).Execute(CancellationToken.None));
+        var badAdmission = new RecordingCutoverOperations(Plan()) { DriftAdmission = true };
+        await Assert.ThrowsAsync<IOException>(() => new Web6CandidateCutoverOrchestrator(badAdmission).Execute(CancellationToken.None));
+        Assert.Contains("chromium:current:drain", badAdmission.Calls);
     }
 
     [Fact]
@@ -75,6 +78,25 @@ public sealed class Web6CandidateCutoverTests
         Assert.Matches("^[0-9a-f]{64}$", receipt.Digest);
         Assert.Throws<IOException>(() => Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(control,
             new string('0', 64), SqlSchemaDefinitionFingerprint.Schema13, "current-allocation"));
+    }
+
+    [Fact]
+    public void SQL_approval_and_post_migration_schema_are_fail_closed()
+    {
+        var now = new DateTimeOffset(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
+        var serverHash = new string('a', 64);
+        var valid = new JObject
+        {
+            ["version"] = 1, ["purpose"] = "web6-cutover", ["serverSha256"] = serverHash,
+            ["expiresUtc"] = now.AddHours(1).ToString("O"),
+        };
+        Web6CutoverSqlApproval.ParseAndVerify(valid.ToString(Newtonsoft.Json.Formatting.None), serverHash, now);
+        valid["purpose"] = "other";
+        Assert.Throws<IOException>(() => Web6CutoverSqlApproval.ParseAndVerify(valid.ToString(Newtonsoft.Json.Formatting.None), serverHash, now));
+        valid["purpose"] = "web6-cutover"; valid["expiresUtc"] = now.AddSeconds(-1).ToString("O");
+        Assert.Throws<IOException>(() => Web6CutoverSqlApproval.ParseAndVerify(valid.ToString(Newtonsoft.Json.Formatting.None), serverHash, now));
+        Assert.Throws<IOException>(() => Web6CutoverSqlApproval.RequireSchema(SqlSchemaDefinitionFingerprint.Schema12,
+            SqlSchemaDefinitionFingerprint.Schema13));
     }
 
     [Fact]
@@ -211,12 +233,14 @@ public sealed class Web6CandidateCutoverTests
         internal RecordingCutoverOperations(Web6CandidateCutoverPlan plan) => _plan = plan;
         internal List<string> Calls { get; } = new List<string>();
         internal bool SkipChromium { get; set; }
+        internal bool DriftAdmission { get; set; }
         public Task<Web6CandidateCutoverPlan> VerifyAuthority(CancellationToken token) { Calls.Add("authority"); return Task.FromResult(_plan); }
         public Task SealProtectedManifest(JObject handles, CancellationToken token) { Calls.Add("manifest"); return Task.CompletedTask; }
         public Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token)
         {
             Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":start");
-            return Task.FromResult(Admission(_plan, pair));
+            var admission = Admission(_plan, pair);
+            return Task.FromResult(DriftAdmission ? admission.WithReceipt(new string('0', 64)) : admission);
         }
         public Task<Web6CutoverBrowserResult> RunAndValidate(string browser, Web6CutoverPair pair, CancellationToken token)
         {

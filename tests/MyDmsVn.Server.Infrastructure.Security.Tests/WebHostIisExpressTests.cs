@@ -66,14 +66,17 @@ public sealed partial class WebHostIisExpressTests
         Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true, web5Pilot: true, web6Candidate: true);
 
     [Web6CutoverSqlFact, Trait("Category", "Web6CutoverPreflight")]
-    public Task Web6_pinned_cutover_preflight_verifies_archives_artifacts_and_separate_SQL() =>
-        RunCutoverPreflight();
+    public Task Web6_pinned_cutover_runs_protected_IIS_and_browser_lifecycle() =>
+        RunCutoverCandidate();
 
     private static async Task Run(bool browser, bool receiptPilot = false, bool integratedPilot = false, bool recoveryPilot = false,
-        bool web5Pilot = false, bool attended = false, bool originalFirstPilot = false, bool admissionOnly = false, bool web6Candidate = false)
+        bool web5Pilot = false, bool attended = false, bool originalFirstPilot = false, bool admissionOnly = false,
+        bool web6Candidate = false, bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null)
     {
         GuiTestSafety.ThrowIfPoisoned();
         if (web6Candidate) Web6CandidateAcceptanceGate.RequireLive(Web6CandidateAcceptanceGate.EnvironmentValues());
+        if (web6Cutover) Web6CutoverAcceptanceGate.RequireLive(Web6CutoverAcceptanceGate.EnvironmentValues());
+        if (web6Cutover && (!web6Candidate || cutoverPlan == null)) throw new InvalidOperationException("WEB6 cutover requires the protected paired candidate fixture and exact handles.");
         if (web6Candidate && (!browser || !receiptPilot || !integratedPilot || !recoveryPilot || !web5Pilot || attended || originalFirstPilot || admissionOnly))
             throw new InvalidOperationException("WEB6 candidate requires the exact paired browser fixture.");
         if (browser && !attended && !web6Candidate) Assert.Contains(Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"), new[] { "chromium", "edge" });
@@ -259,7 +262,7 @@ public sealed partial class WebHostIisExpressTests
                 else
                     await RunBrowser(database, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated,
                         recoveryPilot, web5Pilot, originalFirstPilot, web6Candidate, login.Name,
-                        web6Candidate ? () => candidateBrowserValidated = true : null, candidateManifest, candidateMismatch);
+                        web6Candidate ? () => candidateBrowserValidated = true : null, candidateManifest, candidateMismatch, web6Cutover, cutoverPlan);
             }
             else
             {
@@ -498,7 +501,14 @@ public sealed partial class WebHostIisExpressTests
 
     private const string BrowserPassword = "BrowserPilot_test-only-password_2026!";
 
-    private static async Task RunCutoverPreflight()
+    private static async Task RunCutoverCandidate()
+    {
+        var plan = await RunCutoverPreflight().ConfigureAwait(false);
+        await Run(true, receiptPilot: true, integratedPilot: true, recoveryPilot: true, web5Pilot: true,
+            web6Candidate: true, web6Cutover: true, cutoverPlan: plan).ConfigureAwait(false);
+    }
+
+    private static async Task<Web6CandidateCutoverPlan> RunCutoverPreflight()
     {
         var values = Web6CutoverAcceptanceGate.EnvironmentValues();
         Web6CutoverAcceptanceGate.RequireLive(values);
@@ -520,9 +530,12 @@ public sealed partial class WebHostIisExpressTests
             throw new InvalidOperationException("Cutover deployment epochs are invalid.");
         var admin = Required("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING");
         var controlParent = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_SQL_CONTROL_PARENT"));
+        await Web6CutoverSqlApproval.VerifyFileAsync(Path.GetFullPath(Required("MYDMSVN_SQL_TEST_APPROVAL_FILE")),
+            admin, CancellationToken.None).ConfigureAwait(false);
         SqlTestDatabase? currentDatabase = null, oldDatabase = null;
         SqlTestOwnershipManifest? currentControl = null, oldControl = null;
         var complete = false;
+        Web6CandidateCutoverPlan? verifiedPlan = null;
         try
         {
             currentControl = SqlTestOwnershipManifest.Create(controlParent);
@@ -533,6 +546,19 @@ public sealed partial class WebHostIisExpressTests
             if (!new DatabaseMigrationRunner().MigrateWeb5(currentDatabase.ConnectionString).Successful ||
                 !new DatabaseMigrationRunner().MigrateWeb(oldDatabase.ConnectionString).Successful)
                 throw new InvalidOperationException("Cutover SQL migrations failed.");
+            using (var currentSql = new SqlConnection(currentDatabase.ConnectionString))
+            using (var oldSql = new SqlConnection(oldDatabase.ConnectionString))
+            {
+                await currentSql.OpenAsync().ConfigureAwait(false); await oldSql.OpenAsync().ConfigureAwait(false);
+                await currentDatabase.VerifyOwnershipAsync(currentSql, CancellationToken.None).ConfigureAwait(false);
+                await oldDatabase.VerifyOwnershipAsync(oldSql, CancellationToken.None).ConfigureAwait(false);
+                Web6CutoverSqlApproval.RequireSchema(
+                    await SqlSchemaDefinitionFingerprint.ReadAsync(currentSql, CancellationToken.None).ConfigureAwait(false),
+                    SqlSchemaDefinitionFingerprint.Schema13);
+                Web6CutoverSqlApproval.RequireSchema(
+                    await SqlSchemaDefinitionFingerprint.ReadAsync(oldSql, CancellationToken.None).ConfigureAwait(false),
+                    SqlSchemaDefinitionFingerprint.Schema12);
+            }
             await currentDatabase.WriteOwnershipManifestAsync(currentControl, CancellationToken.None).ConfigureAwait(false);
             await oldDatabase.WriteOwnershipManifestAsync(oldControl, CancellationToken.None).ConfigureAwait(false);
             var currentReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(currentControl, currentControl.VerifiedDigest(),
@@ -547,8 +573,8 @@ public sealed partial class WebHostIisExpressTests
             plan.VerifyArchives(new Web6CutoverArchive(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact),
                 new Web6CutoverArchive(backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact));
             _ = plan.FrontendHandles();
+            verifiedPlan = plan;
             complete = true;
-            throw new InvalidOperationException("WEB6 cutover BLOCKED: protected live host/browser lifecycle has not produced Chromium and Edge evidence.");
         }
         finally
         {
@@ -561,6 +587,7 @@ public sealed partial class WebHostIisExpressTests
             }
             currentControl?.Dispose(); oldControl?.Dispose();
         }
+        return verifiedPlan ?? throw new InvalidOperationException("Cutover authority did not produce a verified plan.");
     }
     private static async Task SeedBrowserActors(SqlConnection connection)
     {
@@ -593,7 +620,8 @@ public sealed partial class WebHostIisExpressTests
 
     private static async Task RunBrowser(SqlTestDatabase database, string runDirectory, int customer, int warehouse, int employee, int product, int receiptProduct, IntegratedCatalog? integrated, bool recoveryPilot, bool web5Pilot, bool originalFirstPilot,
         bool web6Candidate = false, string? runtimeUser = null, Action? candidateValidated = null,
-        Web6CandidateManifest? candidateManifest = null, Web6CandidateHostMismatch? candidateMismatch = null)
+        Web6CandidateManifest? candidateManifest = null, Web6CandidateHostMismatch? candidateMismatch = null,
+        bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null)
     {
         var connectionString = database.ConnectionString;
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
@@ -654,6 +682,7 @@ public sealed partial class WebHostIisExpressTests
             manifestJson["frontendSourceSha"] = web6Expected.FrontendSourceSha;
             manifestJson["backendSourceSha"] = web6Expected.BackendSourceSha;
             manifestJson["frontendDistManifestSha256"] = web6Expected.FrontendDistManifestSha256;
+            if (web6Cutover) manifestJson["cutover"] = cutoverPlan!.FrontendHandles();
         }
         Exception? browserFailure = null;
         Web6CandidateManifest.PrivateInput? privateInput = null;
@@ -667,6 +696,7 @@ public sealed partial class WebHostIisExpressTests
                 start.EnvironmentVariables.Remove(name);
             start.EnvironmentVariables["MYDMSVN_WEB_PILOT_MANIFEST"] = manifestPath;
             start.EnvironmentVariables["NODE_EXTRA_CA_CERTS"] = certificatePath;
+            if (web6Cutover) start.EnvironmentVariables["MYDMSVN_WEB6_CUTOVER_REQUIRED"] = "1";
             try
             {
                 browserDrained = false;

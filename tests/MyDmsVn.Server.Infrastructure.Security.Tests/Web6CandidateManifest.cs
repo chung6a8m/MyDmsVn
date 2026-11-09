@@ -13,6 +13,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
+using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Infrastructure.Operations;
 using Newtonsoft.Json.Linq;
 
@@ -373,6 +374,56 @@ internal sealed class Web6CutoverSqlOwnershipReceipt
     }
 }
 
+internal static class Web6CutoverSqlApproval
+{
+    internal static async Task VerifyFileAsync(string path, string adminConnectionString, CancellationToken token)
+    {
+        path = Web6CandidateFileSystem.CanonicalPath(path);
+        Web6CandidateFileSystem.RequireDirectories(Path.GetDirectoryName(path)!);
+        Web6CandidateFileSystem.RequireRegularFile(path);
+        using var identity = WindowsIdentity.GetCurrent();
+        Web6CandidateManifest.RequirePrivateOwner(File.GetAccessControl(path, SqlTestPrivateRecord.Sections), identity.User!);
+        string text;
+        using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            Web6CandidateFileSystem.Identity(file.SafeFileHandle, directory: false);
+            if (file.Length is < 2 or > 4096) throw new IOException("Cutover SQL approval size is invalid.");
+            using var reader = new StreamReader(file, new UTF8Encoding(false, true), false, 1024, leaveOpen: false);
+            text = await reader.ReadToEndAsync().ConfigureAwait(false);
+        }
+        using var connection = new SqlConnection(new SqlConnectionStringBuilder(adminConnectionString)
+        { InitialCatalog = "master", Pooling = false }.ConnectionString);
+        await connection.OpenAsync(token).ConfigureAwait(false);
+        using var command = connection.CreateCommand(); command.CommandText = "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName'));";
+        var server = (string?)await command.ExecuteScalarAsync(token).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(server)) throw new IOException("Cutover SQL approval server is unavailable.");
+        ParseAndVerify(text, SqlTestPrivateRecord.Hash(Encoding.UTF8.GetBytes(server)), DateTimeOffset.UtcNow);
+    }
+
+    internal static void ParseAndVerify(string text, string expectedServerHash, DateTimeOffset now)
+    {
+        JObject json;
+        try { json = JObject.Parse(text, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error }); }
+        catch (Exception error) { throw new IOException("Cutover SQL approval is invalid.", error); }
+        var keys = new[] { "version", "purpose", "serverSha256", "expiresUtc" };
+        if (!json.Properties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
+                .SequenceEqual(keys.OrderBy(name => name, StringComparer.Ordinal)) || (int?)json["version"] != 1)
+            throw new IOException("Cutover SQL approval shape is invalid.");
+        if ((string?)json["purpose"] != "web6-cutover" ||
+            (string?)json["serverSha256"] != Web6CandidateInputs.RequireHash(expectedServerHash))
+            throw new IOException("Cutover SQL approval authority refused the server or purpose.");
+        if (!DateTimeOffset.TryParse((string?)json["expiresUtc"], CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind, out var expires) || expires <= now || expires > now.AddHours(24))
+            throw new IOException("Cutover SQL approval expiry is invalid.");
+    }
+
+    internal static void RequireSchema(string actual, string expected)
+    {
+        if (!string.Equals(actual, expected, StringComparison.Ordinal))
+            throw new IOException("Cutover post-migration schema fingerprint is incompatible.");
+    }
+}
+
 internal sealed class Web6CutoverBrowserResult
 {
     internal Web6CutoverBrowserResult(int discovered, int passed, int failed, int skipped, int retries, IEnumerable<string> markers)
@@ -419,11 +470,15 @@ internal sealed class Web6CandidateCutoverOrchestrator
             var coordinator = new Web6CandidateCutoverCoordinator(plan);
             foreach (var pair in new[] { Web6CutoverPair.Current, Web6CutoverPair.Old })
             {
-                var admission = await _operations.StartAndObserve(browser, pair, token).ConfigureAwait(false);
-                coordinator.Admit(pair, admission);
                 Exception? failure = null;
+                var started = false;
+                var admitted = false;
                 try
                 {
+                    var admission = await _operations.StartAndObserve(browser, pair, token).ConfigureAwait(false);
+                    started = true;
+                    coordinator.Admit(pair, admission);
+                    admitted = true;
                     var result = await _operations.RunAndValidate(browser, pair, token).ConfigureAwait(false);
                     if (result.Discovered != 3 || result.Passed != 3 || result.Failed != 0 || result.Skipped != 0 || result.Retries != 0 ||
                         !new HashSet<string>(result.Markers, StringComparer.Ordinal).SetEquals(RequiredMarkers))
@@ -432,10 +487,12 @@ internal sealed class Web6CandidateCutoverOrchestrator
                 catch (Exception error) { failure = error; throw; }
                 finally
                 {
-                    try
+                    if (started) try
                     {
                         var drain = await _operations.Drain(browser, pair, token).ConfigureAwait(false);
-                        coordinator.Drain(pair, drain.WorkerExited, drain.QueueAbsent);
+                        if (admitted) coordinator.Drain(pair, drain.WorkerExited, drain.QueueAbsent);
+                        else if (!drain.WorkerExited || !drain.QueueAbsent)
+                            throw new IOException("Cutover failed admission and did not drain its armed host/queue.");
                     }
                     catch (Exception cleanup) when (failure != null)
                     { throw new AggregateException("Cutover browser result and pair drain both failed.", failure, cleanup); }
