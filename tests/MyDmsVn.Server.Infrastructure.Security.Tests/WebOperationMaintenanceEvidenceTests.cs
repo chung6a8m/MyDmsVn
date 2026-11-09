@@ -392,6 +392,51 @@ public sealed class WebOperationMaintenanceEvidenceTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Finalize_escalates_pair_changes_after_primary_manifest_write(bool namedStream)
+    {
+        var store = Store(checkpoint =>
+        {
+            if (checkpoint != MaintenanceEvidenceCheckpoint.AfterPrimaryManifestWrite) return;
+            if (namedStream)
+                WriteNamedStream(Path.Combine(BackupCase, "manifest.json"));
+            else
+                File.WriteAllText(Path.Combine(PrimaryCase, "unexpected.txt"), "retain");
+        });
+        await store.WriteAttemptAsync(Attempt(), CancellationToken.None);
+
+        var receipt = await store.FinalizeAndBackupAsync(CaseId, CancellationToken.None);
+
+        Assert.Equal(MaintenanceEvidenceDelivery.Escalate, receipt.Delivery);
+        Assert.True(File.Exists(Path.Combine(PrimaryCase, "01-attempt.json")));
+        Assert.True(File.Exists(Path.Combine(BackupCase, "01-attempt.json")));
+        Assert.True(File.Exists(Path.Combine(PrimaryCase, "manifest.json")));
+        Assert.True(File.Exists(Path.Combine(BackupCase, "manifest.json")));
+    }
+
+    [Fact]
+    public async Task Purge_checks_a_later_member_before_deleting_the_next_event()
+    {
+        var receipt = await Deliver();
+        _utc = _utc.AddDays(90);
+        var mutated = false;
+        var store = Store(checkpoint =>
+        {
+            if (checkpoint != MaintenanceEvidenceCheckpoint.BeforePurgeEntryVerification || mutated) return;
+            WriteNamedStream(Path.Combine(BackupCase, "manifest.json"));
+            mutated = true;
+        });
+
+        var purge = await store.PurgeExpiredAsync(PrimaryCase, BackupCase, CaseId, receipt.PrimaryManifestHash!,
+            receipt.BackupManifestHash!, CancellationToken.None);
+
+        Assert.True(mutated);
+        Assert.Equal(MaintenanceEvidencePurge.BackupUncertain, purge);
+        AssertCopiesIntact(receipt);
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task Purge_escalates_failed_deletion_and_does_not_continue_to_the_next_copy(bool failBackup)
@@ -441,6 +486,9 @@ public sealed class WebOperationMaintenanceEvidenceTests : IDisposable
 
     private MaintenanceEvidenceStore Store() =>
         new MaintenanceEvidenceStore(new MaintenanceEvidencePolicy(PrimaryRoot, BackupRoot, Retention), () => _utc);
+
+    private MaintenanceEvidenceStore Store(Action<MaintenanceEvidenceCheckpoint> onCheckpoint) =>
+        new MaintenanceEvidenceStore(new MaintenanceEvidencePolicy(PrimaryRoot, BackupRoot, Retention), () => _utc, onCheckpoint);
 
     private static MaintenanceEvidenceRecord Attempt() => Record(MaintenanceEvidencePhase.Attempt,
         MaintenanceTransactionCertainty.NotStarted, MaintenanceReadback.NotRun);
@@ -527,9 +575,10 @@ public sealed class WebOperationMaintenanceEvidenceTests : IDisposable
     private static void WriteNamedStream(string entry)
     {
         const uint genericWrite = 0x40000000;
+        const uint shareAll = 7;
         const uint createNew = 1;
         const uint normalAttributes = 0x80;
-        using var handle = CreateFile(entry + ":outside-manifest:$DATA", genericWrite, 0, IntPtr.Zero, createNew,
+        using var handle = CreateFile(entry + ":outside-manifest:$DATA", genericWrite, shareAll, IntPtr.Zero, createNew,
             normalAttributes, IntPtr.Zero);
         Assert.False(handle.IsInvalid);
         using var stream = new FileStream(handle, FileAccess.Write);

@@ -17,6 +17,8 @@ public interface IMaintenanceEvidenceStore
         string primaryManifestHash, string backupManifestHash, CancellationToken cancellationToken);
 }
 
+internal enum MaintenanceEvidenceCheckpoint { AfterPrimaryManifestWrite, BeforePurgeEntryVerification }
+
 public sealed class MaintenanceEvidenceStore : IMaintenanceEvidenceStore
 {
     private const string ManifestName = "manifest.json";
@@ -24,13 +26,19 @@ public sealed class MaintenanceEvidenceStore : IMaintenanceEvidenceStore
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly MaintenanceEvidencePolicy _policy;
     private readonly Func<DateTimeOffset> _utcNow;
+    private readonly Action<MaintenanceEvidenceCheckpoint>? _onCheckpoint;
     private readonly object _gate = new object();
     private readonly Dictionary<string, ActiveCase> _cases = new Dictionary<string, ActiveCase>(StringComparer.Ordinal);
 
     public MaintenanceEvidenceStore(MaintenanceEvidencePolicy policy, Func<DateTimeOffset>? utcNow = null)
+        : this(policy, utcNow, null) { }
+
+    internal MaintenanceEvidenceStore(MaintenanceEvidencePolicy policy, Func<DateTimeOffset>? utcNow,
+        Action<MaintenanceEvidenceCheckpoint>? onCheckpoint)
     {
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
+        _onCheckpoint = onCheckpoint;
     }
 
     // Durable writes and native handle operations are synchronous. The async
@@ -139,18 +147,26 @@ public sealed class MaintenanceEvidenceStore : IMaintenanceEvidenceStore
 
                 // Only a verified pair counts as delivered. The primary manifest
                 // is the final marker, after the backup contents are durable.
-                primaryCase.VerifyContents(names.Append(ManifestName));
-                backupCase.VerifyContents(names.Append(ManifestName));
+                var finalNames = names.Append(ManifestName).ToArray();
+                primaryCase.VerifyContents(finalNames);
+                backupCase.VerifyContents(finalNames);
                 VerifyCasePair(primary, backup, primaryCase, backupCase);
                 eventHandles.Verify();
                 backupManifestHash = WriteManifest(backupManifestFile, backupManifest);
                 cancellationToken.ThrowIfCancellationRequested();
-                primaryCase.VerifyContents(names.Append(ManifestName));
-                backupCase.VerifyContents(names.Append(ManifestName));
+                primaryCase.VerifyContents(finalNames);
+                backupCase.VerifyContents(finalNames);
                 VerifyCasePair(primary, backup, primaryCase, backupCase);
                 eventHandles.Verify();
                 ReadVerified(backupManifestFile, backupManifestHash);
                 primaryManifestHash = WriteManifest(primaryManifestFile, primaryManifest);
+                _onCheckpoint?.Invoke(MaintenanceEvidenceCheckpoint.AfterPrimaryManifestWrite);
+                VerifyCasePair(primary, backup, primaryCase, backupCase);
+                primaryCase.VerifyContents(finalNames);
+                backupCase.VerifyContents(finalNames);
+                eventHandles.Verify();
+                ReadVerified(backupManifestFile, backupManifestHash);
+                ReadVerified(primaryManifestFile, primaryManifestHash);
                 return new MaintenanceEvidenceReceipt(caseId, hashes, MaintenanceEvidenceDelivery.Delivered,
                     primaryManifestHash, backupManifestHash);
             }
@@ -191,11 +207,11 @@ public sealed class MaintenanceEvidenceStore : IMaintenanceEvidenceStore
                 VerifyCasePair(primaryRoot, backupRoot, primary.Directory, backup.Directory);
                 primary.Verify();
                 backup.Verify();
-                backup.Delete(backupRoot, primaryRoot, primary.Verify, cancellationToken);
+                backup.Delete(backupRoot, primaryRoot, primary.Verify, _onCheckpoint, cancellationToken);
 
                 failure = MaintenanceEvidencePurge.PrimaryUncertain;
                 primary.Verify();
-                primary.Delete(primaryRoot, backupRoot, () => backupRoot.VerifyCaseRemoved(caseId), cancellationToken);
+                primary.Delete(primaryRoot, backupRoot, () => backupRoot.VerifyCaseRemoved(caseId), _onCheckpoint, cancellationToken);
                 return MaintenanceEvidencePurge.Purged;
             }
             catch (Exception exception) when (IsEvidenceFailure(exception) ||
@@ -457,14 +473,17 @@ public sealed class MaintenanceEvidenceStore : IMaintenanceEvidenceStore
         internal EvidenceEntry Directory { get; } = directory;
         internal EvidenceManifest Manifest { get; } = manifest;
 
-        internal void Verify()
+        internal void Verify() => Verify(files);
+
+        private void Verify(IEnumerable<PurgeFile> remaining)
         {
-            Directory.VerifyContents(files.Select(file => file.Name));
-            foreach (var file in files)
+            Directory.VerifyContents(remaining.Select(file => file.Name));
+            foreach (var file in remaining)
                 ReadVerified(file.Entry, file.Hash);
         }
 
-        internal void Delete(EvidenceRoot root, EvidenceRoot peer, Action verifyPeer, CancellationToken cancellationToken)
+        internal void Delete(EvidenceRoot root, EvidenceRoot peer, Action verifyPeer,
+            Action<MaintenanceEvidenceCheckpoint>? onCheckpoint, CancellationToken cancellationToken)
         {
             // Keep the final manifest until after the named event files, so an
             // interrupted delete retains its case and disposition metadata.
@@ -473,11 +492,11 @@ public sealed class MaintenanceEvidenceStore : IMaintenanceEvidenceStore
             {
                 var file = order[index];
                 cancellationToken.ThrowIfCancellationRequested();
+                onCheckpoint?.Invoke(MaintenanceEvidenceCheckpoint.BeforePurgeEntryVerification);
                 root.Verify();
                 peer.Verify();
                 verifyPeer();
-                Directory.VerifyContents(order.Skip(index).Select(remaining => remaining.Name));
-                ReadVerified(file.Entry, file.Hash);
+                Verify(order.Skip(index));
                 file.Entry.Delete();
             }
             cancellationToken.ThrowIfCancellationRequested();
