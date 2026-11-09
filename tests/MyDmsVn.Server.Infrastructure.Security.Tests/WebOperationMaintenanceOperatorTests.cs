@@ -370,6 +370,30 @@ public sealed class WebOperationMaintenanceOperatorTests
         });
 
     [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
+    public Task Compact_preview_denies_elapsed_tombstone_with_trailing_space() =>
+        OwnedPrincipals(async (scenario, principals) =>
+        {
+            await scenario.Observer.ExecuteAsync(principals.ProvisionScript());
+            var operation = Guid.NewGuid();
+            await scenario.Observer.ExecuteAsync(
+                "DECLARE @completed datetime2(7)=DATEADD(day,-8,SYSUTCDATETIME()); " +
+                "INSERT dbo.WebOperationJournal VALUES(@actor,@operation,@epoch,1,1,1,NULL,@hash,41,'EXPIRED ',NULL,@completed,@completed,DATEADD(day,7,@completed));",
+                new { scenario.Actor, operation, scenario.Epoch, hash = FingerprintBytes() });
+            var storedDisposition = await scenario.Observer.QuerySingleAsync<byte[]>(
+                "SELECT CONVERT(varbinary(9),Disposition) FROM dbo.WebOperationJournal " +
+                "WHERE OperationId=@operation AND ResultExpiresAtUtc<=SYSUTCDATETIME();", new { operation });
+            Assert.Equal(Encoding.ASCII.GetBytes("EXPIRED "), storedDisposition);
+            var before = await SnapshotAsync(scenario.Observer);
+
+            var denied = await RunReleaseAsync(SqlArguments(scenario, scenario.Epoch, operation), scenario, principals.Maintenance);
+
+            Assert.Equal(before, await SnapshotAsync(scenario.Observer));
+            Assert.Equal((int)OperatorExitCode.Denied, denied.ExitCode);
+            Assert.Equal("status=DENIED" + Environment.NewLine, denied.StandardError);
+            Assert.Empty(denied.StandardOutput);
+        });
+
+    [SqlServerFact(SqlTestCategory.SecurityProvisioning)]
     public Task Release_preview_uses_only_the_dedicated_maintenance_environment() =>
         OwnedPrincipals(async (scenario, principals) =>
         {
