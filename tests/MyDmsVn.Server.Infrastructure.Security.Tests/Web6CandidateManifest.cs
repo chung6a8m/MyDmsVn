@@ -747,6 +747,9 @@ internal static class Web6CandidateFileSystem
         internal SafeFileHandle CreateRoot(string name, DirectorySecurity acl) =>
             OpenRelativeDirectory(_leases[_leases.Count - 1], name, acl);
 
+        internal SafeFileHandle CreateDeletableRoot(string name, DirectorySecurity acl) =>
+            OpenRelativeDirectory(_leases[_leases.Count - 1], name, acl, deleteAuthority: true);
+
         private void Pin(SafeFileHandle handle)
         {
             _leases.Add(handle);
@@ -761,9 +764,10 @@ internal static class Web6CandidateFileSystem
 
     // Open each child relative to the already pinned parent. Create-new returns the original root handle
     // with the private descriptor already applied, without another lookup through the absolute path.
-    private static SafeFileHandle OpenRelativeDirectory(SafeFileHandle parent, string name, DirectorySecurity? acl)
+    private static SafeFileHandle OpenRelativeDirectory(SafeFileHandle parent, string name, DirectorySecurity? acl,
+        bool deleteAuthority = false)
     {
-        const uint caseInsensitive = 0x40, dontReparse = 0x1000, readAndListAttributes = 0x81, shareRead = 1;
+        const uint caseInsensitive = 0x40, dontReparse = 0x1000, readAndListAttributes = 0x81, delete = 0x10000, shareRead = 1;
         const uint openExisting = 1, createNew = 2, directoryWithoutFollowing = 0x00200001;
         var buffer = IntPtr.Zero;
         var objectName = IntPtr.Zero;
@@ -789,7 +793,7 @@ internal static class Web6CandidateFileSystem
                 Attributes = caseInsensitive | dontReparse,
                 SecurityDescriptor = descriptor.IsAllocated ? descriptor.AddrOfPinnedObject() : IntPtr.Zero
             };
-            var status = NtCreateFile(out var handle, readAndListAttributes, ref attributes, out _, IntPtr.Zero,
+            var status = NtCreateFile(out var handle, readAndListAttributes | (deleteAuthority ? delete : 0), ref attributes, out _, IntPtr.Zero,
                 FileAttributes.Normal, shareRead, acl == null ? openExisting : createNew, directoryWithoutFollowing, IntPtr.Zero, 0);
             if (status >= 0 && handle != null && !handle.IsInvalid) return handle;
             handle?.Dispose();
@@ -825,6 +829,15 @@ internal static class Web6CandidateFileSystem
         return FormattableString.Invariant($"{info.Volume:X8}:{info.IndexHigh:X8}{info.IndexLow:X8}:{info.CreatedHigh:X8}{info.CreatedLow:X8}");
     }
 
+    internal static void MarkDirectoryForDeletion(SafeFileHandle handle)
+    {
+        var disposition = new NativeFileDispositionInfo { DeleteFile = true };
+        if (!SetFileInformationByHandle(handle, 4, ref disposition,
+            (uint)Marshal.SizeOf(typeof(NativeFileDispositionInfo))))
+            throw new IOException("Candidate private directory could not be deleted through its retained identity.",
+                new Win32Exception(Marshal.GetLastWin32Error()));
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeUnicodeString
     {
@@ -856,6 +869,12 @@ internal static class Web6CandidateFileSystem
         internal uint Volume, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeFileDispositionInfo
+    {
+        [MarshalAs(UnmanagedType.Bool)] internal bool DeleteFile;
+    }
+
     [DllImport("ntdll.dll", ExactSpelling = true)]
     private static extern int NtCreateFile(out SafeFileHandle handle, uint access, ref NativeObjectAttributes attributes,
         out NativeIoStatus status, IntPtr allocationSize, FileAttributes fileAttributes, uint share, uint disposition,
@@ -867,6 +886,106 @@ internal static class Web6CandidateFileSystem
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetFileInformationByHandle(SafeFileHandle handle, out FileInformation info);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetFileInformationByHandle(SafeFileHandle handle, int informationClass,
+        ref NativeFileDispositionInfo information, uint bufferSize);
+}
+
+// Create-new private directory whose parent chain and native identity remain pinned for its full use.
+// Deletion is issued through the retained root handle only after exact ACL/identity and emptiness checks.
+internal sealed class Web6PrivateDirectoryLease : IDisposable
+{
+    private readonly Web6CandidateFileSystem.ParentChain _parents;
+    private readonly SecurityIdentifier _owner;
+    private readonly string _identity;
+    private readonly string _acl;
+    private SafeFileHandle? _handle;
+    private bool _deleted;
+
+    private Web6PrivateDirectoryLease(string path, Web6CandidateFileSystem.ParentChain parents,
+        SafeFileHandle handle, SecurityIdentifier owner)
+    {
+        Path = path; _parents = parents; _handle = handle; _owner = owner;
+        _identity = Web6CandidateFileSystem.Identity(handle, directory: true);
+        var security = Directory.GetAccessControl(path, SqlTestPrivateRecord.Sections);
+        Web6CandidateManifest.RequirePrivateOwner(security, owner);
+        _acl = security.GetSecurityDescriptorSddlForm(SqlTestPrivateRecord.Sections);
+        Verify();
+    }
+
+    internal string Path { get; }
+
+    internal static Web6PrivateDirectoryLease CreateNew(string path)
+    {
+        path = Web6CandidateFileSystem.CanonicalPath(path);
+        if (path.Length + 30 > 240 || System.IO.Path.GetDirectoryName(path) is not string parent)
+            throw new IOException("Private directory exceeds its path budget.");
+        using var current = WindowsIdentity.GetCurrent();
+        var owner = current.User ?? throw new IOException("Private directory owner is unavailable.");
+        var parents = new Web6CandidateFileSystem.ParentChain(parent);
+        SafeFileHandle? handle = null;
+        try
+        {
+            handle = parents.CreateDeletableRoot(System.IO.Path.GetFileName(path), SqlTestPrivateRecord.DirectoryAcl(owner));
+            return new Web6PrivateDirectoryLease(path, parents, handle, owner);
+        }
+        catch { handle?.Dispose(); parents.Dispose(); throw; }
+    }
+
+    internal void Verify()
+    {
+        var handle = _handle ?? throw new ObjectDisposedException(nameof(Web6PrivateDirectoryLease));
+        if (_deleted || Web6CandidateFileSystem.Identity(handle, directory: true) != _identity ||
+            !Directory.Exists(Path) || (File.GetAttributes(Path) & (FileAttributes.ReparsePoint | FileAttributes.Device)) != 0)
+            throw new IOException("Private directory identity changed.");
+        var security = Directory.GetAccessControl(Path, SqlTestPrivateRecord.Sections);
+        Web6CandidateManifest.RequirePrivateOwner(security, _owner);
+        if (security.GetSecurityDescriptorSddlForm(SqlTestPrivateRecord.Sections) != _acl)
+            throw new IOException("Private directory ACL changed.");
+    }
+
+    internal void DeleteVerified()
+    {
+        Verify();
+        if (Directory.EnumerateFileSystemEntries(Path).Any())
+            throw new IOException("Private directory cleanup requires an empty verified root.");
+        var handle = _handle!;
+        Web6CandidateFileSystem.MarkDirectoryForDeletion(handle);
+        handle.Dispose(); _handle = null; _deleted = true;
+        if (Directory.Exists(Path) || File.Exists(Path))
+            throw new IOException("Private directory deletion was not observed.");
+        _parents.Dispose();
+    }
+
+    internal void DeleteTreeVerified()
+    {
+        Verify();
+        DeleteChildren(Path);
+        DeleteVerified();
+    }
+
+    private static void DeleteChildren(string directory)
+    {
+        foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+        {
+            var attributes = File.GetAttributes(entry);
+            if ((attributes & (FileAttributes.ReparsePoint | FileAttributes.Device)) != 0)
+                throw new IOException("Private directory cleanup refuses a reparse point or device.");
+            if ((attributes & FileAttributes.Directory) != 0)
+            {
+                DeleteChildren(entry);
+                Directory.Delete(entry, false);
+            }
+            else File.Delete(entry);
+        }
+    }
+
+    public void Dispose()
+    {
+        _handle?.Dispose(); _handle = null; _parents.Dispose();
+    }
 }
 
 internal sealed class Web6CandidateObservation

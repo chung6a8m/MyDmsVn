@@ -49,6 +49,7 @@ public sealed partial class WebHostIisExpressTests
         private int _restoredAdmissions, _currentReadmissions;
         private int _customer, _warehouse, _employee, _product, _receiptProduct;
         private IntegratedCatalog? _integrated;
+        private Web6PrivateDirectoryLease? _browserLease;
         private string BrowserRoot => Root + "-browser";
         private string Root => Path.GetFullPath(Required("MYDMSVN_WEB6_CANDIDATE_ROOT"));
         private static string Required(string name) => Environment.GetEnvironmentVariable(name) ?? throw new InvalidOperationException("Missing " + name);
@@ -129,7 +130,7 @@ public sealed partial class WebHostIisExpressTests
             var oldPublish = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_OLD_PUBLISH_DIRECTORY"));
             if (Web6CandidateFileSet.MeasureTree(currentPublish) != _plan.CurrentArtifactHash || Web6CandidateFileSet.MeasureTree(oldPublish) != _plan.OldArtifactHash)
                 throw new IOException("Published cutover artifacts changed.");
-            CreatePrivateDirectory(BrowserRoot);
+            _browserLease = Web6PrivateDirectoryLease.CreateNew(BrowserRoot);
             CreateDeployment("current", currentPublish, Path.Combine(Required("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY"), "dist"), false, false);
             CreateDeployment("cached", currentPublish, Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_DIST_DIRECTORY"), true, false);
             CreateDeployment("restored", currentPublish, Path.Combine(Required("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY"), "dist"), false, false);
@@ -152,9 +153,9 @@ public sealed partial class WebHostIisExpressTests
             var deployment = new Deployment { Root = root, Inputs = inputs, Old = old, Source = published };
             _deployments.Add(key, deployment);
             if (!old) deployment.Manifest = Web6CandidateManifest.CreateNew(root, inputs);
-            else { using var owner = WindowsIdentity.GetCurrent(); Directory.CreateDirectory(root, SqlTestPrivateRecord.DirectoryAcl(owner.User!)); }
+            else deployment.ControlLease = Web6PrivateDirectoryLease.CreateNew(root);
             // The sealed control root has an exact child allowlist; payload/config/logs live outside it.
-            var runtimeRoot = root + "-runtime"; CreatePrivateDirectory(runtimeRoot);
+            var runtimeRoot = root + "-runtime"; deployment.RuntimeLease = Web6PrivateDirectoryLease.CreateNew(runtimeRoot);
             var host = Path.Combine(runtimeRoot, "host"); Directory.CreateDirectory(host);
             CopyTree(published, host, omitWwwroot: true);
             CopyTree(dist, Path.Combine(host, "wwwroot"), omitWwwroot: false);
@@ -186,13 +187,6 @@ public sealed partial class WebHostIisExpressTests
                     Path.Combine(backendRoot, "docs/contracts/web4-v1"), Path.Combine(backendRoot, "docs/contracts/web5-resolution-v1"),
                     Path.Combine(backendRoot, "docs/contracts/web6-resend-eligibility-v1"), dist, Path.Combine(host, "wwwroot")), key == "restored" ? _plan.RestoredDatabaseReceipt : _plan.CurrentDatabaseReceipt);
             }
-        }
-
-        private static void CreatePrivateDirectory(string path)
-        {
-            if (Directory.Exists(path) || File.Exists(path)) throw new IOException("Cutover working directory must be create-new.");
-            using var owner = WindowsIdentity.GetCurrent();
-            Directory.CreateDirectory(path, SqlTestPrivateRecord.DirectoryAcl(owner.User!));
         }
 
         private static void CopyTree(string source, string target, bool omitWwwroot)
@@ -464,6 +458,8 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task VerifyLifecycle()
         {
+            _browserLease?.Verify();
+            foreach (var deployment in _deployments.Values) { deployment.ControlLease?.Verify(); deployment.RuntimeLease?.Verify(); }
             Web6CutoverDelta.VerifyZero(_currentSnapshot!, await LifecycleSnapshot(_current.ConnectionString, true));
             Web6CutoverDelta.VerifyZero(_oldSnapshot!, await LifecycleSnapshot(_old.ConnectionString, false));
             Web6CutoverDelta.VerifyZero(_restoredSnapshot!, await LifecycleSnapshot(_restored.ConnectionString, true));
@@ -520,7 +516,25 @@ public sealed partial class WebHostIisExpressTests
         }
         internal void DisposeManifests()
         {
-            foreach (var deployment in _deployments.Values) { deployment.Handles?.Dispose(); deployment.Manifest?.Dispose(); }
+            var failures = new List<Exception>();
+            void Attempt(Action action) { try { action(); } catch (Exception error) { failures.Add(error); } }
+            foreach (var deployment in _deployments.Values)
+            {
+                Attempt(() => deployment.Handles?.Dispose());
+                Attempt(() => deployment.Manifest?.Dispose());
+            }
+            var safe = _browserDrained && _hostDrained && _corruptionHealthy && !GuiTestSafety.IsPoisoned;
+            foreach (var deployment in _deployments.Values)
+            {
+                if (safe)
+                {
+                    Attempt(() => deployment.RuntimeLease?.DeleteTreeVerified());
+                    Attempt(() => deployment.ControlLease?.DeleteTreeVerified());
+                }
+                else { Attempt(() => deployment.RuntimeLease?.Dispose()); Attempt(() => deployment.ControlLease?.Dispose()); }
+            }
+            if (safe) Attempt(() => _browserLease?.DeleteTreeVerified()); else Attempt(() => _browserLease?.Dispose());
+            if (failures.Count != 0) throw new AggregateException("Cutover private-root cleanup failed; uncertain roots are retained.", failures);
         }
         private sealed class Deployment
         {
@@ -529,6 +543,8 @@ public sealed partial class WebHostIisExpressTests
             internal Web6CandidateInputs Inputs = null!;
             internal Web6CandidateManifest? Manifest;
             internal Web6CandidateManifest.PrivateInput? Handles;
+            internal Web6PrivateDirectoryLease? ControlLease;
+            internal Web6PrivateDirectoryLease? RuntimeLease;
         }
     }
 }
