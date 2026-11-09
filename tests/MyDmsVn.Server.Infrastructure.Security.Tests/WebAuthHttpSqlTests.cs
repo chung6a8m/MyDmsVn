@@ -222,6 +222,13 @@ public sealed class WebAuthHttpSqlTests
         private bool _web4Enabled;
         private bool _web5Enabled;
         private Scenario(string connectionString) { Admin = new SqlConnection(connectionString); }
+        internal static void LoadWithoutSql()
+        {
+            using var scenario = new Scenario("Server=sql-free.invalid;Database=master;Integrated Security=true;Pooling=false;");
+            scenario._web4Enabled = true; scenario._web5Enabled = true;
+            scenario.RestartHost(new NoSqlFactory());
+            Assert.Equal(ConnectionState.Closed, scenario.Admin.State);
+        }
         public static async Task<Scenario> Create(string connectionString, bool web4Enabled = false, bool web5Enabled = false)
         {
             var test = new Scenario(connectionString);
@@ -276,20 +283,25 @@ public sealed class WebAuthHttpSqlTests
             return new Reply((int)response.StatusCode, await response.Content.ReadAsStringAsync(), response.Headers.TryGetValues("Set-Cookie", out var values) ? values.ToArray() : Array.Empty<string>(),
                 response.Headers.Concat(response.Content.Headers).ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase));
         }
-        public void RestartHost()
+        public void RestartHost(IDbConnectionFactory? noSql = null)
         {
             _server?.Dispose(); _server = null;
             _provider?.Dispose(); _provider = null;
             var services = new ServiceCollection();
             services.AddServerApplication().AddHttpRequestIdentity();
             services.AddSqlPersistence(Admin.ConnectionString);
-            services.Replace(ServiceDescriptor.Singleton<IDbConnectionFactory>(new RestrictedFactory(Admin.ConnectionString)));
+            services.Replace(ServiceDescriptor.Singleton<IDbConnectionFactory>(noSql ?? new RestrictedFactory(Admin.ConnectionString)));
             services.Replace(ServiceDescriptor.Singleton<ISecurityAuditSink>(Audit));
             _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
             var options = new WebHostOptions(Origin, Origin, "http-sql-tests", "sql-test", new Dictionary<string, byte[]> { ["sql-test"] = Encoding.UTF8.GetBytes("test-only-key-for-real-sql-http-auth-boundary") }, web4Enabled: _web4Enabled, web5Enabled: _web5Enabled);
             _server = TestServer.Create(app => Web2Pipeline.Configure(app, options, _provider));
         }
         public void Dispose() { _server?.Dispose(); _provider?.Dispose(); Admin.Dispose(); }
+        private sealed class NoSqlFactory : IDbConnectionFactory
+        {
+            public IDbConnection OpenConnection() => throw new InvalidOperationException("SQL is forbidden in dependency preflight.");
+            public Task<IDbConnection> OpenConnectionAsync(CancellationToken token) => throw new InvalidOperationException("SQL is forbidden in dependency preflight.");
+        }
         private static string ReadProvisioning()
         {
             for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
