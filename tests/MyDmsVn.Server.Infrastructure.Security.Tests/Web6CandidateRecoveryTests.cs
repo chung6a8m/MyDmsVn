@@ -15,6 +15,16 @@ public sealed class Web6CandidateRecoveryTests
     {
         var values = Web6CandidateRecoveryAcceptanceGate.EnvironmentValues();
         Web6CandidateRecoveryAcceptanceGate.RequireLive(values);
+        var task4 = Web6WorkloadTask4Receipt.ReadProtected(values["MYDMSVN_WEB6_TASK4_ACCEPTANCE_PATH"]!,
+            values["MYDMSVN_WEB6_TASK4_ACCEPTANCE_SHA256"]!);
+        if (!string.Equals(task4.CandidateId, values["MYDMSVN_WEB6_CANDIDATE_ID"], StringComparison.Ordinal))
+            throw new InvalidDataException("Task4 accepted candidate identity does not match the recovery candidate.");
+        var publish = Web6CandidateFileSystem.CanonicalPath(values["MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY"]!);
+        _ = Web6CandidateFileSet.MeasureTree(publish);
+        var thumbprint = values["MYDMSVN_WEB_TEST_TLS_THUMBPRINT"]!;
+        if (thumbprint.Length != 40 || thumbprint.Any(value => !Uri.IsHexDigit(value)))
+            throw new InvalidDataException("Recovery TLS thumbprint is invalid.");
+        using var recoveryRoot = Web6PrivateDirectoryLease.CreateNew(values["MYDMSVN_WEB6_RECOVERY_ROOT"]!);
         var fixture = await Web6MaintenanceRecoveryFixture.CreateAsync();
         var result = await fixture.RunAsync(Web6MaintenanceRecoveryFixture.Failure.None);
         Assert.True(result.Succeeded, result.Phase);
@@ -24,6 +34,7 @@ public sealed class Web6CandidateRecoveryTests
         Assert.Equal(3, result.StaleDenials);
         Assert.Equal(1, result.CurrentOperations);
         Assert.True(result.ResourcesAbsent);
+        recoveryRoot.DeleteTreeVerified();
     }
 
     [Theory]
@@ -68,11 +79,28 @@ public sealed class Web6CandidateRecoveryTests
     public async Task Recovery_failure_never_admits_or_deletes_uncertain_resources(string failure)
     {
         var operations = new FakeOperations { Failure = failure };
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        await Assert.ThrowsAnyAsync<Exception>(() =>
             new Web6CandidateRecoveryCoordinator(operations).Execute(ValidPlan(), CancellationToken.None));
         Assert.False(operations.TrustedAdmission);
         Assert.False(operations.DeletedResources);
         Assert.True(operations.RetainedEvidence);
+        if (failure is "stale-writer" or "cleanup-identity") Assert.Contains("drain-restored", operations.Calls);
+    }
+
+    [Theory]
+    [InlineData("authenticated-health")]
+    [InlineData("fresh-write")]
+    [InlineData("rpo")]
+    public async Task Admitted_recovery_failure_always_attempts_verified_drain_and_retains_evidence(string failure)
+    {
+        var operations = new FakeOperations { Failure = failure };
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new Web6CandidateRecoveryCoordinator(operations).Execute(ValidPlan(), CancellationToken.None));
+        Assert.Contains("admit-host", operations.Calls);
+        Assert.Contains("drain-restored", operations.Calls);
+        Assert.DoesNotContain("cleanup", operations.Calls);
+        Assert.True(operations.RetainedEvidence);
+        Assert.False(operations.DeletedResources);
     }
 
     [Fact]
@@ -262,6 +290,8 @@ internal sealed class Web6CandidateRecoveryCoordinator
     {
         plan.Validate();
         var timeline = new Web6RecoveryTimeline();
+        var hostAdmitted = false;
+        var restoredDrained = false;
         try
         {
             await _operations.VerifySource(plan, token).ConfigureAwait(false);
@@ -276,6 +306,7 @@ internal sealed class Web6CandidateRecoveryCoordinator
             await _operations.RotateEpoch(plan, token).ConfigureAwait(false);
             await _operations.ReprovisionPrincipals(plan, token).ConfigureAwait(false);
             await _operations.AdmitHost(plan, token).ConfigureAwait(false);
+            hostAdmitted = true;
             timeline.Record(Web6RecoveryMilestone.HostAdmitted, _operations.Timestamp());
             await _operations.RejectStaleWriterReceiptAndStatus(plan, token).ConfigureAwait(false);
             await _operations.AuthenticatedHealth(token).ConfigureAwait(false);
@@ -285,12 +316,21 @@ internal sealed class Web6CandidateRecoveryCoordinator
             var snapshots = await _operations.RecoverySnapshots(token).ConfigureAwait(false);
             var rpo = Web6CandidateOracle.CompareRecovery(snapshots.Before, snapshots.After);
             await _operations.DrainRestored(token).ConfigureAwait(false);
+            restoredDrained = true;
             await _operations.CleanupVerified(token).ConfigureAwait(false);
             return timeline.Complete(rpo.LostBusinessRows, rpo.LostJournalRows);
         }
-        catch
+        catch (Exception failure)
         {
+            Exception? drainFailure = null;
+            if (hostAdmitted && !restoredDrained)
+            {
+                try { await _operations.DrainRestored(token).ConfigureAwait(false); }
+                catch (Exception error) { drainFailure = error; }
+            }
             _operations.RetainEvidence();
+            if (drainFailure != null)
+                throw new AggregateException("WEB6 restored host failure and drain uncertainty; retain all resources.", failure, drainFailure);
             throw;
         }
     }
