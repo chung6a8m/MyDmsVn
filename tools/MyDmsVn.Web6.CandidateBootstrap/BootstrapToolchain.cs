@@ -182,7 +182,7 @@ internal sealed class BootstrapToolchain
 
     // net48 has no ProcessStartInfo.ArgumentList. Encode each argument independently
     // using Windows argv quoting, including backslashes before quotes and closing delimiters.
-    private static string Quote(string argument)
+    internal static string Quote(string argument)
     {
         var result = new StringBuilder("\"");
         var slashes = 0;

@@ -467,9 +467,10 @@ internal static class BootstrapJson
         return array.Values<string>().Select(value => value!).ToArray();
     }
 
-    internal static string CandidateId(JObject obj)
+    internal static string CandidateId(JObject obj) => RequireCandidateId(Text(obj, "candidateId"));
+
+    internal static string RequireCandidateId(string candidateId)
     {
-        var candidateId = Text(obj, "candidateId");
         if (!Candidate.IsMatch(candidateId) || IsQuarantineHandle(candidateId))
             throw new IOException("Bootstrap candidate ID is invalid.");
         return candidateId;
