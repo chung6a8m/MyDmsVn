@@ -33,6 +33,7 @@ public sealed partial class WebHostIisExpressTests
         private readonly Dictionary<Guid, string> _operationIdentities = new Dictionary<Guid, string>();
         private readonly byte[] _jwt = new byte[32];
         private readonly Web6SelectorOutput? _bootstrap;
+        private readonly Web6CandidateBackendSource _currentBackend;
         internal JArray BootstrapResources { get; } = new JArray();
         internal string? BootstrapSqlReceipt { get; private set; }
         internal string? BootstrapManifestHash { get; private set; }
@@ -61,10 +62,12 @@ public sealed partial class WebHostIisExpressTests
 
         internal LiveCutoverOperations(Web6CandidateCutoverPlan plan, SqlTestDatabase current, SqlTestDatabase old, SqlTestDatabase restored,
             SqlTestOwnershipManifest currentControl, SqlTestOwnershipManifest oldControl, SqlTestOwnershipManifest restoredControl,
+            Web6CandidateBackendSource currentBackend,
             Web6SelectorOutput? bootstrap = null)
         {
             _plan = plan; _current = current; _old = old; _currentControl = currentControl; _oldControl = oldControl; _restored = restored; _restoredControl = restoredControl;
             _bootstrap = bootstrap;
+            _currentBackend = currentBackend;
             _currentLogin = new OwnedLogin(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable));
             _oldLogin = new OwnedLogin(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable));
             _restoredLogin = new OwnedLogin(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable));
@@ -119,7 +122,7 @@ public sealed partial class WebHostIisExpressTests
         {
             using var sql = new SqlConnection(database.ConnectionString); await sql.OpenAsync();
             await sql.ExecuteAsync("CREATE USER [" + login.Name + "] FOR LOGIN [" + login.Name + "]; CREATE USER WebSmokeMigration WITHOUT LOGIN;");
-            await sql.ExecuteAsync(File.ReadAllText(FindRootFile("deployment/sql/Provision-MyDmsVnWebPrincipals.sql"))
+            await sql.ExecuteAsync(File.ReadAllText(Path.Combine(_currentBackend.Root, "deployment", "sql", "Provision-MyDmsVnWebPrincipals.sql"))
                 .Replace("$(WebRuntimeUser)", login.Name).Replace("$(MigrationUser)", "WebSmokeMigration"));
             await sql.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',@hash,N'',N'BCrypt'); " +
                 "INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';",
@@ -160,9 +163,9 @@ public sealed partial class WebHostIisExpressTests
 
         private void CreateDeployment(string key, string published, string dist, bool cached, bool old)
         {
-            var backendRoot = old ? Required("MYDMSVN_WEB6_CUTOVER_BACKEND_ARCHIVE_DIRECTORY") : Path.GetDirectoryName(FindRootFile("CleanArchitecture.sln"))!;
+            var backendRoot = old ? Required("MYDMSVN_WEB6_CUTOVER_BACKEND_ARCHIVE_DIRECTORY") : _currentBackend.Root;
             var frontendRoot = cached ? Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY") : Required("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY");
-            var backend = GitIdentity(backendRoot); var frontend = GitIdentity(frontendRoot);
+            var backend = old ? GitIdentity(backendRoot) : _currentBackend.Verify(); var frontend = GitIdentity(frontendRoot);
             var root = key == "current" ? Root : Root + "-" + key;
             if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Cutover deployment root must be create-new.");
             var inputs = new Web6CandidateInputs(_plan.CurrentCandidateId, backend, frontend, SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(),
@@ -348,7 +351,7 @@ public sealed partial class WebHostIisExpressTests
                 await RunBrowser(_current, BrowserRoot, _customer, _warehouse, _employee, _product, _receiptProduct, _integrated,
                     true, true, false, true, _currentLogin.Name, null, _deployments["current"].Manifest, null, true, _plan, _control, browser,
                     (count, output) => result = new Web6CutoverBrowserResult((int)count["discovered"]!, (int)count["passed"]!, (int)count["failed"]!,
-                        (int)count["skipped"]!, (int)count["retries"]!, ((JArray)output["checks"]!).Values<string>()!));
+                        (int)count["skipped"]!, (int)count["retries"]!, ((JArray)output["checks"]!).Values<string>()!), _currentBackend);
                 _browserDrained = true;
                 _session.VerifyComplete();
                 await VerifyLifecycle();

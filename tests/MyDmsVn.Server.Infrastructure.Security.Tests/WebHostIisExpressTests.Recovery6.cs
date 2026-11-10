@@ -25,29 +25,29 @@ public sealed partial class WebHostIisExpressTests
         Web6WorkloadTask4Receipt task4, string publish, string thumbprint)
     {
         using var bootstrap = Web6SelectorOutput.Open("recovery");
+        var currentBackend = AdmitCurrentBackend(bootstrap);
         var candidateRoot = Web6CandidateFileSystem.CanonicalPath(values["MYDMSVN_WEB6_CANDIDATE_ROOT"]!);
         var recoveryRoot = Path.GetFullPath(values["MYDMSVN_WEB6_RECOVERY_ROOT"]!);
         var frontendRoot = Web6CandidateFileSystem.CanonicalPath(values["MYDMSVN_WEB_TEST_BROWSER_DIRECTORY"]!);
-        var backendRoot = Path.GetDirectoryName(FindRootFile("CleanArchitecture.sln"))!;
         var candidateManifest = Path.Combine(candidateRoot, "candidate.manifest");
         Web6CandidateFileSystem.RequireRegularFile(candidateManifest);
         using (var identity = WindowsIdentity.GetCurrent())
             Web6CandidateManifest.RequirePrivateOwner(File.GetAccessControl(candidateManifest, SqlTestPrivateRecord.Sections), identity.User!);
         var manifestHash = SqlTestPrivateRecord.Hash(File.ReadAllBytes(candidateManifest));
-        if (task4.BackendSha != GitIdentity(backendRoot).Sha || task4.FrontendSha != GitIdentity(frontendRoot).Sha ||
+        if (task4.BackendSha != currentBackend.Verify().Sha || task4.FrontendSha != GitIdentity(frontendRoot).Sha ||
             task4.FrontendDistHash != Web6CandidateFileSet.MeasureTree(Path.Combine(frontendRoot, "dist")) ||
             task4.FrontendDistHash != Web6CandidateFileSet.MeasureTree(Path.Combine(publish, "wwwroot")) ||
             task4.ManifestHash != manifestHash)
             throw new InvalidDataException("Protected Task4 receipt does not bind the measured recovery publication and candidate root.");
 
-        var fixture = await Web6MaintenanceRecoveryFixture.CreateAsync(recoveryRoot);
+        var fixture = await currentBackend.AllocateAsync(() => Web6MaintenanceRecoveryFixture.CreateAsync(recoveryRoot));
         try
         {
-            await fixture.PrepareSourceForLiveServiceAsync();
+            await currentBackend.AllocateAsync(fixture.PrepareSourceForLiveServiceAsync);
             var plan = new Web6CandidateRecoveryPlan(fixture.SourceDatabaseIdentity, fixture.DestinationDatabaseIdentity,
                 fixture.SourceEpoch, fixture.RestoredEpoch, fixture.SourceRuntimePrincipal, fixture.RestoredRuntimePrincipal);
             var operations = new LiveCandidateRecoveryOperations(fixture, publish, thumbprint, task4.CandidateId,
-                recoveryRoot, frontendRoot, backendRoot, bootstrap);
+                recoveryRoot, frontendRoot, currentBackend, bootstrap);
             var result = await new Web6CandidateRecoveryCoordinator(operations).Execute(plan, CancellationToken.None);
             if (!result.TrustedService || result.RpoLostBusinessRows != 0 || result.RpoLostJournalRows != 0)
                 throw new InvalidDataException("WEB6 service recovery result was not trusted and zero-loss.");
@@ -71,6 +71,7 @@ public sealed partial class WebHostIisExpressTests
         private readonly Web6MaintenanceRecoveryFixture _fixture;
         private readonly string _publish, _publishHash, _thumbprint, _candidateId, _recoveryRoot;
         private readonly string _frontendRoot, _backendRoot;
+        private readonly Web6CandidateBackendSource _backendSource;
         private readonly byte[] _jwt = new byte[32];
         private Process? _process;
         private Web5IisExpressIdentity? _identity;
@@ -85,10 +86,10 @@ public sealed partial class WebHostIisExpressTests
         internal string? BootstrapSqlReceipt { get; private set; }
 
         internal LiveCandidateRecoveryOperations(Web6MaintenanceRecoveryFixture fixture, string publish, string thumbprint,
-            string candidateId, string recoveryRoot, string frontendRoot, string backendRoot, Web6SelectorOutput? bootstrap)
+            string candidateId, string recoveryRoot, string frontendRoot, Web6CandidateBackendSource backendSource, Web6SelectorOutput? bootstrap)
         {
             _fixture = fixture; _publish = publish; _thumbprint = thumbprint; _candidateId = candidateId; _recoveryRoot = recoveryRoot;
-            _frontendRoot = frontendRoot; _backendRoot = backendRoot;
+            _frontendRoot = frontendRoot; _backendRoot = backendSource.Root; _backendSource = backendSource;
             _bootstrap = bootstrap;
             _publishHash = Web6CandidateFileSet.MeasureTree(publish);
             using var random = RandomNumberGenerator.Create(); random.GetBytes(_jwt);
@@ -214,7 +215,7 @@ public sealed partial class WebHostIisExpressTests
 
         private Web6CandidateManifest CreateAdmissionManifest(string root, string configuration, string sqlReceipt)
         {
-            var backend = GitIdentity(_backendRoot); var frontend = GitIdentity(_frontendRoot);
+            var backend = _backendSource.Verify(); var frontend = GitIdentity(_frontendRoot);
             var inputs = new Web6CandidateInputs(_candidateId, backend, frontend,
                 SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(), new Uri(Origin + "/"),
                 CertificateHash(_thumbprint), "Web6CandidateRecovery", 600, 60);
@@ -241,7 +242,7 @@ public sealed partial class WebHostIisExpressTests
             var queue = await Web5IisExpressHostAdmission.VerifyAsync(_identity, token);
             if (_bootstrap != null) Web6BootstrapSelectorEvidence.Host(BootstrapResources, _identity, queue.Name);
             if (_process.HasExited || queue.AttachedProcessCount != 1) throw new IOException("Recovery host admission is not exclusive.");
-            var backend = GitIdentity(_backendRoot); var frontend = GitIdentity(_frontendRoot);
+            var backend = _backendSource.Verify(); var frontend = GitIdentity(_frontendRoot);
             _activeManifest.VerifyBeforeAdmission(_process.Id, _process.StartTime.ToUniversalTime(), queue.Name, () =>
                 new Web6CandidateObservation((backend.Sha, backend.Tree, true), (frontend.Sha, frontend.Tree, true),
                     SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(), CertificateHash(_thumbprint), _activeSqlReceipt,

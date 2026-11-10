@@ -92,6 +92,9 @@ public sealed partial class WebHostIisExpressTests
         if (web6Candidate) Web6CandidateAcceptanceGate.RequireLive(Web6CandidateAcceptanceGate.EnvironmentValues());
         using var bootstrap = web6Candidate ? Web6SelectorOutput.Open(web6Workload ? "workload" :
             "pair-" + Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT")) : null;
+        var currentBackend = web6Candidate ? AdmitCurrentBackend(bootstrap) : null;
+        if (web6Workload && workloadReceipt!.BackendSha != currentBackend!.Verify().Sha)
+            throw new IOException("Accepted Task4 receipt does not bind this workload backend source.");
         var bootstrapResources = new JArray();
         JArray? bootstrapProfiles = null;
         if (web6Cutover) Web6CutoverAcceptanceGate.RequireLive(Web6CutoverAcceptanceGate.EnvironmentValues());
@@ -113,7 +116,8 @@ public sealed partial class WebHostIisExpressTests
         var attendedPassword = attended ? "Pilot!" + Guid.NewGuid().ToString("N") : null;
         var admin = Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!;
         using var bootstrapSqlControl = bootstrap == null ? null : SqlTestOwnershipManifest.Create(bootstrap.Plan.Text("sqlControlParent"));
-        var database = await SqlTestDatabase.CreateAsync(admin);
+        var database = currentBackend == null ? await SqlTestDatabase.CreateAsync(admin) :
+            await currentBackend.AllocateAsync(() => SqlTestDatabase.CreateAsync(admin));
         string? bootstrapSqlReceipt = null;
         var login = new OwnedLogin(admin);
         Process? process = null;
@@ -167,7 +171,8 @@ public sealed partial class WebHostIisExpressTests
             {
                 await connection.OpenAsync();
                 await connection.ExecuteAsync("CREATE USER [" + login.Name + "] FOR LOGIN [" + login.Name + "]; CREATE USER WebSmokeMigration WITHOUT LOGIN;");
-                await connection.ExecuteAsync(File.ReadAllText(FindRootFile("deployment/sql/Provision-MyDmsVnWebPrincipals.sql"))
+                await connection.ExecuteAsync(File.ReadAllText(currentBackend == null ? FindRootFile("deployment/sql/Provision-MyDmsVnWebPrincipals.sql") :
+                    Path.Combine(currentBackend.Root, "deployment", "sql", "Provision-MyDmsVnWebPrincipals.sql"))
                     .Replace("$(WebRuntimeUser)", login.Name).Replace("$(MigrationUser)", "WebSmokeMigration"));
                 await connection.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',@hash,N'',N'BCrypt'); " +
                     "INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';",
@@ -193,9 +198,9 @@ public sealed partial class WebHostIisExpressTests
             var configuration = CreateConfiguration(runDirectory, published!);
             if (web6Candidate)
             {
-                var backendRoot = Path.GetDirectoryName(FindRootFile("CleanArchitecture.sln"))!;
+                var backendRoot = currentBackend!.Root;
                 var frontendRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
-                var backendIdentity = GitIdentity(backendRoot);
+                var backendIdentity = currentBackend.Verify();
                 var frontendIdentity = GitIdentity(frontendRoot);
                 if (web6Workload && (workloadReceipt!.CandidateId != Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID") ||
                     workloadReceipt.BackendSha != backendIdentity.Sha || workloadReceipt.FrontendSha != frontendIdentity.Sha ||
@@ -337,7 +342,8 @@ public sealed partial class WebHostIisExpressTests
                 else
                     await RunBrowser(database, runDirectory, customer, warehouse, employee, product, receiptProduct, integrated,
                         recoveryPilot, web5Pilot, originalFirstPilot, web6Candidate, login.Name,
-                        web6Candidate ? () => candidateBrowserValidated = true : null, candidateManifest, candidateMismatch, web6Cutover, cutoverPlan);
+                        web6Candidate ? () => candidateBrowserValidated = true : null, candidateManifest, candidateMismatch, web6Cutover, cutoverPlan,
+                        backendSource: currentBackend);
             }
             else
             {
@@ -610,6 +616,7 @@ public sealed partial class WebHostIisExpressTests
         var values = Web6CutoverAcceptanceGate.EnvironmentValues();
         Web6CutoverAcceptanceGate.RequireLive(values);
         using var bootstrap = Web6SelectorOutput.Open("cutover");
+        var currentBackend = AdmitCurrentBackend(bootstrap);
         string Required(string name) => values[name] ?? throw new InvalidOperationException("Cutover prerequisite disappeared.");
         var frontendRoot = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY"));
         var backendRoot = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_BACKEND_ARCHIVE_DIRECTORY"));
@@ -643,9 +650,9 @@ public sealed partial class WebHostIisExpressTests
             currentControl = SqlTestOwnershipManifest.Create(controlParent);
             oldControl = SqlTestOwnershipManifest.Create(controlParent);
             restoredControl = SqlTestOwnershipManifest.Create(controlParent);
-            currentDatabase = await SqlTestDatabase.CreateAsync(admin).ConfigureAwait(false);
-            oldDatabase = await SqlTestDatabase.CreateAsync(admin).ConfigureAwait(false);
-            restoredDatabase = await SqlTestDatabase.CreateAsync(admin).ConfigureAwait(false);
+            currentDatabase = await currentBackend.AllocateAsync(() => SqlTestDatabase.CreateAsync(admin)).ConfigureAwait(false);
+            oldDatabase = await currentBackend.AllocateAsync(() => SqlTestDatabase.CreateAsync(admin)).ConfigureAwait(false);
+            restoredDatabase = await currentBackend.AllocateAsync(() => SqlTestDatabase.CreateAsync(admin)).ConfigureAwait(false);
             if (new[] { currentDatabase.DatabaseName, oldDatabase.DatabaseName, restoredDatabase.DatabaseName }.Distinct(StringComparer.OrdinalIgnoreCase).Count() != 3) throw new InvalidOperationException("Cutover SQL allocations collided.");
             if (!new DatabaseMigrationRunner().MigrateWeb5(currentDatabase.ConnectionString).Successful ||
                 !new DatabaseMigrationRunner().MigrateWeb(oldDatabase.ConnectionString).Successful ||
@@ -687,7 +694,7 @@ public sealed partial class WebHostIisExpressTests
                 13, 12, currentReceipt, oldReceipt, restoredReceipt, currentEpoch, restoredEpoch);
             plan.VerifyArchives(new Web6CutoverArchive(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact),
                 new Web6CutoverArchive(backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact));
-            operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl, bootstrap);
+            operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl, currentBackend, bootstrap);
             await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None).ConfigureAwait(false);
             complete = true;
             }, async () =>
@@ -757,7 +764,8 @@ public sealed partial class WebHostIisExpressTests
         bool web6Candidate = false, string? runtimeUser = null, Action? candidateValidated = null,
         Web6CandidateManifest? candidateManifest = null, Web6CandidateHostMismatch? candidateMismatch = null,
         bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null,
-        WebRecoveryPilotControl? cutoverControl = null, string? cutoverBrowser = null, Action<JObject, JObject>? cutoverResult = null)
+        WebRecoveryPilotControl? cutoverControl = null, string? cutoverBrowser = null, Action<JObject, JObject>? cutoverResult = null,
+        Web6CandidateBackendSource? backendSource = null)
     {
         var connectionString = database.ConnectionString;
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
@@ -804,7 +812,7 @@ public sealed partial class WebHostIisExpressTests
         {
             Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web6-manual-resend-live.spec.ts")));
             var frontendSha = GitHead(checkout);
-            var backendSha = GitHead(FindRootFile("CleanArchitecture.sln"), fileIsRootMarker: true);
+            var backendSha = (backendSource ?? throw new IOException("Candidate backend source was not admitted before SQL allocation.")).Verify().Sha;
             var sourceDist = Path.Combine(checkout, "dist");
             var publishedDist = Path.Combine(Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY")!), "wwwroot");
             var sourceHash = Web6CandidateFileSet.MeasureTree(sourceDist);
@@ -1045,9 +1053,15 @@ public sealed partial class WebHostIisExpressTests
     private static string Sanitize(string output) => Regex.Replace(
         Regex.Replace(output.Replace(BrowserPassword, "<redacted>"), "(?i)(authorization: Bearer )[^\\s]+", "$1<redacted>"),
         "(?i)(__Host-mydmsvn-rt=)[^;\\s]+", "$1<redacted>");
-    private static string GitHead(string path, bool fileIsRootMarker = false)
+    private static Web6CandidateBackendSource AdmitCurrentBackend(Web6SelectorOutput? bootstrap) =>
+        Web6CandidateBackendSource.Admit(AppContext.BaseDirectory, root =>
+        {
+            var identity = GitIdentity(root);
+            return (Git(root, "rev-parse --show-toplevel"), identity.Sha, identity.Tree);
+        }, bootstrap?.Plan.Text("backendWorktree"), bootstrap?.Plan.Text("backendSha"), bootstrap?.Plan.Text("backendTree"));
+
+    private static string GitHead(string root)
     {
-        var root = fileIsRootMarker ? Path.GetDirectoryName(path)! : path;
         if (Git(root, "status --porcelain").Length != 0) throw new InvalidOperationException("Candidate source tree must be clean.");
         var sha = Git(root, "rev-parse HEAD");
         return Web6CandidateInputs.RequireHash(sha, 40);
