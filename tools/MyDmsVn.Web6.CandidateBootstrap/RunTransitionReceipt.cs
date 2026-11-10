@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using Newtonsoft.Json.Linq;
 
@@ -19,16 +20,18 @@ internal enum BootstrapRunStage
 
 internal sealed class RunTransitionReceipt
 {
-    internal RunTransitionReceipt(BootstrapRunStage stage, string path, string sha256)
+    internal RunTransitionReceipt(BootstrapRunStage stage, string path, string sha256, DateTimeOffset recordedAtUtc)
     {
         Stage = stage;
         Path = path;
         Sha256 = sha256;
+        RecordedAtUtc = recordedAtUtc;
     }
 
     internal BootstrapRunStage Stage { get; }
     internal string Path { get; }
     internal string Sha256 { get; }
+    internal DateTimeOffset RecordedAtUtc { get; }
 }
 
 // Task 5 adapts the selector-native evidence after validating its gate-specific
@@ -91,7 +94,8 @@ internal sealed class ProtectedGateReceipt
 internal sealed class ProtectedDispositionReceipt
 {
     private ProtectedDispositionReceipt(string privatePath, string sha256, string runId, string candidateId,
-        string nativePath, string nativeSha256, bool processDrained, bool httpQueuesAbsent, bool sqlQuiescent, bool resourcesVerified)
+        string nativePath, string nativeSha256, string recoveryTransitionSha256, DateTimeOffset observedAtUtc,
+        bool processDrained, bool httpQueuesAbsent, bool sqlQuiescent, bool resourcesVerified)
     {
         PrivatePath = privatePath;
         Sha256 = sha256;
@@ -99,6 +103,8 @@ internal sealed class ProtectedDispositionReceipt
         CandidateId = candidateId;
         NativePath = nativePath;
         NativeSha256 = nativeSha256;
+        RecoveryTransitionSha256 = recoveryTransitionSha256;
+        ObservedAtUtc = observedAtUtc;
         ProcessDrained = processDrained;
         HttpQueuesAbsent = httpQueuesAbsent;
         SqlQuiescent = sqlQuiescent;
@@ -111,23 +117,31 @@ internal sealed class ProtectedDispositionReceipt
     internal string CandidateId { get; }
     internal string NativePath { get; }
     internal string NativeSha256 { get; }
+    internal string RecoveryTransitionSha256 { get; }
+    internal DateTimeOffset ObservedAtUtc { get; }
     internal bool ProcessDrained { get; }
     internal bool HttpQueuesAbsent { get; }
     internal bool SqlQuiescent { get; }
     internal bool ResourcesVerified { get; }
 
     internal static ProtectedDispositionReceipt Write(string path, string runId, string candidateId, string nativePath,
-        string nativeSha256, bool processDrained, bool httpQueuesAbsent, bool sqlQuiescent, bool resourcesVerified)
+        string nativeSha256, string recoveryTransitionSha256, DateTimeOffset observedAtUtc,
+        bool processDrained, bool httpQueuesAbsent, bool sqlQuiescent, bool resourcesVerified)
     {
+        if (!BootstrapJson.IsLowerHex(recoveryTransitionSha256, 64) || observedAtUtc.Offset != TimeSpan.Zero ||
+            observedAtUtc > DateTimeOffset.UtcNow)
+            throw new IOException("Bootstrap disposition observation or recovery transition digest is invalid.");
         var payload = new JObject
         {
             ["version"] = 1, ["runId"] = runId, ["candidateId"] = candidateId,
             ["nativePath"] = nativePath, ["nativeSha256"] = nativeSha256,
+            ["recoveryTransitionSha256"] = recoveryTransitionSha256,
+            ["observedAtUtc"] = observedAtUtc.ToString("O", CultureInfo.InvariantCulture),
             ["processDrained"] = processDrained, ["httpQueuesAbsent"] = httpQueuesAbsent,
             ["sqlQuiescent"] = sqlQuiescent, ["resourcesVerified"] = resourcesVerified,
         };
         var digest = ProtectedJsonFile.WriteNew(path, BootstrapJson.Serialize(payload));
         return new ProtectedDispositionReceipt(path, digest, runId, candidateId, nativePath, nativeSha256,
-            processDrained, httpQueuesAbsent, sqlQuiescent, resourcesVerified);
+            recoveryTransitionSha256, observedAtUtc, processDrained, httpQueuesAbsent, sqlQuiescent, resourcesVerified);
     }
 }

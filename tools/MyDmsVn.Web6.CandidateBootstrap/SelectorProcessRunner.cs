@@ -43,14 +43,21 @@ internal sealed class SelectorProcessRunner
     };
 
     private readonly string _dotnet;
+    private readonly string _git;
+    private readonly string _gitSha256;
     private readonly string _directory;
     private readonly string _project;
     private readonly Func<BootstrapProcessRequest, CancellationToken, Task<GuiProcessResult>> _run;
 
-    internal SelectorProcessRunner(string dotnet, string directory, string project,
+    internal SelectorProcessRunner(string dotnet, string git, string gitSha256, string directory, string project,
         Func<BootstrapProcessRequest, CancellationToken, Task<GuiProcessResult>>? run = null)
     {
         _dotnet = BootstrapJson.AbsolutePath(dotnet);
+        _git = BootstrapJson.AbsolutePath(git);
+        if (!string.Equals(Path.GetFileName(_git), "git.exe", StringComparison.OrdinalIgnoreCase) ||
+            !BootstrapJson.IsLowerHex(gitSha256, 64))
+            throw new IOException("Bootstrap selector Git executable or digest is invalid.");
+        _gitSha256 = gitSha256;
         _directory = BootstrapJson.AbsolutePath(directory);
         _project = BootstrapJson.AbsolutePath(project);
         if (!BootstrapJson.IsChild(_project, _directory) || Path.GetExtension(_project) != ".csproj")
@@ -65,6 +72,9 @@ internal sealed class SelectorProcessRunner
         BootstrapJson.RequireCandidateId(invocation.Name);
         var trxPath = BootstrapJson.AbsolutePath(invocation.TrxPath);
         var trxDirectory = Path.GetDirectoryName(trxPath)!;
+        var selectorDll = BootstrapJson.AbsolutePath(invocation.SelectorDllPath);
+        if (!BootstrapJson.IsChild(selectorDll, _directory) || !string.Equals(Path.GetExtension(selectorDll), ".dll", StringComparison.OrdinalIgnoreCase))
+            throw new IOException("Bootstrap selector DLL must be inside its source checkout.");
         if (Path.GetExtension(trxPath) != ".trx" || Path.GetFileName(trxPath).IndexOfAny(new[] { ';', '=' }) >= 0 ||
             invocation.Timeout <= TimeSpan.Zero || invocation.Timeout > TimeSpan.FromMinutes(30))
             throw new IOException("Bootstrap selector result file or timeout is invalid.");
@@ -72,15 +82,21 @@ internal sealed class SelectorProcessRunner
         var environment = ChildEnvironment(invocation.Environment);
         using var dotnetParents = new ProtectedJsonFile.PathLease(_dotnet);
         using var dotnet = dotnetParents.OpenRead(installedTool: true);
+        using var gitParents = new ProtectedJsonFile.PathLease(_git);
+        using var git = gitParents.OpenRead(installedTool: true);
+        VerifyPinnedFile(_git, gitParents, git, _gitSha256, installedTool: true);
         using var projectParents = new ProtectedJsonFile.PathLease(_project);
         using var project = projectParents.OpenRead();
+        using var assemblyParents = new ProtectedJsonFile.PathLease(selectorDll);
+        using var assembly = assemblyParents.OpenRead();
+        var assemblySha256 = BootstrapPathPolicy.HashStream(assembly);
         // Create-new makes this path a one-shot evidence location, even across
         // process restarts. Never adopt an existing directory or TRX.
         using var results = new BootstrapPathPolicy.PinnedDirectory(trxDirectory, create: true);
         var arguments = new[]
         {
-            // The orchestrator must complete locked restore before admitting a live selector.
-            "test", _project, "--configuration", "Release", "--framework", "net48", "--no-restore", "--disable-build-servers",
+            // The orchestrator restores and builds before the selector DLL is pinned.
+            "test", _project, "--configuration", "Release", "--framework", "net48", "--no-build", "--no-restore", "--disable-build-servers",
             "-nr:false", "--filter", invocation.Filter,
             "--logger", "trx;LogFileName=" + Path.GetFileName(trxPath), "--results-directory", trxDirectory,
         };
@@ -106,7 +122,7 @@ internal sealed class SelectorProcessRunner
         {
             return new SelectorResult(invocation, SelectorDisposition.Canceled, started, DateTimeOffset.UtcNow, processTreeDrained: false);
         }
-        catch (Exception error) when (error is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+        catch (Exception error) when (error is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException or AggregateException)
         {
             return new SelectorResult(invocation, SelectorDisposition.ProcessUncertain, started, DateTimeOffset.UtcNow, processTreeDrained: false);
         }
@@ -115,10 +131,13 @@ internal sealed class SelectorProcessRunner
         var trxDisposition = SelectorDisposition.MissingTrx;
         try
         {
+            VerifyPinnedFile(_git, gitParents, git, _gitSha256, installedTool: true);
+            VerifyPinnedFile(selectorDll, assemblyParents, assembly, assemblySha256);
             results.Verify();
             if (File.Exists(trxPath))
             {
-                counts = BootstrapPathPolicy.ReadFile(trxPath, file => ReadTrx(file, invocation.Filter.Substring(FilterPrefix.Length))).Value;
+                counts = BootstrapPathPolicy.ReadFile(trxPath,
+                    file => ReadTrx(file, invocation.Filter.Substring(FilterPrefix.Length), selectorDll)).Value;
                 trxDisposition = counts.Failed == 0 && counts.Skipped == 0 ? SelectorDisposition.Passed : SelectorDisposition.MandatoryTestFailed;
             }
             results.Verify();
@@ -154,9 +173,9 @@ internal sealed class SelectorProcessRunner
             environment.Add(variable.Key, variable.Value);
         }
 
-        var path = new List<string> { Path.GetDirectoryName(_dotnet)!, Environment.SystemDirectory };
+        var path = new List<string> { Path.GetDirectoryName(_git)!, Path.GetDirectoryName(_dotnet)!, Environment.SystemDirectory };
         if (environment.TryGetValue("MYDMSVN_WEB_TEST_NODE", out var node))
-            path.Insert(0, Path.GetDirectoryName(BootstrapJson.AbsolutePath(node))!);
+            path.Insert(1, Path.GetDirectoryName(BootstrapJson.AbsolutePath(node))!);
         if (path.Any(directory => directory.Contains(";")))
             throw new IOException("Bootstrap tool path contains a PATH separator.");
         environment["PATH"] = string.Join(";", path.Distinct(StringComparer.OrdinalIgnoreCase));
@@ -176,7 +195,18 @@ internal sealed class SelectorProcessRunner
         return GuiOwnedProcess.RunAttendedAsync(info, command.Timeout, token);
     }
 
-    private static SelectorTrx ReadTrx(FileStream file, string expectedName)
+    private static void VerifyPinnedFile(string path, ProtectedJsonFile.PathLease parents, FileStream file,
+        string expectedDigest, bool installedTool = false)
+    {
+        using var reopened = parents.OpenRead(installedTool);
+        var identity = ProtectedJsonFile.Inspect(file.SafeFileHandle, path, directory: false, installedTool: installedTool);
+        file.Position = 0;
+        if (identity != ProtectedJsonFile.Inspect(reopened.SafeFileHandle, path, directory: false, installedTool: installedTool) ||
+            BootstrapPathPolicy.HashStream(file) != expectedDigest)
+            throw new IOException("Bootstrap selector tool or assembly changed.");
+    }
+
+    private static SelectorTrx ReadTrx(FileStream file, string expectedName, string expectedAssembly)
     {
         const int maxSize = 8 * 1024 * 1024;
         if (file.Length > maxSize) throw new IOException("Bootstrap TRX exceeds its size budget.");
@@ -195,6 +225,7 @@ internal sealed class SelectorProcessRunner
         var entry = SingleRow(Only(root, "TestEntries"), "TestEntry");
         var result = SingleRow(Only(root, "Results"), "UnitTestResult");
         if ((string?)method.Attribute("className") + "." + (string?)method.Attribute("name") != expectedName ||
+            !MatchesAssembly(definition, "storage", expectedAssembly) || !MatchesAssembly(method, "codeBase", expectedAssembly) ||
             !Guid.TryParse((string?)definition.Attribute("id"), out var testId) || testId == Guid.Empty ||
             !Guid.TryParse((string?)execution.Attribute("id"), out var executionId) || executionId == Guid.Empty ||
             !Matches(entry, "testId", testId) || !Matches(result, "testId", testId) ||
@@ -238,6 +269,9 @@ internal sealed class SelectorProcessRunner
 
     private static bool Matches(XElement element, string name, Guid value) =>
         Guid.TryParse((string?)element.Attribute(name), out var actual) && actual == value;
+
+    private static bool MatchesAssembly(XElement element, string name, string path) =>
+        (string?)element.Attribute(name) is { } value && BootstrapJson.SamePath(BootstrapJson.AbsolutePath(value), path);
 
     private static int Count(XElement counters, string name)
     {

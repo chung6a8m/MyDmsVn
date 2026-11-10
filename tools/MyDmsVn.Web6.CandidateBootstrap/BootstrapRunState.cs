@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -13,6 +14,7 @@ internal sealed class BootstrapRunState
     private readonly object _sync = new();
     private readonly DateTimeOffset _expiry;
     private readonly RunTransitionReceipt _prepared;
+    private readonly List<(string Path, string Sha256)> _acceptedEvidence = new();
     private RunTransitionReceipt _current;
     private DateTimeOffset _lastSelectorEndedAtUtc;
     private (SelectorResult Result, ProtectedGateReceipt Receipt)? _chromium;
@@ -36,8 +38,9 @@ internal sealed class BootstrapRunState
                 DateTimeStyles.None, out _expiry) || _expiry <= DateTimeOffset.UtcNow)
             throw new IOException("Bootstrap prepared receipt is not admitted for a run.");
 
-        _current = _prepared = new RunTransitionReceipt(BootstrapRunStage.Prepared, prepared.Path, prepared.Sha256);
         _lastSelectorEndedAtUtc = DateTimeOffset.UtcNow;
+        _current = _prepared = new RunTransitionReceipt(BootstrapRunStage.Prepared, prepared.Path, prepared.Sha256, _lastSelectorEndedAtUtc);
+        _acceptedEvidence.Add((prepared.Path, prepared.Sha256));
         prepared.Verify();
         // Reserve the prepared root before any selector can be launched. A
         // crashed or failed run cannot be reopened as a new attempt.
@@ -86,6 +89,7 @@ internal sealed class BootstrapRunState
             if (expected == "pair-chromium")
             {
                 _chromium = (result, receipt);
+                RecordGateEvidence(receipt);
                 _lastSelectorEndedAtUtc = result.EndedAtUtc;
                 return null;
             }
@@ -105,11 +109,13 @@ internal sealed class BootstrapRunState
                 VerifyTrx(chromium.Result);
                 AddChromium(payload);
                 var pair = Commit(next, payload);
+                RecordGateEvidence(receipt);
                 _lastSelectorEndedAtUtc = result.EndedAtUtc;
                 return pair;
             }
 
             var transition = Commit(next, payload);
+            RecordGateEvidence(receipt);
             _lastSelectorEndedAtUtc = result.EndedAtUtc;
             if (next == BootstrapRunStage.WorkloadRecorded) _workloadStatus = receipt.WorkloadStatus;
             if (next == BootstrapRunStage.RecoveryRecorded)
@@ -128,6 +134,10 @@ internal sealed class BootstrapRunState
             if (_current.Stage != BootstrapRunStage.RecoveryRecorded || _workloadStatus != "Measured" ||
                 _recoveryRpo != 0 || _recoveryRtoMilliseconds is not > 0 ||
                 receipt.RunId != RunId || receipt.CandidateId != CandidateId ||
+                receipt.RecoveryTransitionSha256 != _current.Sha256 || receipt.ObservedAtUtc <= _current.RecordedAtUtc ||
+                receipt.ObservedAtUtc > DateTimeOffset.UtcNow ||
+                _acceptedEvidence.Any(evidence => BootstrapJson.SamePath(receipt.NativePath, evidence.Path) ||
+                    receipt.NativeSha256 == evidence.Sha256) ||
                 !receipt.ProcessDrained || !receipt.HttpQueuesAbsent || !receipt.SqlQuiescent || !receipt.ResourcesVerified)
                 throw new IOException("Bootstrap final verification requires measured workload, recovery and verified resource disposition.");
 
@@ -140,6 +150,8 @@ internal sealed class BootstrapRunState
             payload["gateSha256"] = receipt.Sha256;
             payload["ownedResourcePrivatePath"] = receipt.NativePath;
             payload["ownedResourceSha256"] = receipt.NativeSha256;
+            payload["recoveryTransitionSha256"] = receipt.RecoveryTransitionSha256;
+            payload["dispositionObservedAtUtc"] = Utc(receipt.ObservedAtUtc);
             payload["processTreeDrained"] = receipt.ProcessDrained;
             payload["httpQueuesAbsent"] = receipt.HttpQueuesAbsent;
             payload["sqlQuiescent"] = receipt.SqlQuiescent;
@@ -239,7 +251,7 @@ internal sealed class BootstrapRunState
             ["discovered"] = result?.Discovered ?? 0, ["executed"] = result?.Executed ?? 0, ["passed"] = result?.Passed ?? 0,
             ["failed"] = result?.Failed ?? 0, ["skipped"] = result?.Skipped ?? 0,
             ["startedAtUtc"] = Utc(result?.StartedAtUtc ?? now), ["endedAtUtc"] = Utc(result?.EndedAtUtc ?? now),
-            ["recordedAtUtc"] = Utc(now), ["disposition"] = disposition,
+            ["disposition"] = disposition,
             ["processTreeDrained"] = result?.ProcessTreeDrained, ["requiresDispositionProof"] = result?.RequiresDispositionProof ?? false,
             ["privateTaskRoot"] = TaskRoot, ["trxPrivatePath"] = result?.TrxPath, ["trxSha256"] = result?.TrxSha256,
         };
@@ -263,9 +275,18 @@ internal sealed class BootstrapRunState
 
     private RunTransitionReceipt Commit(BootstrapRunStage next, JObject payload)
     {
+        var recordedAtUtc = DateTimeOffset.UtcNow;
+        payload["recordedAtUtc"] = Utc(recordedAtUtc);
         var path = Path.Combine(TaskRoot, "run-" + next.ToString() + ".json");
         var digest = ProtectedJsonFile.WriteNew(path, BootstrapJson.Serialize(payload));
-        return _current = new RunTransitionReceipt(next, path, digest);
+        _acceptedEvidence.Add((path, digest));
+        return _current = new RunTransitionReceipt(next, path, digest, recordedAtUtc);
+    }
+
+    private void RecordGateEvidence(ProtectedGateReceipt receipt)
+    {
+        _acceptedEvidence.Add((receipt.PrivatePath, receipt.Sha256));
+        _acceptedEvidence.Add((receipt.NativePath, receipt.NativeSha256));
     }
 
     private static string Utc(DateTimeOffset date) => date.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);

@@ -26,14 +26,21 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
     private const string TestId = "d0e55b21-80c2-437d-8175-679079248c2d";
     private const string ExecutionId = "f7028eef-f8b7-4063-a663-c57ac8aa6418";
     private readonly string _root = Path.Combine(Path.GetTempPath(), "web6 selector " + Guid.NewGuid().ToString("N"));
+    private readonly string _gitSha;
     private string Executable => Path.Combine(_root, "fixture.exe");
+    private string GitExecutable => Path.Combine(_root, "pinned-git", "git.exe");
     private string Project => Path.Combine(_root, "fixture.csproj");
+    private string SelectorDll => Path.Combine(_root, "fixture.dll");
 
     public Web6CandidateBootstrapRunnerTests()
     {
         Directory.CreateDirectory(_root);
         File.WriteAllText(Executable, "fake tool");
         File.WriteAllText(Project, "fake project");
+        File.WriteAllText(SelectorDll, "fixture assembly");
+        Directory.CreateDirectory(Path.GetDirectoryName(GitExecutable)!);
+        File.WriteAllText(GitExecutable, "pinned git");
+        _gitSha = ProtectedJsonFile.Digest(File.ReadAllBytes(GitExecutable));
     }
 
     [Fact]
@@ -52,12 +59,16 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
             Assert.Equal("test", command.Arguments[0]);
             Assert.Equal(Project, command.Arguments[1]);
             Assert.Contains("--no-restore", command.Arguments);
+            Assert.Contains("--no-build", command.Arguments);
             Assert.Contains(Filter, command.Arguments);
             Assert.Contains("trx;LogFileName=result.trx", command.Arguments);
             Assert.Contains(Path.GetDirectoryName(invocation.TrxPath), command.Arguments);
+            Assert.Equal(Path.GetDirectoryName(GitExecutable), command.Environment["PATH"].Split(';')[0]);
             Assert.Equal("1", command.Environment["MYDMSVN_WEB6_CANDIDATE_ENABLE"]);
             Assert.DoesNotContain("MYDMSVN_WEB_JWT_KEYS", command.Environment.Keys);
             Assert.DoesNotContain("DOTNET_STARTUP_HOOKS", command.Environment.Keys);
+            Assert.Throws<IOException>(() => File.WriteAllText(GitExecutable, "replaced during execution"));
+            Assert.Throws<IOException>(() => File.WriteAllText(SelectorDll, "replaced during execution"));
             File.WriteAllText(invocation.TrxPath, Trx());
             return Task.FromResult(new GuiProcessResult(0, "success", ""));
         });
@@ -66,6 +77,37 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
         Assert.Equal((1, 1, 1, 0, 0), (result.Discovered, result.Executed, result.Passed, result.Failed, result.Skipped));
         Assert.Equal(64, result.TrxSha256?.Length);
         await Assert.ThrowsAsync<IOException>(() => runner.RunAsync(invocation, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Missing_prebuilt_selector_dll_is_refused_before_launch()
+    {
+        File.Delete(SelectorDll);
+        var runner = Runner((_, _) => throw new InvalidOperationException("selector launched"));
+        await Assert.ThrowsAsync<IOException>(() => runner.RunAsync(Invocation("cutover"), CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData("missing file")]
+    [InlineData("relative path")]
+    [InlineData("wrong executable name")]
+    [InlineData("wrong digest")]
+    public async Task Missing_or_wrong_prepared_git_is_refused_before_launch(string defect)
+    {
+        if (defect == "missing file") File.Delete(GitExecutable);
+        if (defect == "wrong digest") File.WriteAllText(GitExecutable, "substituted git");
+        var git = defect switch
+        {
+            "relative path" => "git.exe",
+            "wrong executable name" => Executable,
+            _ => GitExecutable,
+        };
+        await Assert.ThrowsAsync<IOException>(async () =>
+        {
+            var runner = new SelectorProcessRunner(Executable, git, _gitSha, _root, Project,
+                (_, _) => throw new InvalidOperationException("selector launched"));
+            await runner.RunAsync(Invocation("cutover"), CancellationToken.None);
+        });
     }
 
     [Theory]
@@ -83,6 +125,10 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
     [InlineData("malformed", "InvalidTrx")]
     [InlineData("dtd", "InvalidTrx")]
     [InlineData("wrong FQN", "InvalidTrx")]
+    [InlineData("foreign storage", "InvalidTrx")]
+    [InlineData("foreign codeBase", "InvalidTrx")]
+    [InlineData("missing codeBase", "InvalidTrx")]
+    [InlineData("aliased storage", "InvalidTrx")]
     [InlineData("discovery mismatch", "InvalidTrx")]
     [InlineData("executed mismatch", "InvalidTrx")]
     [InlineData("foreign row", "InvalidTrx")]
@@ -103,6 +149,10 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
                 "malformed" => "<TestRun",
                 "dtd" => "<!DOCTYPE TestRun [<!ENTITY embedded 'secret'>]>" + Trx(),
                 "wrong FQN" => Trx().Replace("Fixture.Namespace.Selectors", "Unrelated.Selectors"),
+                "foreign storage" => Trx().Replace($"storage=\"{SelectorDll.ToLowerInvariant()}\"", $"storage=\"{Path.Combine(_root, "foreign.dll")}\""),
+                "foreign codeBase" => Trx().Replace($"codeBase=\"{SelectorDll}\"", $"codeBase=\"{Path.Combine(_root, "foreign.dll")}\""),
+                "missing codeBase" => Trx().Replace($" codeBase=\"{SelectorDll}\"", ""),
+                "aliased storage" => Trx().Replace($"storage=\"{SelectorDll.ToLowerInvariant()}\"", $"storage=\"{_root}\\child\\..\\fixture.dll\""),
                 "discovery mismatch" => Trx().Replace("total=\"1\"", "total=\"2\""),
                 "executed mismatch" => Trx().Replace("executed=\"1\"", "executed=\"0\""),
                 "foreign row" => Trx().Replace(
@@ -120,6 +170,22 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
         Assert.Equal(1, calls);
         if (defect == "skipped") Assert.Equal((1, 0, 0, 0, 1), (result.Discovered, result.Executed, result.Passed, result.Failed, result.Skipped));
         if (defect == "failed") Assert.Equal((1, 1, 0, 1, 0), (result.Discovered, result.Executed, result.Passed, result.Failed, result.Skipped));
+    }
+
+    [Fact]
+    public async Task Combined_launch_and_cleanup_failure_is_a_single_sanitized_uncertain_attempt()
+    {
+        var calls = 0;
+        var runner = Runner((_, _) =>
+        {
+            Interlocked.Increment(ref calls);
+            throw new AggregateException(new IOException("connection-string-secret"), new IOException(_root));
+        });
+        var result = await runner.RunAsync(Invocation("cutover"), CancellationToken.None);
+        Assert.Equal(1, calls);
+        Assert.Equal("ProcessUncertain", result.SanitizedDisposition);
+        Assert.False(result.ProcessTreeDrained);
+        Assert.True(result.RequiresDispositionProof);
     }
 
     [Fact]
@@ -165,7 +231,8 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
             """);
         Assert.False(compiled.Errors.HasErrors);
         var invocation = Invocation("cutover", timeout: TimeSpan.FromSeconds(4));
-        var result = await new SelectorProcessRunner(Executable, _root, Project).RunAsync(invocation, CancellationToken.None);
+        var result = await new SelectorProcessRunner(Executable, GitExecutable, _gitSha, _root, Project)
+            .RunAsync(invocation, CancellationToken.None);
         Assert.Equal(SelectorDisposition.TimedOut, result.Disposition);
         Assert.True(result.ProcessTreeDrained);
         Assert.True(result.RequiresDispositionProof);
@@ -208,12 +275,67 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
         }
         Assert.Equal(BootstrapRunStage.RecoveryRecorded, state.Stage);
         var native = Native("disposition");
-        var incomplete = ProtectedDispositionReceipt.Write(Path.Combine(_root, "incomplete.json"), RunId,
-            Candidate, native.Path, native.Sha, processDrained: true, httpQueuesAbsent: false, sqlQuiescent: true, resourcesVerified: true);
+        await Task.Delay(35);
+        var incomplete = ProtectedDispositionReceipt.Write(Path.Combine(_root, "incomplete.json"), RunId, Candidate,
+            native.Path, native.Sha, prior, DateTimeOffset.UtcNow,
+            processDrained: true, httpQueuesAbsent: false, sqlQuiescent: true, resourcesVerified: true);
         Assert.Throws<IOException>(() => state.Complete(incomplete));
-        var complete = ProtectedDispositionReceipt.Write(Path.Combine(_root, "complete.json"), RunId,
-            Candidate, native.Path, native.Sha, processDrained: true, httpQueuesAbsent: true, sqlQuiescent: true, resourcesVerified: true);
-        AssertTransition(state.Complete(complete), BootstrapRunStage.CandidateVerified, prior);
+        var complete = ProtectedDispositionReceipt.Write(Path.Combine(_root, "complete.json"), RunId, Candidate,
+            native.Path, native.Sha, prior, DateTimeOffset.UtcNow,
+            processDrained: true, httpQueuesAbsent: true, sqlQuiescent: true, resourcesVerified: true);
+        var final = AssertTransition(state.Complete(complete), BootstrapRunStage.CandidateVerified, prior);
+        Assert.Equal(prior, (string?)final["recoveryTransitionSha256"]);
+        Assert.Equal(complete.ObservedAtUtc, (DateTimeOffset?)final["dispositionObservedAtUtc"]);
+    }
+
+    [Theory]
+    [InlineData("pre-recovery observation")]
+    [InlineData("equal recovery timestamp")]
+    [InlineData("stale transition")]
+    [InlineData("recovery native file")]
+    [InlineData("earlier gate native file")]
+    [InlineData("earlier gate envelope")]
+    [InlineData("native bytes copied to another file")]
+    [InlineData("native path reused with different bytes")]
+    [InlineData("recovery transition as evidence")]
+    [InlineData("workload transition as evidence")]
+    public async Task Final_disposition_requires_fresh_independent_evidence_bound_to_recovery(string defect)
+    {
+        var earlier = DateTimeOffset.UtcNow;
+        var prepared = Prepared();
+        var state = BootstrapRunState.Open(prepared.Path, prepared.Sha, RunId);
+        var chromium = Gate("pair-chromium");
+        Assert.Null(state.Accept(await Passed("pair-chromium"), chromium));
+        Assert.NotNull(state.Accept(await Passed("pair-edge"), Gate("pair-edge")));
+        Assert.NotNull(state.Accept(await Passed("cutover"), Gate("cutover")));
+        var workload = state.Accept(await Passed("workload"), Gate("workload"))!;
+        var recoveryGate = Gate("recovery");
+        var recovery = state.Accept(await Passed("recovery"), recoveryGate)!;
+        await Task.Delay(35);
+
+        var native = defect switch
+        {
+            "recovery native file" => (recoveryGate.NativePath, recoveryGate.NativeSha256),
+            "earlier gate native file" => (chromium.NativePath, chromium.NativeSha256),
+            "earlier gate envelope" => (chromium.PrivatePath, chromium.Sha256),
+            "native bytes copied to another file" => CopyNative(recoveryGate.NativePath),
+            "native path reused with different bytes" => ReplaceNative(recoveryGate.NativePath),
+            "recovery transition as evidence" => (recovery.Path, recovery.Sha256),
+            "workload transition as evidence" => (workload.Path, workload.Sha256),
+            _ => Native("disposition"),
+        };
+        var observedAt = defect switch
+        {
+            "pre-recovery observation" => earlier,
+            "equal recovery timestamp" => recovery.RecordedAtUtc,
+            _ => DateTimeOffset.UtcNow,
+        };
+        var disposition = ProtectedDispositionReceipt.Write(Path.Combine(_root, "complete.json"), RunId, Candidate,
+            native.Item1, native.Item2, defect == "stale transition" ? workload.Sha256 : recovery.Sha256,
+            observedAt,
+            processDrained: true, httpQueuesAbsent: true, sqlQuiescent: true, resourcesVerified: true);
+        Assert.Throws<IOException>(() => state.Complete(disposition));
+        Assert.Equal(BootstrapRunStage.RecoveryRecorded, state.Stage);
     }
 
     [Theory]
@@ -288,12 +410,12 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
     }
 
     private SelectorProcessRunner Runner(Func<BootstrapProcessRequest, CancellationToken, Task<GuiProcessResult>> run) =>
-        new(Executable, _root, Project, run);
+        new(Executable, GitExecutable, _gitSha, _root, Project, run);
 
     private SelectorInvocation Invocation(string name, string filter = Filter, IReadOnlyDictionary<string, string>? environment = null,
         TimeSpan? timeout = null) => new(name, filter, environment ?? new Dictionary<string, string>
         { ["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = RunId },
-            timeout ?? TimeSpan.FromSeconds(5), Path.Combine(_root, "trx-" + Guid.NewGuid().ToString("N"), "result.trx"));
+            timeout ?? TimeSpan.FromSeconds(5), Path.Combine(_root, "trx-" + Guid.NewGuid().ToString("N"), "result.trx"), SelectorDll);
 
     private Task<SelectorResult> Passed(string name)
     {
@@ -305,10 +427,10 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
         }).RunAsync(invocation, CancellationToken.None);
     }
 
-    private static string Trx(string outcome = "Passed", int executed = 1, int passed = 1, int failed = 0, int skipped = 0) => $"""
+    private string Trx(string outcome = "Passed", int executed = 1, int passed = 1, int failed = 0, int skipped = 0) => $"""
         <TestRun xmlns="{TrxNamespace}">
           <Results><UnitTestResult testId="{TestId}" executionId="{ExecutionId}" outcome="{outcome}" /></Results>
-          <TestDefinitions><UnitTest id="{TestId}"><Execution id="{ExecutionId}"/><TestMethod className="Fixture.Namespace.Selectors" name="Required"/></UnitTest></TestDefinitions>
+          <TestDefinitions><UnitTest id="{TestId}" storage="{SelectorDll.ToLowerInvariant()}"><Execution id="{ExecutionId}"/><TestMethod className="Fixture.Namespace.Selectors" name="Required" codeBase="{SelectorDll}"/></UnitTest></TestDefinitions>
           <TestEntries><TestEntry testId="{TestId}" executionId="{ExecutionId}"/></TestEntries>
           <ResultSummary outcome="{(failed == 0 ? "Completed" : "Failed")}"><Counters total="1" executed="{executed}" passed="{passed}" failed="{failed}" notExecuted="{skipped}" error="0" aborted="0"/></ResultSummary>
         </TestRun>
@@ -342,7 +464,19 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
     private (string Path, string Sha) Native(string name)
     {
         var path = Path.Combine(_root, name + "-native.json");
-        return (path, ProtectedJsonFile.WriteNew(path, BootstrapJson.Serialize(new JObject { ["version"] = 1 })));
+        return (path, ProtectedJsonFile.WriteNew(path, BootstrapJson.Serialize(new JObject { ["version"] = 1, ["gate"] = name })));
+    }
+
+    private (string, string) CopyNative(string source)
+    {
+        var path = Path.Combine(_root, "copied-native.json");
+        return (path, ProtectedJsonFile.WriteNew(path, File.ReadAllBytes(source)));
+    }
+
+    private static (string, string) ReplaceNative(string path)
+    {
+        File.Delete(path);
+        return (path, ProtectedJsonFile.WriteNew(path, BootstrapJson.Serialize(new JObject { ["version"] = 1, ["replaced"] = true })));
     }
 
     private static JObject AssertTransition(RunTransitionReceipt receipt, BootstrapRunStage stage, string previous)

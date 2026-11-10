@@ -7,7 +7,8 @@ namespace MyDmsVn.Web6.CandidateBootstrap;
 
 internal sealed class SelectorInvocation
 {
-    internal SelectorInvocation(string name, string filter, IReadOnlyDictionary<string, string> environment, TimeSpan timeout, string trxPath)
+    internal SelectorInvocation(string name, string filter, IReadOnlyDictionary<string, string> environment, TimeSpan timeout,
+        string trxPath, string selectorDllPath)
     {
         Name = name;
         Filter = filter;
@@ -15,6 +16,7 @@ internal sealed class SelectorInvocation
             StringComparer.OrdinalIgnoreCase));
         Timeout = timeout;
         TrxPath = trxPath;
+        SelectorDllPath = selectorDllPath;
     }
 
     internal string Name { get; }
@@ -22,6 +24,7 @@ internal sealed class SelectorInvocation
     internal IReadOnlyDictionary<string, string> Environment { get; }
     internal TimeSpan Timeout { get; }
     internal string TrxPath { get; }
+    internal string SelectorDllPath { get; }
 }
 
 internal enum SelectorDisposition
