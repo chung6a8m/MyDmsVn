@@ -195,6 +195,62 @@ public sealed class Web6CandidateBootstrapAuthorityTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(0x00010000u)]
+    [InlineData(0x40000000u)]
+    public async Task ProtectedAuthorityParentDeniesPeerDeleteAndGenericWrite(uint requestedAccess)
+    {
+        var digest = await CreateAuthority();
+        using (var available = OpenNativeDirectory(_root, requestedAccess))
+            Assert.False(available.IsInvalid);
+
+        using var authority = BootstrapAuthority.ReadProtected(AuthorityPath, digest, _expires.AddSeconds(-1));
+        using var peer = OpenNativeDirectory(_root, requestedAccess);
+        var error = Marshal.GetLastWin32Error();
+        Assert.True(peer.IsInvalid);
+        Assert.Equal(32, error);
+    }
+
+    [Fact]
+    public void CreateNewRefusesAttributesOnlyReparseDriftWithoutRedirectingReceipt()
+    {
+        var output = Directory.CreateDirectory(Path.Combine(_root, "output")).FullName;
+        var redirected = Directory.CreateDirectory(Path.Combine(_root, "redirected")).FullName;
+        var receipt = Path.Combine(output, "authority.json");
+        var installed = false;
+        try
+        {
+            using var parents = new ProtectedJsonFile.PathLease(receipt);
+            const uint writeAttributes = 0x100;
+            using var peer = OpenNativeDirectory(output, writeAttributes);
+            Assert.False(peer.IsInvalid);
+            var junction = JunctionData(redirected);
+            const uint setReparsePoint = 0x000900a4;
+            installed = DeviceIoControl(peer, setReparsePoint, junction, junction.Length,
+                IntPtr.Zero, 0, out _, IntPtr.Zero);
+            var error = Marshal.GetLastWin32Error();
+            Assert.True(installed, "Attributes-only junction installation failed with Win32 error " + error);
+            Assert.True(File.GetAttributes(output).HasFlag(FileAttributes.ReparsePoint));
+
+            using var user = WindowsIdentity.GetCurrent();
+            var acl = new FileSecurity();
+            acl.SetOwner(user.User!);
+            acl.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+            acl.AddAccessRule(new FileSystemAccessRule(user.User!, FileSystemRights.FullControl, AccessControlType.Allow));
+            var refusal = Record.Exception(() =>
+            {
+                using var file = parents.CreateNewFile(acl);
+            });
+            Assert.Empty(Directory.GetFileSystemEntries(redirected));
+            Assert.Contains("NTSTATUS", Assert.IsType<IOException>(refusal).Message);
+        }
+        finally
+        {
+            if (installed)
+                Directory.Delete(output);
+        }
+    }
+
     [Fact]
     public async Task RequestRefusesAuthorityNativeIdentityDrift()
     {
@@ -311,11 +367,42 @@ public sealed class Web6CandidateBootstrapAuthorityTests : IDisposable
         Assert.ThrowsAny<IOException>(() => BootstrapRequest.ReadStrict(WriteRequest(request), authority));
     }
 
+    [Theory]
+    [InlineData("pair")]
+    [InlineData("cutover")]
+    [InlineData("workload")]
+    public async Task StrictRequestRejectsEachMissingMandatoryDrill(string missing)
+    {
+        var input = Authority();
+        input["drillClasses"] = new JArray(new[] { "cutover", "pair", "recovery", "workload" }.Where(drill => drill != missing));
+        var digest = await CreateAuthority(input);
+        using var authority = BootstrapAuthority.ReadProtected(AuthorityPath, digest, _expires.AddSeconds(-1));
+        var request = Request(digest);
+        request["recoveryAuthorized"] = false;
+        Assert.ThrowsAny<IOException>(() => BootstrapRequest.ReadStrict(WriteRequest(request), authority));
+    }
+
+    [Fact]
+    public async Task PairOnlyAuthorityCanBeRecordedButCannotPrepareFullRequest()
+    {
+        var input = Authority();
+        input["drillClasses"] = new JArray("pair");
+        var digest = await CreateAuthority(input);
+        var request = Request(digest);
+        request["recoveryAuthorized"] = false;
+        var (code, output, error) = await Run(
+            "prepare", "--request", WriteRequest(request), "--authority", AuthorityPath, "--authority-sha256", digest);
+        Assert.Equal(3, code);
+        Assert.Empty(output);
+        Assert.Equal("status=REFUSED_AUTHORITY" + Environment.NewLine, error);
+        Assert.False(Directory.Exists(TaskRoot));
+    }
+
     [Fact]
     public async Task StrictRequestRequiresExplicitRecoveryAuthorityForOptIn()
     {
         var input = Authority();
-        input["drillClasses"] = new JArray("pair");
+        input["drillClasses"] = new JArray("cutover", "pair", "workload");
         var digest = await CreateAuthority(input);
         using var authority = BootstrapAuthority.ReadProtected(AuthorityPath, digest, _expires.AddSeconds(-1));
         var request = Request(digest);
@@ -482,6 +569,43 @@ public sealed class Web6CandidateBootstrapAuthorityTests : IDisposable
     [DllImport("kernel32.dll", ExactSpelling = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetFileTime(SafeFileHandle handle, ref long creationTime, IntPtr accessTime, IntPtr writeTime);
+
+    private static byte[] JunctionData(string target)
+    {
+        var substituteName = Encoding.Unicode.GetBytes(@"\??\" + target);
+        var printName = Encoding.Unicode.GetBytes(target);
+        using var buffer = new MemoryStream();
+        using var writer = new BinaryWriter(buffer);
+        writer.Write(0xa0000003u); // IO_REPARSE_TAG_MOUNT_POINT
+        writer.Write(checked((ushort)(8 + substituteName.Length + 2 + printName.Length + 2)));
+        writer.Write((ushort)0);
+        writer.Write((ushort)0);
+        writer.Write(checked((ushort)substituteName.Length));
+        writer.Write(checked((ushort)(substituteName.Length + 2)));
+        writer.Write(checked((ushort)printName.Length));
+        writer.Write(substituteName);
+        writer.Write((ushort)0);
+        writer.Write(printName);
+        writer.Write((ushort)0);
+        return buffer.ToArray();
+    }
+
+    [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeviceIoControl(SafeFileHandle handle, uint controlCode, byte[] input, int inputSize,
+        IntPtr output, int outputSize, out int bytesReturned, IntPtr overlapped);
+
+    private static SafeFileHandle OpenNativeDirectory(string path, uint access)
+    {
+        const uint backupSemantics = 0x02000000;
+        const uint openReparsePoint = 0x00200000;
+        return CreateFile(path, access, FileShare.Read | FileShare.Write | FileShare.Delete,
+            IntPtr.Zero, FileMode.Open, backupSemantics | openReparsePoint, IntPtr.Zero);
+    }
+
+    [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    private static extern SafeFileHandle CreateFile(string path, uint access, FileShare share, IntPtr security,
+        FileMode mode, uint flags, IntPtr template);
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

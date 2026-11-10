@@ -15,6 +15,7 @@ internal sealed class BootstrapRequest
         "workloadSeconds", "recoveryAuthorized", "authorityPath", "authoritySha256",
     };
     private static readonly IReadOnlyList<string> RequiredBrowserProjects = Array.AsReadOnly(new[] { "chromium", "edge" });
+    private static readonly string[] RequiredDrills = { "pair", "cutover", "workload" };
 
     private BootstrapRequest(JObject value, BootstrapAuthority authority)
     {
@@ -36,6 +37,8 @@ internal sealed class BootstrapRequest
         BootstrapJson.RequireSeparateRoots(BackendRepository, FrontendRepository, TaskRoot, SqlControlParent);
         if (BootstrapJson.SamePath(SqlApprovalFile, AuthorityPath))
             throw new IOException("Bootstrap requires a separate SQL approval file.");
+        if (RequiredDrills.Any(drill => !authority.DrillClasses.Contains(drill)))
+            throw new IOException("Bootstrap authority is missing a mandatory drill.");
 
         var thumbprint = BootstrapJson.Text(value, "tlsThumbprint");
         if (!BootstrapJson.IsLowerHex(thumbprint.ToLowerInvariant(), 40))

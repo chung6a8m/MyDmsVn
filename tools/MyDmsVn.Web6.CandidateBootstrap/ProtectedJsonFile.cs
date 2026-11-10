@@ -51,7 +51,7 @@ internal sealed class ProtectedJsonFile : IDisposable
         var parents = new PathLease(path);
         try
         {
-            var stream = OpenRead(path);
+            var stream = parents.OpenRead();
             try
             {
                 return new ProtectedJsonFile(path, sha256, parents, stream);
@@ -73,7 +73,7 @@ internal sealed class ProtectedJsonFile : IDisposable
     {
         path = BootstrapJson.AbsolutePath(path);
         using var parents = new PathLease(path);
-        using var stream = OpenRead(path);
+        using var stream = parents.OpenRead();
         var identity = Inspect(stream.SafeFileHandle, path, directory: false);
         var bytes = ReadBytes(stream);
         if (identity != Inspect(stream.SafeFileHandle, path, directory: false))
@@ -92,8 +92,8 @@ internal sealed class ProtectedJsonFile : IDisposable
         acl.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
         acl.AddAccessRule(new FileSystemAccessRule(owner, FileSystemRights.FullControl, AccessControlType.Allow));
 
-        using var stream = new FileStream(path, FileMode.CreateNew, FileSystemRights.FullControl,
-            FileShare.None, 4096, FileOptions.WriteThrough, acl);
+        using var handle = parents.CreateNewFile(acl);
+        using var stream = new FileStream(handle, FileAccess.ReadWrite, bufferSize: 4096);
         var identity = Inspect(stream.SafeFileHandle, path, directory: false);
         var initialAcl = PrivateAcl(stream, owner);
         stream.Write(bytes, 0, bytes.Length);
@@ -166,13 +166,17 @@ internal sealed class ProtectedJsonFile : IDisposable
         return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
     }
 
-    private static FileStream OpenRead(string path)
+    private static SafeFileHandle OpenDrive(string path)
     {
-        const uint genericRead = 0x80000000;
-        var handle = OpenPath(path, genericRead, FileShare.Read, directory: false);
+        const uint fileTraverse = 0x20;
+        const uint openReparsePoint = 0x00200000;
+        const uint backupSemantics = 0x02000000;
+        var handle = CreateFile(path, fileTraverse, FileShare.Read, IntPtr.Zero, FileMode.Open,
+            openReparsePoint | backupSemantics, IntPtr.Zero);
         try
         {
-            return new FileStream(handle, FileAccess.Read, bufferSize: 1);
+            Inspect(handle, path, directory: true);
+            return handle;
         }
         catch
         {
@@ -181,21 +185,83 @@ internal sealed class ProtectedJsonFile : IDisposable
         }
     }
 
-    private static SafeFileHandle OpenPath(string path, uint access, FileShare share, bool directory)
+    private static SafeFileHandle OpenRelative(SafeFileHandle parent, string path, bool directory, byte[]? acl = null)
     {
+        const uint fileTraverse = 0x20;
+        const uint readAttributes = 0x80;
+        const uint synchronize = 0x00100000;
+        const uint caseInsensitive = 0x40;
+        const uint dontReparse = 0x1000;
+        const uint fileOpen = 1;
+        const uint fileCreate = 2;
+        const uint fileDirectoryFile = 1;
+        const uint writeThrough = 2;
+        const uint synchronousIoNonAlert = 0x20;
+        const uint fileNonDirectoryFile = 0x40;
         const uint openReparsePoint = 0x00200000;
-        const uint backupSemantics = 0x02000000;
-        var handle = CreateFile(path, access, share, IntPtr.Zero, FileMode.Open,
-            openReparsePoint | (directory ? backupSemantics : 0), IntPtr.Zero);
+
+        var component = System.IO.Path.GetFileName(path);
+        var nameBuffer = IntPtr.Zero;
+        var unicodeString = IntPtr.Zero;
+        var securityDescriptor = IntPtr.Zero;
+        var parentRef = false;
         try
         {
-            Inspect(handle, path, directory);
-            return handle;
+            parent.DangerousAddRef(ref parentRef);
+            nameBuffer = Marshal.StringToHGlobalUni(component);
+            var nameLength = checked((ushort)(component.Length * sizeof(char)));
+            unicodeString = Marshal.AllocHGlobal(Marshal.SizeOf<UnicodeString>());
+            Marshal.StructureToPtr(new UnicodeString
+            {
+                Length = nameLength,
+                MaximumLength = checked((ushort)(nameLength + sizeof(char))),
+                Buffer = nameBuffer,
+            }, unicodeString, false);
+
+            if (acl != null)
+            {
+                securityDescriptor = Marshal.AllocHGlobal(acl.Length);
+                Marshal.Copy(acl, 0, securityDescriptor, acl.Length);
+            }
+            var attributes = new ObjectAttributes
+            {
+                Length = Marshal.SizeOf<ObjectAttributes>(),
+                RootDirectory = parent.DangerousGetHandle(),
+                ObjectName = unicodeString,
+                Attributes = caseInsensitive | dontReparse,
+                SecurityDescriptor = securityDescriptor,
+            };
+            var access = directory ? fileTraverse | readAttributes | synchronize
+                : (uint)(acl == null ? FileSystemRights.Read | FileSystemRights.Synchronize : FileSystemRights.FullControl);
+            var options = synchronousIoNonAlert | openReparsePoint | (directory ? fileDirectoryFile : fileNonDirectoryFile);
+            if (acl != null)
+                options |= writeThrough;
+
+            // Resolve exactly one component beneath the admitted handle. Absolute
+            // path resolution could follow a reparse mutation made via attributes-only access.
+            var status = NtCreateFile(out var handle, access, ref attributes, out _, IntPtr.Zero,
+                (uint)FileAttributes.Normal, (uint)(acl == null ? FileShare.Read : FileShare.None),
+                acl == null ? fileOpen : fileCreate, options, IntPtr.Zero, 0);
+            try
+            {
+                if (status != 0 || handle.IsInvalid)
+                    throw new IOException($"Bootstrap entry could not be opened or created beneath its pinned directory (NTSTATUS 0x{status:x8}).");
+                Inspect(handle, path, directory);
+                return handle;
+            }
+            catch
+            {
+                handle.Dispose();
+                throw;
+            }
         }
-        catch
+        finally
         {
-            handle.Dispose();
-            throw;
+            if (parentRef)
+                parent.DangerousRelease();
+            Marshal.FreeHGlobal(securityDescriptor);
+            Marshal.FreeHGlobal(unicodeString);
+            Marshal.FreeHGlobal(nameBuffer);
         }
     }
 
@@ -216,28 +282,29 @@ internal sealed class ProtectedJsonFile : IDisposable
         return (info.VolumeSerialNumber, info.FileIndexHigh, info.FileIndexLow, info.CreationTime);
     }
 
-    private sealed class PathLease : IDisposable
+    internal sealed class PathLease : IDisposable
     {
-        private readonly List<SafeFileHandle> _handles = new List<SafeFileHandle>();
+        private readonly string _path;
+        private readonly List<SafeFileHandle> _ancestors = new List<SafeFileHandle>();
 
         internal PathLease(string path)
         {
-            var drive = System.IO.Path.GetPathRoot(path);
+            _path = BootstrapJson.AbsolutePath(path);
+            var drive = System.IO.Path.GetPathRoot(_path);
             var volume = new DriveInfo(drive);
             if (volume.DriveType != DriveType.Fixed || volume.DriveFormat != "NTFS")
                 throw new IOException("Bootstrap files require a fixed local NTFS drive.");
 
             var ancestors = new Stack<string>();
-            for (var parent = System.IO.Path.GetDirectoryName(path); parent != null; parent = System.IO.Path.GetDirectoryName(parent))
+            for (var parent = System.IO.Path.GetDirectoryName(_path); parent != null; parent = System.IO.Path.GetDirectoryName(parent))
                 ancestors.Push(parent);
 
             try
             {
-                // Open from the drive down. Holding each ancestor without delete sharing
-                // keeps the name resolved by the next open under the admitted parent.
-                const uint fileTraverse = 0x20;
+                // Hold every directory with read-only sharing through the child operation.
+                _ancestors.Add(OpenDrive(ancestors.Pop()));
                 foreach (var ancestor in ancestors)
-                    _handles.Add(OpenPath(ancestor, fileTraverse, FileShare.Read | FileShare.Write, directory: true));
+                    _ancestors.Add(OpenRelative(Parent, ancestor, directory: true));
             }
             catch
             {
@@ -246,11 +313,56 @@ internal sealed class ProtectedJsonFile : IDisposable
             }
         }
 
+        private SafeFileHandle Parent => _ancestors[_ancestors.Count - 1];
+
+        internal FileStream OpenRead()
+        {
+            var handle = OpenRelative(Parent, _path, directory: false);
+            try
+            {
+                return new FileStream(handle, FileAccess.Read, bufferSize: 1);
+            }
+            catch
+            {
+                handle.Dispose();
+                throw;
+            }
+        }
+
+        internal SafeFileHandle CreateNewFile(FileSecurity acl) =>
+            OpenRelative(Parent, _path, directory: false, acl.GetSecurityDescriptorBinaryForm());
+
         public void Dispose()
         {
-            for (var index = _handles.Count - 1; index >= 0; index--)
-                _handles[index].Dispose();
+            for (var index = _ancestors.Count - 1; index >= 0; index--)
+                _ancestors[index].Dispose();
         }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct UnicodeString
+    {
+        internal ushort Length;
+        internal ushort MaximumLength;
+        internal IntPtr Buffer;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ObjectAttributes
+    {
+        internal int Length;
+        internal IntPtr RootDirectory;
+        internal IntPtr ObjectName;
+        internal uint Attributes;
+        internal IntPtr SecurityDescriptor;
+        internal IntPtr SecurityQualityOfService;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IoStatusBlock
+    {
+        internal IntPtr Status;
+        internal IntPtr Information;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
@@ -271,6 +383,11 @@ internal sealed class ProtectedJsonFile : IDisposable
     [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern SafeFileHandle CreateFile(string path, uint access, FileShare share, IntPtr security,
         FileMode mode, uint flags, IntPtr template);
+
+    [DllImport("ntdll.dll", ExactSpelling = true)]
+    private static extern int NtCreateFile(out SafeFileHandle handle, uint access, ref ObjectAttributes attributes,
+        out IoStatusBlock ioStatusBlock, IntPtr allocationSize, uint fileAttributes, uint shareAccess,
+        uint disposition, uint options, IntPtr eaBuffer, uint eaLength);
 
     [DllImport("kernel32.dll", ExactSpelling = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
