@@ -4,6 +4,7 @@ using System.Data;
 using System.Linq;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -111,6 +112,22 @@ public sealed class WebRecoveryPilotResultTests
         var lifecycle = new Web6CandidateHostMismatch(expected, _ => Task.CompletedTask);
         Assert.NotEqual(expected, lifecycle.MismatchCandidateId);
         Assert.Matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", lifecycle.MismatchCandidateId);
+    }
+
+    [Fact]
+    public void Candidate_sales_header_query_uses_physical_columns_and_preserves_reader_names()
+    {
+        var query = Regex.Match(Web6CandidateOracle.SalesHeaderProjectionSql,
+            @"\ASELECT (?<columns>.+) FROM dbo\.SalesReceipts WHERE SaleId=@id;\z", RegexOptions.CultureInvariant);
+        Assert.True(query.Success);
+        var columns = query.Groups["columns"].Value.Split(',')
+            .Select(column => column.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)).ToArray();
+        // Physical migration010 columns, independent of the result DTO property names.
+        Assert.Equal(new[] { "SaleId", "SaleNo", "SaleDate", "CustomerId", "WarehouseId", "EmployeeId",
+            "Status", "Note", "RowVersion", "PostedAtUtc", "PostedByUserId" }, columns.Select(column => column[0]));
+        // SqlTestOracle.Read binds SalesHeader properties by the result column name.
+        Assert.Equal(new[] { "SaleId", "SaleNumber", "SaleDate", "CustomerId", "WarehouseId", "EmployeeId",
+            "Status", "Note", "RowVersion", "PostedAtUtc", "PostedByUserId" }, columns.Select(column => column.Last()));
     }
 
     [Theory]

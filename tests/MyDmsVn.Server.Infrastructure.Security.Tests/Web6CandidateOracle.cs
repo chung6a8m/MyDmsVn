@@ -300,12 +300,15 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE 
         return row.ResultDocumentId;
     }
 
+    internal const string SalesHeaderProjectionSql =
+        "SELECT SaleId,SaleNo AS SaleNumber,SaleDate,CustomerId,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.SalesReceipts WHERE SaleId=@id;";
+
     private static async Task VerifyResultProjection(SqlConnection sql, JournalRow row, JObject envelope, CancellationToken cancellationToken)
     {
         if (row.OperationKind is 1 or 2)
         {
             var header = await sql.QuerySingleAsync<SalesHeader>(new SqlTestCommand(
-                "SELECT SaleId,SaleNumber,SaleDate,CustomerId,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.SalesReceipts WHERE SaleId=@id;",
+                SalesHeaderProjectionSql,
                 new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             var lines = (await sql.QueryAsync<SalesLine>(new SqlTestCommand(
                 "SELECT SaleLineId,LineNo,ProductId,Qty,UnitPrice,IsGift,LineAmount FROM dbo.SalesReceiptLines WHERE SaleId=@id ORDER BY LineNo;",
