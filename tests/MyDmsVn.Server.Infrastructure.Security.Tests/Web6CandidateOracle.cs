@@ -55,6 +55,24 @@ internal sealed class Web6StockExpectation
     }
 }
 
+internal sealed class Web6RecoveryOracleSnapshot
+{
+    internal Web6RecoveryOracleSnapshot(long businessHeaders, long journalRows, long businessLines,
+        long stockLedgerRows, long valuationRows, long stockBalanceRows, string canonicalDigest)
+    {
+        BusinessHeaders = businessHeaders; JournalRows = journalRows; BusinessLines = businessLines;
+        StockLedgerRows = stockLedgerRows; ValuationRows = valuationRows; StockBalanceRows = stockBalanceRows;
+        CanonicalDigest = canonicalDigest;
+    }
+    internal long BusinessHeaders { get; }
+    internal long JournalRows { get; }
+    internal long BusinessLines { get; }
+    internal long StockLedgerRows { get; }
+    internal long ValuationRows { get; }
+    internal long StockBalanceRows { get; }
+    internal string CanonicalDigest { get; }
+}
+
 internal static class Web6CandidateOracle
 {
     private static readonly string[] Kinds =
@@ -144,6 +162,24 @@ internal static class Web6CandidateOracle
     {
         if (!auditHealthy || !browserDrained || !hostDrained || !cleanupVerified)
             throw new InvalidDataException("WEB6 candidate disposition is not clean and healthy.");
+    }
+
+    internal static (long LostBusinessRows, long LostJournalRows) CompareRecovery(
+        Web6RecoveryOracleSnapshot source, Web6RecoveryOracleSnapshot restored)
+    {
+        if (source == null || restored == null || string.IsNullOrWhiteSpace(source.CanonicalDigest) ||
+            !Regex.IsMatch(source.CanonicalDigest, @"\A[A-Za-z0-9._:-]{3,127}\z", RegexOptions.CultureInvariant) ||
+            source.BusinessHeaders < 0 || source.JournalRows < 0 || source.BusinessLines < 0 ||
+            source.StockLedgerRows < 0 || source.ValuationRows < 0 || source.StockBalanceRows < 0)
+            throw Invalid();
+        var businessLost = source.BusinessHeaders - restored.BusinessHeaders;
+        var journalLost = source.JournalRows - restored.JournalRows;
+        if (businessLost != 0 || journalLost != 0 || source.BusinessLines != restored.BusinessLines ||
+            source.StockLedgerRows != restored.StockLedgerRows || source.ValuationRows != restored.ValuationRows ||
+            source.StockBalanceRows != restored.StockBalanceRows ||
+            !string.Equals(source.CanonicalDigest, restored.CanonicalDigest, StringComparison.Ordinal))
+            throw new InvalidDataException("WEB6 restored business/journal oracle does not match the verified source.");
+        return (0, 0);
     }
 
     internal static JObject ValidateCanonicalResultBytes(int operationKind, byte[] bytes)
