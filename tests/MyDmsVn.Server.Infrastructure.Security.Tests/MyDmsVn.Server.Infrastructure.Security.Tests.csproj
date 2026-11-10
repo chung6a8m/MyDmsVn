@@ -30,6 +30,7 @@
     <ProjectReference Include="..\..\src\MyDmsVn.Server.Infrastructure\MyDmsVn.Server.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\MyDmsVn.Server.HttpHost\MyDmsVn.Server.HttpHost.csproj" />
     <ProjectReference Include="..\..\tools\MyDmsVn.WebOperation.Operator\MyDmsVn.WebOperation.Operator.csproj" />
+    <ProjectReference Include="..\..\tools\MyDmsVn.Web6.CandidateBootstrap\MyDmsVn.Web6.CandidateBootstrap.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\MyDmsVn.Server.Infrastructure.IntegrationTests\Fixtures\ReusableSqlFixture.cs" Link="Fixtures\ReusableSqlFixture.cs" />

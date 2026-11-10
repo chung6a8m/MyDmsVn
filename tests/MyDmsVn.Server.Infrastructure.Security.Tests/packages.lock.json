@@ -603,6 +603,12 @@
       "mydmsvn.sharedkernel": {
         "type": "Project"
       },
+      "mydmsvn.web6.candidatebootstrap": {
+        "type": "Project",
+        "dependencies": {
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
       "mydmsvn.weboperation.operator": {
         "type": "Project",
         "dependencies": {
