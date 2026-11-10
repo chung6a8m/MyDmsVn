@@ -25,10 +25,12 @@ namespace MyDmsVn.Desktop.Tests
             => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(5), cancellationToken, started);
 
         // Human walkthroughs use an explicit longer budget with the same job, fail-stop and drain policy.
-        public static Task<GuiProcessResult> RunAttendedAsync(ProcessStartInfo start, TimeSpan timeout, CancellationToken cancellationToken = default)
-            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(30), cancellationToken);
+        public static Task<GuiProcessResult> RunAttendedAsync(ProcessStartInfo start, TimeSpan timeout,
+            CancellationToken cancellationToken = default, Encoding? stdoutEncoding = null)
+            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(30), cancellationToken, stdoutEncoding: stdoutEncoding);
 
-        private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout, CancellationToken cancellationToken, Action<int>? started = null)
+        private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout,
+            CancellationToken cancellationToken, Action<int>? started = null, Encoding? stdoutEncoding = null)
         {
             GuiTestSafety.ThrowIfPoisoned();
             cancellationToken.ThrowIfCancellationRequested();
@@ -38,7 +40,7 @@ namespace MyDmsVn.Desktop.Tests
                 throw new ArgumentException("GUI child requires an existing absolute executable and UseShellExecute=false.", nameof(start));
 
             var clock = Stopwatch.StartNew();
-            using (var child = NativeChild.Start(start))
+            using (var child = NativeChild.Start(start, stdoutEncoding))
             {
                 var outputCapture = new GuiOutputCapture();
                 var errorCapture = new GuiOutputCapture();
@@ -175,7 +177,7 @@ namespace MyDmsVn.Desktop.Tests
 
             public void Terminate() => Check(TerminateJobObject(_job, 0xe001));
 
-            public static NativeChild Start(ProcessStartInfo start)
+            public static NativeChild Start(ProcessStartInfo start, Encoding? stdoutEncoding)
             {
                 var job = CreateJobObject(IntPtr.Zero, null);
                 KernelHandle? process = null;
@@ -192,7 +194,7 @@ namespace MyDmsVn.Desktop.Tests
                     Check(CreatePipe(out var outputRead, out var outputWrite, ref security, 0));
                     using (outputWrite)
                     {
-                        output = Reader(outputRead);
+                        output = Reader(outputRead, stdoutEncoding);
                         Check(CreatePipe(out var errorRead, out var errorWrite, ref security, 0));
                         using (errorWrite)
                         using (var input = CreateFile("NUL", 0x80000000, 3, ref security, 3, 0, IntPtr.Zero))
@@ -256,12 +258,13 @@ namespace MyDmsVn.Desktop.Tests
                 }
             }
 
-            private static StreamReader Reader(SafeFileHandle handle)
+            private static StreamReader Reader(SafeFileHandle handle, Encoding? encoding = null)
             {
                 try
                 {
                     Check(SetHandleInformation(handle, 1, 0));
-                    return new StreamReader(new FileStream(handle, FileAccess.Read, 4096, false), Encoding.UTF8);
+                    return new StreamReader(new FileStream(handle, FileAccess.Read, 4096, false), encoding ?? Encoding.UTF8,
+                        detectEncodingFromByteOrderMarks: encoding == null);
                 }
                 catch { handle.Dispose(); throw; }
             }

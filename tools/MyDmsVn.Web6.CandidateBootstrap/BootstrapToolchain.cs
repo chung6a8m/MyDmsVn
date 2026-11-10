@@ -19,13 +19,14 @@ namespace MyDmsVn.Web6.CandidateBootstrap;
 internal sealed class BootstrapProcessRequest
 {
     internal BootstrapProcessRequest(string executable, string directory, string[] arguments,
-        IReadOnlyDictionary<string, string> environment, TimeSpan timeout)
-    { Executable = executable; WorkingDirectory = directory; Arguments = arguments; Environment = environment; Timeout = timeout; }
+        IReadOnlyDictionary<string, string> environment, TimeSpan timeout, bool exactUtf8Stdout = false)
+    { Executable = executable; WorkingDirectory = directory; Arguments = arguments; Environment = environment; Timeout = timeout; ExactUtf8Stdout = exactUtf8Stdout; }
     internal string Executable { get; }
     internal string WorkingDirectory { get; }
     internal IReadOnlyList<string> Arguments { get; }
     internal IReadOnlyDictionary<string, string> Environment { get; }
     internal TimeSpan Timeout { get; }
+    internal bool ExactUtf8Stdout { get; }
 }
 
 internal sealed class BootstrapCertificate
@@ -43,6 +44,8 @@ internal sealed class BootstrapToolchain
 {
     internal const string CandidateVariable = "VITE_MYDMSVN_WEB6_CANDIDATE_ID";
     private const string SqlVariable = "MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING";
+    private static readonly Encoding BytePreservingEncoding = Encoding.GetEncoding(28591);
+    private static readonly Encoding StrictUtf8 = new UTF8Encoding(false, true);
     private readonly Func<BootstrapProcessRequest, CancellationToken, Task<string>> _run;
     private readonly Func<string, string[]> _discover;
     private readonly Func<string, BootstrapCertificate[]> _certificates;
@@ -177,9 +180,18 @@ internal sealed class BootstrapToolchain
         try
         {
             // This existing bounded job runner starts suspended and assigns the job before any child can spawn.
-            var result = await GuiOwnedProcess.RunAttendedAsync(info, command.Timeout, token).ConfigureAwait(false);
+            // Capture every byte without BOM detection or decoding errors during pipe drain.
+            var result = await GuiOwnedProcess.RunAttendedAsync(info, command.Timeout, token,
+                stdoutEncoding: command.ExactUtf8Stdout ? BytePreservingEncoding : null).ConfigureAwait(false);
             if (result.ExitCode != 0) throw new IOException("Bootstrap child process returned a nonzero exit.");
-            return result.StandardOutput.Trim();
+            if (!command.ExactUtf8Stdout) return result.StandardOutput.Trim();
+            if (result.StandardOutput.Length >= GuiOwnedProcess.OutputLimit)
+                throw new IOException("Bootstrap exact stdout exceeds the capture budget.");
+            return StrictUtf8.GetString(BytePreservingEncoding.GetBytes(result.StandardOutput));
+        }
+        catch (DecoderFallbackException)
+        {
+            throw new IOException("Bootstrap exact stdout contains invalid UTF-8.");
         }
         catch (Exception error) when (error is GuiProcessException or Win32Exception or AggregateException)
         {
@@ -250,7 +262,7 @@ internal sealed class BootstrapToolchain
         }
 
         internal async Task<string> RunAsync(string tool, string directory, CancellationToken token,
-            string[] arguments, string? candidate = null, bool build = false)
+            string[] arguments, string? candidate = null, bool build = false, bool exactUtf8Stdout = false)
         {
             token.ThrowIfCancellationRequested();
             var env = new Dictionary<string, string>(_environment, StringComparer.OrdinalIgnoreCase);
@@ -259,7 +271,7 @@ internal sealed class BootstrapToolchain
             using var working = new BootstrapPathPolicy.PinnedDirectory(directory);
             VerifyIdentity(executable);
             var command = new BootstrapProcessRequest(executable.Path, directory, arguments, env,
-                build ? TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(30));
+                build ? TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(30), exactUtf8Stdout);
             string result;
             try { result = await _owner._run(command, token).ConfigureAwait(false); }
             catch (TimeoutException) { throw new IOException("Bootstrap child process exceeded its execution budget."); }

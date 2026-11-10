@@ -57,16 +57,85 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
             File.WriteAllBytes(At(path), new byte[] { 1, 2, 3 });
     }
 
-    [Fact]
-    public async Task Fresh_prepare_accepts_the_reviewed_artifact_command_pin()
+    [Theory]
+    [InlineData("13179f56a3381275c0652f6edaf29258f18927f2", "PIN_MATCHED")]
+    [InlineData("5f7c0051497e8631925b68127ff556d2d066cd5c", "BLOCKED_REVIEWED_FRONTEND_PIN")]
+    public async Task FreshPrepareRequiresTheReviewedArtifactCommandPin(string pin, string admission)
     {
-        _currentFrontend = PreparedCandidateReceipt.ReviewedFrontendSha;
+        _currentFrontend = pin;
         using var authority = Authority();
         var request = Request(authority);
         var receipt = await new BootstrapPreflight(Toolchain()).PrepareAsync(request, CancellationToken.None);
-        Assert.Equal("PIN_MATCHED", receipt.CutoverAdmission);
+        Assert.Equal(admission, receipt.CutoverAdmission);
         Assert.Equal(_currentFrontend, receipt.Payload["frontendSha"]);
         Assert.Empty(Directory.GetFileSystemEntries(At("sql")));
+    }
+
+    [Fact]
+    public async Task PublishesArtifactManifestsUnderHeldParentWithExactBuildEnvironment()
+    {
+        using var authority = Authority();
+        var variable = BootstrapToolchain.CandidateVariable;
+        var previous = Environment.GetEnvironmentVariable(variable);
+        try
+        {
+            Environment.SetEnvironmentVariable(variable, "ambient-wrong-candidate");
+            var receipt = await new BootstrapPreflight(Toolchain()).PrepareAsync(Request(authority), CancellationToken.None);
+            AssertManifest(receipt, "ordinary", null);
+            AssertManifest(receipt, "candidate", Candidate);
+        }
+        finally { Environment.SetEnvironmentVariable(variable, previous); }
+    }
+
+    private void AssertManifest(PreparedCandidateReceipt receipt, string mode, string? id)
+    {
+        var root = Path.Combine(TaskRoot, mode == "ordinary" ? "frontend-ordinary" : "frontend-current");
+        var build = Assert.Single(_processes, process => process.WorkingDirectory == root && process.Arguments.Contains("build"));
+        Assert.Equal(id, build.Environment.TryGetValue(BootstrapToolchain.CandidateVariable, out var buildId) ? buildId : null);
+        var script = Path.Combine(root, "scripts", "web6-candidate-artifact.mjs");
+        var verifier = Assert.Single(_processes, process => process.Arguments[0] == script);
+        Assert.Equal(At(@"node\node.exe"), verifier.Executable);
+        Assert.True(verifier.ExactUtf8Stdout);
+        var expected = new[] { script, "--dist", Path.Combine(root, "dist"), "--mode", mode, "--stdout" };
+        Assert.Equal(id == null ? expected : expected.Concat(new[] { "--candidate-id", id }), verifier.Arguments);
+        Assert.DoesNotContain(BootstrapToolchain.CandidateVariable, verifier.Environment.Keys);
+
+        var path = Path.Combine(TaskRoot, "frontend-" + mode + "-manifest.json");
+        using var manifest = ProtectedJsonFile.Open(path, (string)receipt.Payload[mode + "ManifestSha256"]!);
+        Assert.Equal(Encoding.UTF8.GetBytes(Manifest(Path.Combine(root, "dist"), mode, id)), manifest.Bytes);
+    }
+
+    [Theory]
+    [InlineData("stdout BOM")]
+    [InlineData("stdout newline")]
+    [InlineData("stdout banner")]
+    [InlineData("stdout truncated")]
+    [InlineData("ordinary with ID")]
+    [InlineData("wrong candidate ID")]
+    public async Task InvalidStdoutLeavesTheCorrespondingManifestUnpublished(string failure)
+    {
+        _failure = failure;
+        using var authority = Authority();
+        var mode = failure == "wrong candidate ID" ? "candidate" : "ordinary";
+        await Assert.ThrowsAnyAsync<IOException>(() => new BootstrapPreflight(Toolchain()).PrepareAsync(Request(authority), CancellationToken.None));
+        Assert.Contains(_processes, process => process.Arguments.Contains("--stdout") && process.Arguments.Contains(mode));
+        Assert.False(File.Exists(Path.Combine(TaskRoot, "frontend-" + mode + "-manifest.json")));
+        Assert.False(File.Exists(Path.Combine(TaskRoot, "prepared.json")));
+    }
+
+    [Theory]
+    [InlineData("framing")]
+    [InlineData("invalid UTF-8")]
+    [InlineData("capture limit")]
+    public async Task OwnedExactStdoutPreservesFramingAndRefusesUndecodableOrTruncatedBytes(string probe)
+    {
+        CompileFakeTools();
+        var command = new BootstrapProcessRequest(At(@"node\node.exe"), _root, new[] { "--probe-stdout", probe },
+            new Dictionary<string, string>(), TimeSpan.FromSeconds(10), exactUtf8Stdout: true);
+        if (probe == "framing")
+            Assert.Equal("\uFEFFété\r\n", await BootstrapToolchain.RunOwnedAsync(command, CancellationToken.None));
+        else
+            await Assert.ThrowsAnyAsync<IOException>(() => BootstrapToolchain.RunOwnedAsync(command, CancellationToken.None));
     }
 
     [Theory]
@@ -85,8 +154,6 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
     [InlineData("wrong SQL server")]
     [InlineData("build failed")]
     [InlineData("build timeout")]
-    [InlineData("ordinary with ID")]
-    [InlineData("wrong candidate ID")]
     [InlineData("dist drift")]
     [InlineData("publish drift")]
     [InlineData("same-byte artifact swap")]
@@ -400,10 +467,18 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
                 }
                 if (args.Contains("web6:artifact"))
                 {
+                    Assert.ThrowsAny<IOException>(() => Directory.Move(TaskRoot, TaskRoot + "-moved"));
+                    throw new IOException("EBUSY: frontend hard-link output cannot publish into the held parent.");
+                }
+                if (args[0] == Path.Combine(root, "scripts", "web6-candidate-artifact.mjs"))
+                {
                     var dist = args[Array.IndexOf(args, "--dist") + 1];
                     var mode = args[Array.IndexOf(args, "--mode") + 1];
-                    var output = args[Array.IndexOf(args, "--output") + 1];
-                    WriteManifest(output, dist, mode, mode == "ordinary" ? (_failure == "ordinary with ID" ? Candidate : null) : (_failure == "wrong candidate ID" ? "other" : Candidate));
+                    Assert.Contains("--stdout", args);
+                    Assert.DoesNotContain("--output", args);
+                    Assert.ThrowsAny<IOException>(() => Directory.Move(TaskRoot, TaskRoot + "-moved"));
+                    Assert.False(File.Exists(Path.Combine(TaskRoot, "frontend-" + mode + "-manifest.json")));
+                    var manifest = Manifest(dist, mode, mode == "ordinary" ? (_failure == "ordinary with ID" ? Candidate : null) : (_failure == "wrong candidate ID" ? "other" : Candidate));
                     if (_failure == "dist drift") File.AppendAllText(Path.Combine(dist, "app.js"), "drift");
                     if (_failure == "same-byte artifact swap")
                     {
@@ -412,6 +487,14 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
                         File.Move(path, Path.Combine(TaskRoot, "retained.js"));
                         File.WriteAllBytes(path, bytes);
                     }
+                    return Task.FromResult(_failure switch
+                    {
+                        "stdout BOM" => "\uFEFF" + manifest,
+                        "stdout newline" => manifest + "\r\n",
+                        "stdout banner" => "artifact complete\n" + manifest,
+                        "stdout truncated" => manifest.Substring(0, manifest.Length - 1),
+                        _ => manifest,
+                    });
                 }
                 break;
             default:
@@ -467,6 +550,13 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
                 static int Main(string[] args)
                 {
                     var tool = Path.GetFileName(Assembly.GetExecutingAssembly().Location);
+                    if (args[0] == "--probe-stdout")
+                    {
+                        var bytes = args[1] == "invalid UTF-8" ? new byte[] { 0xc3, 0x28 } :
+                            args[1] == "capture limit" ? new byte[32768] : Encoding.UTF8.GetBytes("\uFEFF\u00E9t\u00E9\r\n");
+                        using (var output = Console.OpenStandardOutput()) output.Write(bytes, 0, bytes.Length);
+                        return 0;
+                    }
                     if (args.Contains("--version"))
                     {
                         Console.WriteLine(tool == "dotnet.exe" ? "8.0.427" : args.Length == 1 ? "v22.14.0" : "11.6.0");
@@ -498,14 +588,15 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
                             File.WriteAllText("dist/app.js", "fixture\n/* MyDmsVn WEB6 build marker " + marker + " */\n");
                         }
                     }
-                    if (args.Contains("web6:artifact"))
+                    if (args.Contains("web6:artifact")) return 16; // Simulate EBUSY on legacy hard-link publication.
+                    if (args.Contains("--stdout"))
                     {
                         var mode = Value(args, "--mode");
                         var id = mode == "candidate" ? "\"" + Value(args, "--candidate-id") + "\"" : "null";
                         var files = Directory.GetFiles(Value(args, "--dist")).OrderBy(path => path, StringComparer.Ordinal)
                             .Select(path => "{\"path\":\"" + Path.GetFileName(path) + "\",\"sha256\":\"" + Hash(File.ReadAllBytes(path)) + "\"}");
                         var payload = "{\"version\":1,\"mode\":\"" + mode + "\",\"candidateId\":" + id + ",\"files\":[" + string.Join(",", files) + "]}";
-                        File.WriteAllText(Value(args, "--output"), payload.Substring(0, payload.Length - 1) +
+                        Console.Write(payload.Substring(0, payload.Length - 1) +
                             ",\"manifestSha256\":\"" + Hash(Encoding.UTF8.GetBytes(payload)) + "\"}");
                     }
                     return 0;
@@ -521,7 +612,7 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
         File.Copy(At("dotnet.exe"), At(@"node\node.exe"));
     }
 
-    private static void WriteManifest(string output, string dist, string mode, string? candidate)
+    private static string Manifest(string dist, string mode, string? candidate)
     {
         var manifest = new JObject
         {
@@ -530,7 +621,7 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
                 new JObject { ["path"] = Path.GetFileName(path), ["sha256"] = Hash(File.ReadAllBytes(path)) })),
         };
         manifest["manifestSha256"] = Hash(Encoding.UTF8.GetBytes(manifest.ToString(Formatting.None)));
-        File.WriteAllText(output, manifest.ToString(Formatting.None));
+        return manifest.ToString(Formatting.None);
     }
 
     private static string Hash(byte[] bytes)

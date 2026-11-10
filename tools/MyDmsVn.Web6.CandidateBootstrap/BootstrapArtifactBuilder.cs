@@ -38,14 +38,16 @@ internal sealed class BootstrapArtifactBuilder
         }
 
         var mode = candidate == null ? "ordinary" : "candidate";
-        var args = new List<string> { "--ignore-scripts", "run", "web6:artifact", "--", "--dist", tree.Root, "--mode", mode, "--output", manifestPath };
+        var script = Path.Combine(frontend.Path, "scripts", "web6-candidate-artifact.mjs");
+        var args = new List<string> { script, "--dist", tree.Root, "--mode", mode, "--stdout" };
         if (candidate != null) args.AddRange(new[] { "--candidate-id", candidate });
-        await _tools.NpmAsync(frontend.Path, token, args.ToArray()).ConfigureAwait(false);
+        var stdout = await _tools.RunAsync("node", frontend.Path, token, args.ToArray(), exactUtf8Stdout: true).ConfigureAwait(false);
         tree.Verify();
-        var manifestDigest = VerifyManifest(manifestPath, tree, mode, candidate);
+        var manifest = VerifyManifest(stdout, tree, mode, candidate);
         VerifyMarkers(tree, candidate);
         tree.Verify();
-        return (tree, manifestDigest);
+        token.ThrowIfCancellationRequested();
+        return (tree, ProtectedJsonFile.WriteNew(manifestPath, manifest));
     }
 
     internal async Task<BootstrapTree> BuildBackendAsync(BootstrapSource backend, string publish,
@@ -113,7 +115,7 @@ internal sealed class BootstrapArtifactBuilder
         return runtime[0]!;
     }
 
-    private static string VerifyManifest(string path, BootstrapTree tree, string mode, string? candidate)
+    private static byte[] VerifyManifest(string stdout, BootstrapTree tree, string mode, string? candidate)
     {
         var payload = new JObject
         {
@@ -123,15 +125,9 @@ internal sealed class BootstrapArtifactBuilder
         // Task 1's canonical JSON uses JSON.stringify. Its property order is part of the format.
         payload["manifestSha256"] = ProtectedJsonFile.Digest(BootstrapJson.Serialize(payload));
         var expected = BootstrapJson.Serialize(payload);
-        return BootstrapPathPolicy.ReadFile(path, file =>
-        {
-            if (file.Length != expected.Length) throw new IOException("Bootstrap frontend manifest size differs from the measured artifact.");
-            using var bytes = new MemoryStream();
-            file.CopyTo(bytes);
-            if (!bytes.ToArray().SequenceEqual(expected))
-                throw new IOException("Bootstrap frontend manifest mode, candidate ID or inventory differs.");
-            return ProtectedJsonFile.Digest(expected);
-        }).Value;
+        if (!string.Equals(stdout, Encoding.UTF8.GetString(expected), StringComparison.Ordinal))
+            throw new IOException("Bootstrap frontend manifest stdout differs from the exact measured artifact.");
+        return expected;
     }
 
     private static void VerifyMarkers(BootstrapTree tree, string? candidate)
