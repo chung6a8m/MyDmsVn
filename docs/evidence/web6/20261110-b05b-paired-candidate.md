@@ -1,6 +1,44 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-10): attempt09 PREPARED / PIN_MATCHED, then FailedRetained in the Chromium selector; Task 6 OPEN.** Nested Chromium passed two tests; the third timed out on `candidateMismatchOn` in `response-header` phase after 10,000 ms. Cleanup is Quarantined; owned SQL/runtime resources remain retained. All later gates are NOT RUN. Prior attempts retain their separate dispositions. No CandidateVerified, live pair PASS, workload or recovery result is claimed.
+**Latest disposition (2026-11-10): attempt10 PREPARED / PIN_MATCHED, then FailedRetained in the Chromium selector; Task 6 OPEN.** Nested Chromium passed two tests; the third could not find the resend button at a boundary assertion, with login UI visible in the retained snapshot. Cleanup is Quarantined; owned SQL/runtime resources remain retained. All later gates are NOT RUN. Prior attempts retain their separate dispositions. No CandidateVerified, live pair PASS, workload or recovery result is claimed.
+
+## Task 6 attempt10 boundary assertion failure and retained quarantine
+
+The Owner authorized one fresh attempt after independent review of the mismatch response-budget correction. Candidate `web6-20261110-dd12de6d` used backend `aa59990db966c450378c1a5981190174258ef9c8` / tree `255f2fed1068173da75b3294b23387603be50b63` and frontend `b91aba84b8e42b8aac78bd113c732ad9c5bff715` / tree `5daba3195ca055246f751bd7919ccc970c29b800`. Reviewed mismatch header budget is 170,000 ms with an absolute deadline; body/ordinary calls remain 10,000 ms. Third browser case budget is 480,000 ms; no command retry was added.
+
+Before new root/approval issuance, four read-only Edge observations at `11:07:42.1270872Z`–`11:08:12.2539956Z` (30.1269084 seconds) matched identity/version `157.0.4341.46`/SHA-256 `3e2c8557b5ca4d78868d3089346146ceab94f198ce3d58526ce8f6c8d4b4167c`. All 2,337 tool files/572 directories passed independent identity/hash/current-owner protected ACL/no-link verification: Node `22.14.0`, npm `11.6.0`, tree `c55ed76c2333bcb335b2327f639195464c2ed7685b329da812f02c85bed29529`. A bounded query independently reverified approved effective master/server. No custom lock/copy/updater change, installation or global mutation occurred.
+
+Fresh roots, independent SQL approval, Owner authority and request were created using Windows PowerShell/net48 protected create-new publication. Exact four-field `web6-cutover` schema/current-user-only protected ACL/digest/master binding passed; eight-hour expiry `2026-11-10T19:08:26Z`. No old protected payload/resource was inspected, copied, reused or adopted. Authorize once exited 0; prepare once ran `11:08:44.7369553Z`–`11:11:19.8098887Z`, exit 0 `PIN_MATCHED`. Independent checks confirmed ordinary null candidate ID/OFF, exact candidate marker, ten-file full dist/wwwroot equality, clean detached pins and zero pre-run live allocation.
+
+| Attempt10 record | SHA-256 |
+|---|---|
+| Release/net48 bootstrap | `301df9f68fb63affd36e9bcce938f24907a813c54741cee100f6e88a9b8b94cc` |
+| New SQL approval | `08ae0028b84357c081317200497c5f069a266533e7fb26ee0847e65fa248426b` |
+| Owner authority / request | `c4a739f3d4141a9e6d2e1281444b5d71cf9105be3f12e69f4ddafb3fe19374e7` / `e68129be02658e9707b983f1e5f8d919bd9a4434747bcd4f28c75d72d1e44068` |
+| Prepared / terminal receipt | `b27cce07365b1e7f1a2885436f3e3a6acebb5faa0b1f22e692d6035371c33cd4` / `c1425096003bbde5610ebf1ce1c86736830b837bc875744b68c79459f71928fd` |
+| Ordinary dist / manifest | `5c7908157609e24760dcab5da26b170f5194f1918f2343f80aa164aab0ef59ab` / `796d86094b6cfd29efa1d99aac49bd9fd10bb80c73b71d0164d853e74485ef53` |
+| Candidate dist / manifest | `dc4e693818fdc5bd96a8923cd13c363179b4999dbbe6e2a71415a849c73241a9` / `f83f82b44ca0860cab915d62fa203761713192c1a7d0f71fddb7ec3ff470958b` |
+| Current / old backend publish | `61728c3566a9e738ceb050763ed7c56eeb8e3d4fff8c454e02a8917691e4bf16` / `dbe262110a273e11a4ccf6ae36a140c0f1308649289890b77f95cd4c29f4d3cb` |
+| Cutover build authority | `121b196a543e4c1fcb036e4115c2e9b57b927cccbe538a2bd2446b2aeed18168` |
+| Chromium wrapper TRX / selector DLL | `145326507aef32df94e65575380aa81128f5c91eb39514a643e6bc7078c86bf5` / `906635750b87d8ba3fb009059333b3841d88a47c1a1faba8e3b7057e8a133b1a` |
+
+Run began `11:11:20.4204078Z`, **0.611 seconds** after prepare, and ended `11:13:29.6614655Z`, exit 5 `FailedRetained`; run ID `run-9e1699490b2d4e9fb73018723c3decb0`. Sole Chromium selector: `11:11:40.2039657Z`–`11:13:29.6335178Z`, wrapper duration 97.371 seconds, child exit 1, `NonzeroExit`, `processTreeDrained:true`, `requiresDispositionProof:true`. No external termination occurred; the assertion failed within the reviewed test budget.
+
+| Required selector | Discovered / executed / passed / failed / skipped | Result |
+|---|---:|---|
+| Chromium pair | 1 / 1 / 0 / 1 / 0 | FAIL / FailedRetained |
+| Edge pair | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Cutover | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Workload | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+| Recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+Nested Chromium selected three tests/one worker: **2 passed, 1 failed, 0 did not run**; displayed duration `1.1m`, plus one reporter error outside a test. The six-operation explicit-consent and committed-response-loss cases passed. The third two-tab/candidate/grant/HTTP case failed at spec line `238:73`: `expect(firstResend).toBeEnabled()`, timeout 5,000 ms, `element(s) not found`. The locator targets the exact resend button inside the recovery dialog. This follows a completed candidate-control call, button click and awaited operations response in the shared `candidateMismatchOn / eligibility401 / eligibility500` loop.
+
+Current retained snapshot shows the login button/password control; recovery dialog/resend button are absent. Current audit has 11 entries, ending in `WebAuthRefresh / Authentication / Denied`. The log does not identify the loop iteration or response status, so neither is inferred. There is no socket-failure diagnostic or SQL oracle exception in current evidence. This assertion failure does not prove complete mismatch/boundary acceptance. No timeout change, source patch or live rerun was made.
+
+Candidate records are `Chromium=Failed`, `Cleanup=Quarantined`. One original SQL database/runtime login/control root, host-runtime/config/browser log, candidate manifest/audit/disposition and prepared artifacts remain retained. Allocation receipt `bdbcc5d9c52b27396109f4e4214d9064d9c82a661accacbf03e7f515d144b398` binds control digest `0358586f5b68ceb8a893e092ef289cb51156eb9ff49757044306b8d417531942`. Later live roots/native success envelopes are absent. Process drain is not accepted SQL/artifact cleanup or final independent disposition. No post-failure SQL query, manual cleanup, historical-resource inspection/adoption or retry occurred.
+
+Environment: Windows 11 Home x64 build 26300, SDK `8.0.427`, SQL `14.0.2140.2`, IIS Express `10.0.26013.1000`, Chromium `156.0.8078.4`, Edge `157.0.4341.46`; Node/npm above. Workload samples/percentiles, RPO/RTO, Task4 acceptance and CandidateVerified are absent. A reviewed boundary correction and new explicit Owner authorization are required before a fresh attempt. Ordinary resend OFF, full IIS/unperformed Narrator NOT RUN, staging NOT ACCEPTED, production NO-GO. Task 6 and B05/F04 remain incomplete.
 
 ## Task 6 attempt09 diagnosed control timeout and retained quarantine
 
@@ -256,7 +294,7 @@ TRX SHA-256: Application `c7a0a06507e1cadf6fcf6ae37997520b0bf59e42c5d1c93aa7c92b
 
 ## Task 6 controlled bootstrap attempt
 
-**Attempt01 history; the latest disposition is attempt09 above.**
+**Attempt01 history; the latest disposition is attempt10 above.**
 
 Owner approved the nonproduction bootstrap plan and destructive drill scope, including the separate authorization step. Candidate `web6-20261110-25a1cf46`, attempt `attempt01`, ran once at `2026-11-10T05:01:14Z`. The Owner authority covered HTTPS localhost ports 44321/44322, the pair/cutover/workload/recovery drills, new private task/SQL parents, the four exact source pins below and expiry `2026-11-10T13:01:13Z`. That authority is not a pilot-enable decision.
 
