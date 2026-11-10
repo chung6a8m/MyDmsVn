@@ -93,7 +93,7 @@ Audit the HTTP transport/server code for middleware retries, redirect, 401/refre
 
 ## 6. B05 — One-candidate production-like integration and operational hardening (WEB6-05)
 
-**Not automatically activated by B03 closure.** B02 PR #102 and B04 PR #100 are MERGED. B05 first requires a **separately Owner-selected prerequisite audit**, an **explicit B03 dependency waiver** for the unaccepted full candidate/unrun hosted proof, and **paired frontend F02/F03 readiness** with exact source/evidence pins. The B03 closure itself grants no dependency waiver or pilot authority.
+**Bounded implementation selected and executed 2026-11-10; live candidate remains blocked.** B02 PR #102 and B04 PR #100 are MERGED. The Owner selected the prerequisite audit, granted a B03 dependency waiver for implementation only and supplied reviewed frontend F02/F03/F04 evidence pins. [B05a operations evidence](../evidence/web6/20261110-b05a-operations.md) and [B05b paired evidence](../evidence/web6/20261110-b05b-paired-candidate.md) record the implementation and local gates. All exact enabled live pair/cutover/workload/recovery selectors failed closed with zero skip before resource allocation because private candidate inputs were absent. This is not pilot authority, live PASS, staging acceptance or production GO.
 
 Use [candidate runbook](../development/WEB6_CANDIDATE_RUNBOOK.md). Freeze exact backend head and **published binaries**, frontend head and **compiled dist**, lockfiles, JSON contracts, SQL schema13 fingerprint, `web5` mode, separate runtime/operator principals, process/config/TLS origin and hash manifest. PR #95's `VerifyHost → Admit` must execute **before any HTTPS scenario**, with exclusive queue/worker route precedence proof, and process/queue absence **before owned SQL cleanup**. No PID4, foreign listener, proxy, localhost health alone or netsh parser fallback as proof. Reverify on process restart/cutover.
 
@@ -140,7 +140,7 @@ Record existing accepted constraints rather than accumulating repeated debt: ful
 - [x] B03 — CLOSED BOUNDED WITH OWNER_ACCEPTED_EXCEPTION; full candidate NOT ACCEPTED, hosted SQL NOT RUN; no active execution queue.
 - [x] B04 six-command same-key crash/fence/negative SQL proof — PR #100 MERGED, retained bounded scope.
 - [ ] F02/F03 gated consent/durable dispatch/UI/browser proof in frontend repository.
-- [ ] B05/F04 pinned-pair IIS Express/SQL/Chromium/Edge/cutover/workload/recovery evidence.
+- [ ] B05/F04 live pinned-pair IIS Express/SQL/Chromium/Edge/cutover/workload/recovery evidence. Harness implementation/local verification is recorded; exact enabled selectors are BLOCKED/NOT RUN and workload is NOT MEASURED.
 - [ ] B06/F05 final readiness dossier and Owner disposition.
 
 **Historical B03 final-run stop (2026-11-09):** [candidate evidence](../evidence/web6/20261109-b03-maintenance-recovery.md) preserves 344 executed, 342 passed / 2 failed / 0 skipped. A net48 path-length failure in the last race arrangement caused its guard to retain a new database and refuse further admission. Fresh quiescence does not replace the missing original allocation tuple or authorize cleanup. The later remediation below does not convert that candidate to PASS.
