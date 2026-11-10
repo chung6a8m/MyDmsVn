@@ -1,6 +1,6 @@
 # WEB6 — Pinned Windows/IIS Express/SQL candidate runbook
 
-**Status: harness IMPLEMENTED / LOCALLY VERIFIED; live candidate BLOCKED / NOT RUN (2026-11-10).** This runbook specifies a nonproduction **production-like** candidate acceptance path for Codex Local on the existing Windows dev machine and protected Windows CI. The exact enabled pair, cutover, workload and recovery selectors failed closed with zero skip before allocation because their reviewed private prerequisites were absent; see [B05a operations](../evidence/web6/20261110-b05a-operations.md) and [B05b paired candidate](../evidence/web6/20261110-b05b-paired-candidate.md). It neither requires Docker Desktop nor demands a Windows Server VM now. [Backend roadmap](../plans/20261103-001-web6-recovery-quality-backend.md) · [acceptance](WEB6_BACKEND_ACCEPTANCE.md) · [WEB5 owned-host evidence](../evidence/web5/20261103-b05-owned-host-admission.md) · [React companion](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261103-001-web6-recovery-quality-web.md).
+**Status: bootstrap IMPLEMENTED / PURE GATES VERIFIED; Task 6 BLOCKED / NO LIVE ALLOCATION (2026-11-10).** The controlled attempt was refused at protected SQL approval before preparation or live selector execution; no Prepared or CandidateVerified receipt exists. Earlier enabled-selector prerequisite failures remain separate history. This runbook specifies a nonproduction **production-like** candidate acceptance path for Codex Local on the existing Windows dev machine and protected Windows CI; see [B05a operations](../evidence/web6/20261110-b05a-operations.md) and [B05b paired candidate](../evidence/web6/20261110-b05b-paired-candidate.md). It neither requires Docker Desktop nor demands a Windows Server VM now. [Backend roadmap](../plans/20261103-001-web6-recovery-quality-backend.md) · [acceptance](WEB6_BACKEND_ACCEPTANCE.md) · [WEB5 owned-host evidence](../evidence/web5/20261103-b05-owned-host-admission.md) · [React companion](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261103-001-web6-recovery-quality-web.md).
 
 ## 1. Candidate manifest required before any live test
 
@@ -74,6 +74,43 @@ Report each gate as `PASS / FAIL / BLOCKED / NOT RUN / NOT_APPLICABLE / OWNER_AC
 
 ## 6. B05 execution disposition — 2026-11-10
 
+**Earlier checkpoint, before the Task 6 bootstrap attempt below.**
+
 The implementation now provides sealed candidate admission, protected audit/health behavior, paired browser bridge, current/old/restored cutover adapters, bounded metrics and owned recovery orchestration. SQL-free local gates passed, including Application 363/363 and HttpHost 635/635. The pure affected Security selection passed 253 with one intentionally disabled live-recovery skip.
 
 No private candidate manifest/root, published artifacts, certificate, browser installation pin, owned SQL control root or recovery/workload authority was supplied for a live run. Consequently each exact opt-in selector was enabled and executed serially, then failed its prerequisite contract with 0 pass / 1 fail / 0 skip before allocation. Pair/cutover/recovery remain BLOCKED / NOT RUN and workload remains NOT MEASURED. No live host, SQL, browser, performance, RPO or RTO result exists. Retained failed-attempt resources and historical quarantines were not cleaned or adopted. Ordinary resend remains OFF; staging is NOT ACCEPTED and production remains NO-GO.
+
+## 7. Controlled bootstrap and protected SQL approval
+
+The implemented net48 test-support executable is `tools/MyDmsVn.Web6.CandidateBootstrap`; it is not a shipped runtime or operator tool. Use its exact `authorize`, `prepare`, then `run` commands with new private roots and approved exact source commits. `authorize` requires the exact acknowledgement `I AUTHORIZE WEB6 NONPRODUCTION DESTRUCTIVE DRILLS` and creates only Owner authority. It does not create independent SQL authority or approve pilot enablement.
+
+The existing designated local SQL approval is a legacy document. On the Task 6 attempt it had an unprotected inherited ACL and a different schema, so it could not authorize WEB6 allocation. Owner identity, a nonproduction boolean, a matching stored fingerprint or a successful read-only connection to master do not waive that refusal. Keep its bytes and ACL unchanged. Do not copy it into protected storage, repair its ACL, reinterpret its endpoint or derive a WEB6 approval from it.
+
+Before resuming, the authorized Owner/operator must separately supply a **new independent protected SQL approval** for the designated nonproduction instance, with all of these properties:
+
+- Absolute local file path outside Git, no reparse components or hard-linked file, UTF-8 without BOM, size at most 16 KiB, and exactly the fields shown below. Keep connection strings and credentials outside this file.
+- Current Windows user's SID owns the file. The file DACL is protected from inheritance and contains exactly one non-inherited Allow ACE granting that same SID FullControl, with no inheritance/propagation flags and no other ACEs.
+- `serverSha256` is lowercase SHA-256 of UTF-8 bytes of the exact value returned by `SELECT CONVERT(nvarchar(128), SERVERPROPERTY('ServerName'))` on the approved instance. Bind it to independent Owner/operator verification of the designated server; do not hash a connection string or treat an unverified legacy document as authority.
+- `expiresUtc` is an unexpired ISO-8601 timestamp at most 24 hours ahead when validated. Purpose is exactly `web6-cutover`, version is integer `1`; unknown fields are refused.
+- The explicitly designated `MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING` must specify and actually reach `master` on that same approved server. Attachment, user-instance and failover-partner options are refused. Allocator, restricted runtime, operator and maintenance responsibilities remain separate.
+
+Schema template only; placeholders are not executable authority:
+
+```json
+{"version":1,"purpose":"web6-cutover","serverSha256":"<64 lowercase hex characters>","expiresUtc":"<approved unexpired UTC timestamp>"}
+```
+
+Use a new candidate attempt/root and new Owner authority/request with that approval path; retain the failed attempt. The strict request must select both browser projects, `actorCohort=web.smoke`, `workloadSeconds=60` and recovery authorization. Its Owner authority must cover the approved localhost origins 44321/44322. CLI syntax, using protected path variables:
+
+```powershell
+& $bootstrap authorize --input $ownerInput --output $ownerAuthority --acknowledge 'I AUTHORIZE WEB6 NONPRODUCTION DESTRUCTIVE DRILLS'
+& $bootstrap prepare --request $request --authority $ownerAuthority --authority-sha256 $ownerAuthoritySha256
+# Only after fresh PREPARED / PIN_MATCHED and ordinary-artifact OFF proof:
+& $bootstrap run --prepared $prepared --prepared-sha256 $preparedSha256
+```
+
+Fresh prepare must validate the reviewed frontend/archive pins, clean detached source worktrees, ordinary OFF/candidate ID markers, full publish/dist equality and existing tool/browser/TLS pins. It allocates no live SQL/IIS/browser resources. A BLOCKED result is not a prepared receipt; do not invoke run or hand-create a receipt to bypass it.
+
+Run invokes exactly five selectors serially: Chromium pair, Edge pair, cutover, workload, recovery. Each must report 1 passed / 0 failed / 0 skipped, workload must cover profiles 1/4/8/16 and at least 1,000 successful observations for each of the six mutation classes, and recovery must observe zero-loss RPO with positive RTO. Only the final independent disposition can produce CandidateVerified. Any live failure/uncertainty stops further selectors and retains resources according to ownership receipts; no automatic rerun or historical cleanup is authorized.
+
+Task 6 candidate `web6-20261110-25a1cf46` ran authorize once (exit 0) and prepare once (exit 4, `BLOCKED_PREFLIGHT`). A read-only diagnostic confirmed the protected-SQL-approval refusal after authority/request/tool/certificate binding. The task root remained absent, SQL control parent empty and all five live selectors NOT RUN. See [exact hashes, counts and retained records](../evidence/web6/20261110-b05b-paired-candidate.md#task-6-controlled-bootstrap-attempt). Task 6 remains open; ordinary resend OFF, full IIS/Narrator NOT RUN, staging NOT ACCEPTED and production NO-GO.
