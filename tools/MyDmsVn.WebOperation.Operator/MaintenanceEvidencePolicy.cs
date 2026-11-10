@@ -275,7 +275,11 @@ internal sealed class EvidenceEntry : IDisposable
             var options = SynchronousIo | OpenReparsePoint | (directory ? DirectoryFile : NonDirectoryFile);
             // Ancestors and root leases deny rename/delete. Case/file delete handles
             // also exclude competing delete handles; files deny writers throughout.
-            var sharing = directory && !delete ? ShareRead : 0u;
+            // Recovery roots may be held by an identity-pinned cleanup lease with DELETE access.
+            // Sharing delete here permits that already-pinned owner while this read/traverse
+            // handle still refuses writers and independently verifies every ancestry identity.
+            const uint shareDelete = 4;
+            var sharing = directory && !delete ? ShareRead | shareDelete : 0u;
             var status = NtCreateFile(out var handle, access, ref attributes, out _, IntPtr.Zero,
                 (uint)FileAttributes.Normal, sharing, create ? CreateNew : OpenExisting, options, IntPtr.Zero, 0);
             GC.KeepAlive(parent);

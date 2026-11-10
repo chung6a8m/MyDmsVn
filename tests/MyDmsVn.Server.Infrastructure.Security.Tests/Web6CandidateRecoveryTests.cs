@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -31,16 +33,26 @@ public sealed class Web6CandidateRecoveryTests
     [InlineData("same-database")]
     [InlineData("same-epoch")]
     [InlineData("same-principal")]
-    [InlineData("backup-mismatch")]
     public void Recovery_plan_refuses_unsafe_source_destination_contract(string mutation)
     {
         var plan = ValidPlan();
         plan = new Web6CandidateRecoveryPlan(plan.SourceDatabaseIdentity,
             mutation == "same-database" ? plan.SourceDatabaseIdentity : plan.DestinationDatabaseIdentity,
             plan.SourceEpoch, mutation == "same-epoch" ? plan.SourceEpoch : plan.RestoredEpoch,
-            plan.SourceRuntimePrincipal, mutation == "same-principal" ? plan.SourceRuntimePrincipal : plan.RestoredRuntimePrincipal,
-            plan.ExpectedBackupSha256, mutation == "backup-mismatch" ? new string('f', 64) : plan.ObservedBackupSha256);
+            plan.SourceRuntimePrincipal, mutation == "same-principal" ? plan.SourceRuntimePrincipal : plan.RestoredRuntimePrincipal);
         Assert.Throws<InvalidDataException>(() => plan.Validate());
+    }
+
+    [Fact]
+    public async Task Backup_digest_is_measured_after_failure_and_must_match_before_restore()
+    {
+        var operations = new FakeOperations { Failure = "backup-mismatch" };
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            new Web6CandidateRecoveryCoordinator(operations).Execute(ValidPlan(), CancellationToken.None));
+        Assert.Contains("detect-failure", operations.Calls);
+        Assert.Contains("drain-source", operations.Calls);
+        Assert.Contains("backup", operations.Calls);
+        Assert.DoesNotContain("restore-distinct", operations.Calls);
     }
 
     [Fact]
@@ -51,7 +63,7 @@ public sealed class Web6CandidateRecoveryTests
 
         Assert.Equal(new[]
         {
-            "verify-source", "detect-failure", "drain-source", "backup", "restore-distinct", "oracle",
+            "verify-source", "start-source", "verify-source-admission", "detect-failure", "drain-source", "backup", "restore-distinct", "oracle",
             "rotate-epoch", "reprovision-principals", "start-host", "verify-admission", "reject-stale", "authenticated-health",
             "fresh-write", "rpo", "drain-restored", "cleanup"
         }, operations.Calls);
@@ -59,6 +71,20 @@ public sealed class Web6CandidateRecoveryTests
         Assert.Equal(0, result.RpoLostBusinessRows);
         Assert.Equal(0, result.RpoLostJournalRows);
         Assert.True(result.RtoTicks > 0);
+    }
+
+    [Theory]
+    [InlineData("start-source")]
+    [InlineData("verify-source-admission")]
+    [InlineData("detect-failure")]
+    public async Task Source_start_or_outage_failure_drains_before_any_backup(string failure)
+    {
+        var operations = new FakeOperations { Failure = failure };
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            new Web6CandidateRecoveryCoordinator(operations).Execute(ValidPlan(), CancellationToken.None));
+        Assert.Contains("drain-source", operations.Calls);
+        Assert.DoesNotContain("backup", operations.Calls);
+        Assert.True(operations.RetainedEvidence);
     }
 
     [Theory]
@@ -153,6 +179,47 @@ public sealed class Web6CandidateRecoveryTests
             new Web6RecoveryOracleSnapshot(7, 11, 4, 9, 3, 3, "abc")));
     }
 
+    [Theory]
+    [InlineData(500, "{\"error\":{\"code\":\"InternalError\"}}")]
+    [InlineData(0, "")]
+    [InlineData(409, "{\"error\":{\"code\":\"Operation.Unavailable\"}}")]
+    public void Stale_rejection_requires_exact_epoch_denial_not_error_or_lost_response(int status, string body) =>
+        Assert.Throws<InvalidDataException>(() => Web6RecoveryHttpDenial.Require(status, body, "stale"));
+
+    [Fact]
+    public void Error_response_with_committed_mutation_is_rejected_by_zero_effect_oracle() =>
+        Assert.Throws<InvalidDataException>(() => Web6RecoveryHttpDenial.RequireNoEffect("before", "committed-after-error"));
+
+    [Theory]
+    [InlineData("reparse")]
+    [InlineData("path-swap")]
+    public void Recovery_root_handle_refuses_reparse_or_path_swap_cleanup(string drift)
+    {
+        var parent = Path.Combine(Path.GetTempPath(), "web6-recovery-lease-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(parent);
+        var root = Path.Combine(parent, "root"); var outside = Directory.CreateDirectory(Path.Combine(parent, "outside")).FullName;
+        using var lease = Web6PrivateDirectoryLease.CreateNew(root,
+            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
+        var victim = Path.Combine(root, "victim");
+        if (drift == "reparse") CreateJunction(victim, outside);
+        else Directory.CreateDirectory(victim);
+        var swapped = false;
+        Assert.Throws<IOException>(() => lease.DeleteTreeVerified(entry =>
+        {
+            if (drift != "path-swap" || swapped || !entry.Equals(victim, StringComparison.OrdinalIgnoreCase)) return;
+            Directory.Delete(victim); CreateJunction(victim, outside); swapped = true;
+        }));
+        Assert.True(Directory.Exists(root)); Assert.Empty(Directory.GetFileSystemEntries(outside));
+        Directory.Delete(victim); lease.DeleteTreeVerified(); Directory.Delete(outside); Directory.Delete(parent);
+    }
+
+    private static void CreateJunction(string junction, string target)
+    {
+        using var command = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+            "/d /c mklink /J \"" + junction + "\" \"" + target + "\"") { UseShellExecute = false, CreateNoWindow = true });
+        Assert.NotNull(command); Assert.True(command!.WaitForExit(5000)); Assert.Equal(0, command.ExitCode);
+    }
+
     [Fact]
     public void Enabled_recovery_gate_missing_prerequisites_is_non_success()
     {
@@ -163,7 +230,7 @@ public sealed class Web6CandidateRecoveryTests
 
     private static Web6CandidateRecoveryPlan ValidPlan() => new(
         "source-allocation", "restored-allocation", Guid.NewGuid(), Guid.NewGuid(),
-        "runtime-source", "runtime-restored", new string('a', 64), new string('a', 64));
+        "runtime-source", "runtime-restored");
 
     private sealed class FakeOperations : IWeb6CandidateRecoveryOperations
     {
@@ -184,10 +251,16 @@ public sealed class Web6CandidateRecoveryTests
             return Task.CompletedTask;
         }
         public Task VerifySource(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("verify-source");
+        public Task StartSourceHost(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("start-source");
+        public Task VerifySourceAdmission(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("verify-source-admission");
         public Task DetectFailure(CancellationToken token) => Step("detect-failure");
         public Task DrainSource(CancellationToken token) => Step("drain-source");
-        public Task Backup(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("backup");
-        public Task RestoreDistinct(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("restore-distinct");
+        public async Task<Web6VerifiedBackup> Backup(Web6CandidateRecoveryPlan plan, CancellationToken token)
+        {
+            await Step("backup");
+            return new Web6VerifiedBackup(new string('a', 64), Failure == "backup-mismatch" ? new string('b', 64) : new string('a', 64));
+        }
+        public Task RestoreDistinct(Web6CandidateRecoveryPlan plan, Web6VerifiedBackup backup, CancellationToken token) => Step("restore-distinct");
         public Task VerifyRestoreOracle(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("oracle");
         public Task RotateEpoch(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("rotate-epoch");
         public Task ReprovisionPrincipals(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("reprovision-principals");
@@ -223,16 +296,37 @@ public sealed class Web6CandidateRecoveryTests
     }
 }
 
+internal static class Web6RecoveryHttpDenial
+{
+    internal static void Require(int status, string body, string role)
+    {
+        if (status != 409 || string.IsNullOrWhiteSpace(role)) throw Invalid();
+        try
+        {
+            var json = Newtonsoft.Json.Linq.JObject.Parse(body);
+            if ((string?)json["error"]?["code"] != "Deployment.EpochMismatch" || json["data"] != null) throw Invalid();
+        }
+        catch (Newtonsoft.Json.JsonException) { throw Invalid(); }
+    }
+
+    internal static void RequireNoEffect(string before, string after)
+    {
+        if (string.IsNullOrWhiteSpace(before) || before != after)
+            throw new InvalidDataException("Stale recovery request changed journal, document, stock, ledger or valuation state.");
+    }
+
+    private static InvalidDataException Invalid() =>
+        new InvalidDataException("Stale recovery request did not receive the exact semantic epoch denial.");
+}
+
 internal sealed class Web6CandidateRecoveryPlan
 {
     internal Web6CandidateRecoveryPlan(string sourceDatabaseIdentity, string destinationDatabaseIdentity,
-        Guid sourceEpoch, Guid restoredEpoch, string sourceRuntimePrincipal, string restoredRuntimePrincipal,
-        string expectedBackupSha256, string observedBackupSha256)
+        Guid sourceEpoch, Guid restoredEpoch, string sourceRuntimePrincipal, string restoredRuntimePrincipal)
     {
         SourceDatabaseIdentity = sourceDatabaseIdentity; DestinationDatabaseIdentity = destinationDatabaseIdentity;
         SourceEpoch = sourceEpoch; RestoredEpoch = restoredEpoch; SourceRuntimePrincipal = sourceRuntimePrincipal;
-        RestoredRuntimePrincipal = restoredRuntimePrincipal; ExpectedBackupSha256 = expectedBackupSha256;
-        ObservedBackupSha256 = observedBackupSha256;
+        RestoredRuntimePrincipal = restoredRuntimePrincipal;
     }
     internal string SourceDatabaseIdentity { get; }
     internal string DestinationDatabaseIdentity { get; }
@@ -240,20 +334,29 @@ internal sealed class Web6CandidateRecoveryPlan
     internal Guid RestoredEpoch { get; }
     internal string SourceRuntimePrincipal { get; }
     internal string RestoredRuntimePrincipal { get; }
-    internal string ExpectedBackupSha256 { get; }
-    internal string ObservedBackupSha256 { get; }
     internal void Validate()
     {
         static bool Identity(string value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 128;
-        static bool Hash(string value) => value?.Length == 64 && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
         if (!Identity(SourceDatabaseIdentity) || !Identity(DestinationDatabaseIdentity) ||
             string.Equals(SourceDatabaseIdentity, DestinationDatabaseIdentity, StringComparison.OrdinalIgnoreCase) ||
             SourceEpoch == Guid.Empty || RestoredEpoch == Guid.Empty || SourceEpoch == RestoredEpoch ||
             !Identity(SourceRuntimePrincipal) || !Identity(RestoredRuntimePrincipal) ||
-            string.Equals(SourceRuntimePrincipal, RestoredRuntimePrincipal, StringComparison.OrdinalIgnoreCase) ||
-            !Hash(ExpectedBackupSha256) || !Hash(ObservedBackupSha256) ||
-            !string.Equals(ExpectedBackupSha256, ObservedBackupSha256, StringComparison.Ordinal))
+            string.Equals(SourceRuntimePrincipal, RestoredRuntimePrincipal, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("WEB6 recovery plan is not a distinct verified restore contract.");
+    }
+}
+
+internal sealed class Web6VerifiedBackup
+{
+    internal Web6VerifiedBackup(string expectedSha256, string observedSha256)
+    { ExpectedSha256 = expectedSha256; ObservedSha256 = observedSha256; }
+    internal string ExpectedSha256 { get; }
+    internal string ObservedSha256 { get; }
+    internal void Validate()
+    {
+        static bool Hash(string value) => value?.Length == 64 && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+        if (!Hash(ExpectedSha256) || !Hash(ObservedSha256) || ExpectedSha256 != ObservedSha256)
+            throw new InvalidDataException("Recovery backup digest changed before restore.");
     }
 }
 
@@ -304,10 +407,12 @@ internal interface IWeb6CandidateRecoveryOperations
 {
     long Timestamp();
     Task VerifySource(Web6CandidateRecoveryPlan plan, CancellationToken token);
+    Task StartSourceHost(Web6CandidateRecoveryPlan plan, CancellationToken token);
+    Task VerifySourceAdmission(Web6CandidateRecoveryPlan plan, CancellationToken token);
     Task DetectFailure(CancellationToken token);
     Task DrainSource(CancellationToken token);
-    Task Backup(Web6CandidateRecoveryPlan plan, CancellationToken token);
-    Task RestoreDistinct(Web6CandidateRecoveryPlan plan, CancellationToken token);
+    Task<Web6VerifiedBackup> Backup(Web6CandidateRecoveryPlan plan, CancellationToken token);
+    Task RestoreDistinct(Web6CandidateRecoveryPlan plan, Web6VerifiedBackup backup, CancellationToken token);
     Task VerifyRestoreOracle(Web6CandidateRecoveryPlan plan, CancellationToken token);
     Task RotateEpoch(Web6CandidateRecoveryPlan plan, CancellationToken token);
     Task ReprovisionPrincipals(Web6CandidateRecoveryPlan plan, CancellationToken token);
@@ -332,17 +437,24 @@ internal sealed class Web6CandidateRecoveryCoordinator
     {
         plan.Validate();
         var timeline = new Web6RecoveryTimeline();
+        var sourceStartArmed = false;
+        var sourceDrained = false;
         var hostStartArmed = false;
         var restoredDrained = false;
         try
         {
             await _operations.VerifySource(plan, token).ConfigureAwait(false);
+            sourceStartArmed = true;
+            await _operations.StartSourceHost(plan, token).ConfigureAwait(false);
+            await _operations.VerifySourceAdmission(plan, token).ConfigureAwait(false);
             await _operations.DetectFailure(token).ConfigureAwait(false);
             timeline.Record(Web6RecoveryMilestone.FailureDetected, _operations.Timestamp());
             await _operations.DrainSource(token).ConfigureAwait(false);
-            await _operations.Backup(plan, token).ConfigureAwait(false);
+            sourceDrained = true;
+            var backup = await _operations.Backup(plan, token).ConfigureAwait(false);
+            backup.Validate();
             timeline.Record(Web6RecoveryMilestone.BackupComplete, _operations.Timestamp());
-            await _operations.RestoreDistinct(plan, token).ConfigureAwait(false);
+            await _operations.RestoreDistinct(plan, backup, token).ConfigureAwait(false);
             timeline.Record(Web6RecoveryMilestone.RestoreComplete, _operations.Timestamp());
             await _operations.VerifyRestoreOracle(plan, token).ConfigureAwait(false);
             await _operations.RotateEpoch(plan, token).ConfigureAwait(false);
@@ -368,7 +480,16 @@ internal sealed class Web6CandidateRecoveryCoordinator
         }
         catch (Exception failure)
         {
-            Exception? drainFailure = null;
+            var drainFailures = new List<Exception>();
+            if (sourceStartArmed && !sourceDrained)
+            {
+                try
+                {
+                    using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    await _operations.DrainSource(cleanup.Token).ConfigureAwait(false);
+                }
+                catch (Exception error) { drainFailures.Add(error); }
+            }
             if (hostStartArmed && !restoredDrained)
             {
                 try
@@ -376,11 +497,11 @@ internal sealed class Web6CandidateRecoveryCoordinator
                     using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                     await _operations.DrainRestored(cleanup.Token).ConfigureAwait(false);
                 }
-                catch (Exception error) { drainFailure = error; }
+                catch (Exception error) { drainFailures.Add(error); }
             }
             _operations.RetainEvidence();
-            if (drainFailure != null)
-                throw new AggregateException("WEB6 restored host failure and drain uncertainty; retain all resources.", failure, drainFailure);
+            if (drainFailures.Count != 0)
+                throw new AggregateException("WEB6 host failure and drain uncertainty; retain all resources.", new[] { failure }.Concat(drainFailures));
             throw;
         }
     }

@@ -958,18 +958,19 @@ internal sealed class Web6PrivateDirectoryLease : IDisposable
 {
     private readonly Web6CandidateFileSystem.ParentChain _parents;
     private readonly SecurityIdentifier _owner;
+    private readonly SecurityIdentifier? _additionalFullControl;
     private readonly string _identity;
     private readonly string _acl;
     private SafeFileHandle? _handle;
     private bool _deleted;
 
     private Web6PrivateDirectoryLease(string path, Web6CandidateFileSystem.ParentChain parents,
-        SafeFileHandle handle, SecurityIdentifier owner)
+        SafeFileHandle handle, SecurityIdentifier owner, SecurityIdentifier? additionalFullControl)
     {
-        Path = path; _parents = parents; _handle = handle; _owner = owner;
+        Path = path; _parents = parents; _handle = handle; _owner = owner; _additionalFullControl = additionalFullControl;
         _identity = Web6CandidateFileSystem.Identity(handle, directory: true);
         var security = Directory.GetAccessControl(path, SqlTestPrivateRecord.Sections);
-        Web6CandidateManifest.RequirePrivateOwner(security, owner);
+        RequireLeaseAcl(security);
         _acl = security.GetSecurityDescriptorSddlForm(SqlTestPrivateRecord.Sections);
         Verify();
     }
@@ -977,6 +978,9 @@ internal sealed class Web6PrivateDirectoryLease : IDisposable
     internal string Path { get; }
 
     internal static Web6PrivateDirectoryLease CreateNew(string path)
+        => CreateNew(path, null);
+
+    internal static Web6PrivateDirectoryLease CreateNew(string path, SecurityIdentifier? additionalFullControl)
     {
         path = Web6CandidateFileSystem.CanonicalPath(path);
         if (path.Length + 30 > 240 || System.IO.Path.GetDirectoryName(path) is not string parent)
@@ -987,8 +991,12 @@ internal sealed class Web6PrivateDirectoryLease : IDisposable
         SafeFileHandle? handle = null;
         try
         {
-            handle = parents.CreateDeletableRoot(System.IO.Path.GetFileName(path), SqlTestPrivateRecord.DirectoryAcl(owner));
-            return new Web6PrivateDirectoryLease(path, parents, handle, owner);
+            var acl = SqlTestPrivateRecord.DirectoryAcl(owner);
+            if (additionalFullControl != null && additionalFullControl != owner)
+                acl.AddAccessRule(new FileSystemAccessRule(additionalFullControl, FileSystemRights.FullControl,
+                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+            handle = parents.CreateDeletableRoot(System.IO.Path.GetFileName(path), acl);
+            return new Web6PrivateDirectoryLease(path, parents, handle, owner, additionalFullControl);
         }
         catch { handle?.Dispose(); parents.Dispose(); throw; }
     }
@@ -1000,9 +1008,26 @@ internal sealed class Web6PrivateDirectoryLease : IDisposable
             !Directory.Exists(Path) || (File.GetAttributes(Path) & (FileAttributes.ReparsePoint | FileAttributes.Device)) != 0)
             throw new IOException("Private directory identity changed.");
         var security = Directory.GetAccessControl(Path, SqlTestPrivateRecord.Sections);
-        Web6CandidateManifest.RequirePrivateOwner(security, _owner);
+        RequireLeaseAcl(security);
         if (security.GetSecurityDescriptorSddlForm(SqlTestPrivateRecord.Sections) != _acl)
             throw new IOException("Private directory ACL changed.");
+    }
+
+    private void RequireLeaseAcl(DirectorySecurity security)
+    {
+        if (_additionalFullControl == null) { Web6CandidateManifest.RequirePrivateOwner(security, _owner); return; }
+        if (!security.AreAccessRulesProtected || !Equals(security.GetOwner(typeof(SecurityIdentifier)), _owner))
+            throw new IOException("Private directory owner or ACL protection changed.");
+        var allowed = new HashSet<SecurityIdentifier>(new[] { _owner, _additionalFullControl });
+        var full = new HashSet<SecurityIdentifier>();
+        foreach (FileSystemAccessRule rule in security.GetAccessRules(true, false, typeof(SecurityIdentifier)))
+        {
+            var sid = (SecurityIdentifier)rule.IdentityReference;
+            if (rule.AccessControlType != AccessControlType.Allow || !allowed.Contains(sid))
+                throw new IOException("Private directory ACL contains foreign authority.");
+            if ((rule.FileSystemRights & FileSystemRights.FullControl) == FileSystemRights.FullControl) full.Add(sid);
+        }
+        if (!full.SetEquals(allowed)) throw new IOException("Private directory full-control authority changed.");
     }
 
     internal void DeleteVerified()

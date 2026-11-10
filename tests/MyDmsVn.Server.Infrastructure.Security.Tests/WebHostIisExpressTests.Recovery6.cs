@@ -10,6 +10,8 @@ using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using MyDmsVn.Server.DbMigrator;
+using MyDmsVn.Server.Infrastructure.Operations;
 using MyDmsVn.Testing.Sql;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -39,13 +41,11 @@ public sealed partial class WebHostIisExpressTests
         var fixture = await Web6MaintenanceRecoveryFixture.CreateAsync(recoveryRoot);
         try
         {
-            await fixture.PrepareForLiveServiceAsync();
-            var backupHash = fixture.BackupSha256;
+            await fixture.PrepareSourceForLiveServiceAsync();
             var plan = new Web6CandidateRecoveryPlan(fixture.SourceDatabaseIdentity, fixture.DestinationDatabaseIdentity,
-                fixture.SourceEpoch, fixture.RestoredEpoch, fixture.SourceRuntimePrincipal, fixture.RestoredRuntimePrincipal,
-                backupHash, backupHash);
+                fixture.SourceEpoch, fixture.RestoredEpoch, fixture.SourceRuntimePrincipal, fixture.RestoredRuntimePrincipal);
             var operations = new LiveCandidateRecoveryOperations(fixture, publish, thumbprint, task4.CandidateId,
-                candidateRoot, recoveryRoot);
+                recoveryRoot, frontendRoot, backendRoot);
             var result = await new Web6CandidateRecoveryCoordinator(operations).Execute(plan, CancellationToken.None);
             if (!result.TrustedService || result.RpoLostBusinessRows != 0 || result.RpoLostJournalRows != 0)
                 throw new InvalidDataException("WEB6 service recovery result was not trusted and zero-loss.");
@@ -62,36 +62,28 @@ public sealed partial class WebHostIisExpressTests
     {
         private const string Origin = "https://localhost:44321";
         private readonly Web6MaintenanceRecoveryFixture _fixture;
-        private readonly string _publish, _publishHash, _thumbprint, _candidateId, _candidateRoot, _recoveryRoot;
+        private readonly string _publish, _publishHash, _thumbprint, _candidateId, _recoveryRoot;
+        private readonly string _frontendRoot, _backendRoot;
         private readonly byte[] _jwt = new byte[32];
         private Process? _process;
         private Web5IisExpressIdentity? _identity;
-        private Web6PrivateDirectoryLease? _runtimeRoot;
+        private readonly List<Web6PrivateDirectoryLease> _runtimeRoots = new List<Web6PrivateDirectoryLease>();
+        private Web6CandidateManifest? _activeManifest;
         private string? _configuration, _access;
-        private bool _drained, _retained;
-        private int _timestampRead;
-        private Guid _saleCreate, _saleUpdate, _salePost;
+        private bool _sourceDrained, _restoredDrained, _retained;
+        private string? _activeRole, _activeSqlReceipt;
+        private Guid _saleCreate, _saleUpdate, _salePost, _staleWriter;
 
         internal LiveCandidateRecoveryOperations(Web6MaintenanceRecoveryFixture fixture, string publish, string thumbprint,
-            string candidateId, string candidateRoot, string recoveryRoot)
+            string candidateId, string recoveryRoot, string frontendRoot, string backendRoot)
         {
-            _fixture = fixture; _publish = publish; _thumbprint = thumbprint; _candidateId = candidateId;
-            _candidateRoot = candidateRoot; _recoveryRoot = recoveryRoot;
+            _fixture = fixture; _publish = publish; _thumbprint = thumbprint; _candidateId = candidateId; _recoveryRoot = recoveryRoot;
+            _frontendRoot = frontendRoot; _backendRoot = backendRoot;
             _publishHash = Web6CandidateFileSet.MeasureTree(publish);
             using var random = RandomNumberGenerator.Create(); random.GetBytes(_jwt);
         }
 
-        public long Timestamp()
-        {
-            _timestampRead++;
-            return _timestampRead switch
-            {
-                1 => _fixture.LiveFailureDetectedTimestamp,
-                2 => _fixture.LiveBackupCompleteTimestamp,
-                3 => _fixture.LiveRestoreCompleteTimestamp,
-                _ => Stopwatch.GetTimestamp(),
-            };
-        }
+        public long Timestamp() => Stopwatch.GetTimestamp();
 
         public Task VerifySource(Web6CandidateRecoveryPlan plan, CancellationToken token)
         {
@@ -102,56 +94,79 @@ public sealed partial class WebHostIisExpressTests
             return Task.CompletedTask;
         }
 
-        public Task DetectFailure(CancellationToken token) { token.ThrowIfCancellationRequested(); return Task.CompletedTask; }
-        public Task DrainSource(CancellationToken token) { token.ThrowIfCancellationRequested(); return Task.CompletedTask; }
+        public Task StartSourceHost(Web6CandidateRecoveryPlan plan, CancellationToken token) =>
+            StartHost("source", _fixture.LiveSourceRuntimeConnectionString, token);
 
-        public Task Backup(Web6CandidateRecoveryPlan plan, CancellationToken token)
+        public Task VerifySourceAdmission(Web6CandidateRecoveryPlan plan, CancellationToken token) => VerifyActiveAdmission(token);
+
+        public Task DetectFailure(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            if (plan.ExpectedBackupSha256 != _fixture.BackupSha256 || !File.Exists(_fixture.BackupPath))
-                throw new InvalidDataException("Protected recovery backup changed.");
+            if (_activeRole != "source" || _process == null || _process.HasExited)
+                throw new IOException("Source candidate outage cannot be observed from an admitted live process.");
+            _process.Kill();
+            if (!_process.WaitForExit(10000)) throw new IOException("Source candidate interruption was not observed.");
             return Task.CompletedTask;
         }
 
-        public Task RestoreDistinct(Web6CandidateRecoveryPlan plan, CancellationToken token)
+        public async Task DrainSource(CancellationToken token)
+        {
+            await DrainActive(token);
+            _sourceDrained = true;
+        }
+
+        public async Task<Web6VerifiedBackup> Backup(Web6CandidateRecoveryPlan plan, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+            if (!_sourceDrained) throw new InvalidOperationException("Verified source drain is required before backup.");
+            await _fixture.BackupLiveSourceAsync();
+            var expected = _fixture.BackupSha256;
+            var observed = _fixture.BackupSha256;
+            return new Web6VerifiedBackup(expected, observed);
+        }
+
+        public async Task RestoreDistinct(Web6CandidateRecoveryPlan plan, Web6VerifiedBackup backup, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested(); backup.Validate();
             if (plan.DestinationDatabaseIdentity != _fixture.DestinationDatabaseIdentity ||
-                plan.SourceDatabaseIdentity == plan.DestinationDatabaseIdentity || plan.ObservedBackupSha256 != _fixture.BackupSha256)
+                plan.SourceDatabaseIdentity == plan.DestinationDatabaseIdentity || backup.ObservedSha256 != _fixture.BackupSha256)
                 throw new InvalidDataException("Distinct restored allocation or backup seal changed.");
-            return Task.CompletedTask;
+            await _fixture.RestoreLiveDestinationAsync();
         }
 
-        public Task VerifyRestoreOracle(Web6CandidateRecoveryPlan plan, CancellationToken token)
+        public async Task VerifyRestoreOracle(Web6CandidateRecoveryPlan plan, CancellationToken token)
         {
-            token.ThrowIfCancellationRequested();
+            token.ThrowIfCancellationRequested(); await _fixture.VerifyLiveRestoreOracleAsync();
             _ = Web6CandidateOracle.CompareRecovery(_fixture.SourceRecoverySnapshot!, _fixture.RestoredRecoverySnapshot!);
-            return Task.CompletedTask;
         }
 
-        public Task RotateEpoch(Web6CandidateRecoveryPlan plan, CancellationToken token)
+        public async Task RotateEpoch(Web6CandidateRecoveryPlan plan, CancellationToken token)
         {
-            token.ThrowIfCancellationRequested();
+            token.ThrowIfCancellationRequested(); await _fixture.RotateLiveEpochAsync();
             if (plan.RestoredEpoch != _fixture.RestoredEpoch || plan.RestoredEpoch == plan.SourceEpoch)
                 throw new InvalidDataException("Restored epoch rotation changed.");
-            return Task.CompletedTask;
         }
 
-        public Task ReprovisionPrincipals(Web6CandidateRecoveryPlan plan, CancellationToken token)
+        public async Task ReprovisionPrincipals(Web6CandidateRecoveryPlan plan, CancellationToken token)
         {
-            token.ThrowIfCancellationRequested();
-            if (plan.RestoredRuntimePrincipal != _fixture.RestoredRuntimePrincipal ||
-                plan.RestoredRuntimePrincipal == plan.SourceRuntimePrincipal)
+            token.ThrowIfCancellationRequested(); await _fixture.ProvisionLiveDestinationAsync();
+            if (plan.RestoredRuntimePrincipal != _fixture.RestoredRuntimePrincipal || plan.RestoredRuntimePrincipal == plan.SourceRuntimePrincipal)
                 throw new InvalidDataException("Restricted restored principal changed.");
-            return Task.CompletedTask;
         }
 
-        public Task StartRestoredHost(Web6CandidateRecoveryPlan plan, CancellationToken token)
+        public Task StartRestoredHost(Web6CandidateRecoveryPlan plan, CancellationToken token) =>
+            StartHost("restored", _fixture.LiveRuntimeConnectionString, token);
+
+        private Task StartHost(string role, string connectionString, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
             if (_process != null) throw new InvalidOperationException("Recovery host is already started.");
-            _runtimeRoot = Web6PrivateDirectoryLease.CreateNew(_recoveryRoot + "-runtime");
-            _configuration = CreateConfiguration(_recoveryRoot + "-runtime", _publish);
+            var runtimeRoot = Web6PrivateDirectoryLease.CreateNew(_recoveryRoot + "-" + role + "-runtime");
+            _runtimeRoots.Add(runtimeRoot);
+            _configuration = CreateConfiguration(runtimeRoot.Path, _publish);
+            var candidateControl = Path.Combine(runtimeRoot.Path, "candidate-control");
+            _activeSqlReceipt = _fixture.LiveOwnershipReceiptSha256;
+            _activeManifest = CreateAdmissionManifest(candidateControl, _configuration, _activeSqlReceipt);
             var executable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "IIS Express", "iisexpress.exe");
             var start = new ProcessStartInfo(executable, "/config:\"" + _configuration + "\" /site:Web2Smoke /systray:false")
             {
@@ -166,13 +181,13 @@ public sealed partial class WebHostIisExpressTests
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_AUDIENCE"] = "web-smoke";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_ACTIVE_KID"] = "smoke";
             start.EnvironmentVariables["MYDMSVN_WEB_JWT_KEYS"] = "smoke:" + Convert.ToBase64String(_jwt);
-            start.EnvironmentVariables["MYDMSVN_WEB_SQL_CONNECTION_STRING"] = _fixture.LiveRuntimeConnectionString;
+            start.EnvironmentVariables["MYDMSVN_WEB_SQL_CONNECTION_STRING"] = connectionString;
             start.EnvironmentVariables["MYDMSVN_WEB_SUPERUSER_USERNAME"] = "web.smoke";
             start.EnvironmentVariables["MYDMSVN_WEB6_RESEND_ELIGIBILITY"] = "receipt-v1";
             start.EnvironmentVariables["MYDMSVN_WEB6_CANDIDATE_ID"] = _candidateId;
-            start.EnvironmentVariables["MYDMSVN_WEB6_CANDIDATE_ROOT"] = _candidateRoot;
-            start.EnvironmentVariables["MYDMSVN_WEB_SECURITY_AUDIT_PATH"] = Path.Combine(_candidateRoot, "security-audit.log");
-            _process = new Process { StartInfo = start };
+            start.EnvironmentVariables["MYDMSVN_WEB6_CANDIDATE_ROOT"] = candidateControl;
+            start.EnvironmentVariables["MYDMSVN_WEB_SECURITY_AUDIT_PATH"] = _activeManifest.AuditPath;
+            _process = new Process { StartInfo = start }; _activeRole = role; _access = null;
             _process.OutputDataReceived += (_, _) => { }; _process.ErrorDataReceived += (_, _) => { };
             if (!_process.Start()) throw new IOException("Recovery IIS Express process did not start.");
             _process.BeginOutputReadLine(); _process.BeginErrorReadLine();
@@ -182,31 +197,89 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task VerifyRestoredAdmission(Web6CandidateRecoveryPlan plan, CancellationToken token)
         {
-            if (_process == null || _identity == null) throw new InvalidOperationException("Recovery host start was not armed.");
+            await VerifyActiveAdmission(token);
+            _fixture.AdmitLiveService();
+        }
+
+        private Web6CandidateManifest CreateAdmissionManifest(string root, string configuration, string sqlReceipt)
+        {
+            var backend = GitIdentity(_backendRoot); var frontend = GitIdentity(_frontendRoot);
+            var inputs = new Web6CandidateInputs(_candidateId, backend, frontend,
+                SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(), new Uri(Origin + "/"),
+                CertificateHash(_thumbprint), "Web6CandidateRecovery", 600, 60);
+            var manifest = Web6CandidateManifest.CreateNew(root, inputs);
+            using (var identity = WindowsIdentity.GetCurrent())
+            using (new FileStream(manifest.AuditPath, FileMode.CreateNew, FileSystemRights.FullControl, FileShare.Read,
+                4096, FileOptions.WriteThrough, SqlTestPrivateRecord.FileAcl(identity.User!))) { }
+            var locks = Directory.GetFiles(_backendRoot, "packages.lock.json", SearchOption.AllDirectories)
+                .Where(path => !path.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj" or ".git"))
+                .Select(path => path.Substring(_backendRoot.Length + 1)).ToArray();
+            manifest.SealArtifacts(new Web6CandidateFileSet(Path.Combine(_publish, "bin", "MyDmsVn.Server.HttpHost.dll"),
+                Path.Combine(_publish, "Web.config"), configuration, _backendRoot, locks,
+                Path.Combine(_frontendRoot, "package-lock.json"), Path.Combine(_backendRoot, "docs/contracts/web4-v1"),
+                Path.Combine(_backendRoot, "docs/contracts/web5-resolution-v1"), Path.Combine(_backendRoot, "docs/contracts/web6-resend-eligibility-v1"),
+                Path.Combine(_frontendRoot, "dist"), Path.Combine(_publish, "wwwroot")), sqlReceipt);
+            return manifest;
+        }
+
+        private async Task VerifyActiveAdmission(CancellationToken token)
+        {
+            if (_process == null || _identity == null || _activeManifest == null || _activeSqlReceipt == null)
+                throw new InvalidOperationException("Recovery host start was not armed.");
             await Web5IisExpressHostAdmission.WaitForAdmissionAsync(_identity, _process, TimeSpan.FromSeconds(45), token);
             var queue = await Web5IisExpressHostAdmission.VerifyAsync(_identity, token);
             if (_process.HasExited || queue.AttachedProcessCount != 1) throw new IOException("Recovery host admission is not exclusive.");
-            _fixture.AdmitLiveService();
+            var backend = GitIdentity(_backendRoot); var frontend = GitIdentity(_frontendRoot);
+            _activeManifest.VerifyBeforeAdmission(_process.Id, _process.StartTime.ToUniversalTime(), queue.Name, () =>
+                new Web6CandidateObservation((backend.Sha, backend.Tree, true), (frontend.Sha, frontend.Tree, true),
+                    SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(), CertificateHash(_thumbprint), _activeSqlReceipt,
+                    new[] { queue }, new Web6CandidateAuditLaunch(_process.Id, _process.StartTime.ToUniversalTime(),
+                        Path.GetDirectoryName(_activeManifest.AuditPath)!, _activeManifest.AuditPath, _candidateId)));
+            var health = await Request(Origin + "/api/v1/health", _thumbprint);
+            if (health.Status != 200 || health.Body != "{\"data\":{\"status\":\"ok\"}}")
+                throw new IOException("Candidate was admitted before healthy readiness.");
+            _activeManifest.VerifyForWorkload(_candidateId);
+        }
+
+        private async Task DrainActive(CancellationToken token)
+        {
+            if (_process != null)
+            {
+                if (!_process.HasExited)
+                {
+                    try { _process.StandardInput.WriteLine("q"); } catch (IOException) { }
+                    if (!_process.WaitForExit(10000)) _process.Kill();
+                }
+                if (!_process.WaitForExit(10000) || _identity == null) throw new IOException("Recovery worker exit identity is uncertain.");
+                await Web5IisExpressHostAdmission.WaitForAbsenceAsync(_identity, TimeSpan.FromSeconds(20), token);
+                _process.Dispose(); _process = null; _identity = null;
+            }
+            _activeManifest?.Dispose(); _activeManifest = null; _activeRole = null; _activeSqlReceipt = null; _access = null;
         }
 
         public async Task RejectStaleWriterReceiptAndStatus(Web6CandidateRecoveryPlan plan, CancellationToken token)
         {
             await Login();
+            var before = await _fixture.LiveEffectSnapshotAsync(token);
             var body = new JObject
             {
                 ["saleDate"] = "2026-11-10", ["customerId"] = _fixture.CustomerId, ["warehouseId"] = _fixture.WarehouseId,
                 ["employeeId"] = _fixture.EmployeeId, ["lines"] = new JArray(new JObject { ["saleLineId"] = "0",
                     ["productId"] = _fixture.ProductId, ["qty"] = "1.0000", ["unitPrice"] = "25.0000", ["isGift"] = false })
             };
-            var staleWriter = await Mutation("/api/v1/sales-receipts", "POST", body, Guid.NewGuid(), _fixture.SourceEpoch);
+            _staleWriter = Guid.NewGuid();
+            var staleWriter = await Mutation("/api/v1/sales-receipts", "POST", body, _staleWriter, _fixture.SourceEpoch);
             var fingerprint = string.Concat(_fixture.OldFingerprint.Select(value => value.ToString("x2", CultureInfo.InvariantCulture)));
             var staleHeaders = new Dictionary<string, string> { ["X-MyDmsVn-Deployment-Epoch"] = _fixture.SourceEpoch.ToString("D"),
                 ["X-MyDmsVn-Operation-Fingerprint"] = fingerprint };
             var staleStatus = await Request(Origin + "/api/v1/operations/" + _fixture.OldCommittedOperation.ToString("D"), _thumbprint, _access, headers: staleHeaders);
             staleHeaders["X-MyDmsVn-Operation-Kind"] = "Sales.Create";
             var staleReceipt = await Request(Origin + "/api/v3/operations/" + _fixture.OldCommittedOperation.ToString("D") + "/resend-receipt", _thumbprint, _access, headers: staleHeaders);
-            if (staleWriter.Status == 200 || staleStatus.Status == 200 || staleReceipt.Status == 200)
-                throw new InvalidDataException("Old epoch writer, status or receipt was accepted after recovery.");
+            var after = await _fixture.LiveEffectSnapshotAsync(token);
+            Web6RecoveryHttpDenial.RequireNoEffect(before, after);
+            Web6RecoveryHttpDenial.Require(staleWriter.Status, staleWriter.Body, "stale writer");
+            Web6RecoveryHttpDenial.Require(staleStatus.Status, staleStatus.Body, "stale status");
+            Web6RecoveryHttpDenial.Require(staleReceipt.Status, staleReceipt.Body, "stale receipt");
         }
 
         public async Task AuthenticatedHealth(CancellationToken token)
@@ -216,6 +289,7 @@ public sealed partial class WebHostIisExpressTests
             var me = await Request(Origin + "/api/v1/auth/me", _thumbprint, _access);
             if (health.Status != 200 || me.Status != 200 || (string?)JObject.Parse(me.Body)["data"]?["username"] != "web.smoke")
                 throw new IOException("Authenticated recovery health failed.");
+            _activeManifest?.VerifyForWorkload(_candidateId);
         }
 
         public async Task FreshWrite(Web6CandidateRecoveryPlan plan, CancellationToken token)
@@ -252,25 +326,16 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task DrainRestored(CancellationToken token)
         {
-            if (_process != null)
-            {
-                if (!_process.HasExited)
-                {
-                    try { _process.StandardInput.WriteLine("q"); } catch (IOException) { }
-                    if (!_process.WaitForExit(10000)) _process.Kill();
-                }
-                if (!_process.WaitForExit(10000) || _identity == null) throw new IOException("Recovery worker exit identity is uncertain.");
-                await Web5IisExpressHostAdmission.WaitForAbsenceAsync(_identity, TimeSpan.FromSeconds(20), token);
-                _process.Dispose(); _process = null; _identity = null;
-            }
-            _drained = true;
+            await DrainActive(token);
+            _restoredDrained = true;
         }
 
         public async Task CleanupVerified(CancellationToken token)
         {
-            if (!_drained || _retained) throw new InvalidOperationException("Verified recovery drain is required before cleanup.");
+            if (!_sourceDrained || !_restoredDrained || _retained) throw new InvalidOperationException("Verified source/restored drain is required before cleanup.");
+            foreach (var root in _runtimeRoots.AsEnumerable().Reverse()) root.DeleteTreeVerified();
+            _runtimeRoots.Clear();
             await _fixture.CleanupLiveServiceAsync();
-            _runtimeRoot?.DeleteTreeVerified(); _runtimeRoot = null;
         }
 
         public void RetainEvidence()
