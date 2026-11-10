@@ -11,8 +11,8 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class Web6CandidatePairBudgetTests
 {
     [Theory]
-    [InlineData(false, 40)]
-    [InlineData(true, 43)]
+    [InlineData(false, 41)]
+    [InlineData(true, 44)]
     public async Task Pair_process_ceiling_admits_only_its_finite_budget_before_executable_validation(bool selector, int minutes)
     {
         var invalid = new ProcessStartInfo("not-an-absolute-executable") { UseShellExecute = false };
@@ -25,7 +25,7 @@ public sealed class Web6CandidatePairBudgetTests
     [Fact]
     public void Sequential_children_fit_strictly_inside_test_controller_process_and_pair_gate()
     {
-        var child = TimeSpan.FromMilliseconds(1797800);
+        var child = TimeSpan.FromMilliseconds(1827800);
         var test = Web6CandidatePairBudgets.ThirdTest;
         var controller = Web6CandidatePairBudgets.ControllerLifetime(true);
         var process = Web6CandidatePairBudgets.BrowserTimeout(true, false, "chromium");
@@ -34,10 +34,15 @@ public sealed class Web6CandidatePairBudgetTests
         Assert.True(controller > test + TimeSpan.FromSeconds(240 + 90 + 60));
         Assert.True(process > controller + TimeSpan.FromSeconds(60));
         Assert.True(gate > process + TimeSpan.FromSeconds(45 + 45 + 30));
-        Assert.Equal(TimeSpan.FromMinutes(31), test);
-        Assert.Equal(TimeSpan.FromMinutes(38), controller);
-        Assert.Equal(TimeSpan.FromMinutes(40), process);
-        Assert.Equal(TimeSpan.FromMinutes(43), gate);
+        // Reject the hierarchy that omitted both pre-login bootstrap refreshes.
+        Assert.True(test > TimeSpan.FromMinutes(31));
+        Assert.True(controller > TimeSpan.FromMinutes(38));
+        Assert.True(process > TimeSpan.FromMinutes(40));
+        Assert.True(gate > TimeSpan.FromMinutes(43));
+        Assert.Equal(TimeSpan.FromMinutes(32), test);
+        Assert.Equal(TimeSpan.FromMinutes(39), controller);
+        Assert.Equal(TimeSpan.FromMinutes(41), process);
+        Assert.Equal(TimeSpan.FromMinutes(44), gate);
     }
 
     [Theory]
@@ -68,7 +73,7 @@ public sealed class Web6CandidatePairBudgetTests
             ["MYDMSVN_WEB_PILOT_PROJECT"] = project, ["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = "unit-run" };
         var name = "pair-" + project;
         Assert.True(Web6CandidatePairBudgets.IsPairSelector(name, Web6CandidatePairBudgets.PairFilter, env));
-        Assert.Equal(TimeSpan.FromMinutes(43), Web6CandidatePairBudgets.SelectorMaximum(name, Web6CandidatePairBudgets.PairFilter, env));
+        Assert.Equal(TimeSpan.FromMinutes(44), Web6CandidatePairBudgets.SelectorMaximum(name, Web6CandidatePairBudgets.PairFilter, env));
         foreach (var key in new[] { "MYDMSVN_WEB6_CANDIDATE_ENABLE", "MYDMSVN_WEB_PILOT_PROJECT", "MYDMSVN_WEB6_BOOTSTRAP_RUN_ID" })
         {
             var missing = new Dictionary<string, string>(env); missing.Remove(key);

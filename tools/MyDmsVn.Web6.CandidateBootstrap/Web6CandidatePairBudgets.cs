@@ -7,7 +7,7 @@ internal static class Web6CandidatePairBudgets
 {
     internal const string PairFilter = "FullyQualifiedName=MyDmsVn.Server.Infrastructure.IntegrationTests.WebHostIisExpressTests.Web6_paired_candidate_runs_six_manual_resends_in_real_browsers_and_SQL";
     // Exact reviewed frontend phase total; see tests/pilot/web6-pair-budgets.ts.
-    internal static readonly TimeSpan SequentialChildren = TimeSpan.FromMilliseconds(1797800);
+    internal static readonly TimeSpan SequentialChildren = TimeSpan.FromMilliseconds(1827800);
     internal static readonly TimeSpan BrowserAssertionMargin = TimeSpan.FromSeconds(60);
     internal static readonly TimeSpan FirstTwoTests = TimeSpan.FromSeconds(240 + 90);
     internal static readonly TimeSpan IpcDrainMargin = TimeSpan.FromSeconds(60);

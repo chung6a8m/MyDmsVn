@@ -418,13 +418,13 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
     {
         var env = new Dictionary<string, string> { ["MYDMSVN_WEB6_CANDIDATE_ENABLE"] = "1",
             ["MYDMSVN_WEB_PILOT_PROJECT"] = project, ["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = RunId };
-        var invocation = Invocation(name, Web6CandidatePairBudgets.PairFilter, env, TimeSpan.FromMinutes(43));
+        var invocation = Invocation(name, Web6CandidatePairBudgets.PairFilter, env, TimeSpan.FromMinutes(44));
         var called = false;
         var runner = Runner((request, _) =>
         {
             called = true;
             Assert.True(request.Web6CandidatePair);
-            Assert.Equal(TimeSpan.FromMinutes(43), request.Timeout);
+            Assert.Equal(TimeSpan.FromMinutes(44), request.Timeout);
             return Task.FromResult(new GuiProcessResult(1, "", ""));
         });
         if (admitted) await runner.RunAsync(invocation, CancellationToken.None);

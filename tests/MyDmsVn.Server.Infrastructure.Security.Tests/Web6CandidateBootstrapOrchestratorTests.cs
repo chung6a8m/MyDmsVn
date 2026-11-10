@@ -291,7 +291,7 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
     private Task<SelectorResult> Invoke(Web6SelectorPlan plan, SelectorInvocation invocation, CancellationToken token)
     {
         _calls.Add(invocation.Name);
-        Assert.Equal(TimeSpan.FromMinutes(invocation.Name is "pair-chromium" or "pair-edge" ? 43 : 25), invocation.Timeout);
+        Assert.Equal(TimeSpan.FromMinutes(invocation.Name is "pair-chromium" or "pair-edge" ? 44 : 25), invocation.Timeout);
         var task4Path = Path.Combine(_root, "evidence", "task4.json");
         Assert.Equal(invocation.Name is "workload" or "recovery", File.Exists(task4Path));
         var started = DateTimeOffset.UtcNow;
