@@ -156,3 +156,13 @@ The sole Chromium wrapper failed **0 passed / 1 failed / 0 skipped**. Nested Pla
 Cleanup is `Quarantined`; SQL database/runtime login/control, host-runtime and prepared/candidate evidence remain retained. Terminal SHA-256 `59be45ab81cc586cc26fe9f7d5c27b537a34bc2d5cfb20b05fc53c5ed71a9a45`; later gates NOT RUN. Process drain is not accepted cleanup or CandidateVerified. See [attempt08 evidence](../evidence/web6/20261110-b05b-paired-candidate.md#task-6-attempt08-partial-chromium-results-and-retained-quarantine).
 
 Do not replay or patch retained resources. A reviewed control-boundary correction and new explicit Owner authorization are required before a fresh candidate/root/approval chain. No post-failure SQL query, manual cleanup or historical-resource adoption occurred. Task 6 stays OPEN; ordinary resend OFF, full IIS/unperformed Narrator NOT RUN, staging NOT ACCEPTED, production NO-GO.
+
+### Attempt09 terminal boundary
+
+After reviewed sanitized socket diagnostics and new explicit Owner authorization, candidate `web6-20261110-69528e92` used backend `9665dfd6aafab3ccaca1aed3f928067b87e25373` / frontend `a8afa96dd81e3a282c6351fd6d1786d331a6479d`. Preissuance Edge stability, complete private tool validation and independent effective-master binding passed; new protected SQL/Owner authorities were issued. Prepare passed `PIN_MATCHED`, ordinary OFF/full dist equality, SHA-256 `34d18b61ba52767b5816673b297ac4042bf843c30d00b581ebb92a46a437f235`. Run began 0.813 seconds later.
+
+Chromium wrapper: **0 passed / 1 failed / 0 skipped**; nested cases **2 passed / 1 failed / 0 not run**. The third case diagnostic is `{"action":"candidateMismatchOn","terminal":"timeout","phase":"response-header","elapsedMs":10000,"category":"socket-timeout"}`, with no optional code. This identifies the client timeout boundary; backend restart failure/completion is not established. No SQL oracle exception appears in current TRX.
+
+Terminal `FailedRetained` SHA-256 `27d59e9907e7ef32272e2f7cbb8d2b4a3580deb4cf818353846ebfb454948b90`; cleanup `Quarantined`, later gates NOT RUN. Retain original SQL database/runtime login/control, host-runtime and all candidate/prepared evidence. No retry, post-failure SQL query, manual cleanup or historical-resource access occurred. See [attempt09 evidence](../evidence/web6/20261110-b05b-paired-candidate.md#task-6-attempt09-diagnosed-control-timeout-and-retained-quarantine).
+
+A reviewed control-boundary correction and new explicit Owner authorization are required for any fresh candidate/root/approval chain. Do not alter terminal artifacts or expand cleanup authority. Task 6 OPEN; CandidateVerified absent, ordinary resend OFF, full IIS/unperformed Narrator NOT RUN, staging NOT ACCEPTED, production NO-GO.

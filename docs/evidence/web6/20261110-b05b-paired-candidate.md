@@ -1,6 +1,48 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-10): attempt08 PREPARED / PIN_MATCHED, then FailedRetained in the Chromium selector; Task 6 OPEN.** Nested Chromium passed two tests and failed the third at candidate control. Cleanup is Quarantined; owned SQL/runtime resources remain retained. All later gates are NOT RUN. Prior attempts retain their separate dispositions. No CandidateVerified, live pair PASS, workload or recovery result is claimed.
+**Latest disposition (2026-11-10): attempt09 PREPARED / PIN_MATCHED, then FailedRetained in the Chromium selector; Task 6 OPEN.** Nested Chromium passed two tests; the third timed out on `candidateMismatchOn` in `response-header` phase after 10,000 ms. Cleanup is Quarantined; owned SQL/runtime resources remain retained. All later gates are NOT RUN. Prior attempts retain their separate dispositions. No CandidateVerified, live pair PASS, workload or recovery result is claimed.
+
+## Task 6 attempt09 diagnosed control timeout and retained quarantine
+
+The Owner authorized one fresh attempt after review of the sanitized socket diagnostic. Candidate `web6-20261110-69528e92` pinned backend `9665dfd6aafab3ccaca1aed3f928067b87e25373` / tree `c80f07727b1e1a51fb1a8de3e84b93b1e5d3c47d` and frontend `a8afa96dd81e3a282c6351fd6d1786d331a6479d` / tree `ad030e4fdc0ec777a90d94da283c51bf67c6d24f`. The diagnostic retains the existing timeout and command dispatch behavior, adding only allowlisted failure fields.
+
+Before new root/approval issuance, four read-only Edge observations at `10:40:06.7687118Z`–`10:40:36.8784861Z` (30.1097743 seconds) matched identity/version `157.0.4341.46`/SHA-256 `3e2c8557b5ca4d78868d3089346146ceab94f198ce3d58526ce8f6c8d4b4167c`. Complete independent tool validation covered 2,337 files/572 directories, identity/hash/current-owner protected ACL/no links: Node `22.14.0`, npm `11.6.0`, tree `c55ed76c2333bcb335b2327f639195464c2ed7685b329da812f02c85bed29529`. A bounded query independently reverified the approved effective master/server. No custom lock/copy/updater change, installation or global mutation occurred.
+
+Fresh roots, SQL approval, Owner authority and request were created using Windows PowerShell/net48 and the repository protected create-new writer. Exact four-field `web6-cutover` schema/current-user-only protected ACL/digest/master binding passed; eight-hour expiry `2026-11-10T18:40:52Z`. No old protected payload/resource was read, copied, reused or adopted. Authorize once exited 0; prepare once ran `10:41:10.1382081Z`–`10:43:51.3024088Z`, exit 0 `PIN_MATCHED`. Independent checks confirmed ordinary null candidate ID/OFF, exact candidate marker, ten-file full dist/wwwroot equality, clean detached pins and zero pre-run allocation/live roots.
+
+| Attempt09 record | SHA-256 |
+|---|---|
+| Release/net48 bootstrap | `39a3b05e29943f1c7e6a6e0dd6356d6eece64fb6367f39cad82324fa222b1509` |
+| New SQL approval | `62abee56442767a1a375111e795908ebd1dff0cbd47db09e7be5a3c665c24cf5` |
+| Owner authority / request | `a7d1ec91ba563978cc477b90dd8b97508196462a41a08b685316883fa956ee2d` / `a6253f2964a52e2c682ad7da5af4206f9d8cd36b90236c8dce45b3c50c3fb8e5` |
+| Prepared / terminal receipt | `34d18b61ba52767b5816673b297ac4042bf843c30d00b581ebb92a46a437f235` / `27d59e9907e7ef32272e2f7cbb8d2b4a3580deb4cf818353846ebfb454948b90` |
+| Ordinary dist / manifest | `5c7908157609e24760dcab5da26b170f5194f1918f2343f80aa164aab0ef59ab` / `796d86094b6cfd29efa1d99aac49bd9fd10bb80c73b71d0164d853e74485ef53` |
+| Candidate dist / manifest | `0e61d45cedd2b6d6197e48b010f9d0332965429915e50db951e2f43c999dd6ac` / `67e352483b8d28da387ed199b5de9f9cfeb37d78ff1fb2fd4e4c0d0725f7b17f` |
+| Current / old backend publish | `e649fb97bf820a74747b0b9961ed0240d112eee4ebd920e307a5a8786e3fda7d` / `1f4a5fe5ced6050c759e3f2ebf2889bfafddc3bd3e810d3bd74dec906cf09295` |
+| Cutover build authority | `b0a221fa55ee059e0748a7bc5de29c5d626c7ac061b3371b510052a796ac43e4` |
+| Chromium wrapper TRX / selector DLL | `91c1f53b9e812574a63513254f8dea1d4fec5b503cd62d90c359c08174dd6350` / `1470765f9d565ddb72747c869bef70fdbbbc20d96f86169f8210e9ad642fb3b9` |
+
+Run began `10:43:52.1153062Z`, **0.813 seconds** after prepare, and ended `10:45:44.4858991Z`, exit 5 `FailedRetained`; run ID `run-d14947dd0e4c4ec8bf778336a1df1683`. Sole Chromium selector: `10:44:11.9648976Z`–`10:45:44.4618867Z`, wrapper duration 80.721 seconds, child exit 1, `NonzeroExit`, `processTreeDrained:true`, `requiresDispositionProof:true`.
+
+| Required selector | Discovered / executed / passed / failed / skipped | Result |
+|---|---:|---|
+| Chromium pair | 1 / 1 / 0 / 1 / 0 | FAIL / FailedRetained |
+| Edge pair | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Cutover | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Workload | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+| Recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+Nested Chromium selected three tests/one worker: **2 passed, 1 failed, 0 did not run**, 36.8 seconds; reporter also recorded one error outside a test. The six-operation explicit-consent and committed-response-loss cases passed. The third two-tab/candidate/grant/HTTP case failed with the exact sanitized diagnostic below; the optional code field was absent:
+
+~~~json
+{"action":"candidateMismatchOn","terminal":"timeout","phase":"response-header","elapsedMs":10000,"category":"socket-timeout"}
+~~~
+
+This establishes a client inactivity timeout in the response-header phase of `candidateMismatchOn`. It does not establish whether the backend restart failed or completed, and no further cause is inferred. Current TRX contains no SQL oracle exception. The source timeout remains ten seconds; no retry, timeout adjustment or retained-candidate patch was made.
+
+Candidate records are `Chromium=Failed`, `Cleanup=Quarantined`. One SQL database/runtime login/control root, host-runtime/config/browser log, candidate manifest/audit/disposition and prepared artifacts remain retained. Allocation receipt `81645a06ade1bd81baf8b66d2716cc97f8c0781ce7c845960b4c10ea179a2b9c` binds control digest `23825fbebe10bc59b437762f5ae6922b058402304421cfcedf5b4d6de108e74a`. Later live roots and native success envelopes are absent. Process drain is not accepted SQL/artifact cleanup or final independent disposition. No post-failure SQL query, manual cleanup, source fix, historical-resource inspection/adoption or retry occurred.
+
+Environment: Windows 11 Home x64 build 26300, SDK `8.0.427`, SQL `14.0.2140.2`, IIS Express `10.0.26013.1000`, Chromium `156.0.8078.4`, Edge `157.0.4341.46`; Node/npm above. Workload samples/percentiles, RPO/RTO, Task4 acceptance and CandidateVerified are absent. A reviewed control-boundary correction and new explicit Owner authorization are required before another fresh attempt. Ordinary resend OFF, full IIS/unperformed Narrator NOT RUN, staging NOT ACCEPTED, production NO-GO. Task 6 and B05/F04 remain incomplete.
 
 ## Task 6 attempt08 partial Chromium results and retained quarantine
 
@@ -214,7 +256,7 @@ TRX SHA-256: Application `c7a0a06507e1cadf6fcf6ae37997520b0bf59e42c5d1c93aa7c92b
 
 ## Task 6 controlled bootstrap attempt
 
-**Attempt01 history; the latest disposition is attempt08 above.**
+**Attempt01 history; the latest disposition is attempt09 above.**
 
 Owner approved the nonproduction bootstrap plan and destructive drill scope, including the separate authorization step. Candidate `web6-20261110-25a1cf46`, attempt `attempt01`, ran once at `2026-11-10T05:01:14Z`. The Owner authority covered HTTPS localhost ports 44321/44322, the pair/cutover/workload/recovery drills, new private task/SQL parents, the four exact source pins below and expiry `2026-11-10T13:01:13Z`. That authority is not a pilot-enable decision.
 
