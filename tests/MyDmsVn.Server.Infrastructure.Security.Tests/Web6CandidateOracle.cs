@@ -311,7 +311,7 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE 
                 SalesHeaderProjectionSql,
                 new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             var lines = (await sql.QueryAsync<SalesLine>(new SqlTestCommand(
-                "SELECT SaleLineId,LineNo,ProductId,Qty,UnitPrice,IsGift,LineAmount FROM dbo.SalesReceiptLines WHERE SaleId=@id ORDER BY LineNo;",
+                "SELECT SaleLineId,[LineNo],ProductId,Qty,UnitPrice,IsGift,LineAmount FROM dbo.SalesReceiptLines WHERE SaleId=@id ORDER BY [LineNo];",
                 new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
             ValidateDraftProjection(row.OperationKind, envelope, header.Json(), new JArray(lines.Select(line => line.Json())));
         }
@@ -321,7 +321,7 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE 
                 "SELECT ReceiptId,ReceiptNo ReceiptNumber,ReceiptDate,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
                 new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             var lines = (await sql.QueryAsync<ReceiptLine>(new SqlTestCommand(
-                "SELECT ReceiptLineId,LineNo LineNumber,ProductId,Quantity,UnitCost FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id ORDER BY LineNo;",
+                "SELECT ReceiptLineId,[LineNo] LineNumber,ProductId,Quantity,UnitCost FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id ORDER BY [LineNo];",
                 new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
             ValidateDraftProjection(row.OperationKind, envelope, header.Json(), new JArray(lines.Select(line => line.Json())));
         }

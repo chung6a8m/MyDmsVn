@@ -130,6 +130,62 @@ public sealed class WebRecoveryPilotResultTests
             "Status", "Note", "RowVersion", "PostedAtUtc", "PostedByUserId" }, columns.Select(column => column.Last()));
     }
 
+    [Fact]
+    public void Candidate_oracle_SQL_matches_the_audited_physical_and_reader_identifiers()
+    {
+        var root = Web6CandidateBackendSource.ResolveRoot(AppContext.BaseDirectory);
+        var source = File.ReadAllText(Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Security.Tests", "Web6CandidateOracle.cs"));
+        // All 23 SELECT alternatives are C# string literals in this file, including the header constant.
+        var actual = Regex.Matches(source, @"@?""(?<sql>\s*SELECT\b[^""]*)""",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            .Cast<Match>().Select(match => match.Groups["sql"].Value).ToArray();
+
+        // Physical names from migrations 002, 005, 007, 010 and 012. SELECT order and aliases
+        // also record the SqlTestOracle reader contract. Keep brackets on the reserved LINENO.
+        const string journal = "SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes " +
+            "FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation";
+        const string ledgerJoin = "FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId";
+        var expected = new[]
+        {
+            journal + ";",
+            "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE OperationId=@operation AND Disposition='COMMITTED';",
+            journal + ";",
+            journal + " AND j.Disposition='COMMITTED';",
+            journal + ";",
+            "SELECT SaleId,SaleNo AS SaleNumber,SaleDate,CustomerId,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.SalesReceipts WHERE SaleId=@id;",
+            "SELECT SaleLineId,[LineNo],ProductId,Qty,UnitPrice,IsGift,LineAmount FROM dbo.SalesReceiptLines WHERE SaleId=@id ORDER BY [LineNo];",
+            "SELECT ReceiptId,ReceiptNo ReceiptNumber,ReceiptDate,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
+            "SELECT ReceiptLineId,[LineNo] LineNumber,ProductId,Quantity,UnitCost FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id ORDER BY [LineNo];",
+            "SELECT Status,PostedAtUtc,RowVersion FROM dbo.SalesReceipts WHERE SaleId=@id;",
+            "SELECT Status,PostedAtUtc,CAST(NULL AS binary(8)) RowVersion FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
+            "SELECT COUNT(*) FROM dbo.SalesReceipts WHERE SaleId=@id;",
+            "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
+            "SELECT COUNT(*) FROM dbo.SalesReceipts WHERE SaleId=@id AND Status='Posted' AND PostedAtUtc IS NOT NULL;",
+            "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE ReceiptId=@id AND Status='Posted' AND PostedAtUtc IS NOT NULL;",
+            "SELECT COUNT(*) FROM dbo.SalesReceiptLines WHERE SaleId=@id;",
+            "SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id;",
+            "SELECT COUNT(*) " + ledgerJoin + " WHERE l.DocumentType=@type AND l.DocumentId=@id;",
+            "SELECT COUNT(*) " + ledgerJoin + " JOIN dbo.SalesReceiptLines s ON s.SaleId=l.DocumentId AND s.SaleLineId=l.DocumentLineId " +
+                "WHERE l.DocumentType='SalesReceipt' AND l.DocumentId=@id AND " +
+                "(l.QuantityChange<>-s.Qty OR v.ValueChange<>-s.CostAmount OR s.PostedUnitCost IS NULL OR s.CostAmount IS NULL);",
+            "SELECT COUNT(*) " + ledgerJoin + " JOIN dbo.GoodsReceiptLines r ON r.ReceiptId=l.DocumentId AND r.ReceiptLineId=l.DocumentLineId " +
+                "WHERE l.DocumentType='GoodsReceipt' AND l.DocumentId=@id AND " +
+                "(l.QuantityChange<>r.Quantity OR v.ValueChange<>ROUND(r.Quantity*r.UnitCost,4));",
+            "SELECT DISTINCT WarehouseId,ProductId FROM dbo.StockLedger WHERE DocumentType=@type AND DocumentId=@id;",
+            "SELECT COALESCE(SUM(l.QuantityChange),0) QuantityChange,COALESCE(SUM(v.ValueChange),0) ValueChange " + ledgerJoin +
+                " WHERE l.WarehouseId=@warehouse AND l.ProductId=@product;",
+            "SELECT Quantity,InventoryValue FROM dbo.StockBalances WHERE WarehouseId=@warehouse AND ProductId=@product;",
+        };
+
+        static string[] Tokens(string sql) => Regex.Matches(sql, @"\[[^\]]+\]|'(?:[^']|'')*'|@?[A-Za-z_][A-Za-z_0-9]*|\d+|<>|\S",
+                RegexOptions.CultureInvariant)
+            .Cast<Match>().Select(match => match.Value).ToArray();
+
+        Assert.Equal(expected.Length, actual.Length);
+        Assert.All(expected.Zip(actual, (audited, sourceSql) => (audited, sourceSql)), pair =>
+            Assert.Equal(Tokens(pair.audited), Tokens(pair.sourceSql)));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
