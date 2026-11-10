@@ -54,6 +54,7 @@ public sealed partial class WebHostIisExpressTests
         {
             // The coordinator/adapter owns verified cleanup after host start. Before start,
             // any uncertain SQL/backup state remains in the protected recovery root.
+            fixture.RetainLiveEvidence();
             throw;
         }
     }
@@ -333,14 +334,17 @@ public sealed partial class WebHostIisExpressTests
         public async Task CleanupVerified(CancellationToken token)
         {
             if (!_sourceDrained || !_restoredDrained || _retained) throw new InvalidOperationException("Verified source/restored drain is required before cleanup.");
-            foreach (var root in _runtimeRoots.AsEnumerable().Reverse()) root.DeleteTreeVerified();
+            token.ThrowIfCancellationRequested();
+            await Web6RecoveryCleanupDisposition.Execute(_runtimeRoots, _fixture.PrepareLiveCleanupAsync);
             _runtimeRoots.Clear();
-            await _fixture.CleanupLiveServiceAsync();
         }
 
         public void RetainEvidence()
         {
             _retained = true;
+            _activeManifest?.Dispose(); _activeManifest = null;
+            foreach (var root in _runtimeRoots) root.Dispose();
+            _fixture.RetainLiveEvidence();
             Console.WriteLine("WEB6_RECOVERY retain=1 activeHostUncertain=" + (_process == null ? "0" : "1") +
                 " recoveryRoot=" + _recoveryRoot);
         }

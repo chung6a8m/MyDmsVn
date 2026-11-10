@@ -19,9 +19,14 @@ public sealed class MaintenanceEvidencePolicy
     private readonly SecurityIdentifier _operator;
     private readonly string[] _primaryAncestry;
     private readonly string[] _backupAncestry;
+    private readonly MaintenanceRecoveryRoot? _recovery;
 
     public MaintenanceEvidencePolicy(string primaryRoot, string backupRoot, TimeSpan retention)
+        : this(primaryRoot, backupRoot, retention, null) { }
+
+    internal MaintenanceEvidencePolicy(string primaryRoot, string backupRoot, TimeSpan retention, MaintenanceRecoveryRoot? recovery)
     {
+        _recovery = recovery;
         if (retention != TimeSpan.FromDays(90))
             throw new ArgumentOutOfRangeException(nameof(retention), "Evidence retention must be exactly 90 days.");
         PrimaryRoot = RequireCanonicalRoot(primaryRoot);
@@ -31,8 +36,8 @@ public sealed class MaintenanceEvidencePolicy
 
         using var identity = WindowsIdentity.GetCurrent();
         _operator = identity.User ?? throw new IOException("Evidence operator identity is unavailable.");
-        using var primary = EvidenceRoot.Open(PrimaryRoot, _operator);
-        using var backup = EvidenceRoot.Open(BackupRoot, _operator);
+        using var primary = EvidenceRoot.Open(PrimaryRoot, _operator, recovery: _recovery);
+        using var backup = EvidenceRoot.Open(BackupRoot, _operator, recovery: _recovery);
         _primaryAncestry = primary.Identities;
         _backupAncestry = backup.Identities;
         if (_primaryAncestry.Contains(backup.Identity) || _backupAncestry.Contains(primary.Identity))
@@ -52,7 +57,7 @@ public sealed class MaintenanceEvidencePolicy
         using var identity = WindowsIdentity.GetCurrent();
         if (!_operator.Equals(identity.User))
             throw new IOException("Evidence operator identity changed.");
-        return EvidenceRoot.Open(path, _operator, ancestry);
+        return EvidenceRoot.Open(path, _operator, ancestry, _recovery);
     }
 
     private static string RequireCanonicalRoot(string path)
@@ -78,10 +83,24 @@ public sealed class MaintenanceEvidencePolicy
     }
 }
 
+// Internal recovery-only bridge. The caller retains a create-new DELETE lease that
+// denies competing rename/delete and pins ancestry; every use revalidates its ACL.
+// Sharing is granted only to the exact native directory represented by that lease.
+internal sealed class MaintenanceRecoveryRoot
+{
+    internal MaintenanceRecoveryRoot(string path, SafeFileHandle handle, Action verify)
+    { Path = path; Handle = handle; Verify = verify; }
+    internal string Path { get; }
+    internal SafeFileHandle Handle { get; }
+    internal Action Verify { get; }
+}
+
 internal sealed class EvidenceRoot : IDisposable
 {
     private readonly SecurityIdentifier _operator;
     private readonly List<EvidenceEntry> _ancestry = new List<EvidenceEntry>();
+    private MaintenanceRecoveryRoot? _recovery;
+    private bool _retained;
 
     private EvidenceRoot(SecurityIdentifier @operator) => _operator = @operator;
 
@@ -89,21 +108,36 @@ internal sealed class EvidenceRoot : IDisposable
     internal string[] Identities => _ancestry.Select(entry => entry.Identity).ToArray();
     private EvidenceEntry Directory => _ancestry[_ancestry.Count - 1];
 
-    internal static EvidenceRoot Open(string path, SecurityIdentifier @operator, string[]? expected = null)
+    internal static EvidenceRoot Open(string path, SecurityIdentifier @operator, string[]? expected = null, MaintenanceRecoveryRoot? recovery = null)
     {
         var result = new EvidenceRoot(@operator);
         try
         {
+            if (recovery != null)
+            {
+                recovery.Verify();
+                if (!path.StartsWith(recovery.Path + "\\", StringComparison.OrdinalIgnoreCase))
+                    throw new IOException("Evidence is outside the retained recovery root.");
+                result._recovery = recovery;
+                recovery.Handle.DangerousAddRef(ref result._retained);
+            }
             var drive = path.Substring(0, 3);
             var driveEntry = EvidenceEntry.OpenDrive(drive);
             result._ancestry.Add(driveEntry);
             var components = path.Substring(3).Split('\\');
+            var current = drive.TrimEnd('\\');
+            var matched = recovery == null;
             for (var index = 0; index < components.Length; index++)
             {
+                current += "\\" + components[index];
                 var isRoot = index == components.Length - 1;
-                var entry = result.Directory.OpenDirectory(components[index], isRoot ? @operator : null);
+                var leased = recovery != null && string.Equals(current, recovery.Path, StringComparison.OrdinalIgnoreCase);
+                var entry = result.Directory.OpenDirectory(components[index], isRoot ? @operator : null, recoveryHandle: leased ? recovery!.Handle : null);
                 result._ancestry.Add(entry);
+                if (leased) matched = true;
             }
+
+            if (!matched) throw new IOException("Retained recovery root was not verified.");
 
             result.Directory.VerifyFinalPath(path);
             if (expected != null && !result.Identities.SequenceEqual(expected, StringComparer.Ordinal))
@@ -128,6 +162,7 @@ internal sealed class EvidenceRoot : IDisposable
 
     internal void Verify()
     {
+        _recovery?.Verify();
         foreach (var entry in _ancestry)
             entry.Verify();
     }
@@ -150,6 +185,7 @@ internal sealed class EvidenceRoot : IDisposable
     {
         for (var index = _ancestry.Count - 1; index >= 0; index--)
             _ancestry[index].Dispose();
+        if (_retained) { _recovery!.Handle.DangerousRelease(); _retained = false; }
     }
 }
 
@@ -226,14 +262,14 @@ internal sealed class EvidenceEntry : IDisposable
         }
     }
 
-    internal EvidenceEntry OpenDirectory(string name, SecurityIdentifier? @operator, bool create = false, bool delete = false) =>
-        Open(this, name, true, @operator, create, delete);
+    internal EvidenceEntry OpenDirectory(string name, SecurityIdentifier? @operator, bool create = false, bool delete = false, SafeFileHandle? recoveryHandle = null) =>
+        Open(this, name, true, @operator, create, delete, recoveryHandle);
 
     internal EvidenceEntry OpenFile(string name, bool create = false, bool delete = false) =>
         Open(this, name, false, _operator, create, delete);
 
     private static EvidenceEntry Open(EvidenceEntry? parent, string name, bool directory, SecurityIdentifier? @operator,
-        bool create, bool delete)
+        bool create, bool delete, SafeFileHandle? recoveryHandle = null)
     {
         if (parent != null && (name.Length == 0 || name == "." || name == ".." || name.IndexOfAny(new[] { '\\', '/', ':', '\0' }) >= 0))
             throw new IOException("Evidence entry is not a single path component.");
@@ -275,11 +311,8 @@ internal sealed class EvidenceEntry : IDisposable
             var options = SynchronousIo | OpenReparsePoint | (directory ? DirectoryFile : NonDirectoryFile);
             // Ancestors and root leases deny rename/delete. Case/file delete handles
             // also exclude competing delete handles; files deny writers throughout.
-            // Recovery roots may be held by an identity-pinned cleanup lease with DELETE access.
-            // Sharing delete here permits that already-pinned owner while this read/traverse
-            // handle still refuses writers and independently verifies every ancestry identity.
             const uint shareDelete = 4;
-            var sharing = directory && !delete ? ShareRead | shareDelete : 0u;
+            var sharing = directory && !delete ? ShareRead | (recoveryHandle != null ? shareDelete : 0u) : 0u;
             var status = NtCreateFile(out var handle, access, ref attributes, out _, IntPtr.Zero,
                 (uint)FileAttributes.Normal, sharing, create ? CreateNew : OpenExisting, options, IntPtr.Zero, 0);
             GC.KeepAlive(parent);
@@ -292,6 +325,13 @@ internal sealed class EvidenceEntry : IDisposable
             }
             try
             {
+                if (recoveryHandle != null && (recoveryHandle.IsClosed || recoveryHandle.IsInvalid ||
+                    !GetFileInformationByHandle(recoveryHandle, out var leased) ||
+                    !GetFileInformationByHandle(handle, out var opened) ||
+                    leased.VolumeSerialNumber != opened.VolumeSerialNumber || leased.FileIndexHigh != opened.FileIndexHigh ||
+                    leased.FileIndexLow != opened.FileIndexLow || leased.CreationTimeHigh != opened.CreationTimeHigh ||
+                    leased.CreationTimeLow != opened.CreationTimeLow))
+                    throw new IOException("Recovery root native identity differs from its retained lease.");
                 return new EvidenceEntry(handle, directory, parent?._volume, @operator);
             }
             catch

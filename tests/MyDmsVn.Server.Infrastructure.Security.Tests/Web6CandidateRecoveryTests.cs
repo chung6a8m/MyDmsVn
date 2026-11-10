@@ -12,6 +12,80 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web6CandidateRecoveryTests
 {
+    [Theory]
+    [InlineData("sql-preflight")]
+    [InlineData("sql-cleanup")]
+    [InlineData("recovery-cleanup")]
+    public async Task Cleanup_failure_after_runtime_preflight_retains_runtime_and_recovery_evidence(string failure)
+    {
+        var parent = Path.Combine(Path.GetTempPath(), "web6-cleanup-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(parent);
+        var runtimePath = Path.Combine(parent, "runtime");
+        var recoveryPath = Path.Combine(parent, "recovery");
+        try
+        {
+            using var runtime = Web6PrivateDirectoryLease.CreateNew(runtimePath);
+            using var recovery = Web6PrivateDirectoryLease.CreateNew(recoveryPath);
+            File.WriteAllText(Path.Combine(runtimePath, "host.log"), "runtime-evidence");
+            File.WriteAllText(Path.Combine(runtimePath, "applicationhost.config"), "runtime-config");
+            File.WriteAllText(Path.Combine(recoveryPath, "ownership.json"), "recovery-evidence");
+            var sqlDeleted = false;
+            await Assert.ThrowsAsync<IOException>(() => Web6RecoveryCleanupDisposition.Execute(
+                new[] { runtime }, () =>
+                {
+                    // These refusals prove runtime preflight ran but has not deleted anything.
+                    Assert.ThrowsAny<IOException>(() => File.Delete(Path.Combine(runtimePath, "host.log")));
+                    if (failure == "sql-preflight") throw new IOException("SQL ownership uncertain");
+                    return Task.FromResult<IWeb6RecoveryCleanup>(new CleanupProbe(recovery,
+                        () => { if (failure == "sql-cleanup") throw new IOException("SQL cleanup failed"); sqlDeleted = true; },
+                        () => { if (failure == "recovery-cleanup") throw new IOException("Recovery disposition failed"); }));
+                }));
+            Assert.Equal(failure == "recovery-cleanup", sqlDeleted);
+            Assert.Equal("runtime-evidence", File.ReadAllText(Path.Combine(runtimePath, "host.log")));
+            Assert.Equal("runtime-config", File.ReadAllText(Path.Combine(runtimePath, "applicationhost.config")));
+            Assert.Equal("recovery-evidence", File.ReadAllText(Path.Combine(recoveryPath, "ownership.json")));
+            // Disposition released every handle; evidence remains available to the operator.
+            recovery.Dispose();
+            Directory.Move(runtimePath, runtimePath + "-retained");
+        }
+        finally { Directory.Delete(parent, true); }
+    }
+
+    private sealed class CleanupProbe : IWeb6RecoveryCleanup
+    {
+        private readonly Web6DirectoryCleanup _tree;
+        private readonly Action _sql, _evidence;
+        internal CleanupProbe(Web6PrivateDirectoryLease lease, Action sql, Action evidence)
+        { _tree = lease.PrepareCleanup(); _sql = sql; _evidence = evidence; }
+        public void Verify() => _tree.Verify();
+        public Task DeleteSqlResources() { _sql(); return Task.CompletedTask; }
+        public void DeleteEvidence() { _evidence(); _tree.Delete(); }
+        public void Dispose() => _tree.Dispose();
+    }
+
+    [Fact]
+    public async Task Verified_cleanup_removes_recovery_before_runtime_only_after_sql_success()
+    {
+        var parent = Path.Combine(Path.GetTempPath(), "web6-cleanup-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(parent);
+        try
+        {
+            using var runtime = Web6PrivateDirectoryLease.CreateNew(Path.Combine(parent, "runtime"));
+            using var recovery = Web6PrivateDirectoryLease.CreateNew(Path.Combine(parent, "recovery"));
+            var runtimeLog = Path.Combine(runtime.Path, "host.log");
+            var ownership = Path.Combine(recovery.Path, "ownership.json");
+            File.WriteAllText(runtimeLog, "runtime"); File.WriteAllText(ownership, "recovery");
+            var sqlDeleted = false;
+            await Web6RecoveryCleanupDisposition.Execute(new[] { runtime }, () => Task.FromResult<IWeb6RecoveryCleanup>(
+                new CleanupProbe(recovery, () =>
+                {
+                    Assert.True(File.Exists(runtimeLog)); Assert.True(File.Exists(ownership)); sqlDeleted = true;
+                }, () => { Assert.True(sqlDeleted); Assert.True(File.Exists(runtimeLog)); })));
+            Assert.False(Directory.Exists(runtime.Path)); Assert.False(Directory.Exists(recovery.Path));
+        }
+        finally { Directory.Delete(parent, true); }
+    }
+
     [Web6RecoverySqlFact, Trait("Category", "Web6CandidateRecovery")]
     public async Task Web6_candidate_recovery_rehearses_distinct_owned_restore_before_service_admission()
     {

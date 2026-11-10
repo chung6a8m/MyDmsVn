@@ -321,13 +321,14 @@ internal sealed class Web6MaintenanceRecoveryFixture
 
     internal void AdmitLiveService() { _admission.Admit(); Record("service-host-admitted"); }
 
-    internal async Task CleanupLiveServiceAsync()
+    internal async Task<IWeb6RecoveryCleanup> PrepareLiveCleanupAsync()
     {
         await VerifyDrain();
         _admission.Drained(); Record("all-workers-sessions-drained");
         _admission.Cleanup(ManifestPath, () => _result.NormalCleanupCommands++);
-        await CleanupOwned();
+        return await PrepareOwnedCleanup();
     }
+    internal void RetainLiveEvidence() => _rootLease.Dispose();
     internal async Task<string> LiveEffectSnapshotAsync(CancellationToken token)
     {
         using var sql = new SqlConnection(CloneConnection); await sql.OpenAsync(token); await VerifyClone(sql);
@@ -562,7 +563,7 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
             CreatePrivateDirectory(root, _user, new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
             _directories.Add(root, Directory.GetCreationTimeUtc(root));
         }
-        var evidence = new MaintenanceEvidenceStore(new MaintenanceEvidencePolicy(roots[0], roots[1], TimeSpan.FromDays(90)));
+        var evidence = new MaintenanceEvidenceStore(_rootLease.CreateEvidencePolicy(roots[0], roots[1]));
         Assert.True(CompactOptions.TryParse(Arguments("compact-preview", _draft), out var compact, out _));
         Assert.Equal(OperatorCompactionOutcome.NoChange, (await new SqlOperatorCompactionClient(factory).PreviewAsync(compact!, default)).Outcome);
         foreach (var operation in new[] { _post, _draft })
@@ -700,6 +701,13 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
     }
     private async Task CleanupOwned()
     {
+        using var cleanup = await PrepareOwnedCleanup();
+        await cleanup.DeleteSqlResources();
+        cleanup.DeleteEvidence();
+    }
+
+    private async Task<IWeb6RecoveryCleanup> PrepareOwnedCleanup()
+    {
         VerifyDirectory(); VerifyManifest(); await VerifyDrain();
         if (_source != null) await VerifySource();
         using var master = new SqlConnection(_admin); await master.OpenAsync();
@@ -715,35 +723,61 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
             await clone.OpenAsync(); await VerifyClone(clone);
             foreach (var principal in _principals) await principal.Verify(clone);
         }
-        foreach (var path in _files.Keys) VerifySealed(path);
-        foreach (var directory in _directories)
-            if (!Directory.Exists(directory.Key) || Directory.GetCreationTimeUtc(directory.Key) != directory.Value ||
-                (File.GetAttributes(directory.Key) & FileAttributes.ReparsePoint) != 0) throw new InvalidOperationException("Owned evidence directory changed.");
-        if (!Directory.GetDirectories(_root, "*", SearchOption.AllDirectories).OrderBy(x => x).SequenceEqual(_directories.Keys.OrderBy(x => x)))
-            throw new InvalidOperationException("Foreign directory retained.");
-        // Verify the intended deletion set first. Foreign children prevent cleanup.
-        var actualFiles = Directory.GetFiles(_root, "*", SearchOption.AllDirectories);
-        if (actualFiles.Any(path => path != ManifestPath && !_files.ContainsKey(path) && !(_cloneCreated && (path == Data || path == Log))))
-            throw new InvalidOperationException("Unowned child retained.");
-        if (_cloneCreated)
+        foreach (var principal in _principals) await principal.Verify(master);
+        // Verify destructive permissions now, before any resource is removed. Runtime
+        // credentials are never used for maintenance cleanup.
+        foreach (var name in new[] { _sourceName, _cloneCreated ? _clone : "" }.Where(name => name.Length > 0))
+            if (await master.QuerySingleAsync<int>("SELECT COALESCE(HAS_PERMS_BY_NAME(@name,'DATABASE','CONTROL'),0);", new { name }) != 1)
+                throw new InvalidOperationException("Database cleanup authority is unavailable.");
+        if (_principals.Count != 0 && await master.QuerySingleAsync<int>("SELECT COALESCE(HAS_PERMS_BY_NAME(NULL,NULL,'ALTER ANY LOGIN'),0);") != 1)
+            throw new InvalidOperationException("Principal cleanup authority is unavailable.");
+        var tree = _rootLease.PrepareCleanup(_cloneCreated ? new[] { Data, Log } : Array.Empty<string>());
+        try
         {
-            await master.ExecuteAsync("DROP DATABASE [" + _clone + "];");
-            _cloneCreated = false;
+            var seals = new Dictionary<string, (DateTime Created, string Hash)>(_files, StringComparer.OrdinalIgnoreCase);
+            if (_manifestHash != null) seals.Add(ManifestPath, (_manifestCreated, _manifestHash));
+            tree.VerifySeals(seals, _directories);
+            return new OwnedCleanup(this, tree);
         }
-        foreach (var principal in _principals) await principal.DropLogin(master);
-        if (_source != null) await _source.DisposeIfQuiescentAsync();
-        foreach (var name in new[] { _sourceName, _clone }.Where(x => x.Length > 0))
-            if (await master.QuerySingleAsync<int>("SELECT COUNT(*) FROM sys.databases WHERE name=@name;", new { name }) != 0) throw new InvalidOperationException("Database remains.");
-        if (File.Exists(Data) || File.Exists(Log)) throw new InvalidOperationException("Restored physical file remains.");
-        foreach (var path in _files.Keys) { VerifySealed(path); File.Delete(path); }
-        VerifyManifest(); File.Delete(ManifestPath);
-        foreach (var directory in _directories.Keys.OrderByDescending(x => x.Length))
+        catch { tree.Dispose(); throw; }
+    }
+
+    private sealed class OwnedCleanup : IWeb6RecoveryCleanup
+    {
+        private readonly Web6MaintenanceRecoveryFixture _owner;
+        private readonly Web6DirectoryCleanup _tree;
+        private bool _sqlRemoved;
+        internal OwnedCleanup(Web6MaintenanceRecoveryFixture owner, Web6DirectoryCleanup tree) { _owner = owner; _tree = tree; }
+        public void Verify() => _tree.Verify();
+        public async Task DeleteSqlResources()
         {
-            if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) throw new InvalidOperationException("Reparse child retained.");
-            Directory.Delete(directory, false);
+            Verify();
+            await _owner.VerifyDrain();
+            if (_owner._source != null) await _owner.VerifySource();
+            using var master = new SqlConnection(_owner._admin); await master.OpenAsync();
+            if (_owner._server.Length > 0) await _owner.VerifyMaster(master);
+            foreach (var principal in _owner._principals) await principal.Verify(master);
+            if (_owner._cloneCreated)
+            {
+                using (var clone = new SqlConnection(_owner.CloneConnection)) { await clone.OpenAsync(); await _owner.VerifyClone(clone); }
+                await master.ExecuteAsync("DROP DATABASE [" + _owner._clone + "];");
+                _owner._cloneCreated = false;
+            }
+            foreach (var principal in _owner._principals) await principal.DropLogin(master);
+            if (_owner._source != null) await _owner._source.DisposeIfQuiescentAsync();
+            foreach (var name in new[] { _owner._sourceName, _owner._clone }.Where(name => name.Length > 0))
+                if (await master.QuerySingleAsync<int>("SELECT COUNT(*) FROM sys.databases WHERE name=@name;", new { name }) != 0)
+                    throw new InvalidOperationException("Database remains.");
+            _tree.VerifySqlFilesRemoved();
+            _sqlRemoved = true;
         }
-        VerifyDirectory(); _rootLease.DeleteVerified(); _done = true;
-        Console.WriteLine("WEB6_RECOVERY exactResourcesAbsent=1");
+        public void DeleteEvidence()
+        {
+            if (!_sqlRemoved) throw new InvalidOperationException("Verified SQL cleanup is required before deleting evidence.");
+            _tree.Delete(); _owner._done = true;
+            Console.WriteLine("WEB6_RECOVERY exactResourcesAbsent=1");
+        }
+        public void Dispose() => _tree.Dispose();
     }
     private void VerifyDirectory()
     {

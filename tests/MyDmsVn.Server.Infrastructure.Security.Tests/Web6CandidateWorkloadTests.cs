@@ -107,6 +107,8 @@ public sealed class Web6CandidateWorkloadTests
         var outside = Directory.CreateDirectory(Path.Combine(fixture.Path, "outside-race")).FullName;
         using var lease = Web6PrivateDirectoryLease.CreateNew(path);
         var victim = Directory.CreateDirectory(Path.Combine(path, "victim")).FullName;
+        var evidence = Path.Combine(path, "a-evidence.log");
+        File.WriteAllText(evidence, "retain on junction race");
         var swapped = false;
         Assert.Throws<IOException>(() => lease.DeleteTreeVerified(entry =>
         {
@@ -117,7 +119,62 @@ public sealed class Web6CandidateWorkloadTests
             Assert.NotNull(command); Assert.True(command!.WaitForExit(5000)); Assert.Equal(0, command.ExitCode);
         }));
         Assert.True(swapped); Assert.True(Directory.Exists(path)); Assert.Empty(Directory.GetFileSystemEntries(outside));
+        Assert.Equal("retain on junction race", File.ReadAllText(evidence));
         Directory.Delete(victim);
+    }
+
+    [Fact]
+    public void Cleanup_preflight_refuses_replaced_regular_child_even_with_preserved_creation_time()
+    {
+        using var fixture = new PrivateParent();
+        using var lease = Web6PrivateDirectoryLease.CreateNew(Path.Combine(fixture.Path, "leased"));
+        var victim = Path.Combine(lease.Path, "victim.log");
+        File.WriteAllText(victim, "original");
+        var created = File.GetCreationTimeUtc(victim);
+        var swapped = false;
+        Assert.Throws<IOException>(() => lease.PrepareCleanup(beforeChildOpen: path =>
+        {
+            if (swapped || path != victim) return;
+            File.Delete(victim); File.WriteAllText(victim, "replacement"); File.SetCreationTimeUtc(victim, created); swapped = true;
+        }));
+        Assert.True(swapped);
+        Assert.Equal("replacement", File.ReadAllText(victim));
+    }
+
+    [Fact]
+    public void Cleanup_preflight_retains_earlier_evidence_when_later_child_is_not_deletable()
+    {
+        using var fixture = new PrivateParent();
+        using var lease = Web6PrivateDirectoryLease.CreateNew(Path.Combine(fixture.Path, "leased"));
+        var evidence = Path.Combine(lease.Path, "a-evidence.log");
+        var blocked = Path.Combine(lease.Path, "z-readonly.log");
+        File.WriteAllText(evidence, "retain"); File.WriteAllText(blocked, "retain too");
+        File.SetAttributes(blocked, FileAttributes.ReadOnly);
+        try
+        {
+            Assert.Throws<IOException>(() => lease.DeleteTreeVerified());
+            Assert.Equal("retain", File.ReadAllText(evidence));
+            Assert.Equal("retain too", File.ReadAllText(blocked));
+        }
+        finally { File.SetAttributes(blocked, FileAttributes.Normal); }
+    }
+
+    [Fact]
+    public void Cleanup_preflight_pins_all_children_until_disposition_and_rejects_path_swap()
+    {
+        using var fixture = new PrivateParent();
+        using var lease = Web6PrivateDirectoryLease.CreateNew(Path.Combine(fixture.Path, "leased"));
+        var nested = Directory.CreateDirectory(Path.Combine(lease.Path, "nested")).FullName;
+        var evidence = Path.Combine(nested, "evidence.log"); File.WriteAllText(evidence, "retain");
+        using (var cleanup = lease.PrepareCleanup())
+        {
+            Assert.ThrowsAny<IOException>(() => Directory.Move(nested, nested + "-swapped"));
+            Assert.ThrowsAny<IOException>(() => File.Delete(evidence));
+            cleanup.Verify();
+        }
+        Assert.Equal("retain", File.ReadAllText(evidence));
+        lease.DeleteTreeVerified();
+        Assert.False(Directory.Exists(lease.Path));
     }
 
     [Fact]
