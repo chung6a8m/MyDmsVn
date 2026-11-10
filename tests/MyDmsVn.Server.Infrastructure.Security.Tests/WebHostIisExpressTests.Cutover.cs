@@ -1,4 +1,5 @@
 using System;
+using MyDmsVn.Web6.CandidateBootstrap;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -31,6 +32,10 @@ public sealed partial class WebHostIisExpressTests
         private readonly Dictionary<string, Deployment> _deployments = new Dictionary<string, Deployment>();
         private readonly Dictionary<Guid, string> _operationIdentities = new Dictionary<Guid, string>();
         private readonly byte[] _jwt = new byte[32];
+        private readonly Web6SelectorOutput? _bootstrap;
+        internal JArray BootstrapResources { get; } = new JArray();
+        internal string? BootstrapSqlReceipt { get; private set; }
+        internal string? BootstrapManifestHash { get; private set; }
         private Web6CandidateCutoverCoordinator _coordinator;
         private Web6CutoverSession? _session;
         private WebRecoveryPilotControl? _control;
@@ -55,9 +60,11 @@ public sealed partial class WebHostIisExpressTests
         private static string Required(string name) => Environment.GetEnvironmentVariable(name) ?? throw new InvalidOperationException("Missing " + name);
 
         internal LiveCutoverOperations(Web6CandidateCutoverPlan plan, SqlTestDatabase current, SqlTestDatabase old, SqlTestDatabase restored,
-            SqlTestOwnershipManifest currentControl, SqlTestOwnershipManifest oldControl, SqlTestOwnershipManifest restoredControl)
+            SqlTestOwnershipManifest currentControl, SqlTestOwnershipManifest oldControl, SqlTestOwnershipManifest restoredControl,
+            Web6SelectorOutput? bootstrap = null)
         {
             _plan = plan; _current = current; _old = old; _currentControl = currentControl; _oldControl = oldControl; _restored = restored; _restoredControl = restoredControl;
+            _bootstrap = bootstrap;
             _currentLogin = new OwnedLogin(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable));
             _oldLogin = new OwnedLogin(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable));
             _restoredLogin = new OwnedLogin(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable));
@@ -71,11 +78,22 @@ public sealed partial class WebHostIisExpressTests
             // Task 3's browser runner must consume the same immutable publication as this owner.
             if (Path.GetFullPath(Required("MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY")) != Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_PUBLISH_DIRECTORY")))
                 throw new IOException("Current publication authorities differ.");
-            if (GitIdentity(Required("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")).Sha != "9eb7d37e8fdb7ced5871ae9eb6be00f3e6e7163d")
-                throw new IOException("Cutover frontend must use reviewed HEAD 9eb7d37.");
+            if (GitIdentity(Required("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")).Sha !=
+                (_bootstrap?.Plan.Text("frontendSha") ?? PreparedCandidateReceipt.ReviewedFrontendSha))
+                throw new IOException("Cutover frontend differs from the reviewed prepared source.");
             await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, token);
             await VerifyDatabase(_old, _oldControl, Web6CutoverPair.Old, token);
             await VerifyDatabase(_restored, _restoredControl, Web6CutoverPair.Restored, token);
+            if (_bootstrap != null)
+            {
+                foreach (var item in new[] { (_current, _currentControl, _currentLogin), (_old, _oldControl, _oldLogin), (_restored, _restoredControl, _restoredLogin) })
+                {
+                    var receipt = await Web6BootstrapSelectorEvidence.Sql(_bootstrap, item.Item1, item.Item2);
+                    BootstrapSqlReceipt ??= receipt.Hash;
+                    BootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("database", item.Item1.DatabaseName, receipt.Hash, receipt.Path));
+                    BootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("login", item.Item3.Name, receipt.Hash, receipt.Path));
+                }
+            }
             await _currentLogin.CreateAsync(); await _oldLogin.CreateAsync(); await _restoredLogin.CreateAsync();
             await Seed(_current, _currentLogin, Web6CutoverPair.Current); await Seed(_old, _oldLogin, Web6CutoverPair.Old);
             await Seed(_restored, _restoredLogin, Web6CutoverPair.Restored);
@@ -259,6 +277,7 @@ public sealed partial class WebHostIisExpressTests
             _identity = Web5IisExpressHostAdmission.Capture(_process, deployment.Configuration, "Web2Smoke", new Uri(origin + "/"));
             await Web5IisExpressHostAdmission.WaitForAdmissionAsync(_identity, _process, TimeSpan.FromSeconds(45), CancellationToken.None);
             var queue = await Web5IisExpressHostAdmission.VerifyAsync(_identity, CancellationToken.None);
+            if (_bootstrap != null) Web6BootstrapSelectorEvidence.Host(BootstrapResources, _identity, queue.Name);
             if (current)
             {
                 var inputs = deployment.Inputs;
@@ -497,11 +516,27 @@ public sealed partial class WebHostIisExpressTests
             var failures = new List<Exception>();
             try { if (_control != null) await _control.Stop(_browserDrained); } catch (Exception error) { failures.Add(error); }
             try { await DrainHost(); } catch (Exception error) { failures.Add(error); }
+            if (_bootstrap != null && !_complete)
+                throw new IOException("Incomplete bootstrap cutover retains every allocation after bounded drain.");
             if (_corruptionHealthy && _browserDrained && _hostDrained && failures.Count == 0 && !GuiTestSafety.IsPoisoned)
             {
-                try { await _currentLogin.CleanupAsync(); } catch (Exception error) { failures.Add(error); }
-                try { await _oldLogin.CleanupAsync(); } catch (Exception error) { failures.Add(error); }
-                try { await _restoredLogin.CleanupAsync(); } catch (Exception error) { failures.Add(error); }
+                if (_bootstrap != null)
+                {
+                    await Web6BootstrapSelectorEvidence.PreflightSqlCleanup(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable),
+                        new[] { (_current, _currentControl), (_old, _oldControl), (_restored, _restoredControl) });
+                    foreach (var deployment in _deployments.Values)
+                    {
+                        if (deployment.RuntimeLease != null) BootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("deletedDirectory", deployment.RuntimeLease.Path));
+                        if (deployment.ControlLease != null) BootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("deletedDirectory", deployment.ControlLease.Path));
+                    }
+                    BootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("deletedDirectory", BrowserRoot));
+                    _bootstrap.SealCleanupInventory(BootstrapResources);
+                }
+                foreach (var login in new[] { _currentLogin, _oldLogin, _restoredLogin })
+                {
+                    try { await login.CleanupAsync(); }
+                    catch (Exception error) { failures.Add(error); if (_bootstrap != null) break; }
+                }
             }
             if (failures.Count != 0) throw new AggregateException("Cutover owned host/pipe/login cleanup failed; allocations remain quarantined.", failures);
             return _corruptionHealthy && _browserDrained && _hostDrained && !GuiTestSafety.IsPoisoned;
@@ -513,8 +548,11 @@ public sealed partial class WebHostIisExpressTests
             Web6CutoverOracle.ValidateAllocationDisposition(_plan, _verifiedSetups, _restoredAdmissions, _currentReadmissions);
             _deployments["current"].Manifest!.RecordDisposition(Web6CandidateStage.Cutover, Web6CandidateOutcome.Passed);
             _deployments["current"].Manifest!.RecordDisposition(Web6CandidateStage.Cleanup, Web6CandidateOutcome.Passed);
+            if (_bootstrap != null)
+                BootstrapManifestHash = _deployments["current"].Manifest!.CopyRetainedIdentityEvidence(
+                    Path.Combine(_bootstrap.Plan.EvidenceRoot, "candidate.manifest"));
         }
-        internal void DisposeManifests()
+        internal void DisposeManifests(bool allowDeletion)
         {
             var failures = new List<Exception>();
             void Attempt(Action action) { try { action(); } catch (Exception error) { failures.Add(error); } }
@@ -523,17 +561,18 @@ public sealed partial class WebHostIisExpressTests
                 Attempt(() => deployment.Handles?.Dispose());
                 Attempt(() => deployment.Manifest?.Dispose());
             }
-            var safe = _browserDrained && _hostDrained && _corruptionHealthy && !GuiTestSafety.IsPoisoned;
+            var safe = allowDeletion && _browserDrained && _hostDrained && _corruptionHealthy && !GuiTestSafety.IsPoisoned;
             foreach (var deployment in _deployments.Values)
             {
-                if (safe)
+                if (safe && (_bootstrap == null || failures.Count == 0))
                 {
                     Attempt(() => deployment.RuntimeLease?.DeleteTreeVerified());
-                    Attempt(() => deployment.ControlLease?.DeleteTreeVerified());
+                    if (_bootstrap == null || failures.Count == 0) Attempt(() => deployment.ControlLease?.DeleteTreeVerified());
+                    else Attempt(() => deployment.ControlLease?.Dispose());
                 }
                 else { Attempt(() => deployment.RuntimeLease?.Dispose()); Attempt(() => deployment.ControlLease?.Dispose()); }
             }
-            if (safe) Attempt(() => _browserLease?.DeleteTreeVerified()); else Attempt(() => _browserLease?.Dispose());
+            if (safe && (_bootstrap == null || failures.Count == 0)) Attempt(() => _browserLease?.DeleteTreeVerified()); else Attempt(() => _browserLease?.Dispose());
             if (failures.Count != 0) throw new AggregateException("Cutover private-root cleanup failed; uncertain roots are retained.", failures);
         }
         private sealed class Deployment

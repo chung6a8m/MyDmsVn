@@ -9,7 +9,11 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+#if WEB6_BOOTSTRAP
+namespace MyDmsVn.Web6.CandidateBootstrap;
+#else
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
+#endif
 
 internal sealed class Web5HttpUrlGroup
 {

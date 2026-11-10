@@ -8,9 +8,7 @@ namespace MyDmsVn.Web6.CandidateBootstrap;
 
 internal sealed class PreparedCandidateReceipt
 {
-    // Existing live selector pins. Task 5 must reconcile this contract with the
-    // reviewed frontend artifact command before any live cutover can be admitted.
-    private const string SelectorFrontendSha = "9eb7d37e8fdb7ced5871ae9eb6be00f3e6e7163d";
+    internal const string ReviewedFrontendSha = "5f7c0051497e8631925b68127ff556d2d066cd5c";
     private const string SelectorOldFrontendSha = "ea104582a5aa4bcdf0d04999296a30a3c43e450e";
     private const string SelectorOldBackendSha = "a3f3db16381a38bdf0b76e8ab36cb55bec02bbd2";
 
@@ -29,6 +27,35 @@ internal sealed class PreparedCandidateReceipt
     internal string BuildAuthoritySha256 { get; }
     internal string CutoverAdmission { get; }
 
+    internal JObject Payload
+    {
+        get
+        {
+            using var file = ProtectedJsonFile.Open(Path, Sha256);
+            return ReadCanonical(file.Bytes);
+        }
+    }
+
+    internal static PreparedCandidateReceipt Read(string path, string digest)
+    {
+        using var file = ProtectedJsonFile.Open(path, digest);
+        var json = ReadCanonical(file.Bytes);
+        return new PreparedCandidateReceipt(file.Path, file.Sha256,
+            (string?)json["cutoverBuildAuthorityPath"] ?? "", (string?)json["cutoverBuildAuthoritySha256"] ?? "",
+            BootstrapJson.Text(json, "cutoverAdmission"));
+    }
+
+    internal static JObject ReadCanonical(byte[] bytes)
+    {
+        using var reader = new Newtonsoft.Json.JsonTextReader(new StringReader(new UTF8Encoding(false, true).GetString(bytes)))
+        { DateParseHandling = Newtonsoft.Json.DateParseHandling.None, MaxDepth = 16 };
+        var json = JObject.Load(reader, new Newtonsoft.Json.Linq.JsonLoadSettings
+        { DuplicatePropertyNameHandling = Newtonsoft.Json.Linq.DuplicatePropertyNameHandling.Error });
+        if (json["version"] is not JValue { Type: JTokenType.Integer, Value: 1L } || !System.Linq.Enumerable.SequenceEqual(bytes, BootstrapJson.Serialize(json)))
+            throw new IOException("Bootstrap protected receipt is not canonical.");
+        return json;
+    }
+
     internal static PreparedCandidateReceipt Create(BootstrapRequest request, BootstrapAuthority authority,
         ProtectedJsonFile approval, string sqlServerDigest, DateTimeOffset sqlExpiry,
         BootstrapSource backend, BootstrapSource oldBackend, BootstrapSource frontend, BootstrapSource oldFrontend,
@@ -45,7 +72,7 @@ internal sealed class PreparedCandidateReceipt
             ["currentPublishedSha256"] = currentPublish.Digest, ["oldPublishedSha256"] = oldPublish.Digest,
         }));
 
-        var cutoverAdmission = frontend.Sha != SelectorFrontendSha ? "BLOCKED_REVIEWED_FRONTEND_PIN" :
+        var cutoverAdmission = frontend.Sha != ReviewedFrontendSha ? "BLOCKED_REVIEWED_FRONTEND_PIN" :
             oldFrontend.Sha != SelectorOldFrontendSha || oldBackend.Sha != SelectorOldBackendSha ? "BLOCKED_REVIEWED_ARCHIVE_PIN" : "PIN_MATCHED";
         var preparedPath = System.IO.Path.Combine(request.TaskRoot, "prepared.json");
         var expiry = authority.ExpiresAtUtc < sqlExpiry ? authority.ExpiresAtUtc : sqlExpiry;

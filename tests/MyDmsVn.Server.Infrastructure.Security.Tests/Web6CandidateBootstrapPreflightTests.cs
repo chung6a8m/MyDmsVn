@@ -57,6 +57,18 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
             File.WriteAllBytes(At(path), new byte[] { 1, 2, 3 });
     }
 
+    [Fact]
+    public async Task Fresh_prepare_accepts_the_reviewed_artifact_command_pin()
+    {
+        _currentFrontend = PreparedCandidateReceipt.ReviewedFrontendSha;
+        using var authority = Authority();
+        var request = Request(authority);
+        var receipt = await new BootstrapPreflight(Toolchain()).PrepareAsync(request, CancellationToken.None);
+        Assert.Equal("PIN_MATCHED", receipt.CutoverAdmission);
+        Assert.Equal(_currentFrontend, receipt.Payload["frontendSha"]);
+        Assert.Empty(Directory.GetFileSystemEntries(At("sql")));
+    }
+
     [Theory]
     [InlineData("dirty checkout")]
     [InlineData("wrong commit")]
@@ -205,6 +217,12 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
         var processEnvironment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var name in new[] { "SystemRoot", "WINDIR", "COMSPEC", "TEMP", "TMP", "PATH", "USERPROFILE", "LOCALAPPDATA" })
             if (Environment.GetEnvironmentVariable(name) is { } value) processEnvironment.Add(name, value);
+        // Use the production Git configuration boundary during fixture creation too.
+        // Inheriting global autocrlf at add/commit then disabling it at preflight
+        // makes the same CRLF bytes appear dirty, depending on index stat timing.
+        processEnvironment["GIT_CONFIG_NOSYSTEM"] = "1";
+        processEnvironment["GIT_CONFIG_GLOBAL"] = "NUL";
+        processEnvironment["GIT_TERMINAL_PROMPT"] = "0";
         Task<string> Git(string root, params string[] args) => BootstrapToolchain.RunOwnedAsync(
             new BootstrapProcessRequest(git, root, args, processEnvironment, TimeSpan.FromSeconds(30)), CancellationToken.None);
         async Task<(string Old, string Current)> Repository(string root)

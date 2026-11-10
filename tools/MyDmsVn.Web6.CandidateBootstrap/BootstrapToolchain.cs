@@ -78,6 +78,14 @@ internal sealed class BootstrapToolchain
         if (certificate.Digest != digest) throw new IOException("Bootstrap TLS certificate changed.");
     }
 
+    internal void VerifyPreparedCertificate(string thumbprint, string digest)
+    {
+        var certificate = Single(_certificates(thumbprint));
+        if (!certificate.PrivateKey || certificate.NotBefore > DateTimeOffset.UtcNow || certificate.NotAfter <= DateTimeOffset.UtcNow ||
+            certificate.Digest != digest || !certificate.Hosts.Contains("localhost", StringComparer.OrdinalIgnoreCase))
+            throw new IOException("Bootstrap pinned TLS certificate changed or expired.");
+    }
+
     private static void VerifyCertificate(BootstrapRequest request, BootstrapCertificate certificate)
     {
         var now = DateTimeOffset.UtcNow;

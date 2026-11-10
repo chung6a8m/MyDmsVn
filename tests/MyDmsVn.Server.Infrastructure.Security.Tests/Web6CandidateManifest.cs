@@ -1,4 +1,5 @@
 using System;
+using MyDmsVn.Web6.CandidateBootstrap;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
@@ -23,7 +24,7 @@ internal sealed class Web6CandidateInputs
 {
     internal Web6CandidateInputs(string candidateId, (string Sha, string Tree) backend, (string Sha, string Tree) frontend,
         string schema13Fingerprint, Uri origin, string certificateHash, string selector, int runSeconds, int shutdownSeconds,
-        string browserSelector = "web6-manual-resend-live.spec.ts")
+        string browserSelector = "web6-manual-resend-live.spec.ts", string browsers = "chromium,edge")
     {
         if (!Regex.IsMatch(candidateId ?? "", @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z", RegexOptions.CultureInvariant) ||
             !IsSelector(selector) || !IsSelector(browserSelector) || runSeconds is < 1 or > 86400 || shutdownSeconds is < 1 or > 600 ||
@@ -40,6 +41,8 @@ internal sealed class Web6CandidateInputs
         BrowserSelector = browserSelector;
         RunSeconds = runSeconds;
         ShutdownSeconds = shutdownSeconds;
+        if (browsers is not ("chromium" or "edge" or "chromium,edge")) throw new ArgumentException("Candidate browser selection refused.");
+        Browsers = browsers;
     }
 
     internal string CandidateId { get; }
@@ -52,6 +55,7 @@ internal sealed class Web6CandidateInputs
     internal string BrowserSelector { get; }
     internal int RunSeconds { get; }
     internal int ShutdownSeconds { get; }
+    internal string Browsers { get; }
 
     internal static string RequireHash(string? hash, int length = 64)
     {
@@ -1167,7 +1171,7 @@ internal sealed class Web6CandidateManifest : IDisposable
                 "\nfrontendSha=" + _inputs.Frontend.Sha + "\nfrontendTree=" + _inputs.Frontend.Tree +
                 "\nschema13=" + _inputs.Schema13Fingerprint + "\norigin=" + _inputs.Origin.GetLeftPart(UriPartial.Authority) +
                 "\ncertificateSha256=" + _inputs.CertificateHash + "\nsqlReceiptSha256=" + receipt +
-                "\nbrowsers=chromium,edge\nselector=" + _inputs.Selector + "\nbrowserSelector=" + _inputs.BrowserSelector +
+                "\nbrowsers=" + _inputs.Browsers + "\nselector=" + _inputs.Selector + "\nbrowserSelector=" + _inputs.BrowserSelector +
                 "\nrunSeconds=" + _inputs.RunSeconds.ToString(CultureInfo.InvariantCulture) +
                 "\nshutdownSeconds=" + _inputs.ShutdownSeconds.ToString(CultureInfo.InvariantCulture) +
                 "\nworkers=1\nstopRule=fail-closed\n" + artifacts;
@@ -1231,6 +1235,20 @@ internal sealed class Web6CandidateManifest : IDisposable
             if (!string.Equals(_inputs.CandidateId, expectedCandidateId, StringComparison.Ordinal))
                 throw new IOException("Candidate identity changed before workload observation.");
             VerifyAdmissionFiles();
+        }
+    }
+
+    internal string CopyRetainedIdentityEvidence(string destination)
+    {
+        lock (_gate)
+        {
+            RequireState(State.Sealed);
+            VerifyRecords();
+            var bytes = File.ReadAllBytes(ManifestPath);
+            if (SqlTestPrivateRecord.Hash(bytes) != _manifestHash) throw new IOException("Candidate identity evidence changed.");
+            // This immutable copy is identity/evidence only. It grants no process,
+            // queue, SQL ownership, cleanup or restored service admission.
+            return ProtectedJsonFile.WriteNew(destination, bytes);
         }
     }
 

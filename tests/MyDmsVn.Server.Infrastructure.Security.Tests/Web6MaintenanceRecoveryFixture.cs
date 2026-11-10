@@ -182,6 +182,7 @@ internal sealed class Web6MaintenanceRecoveryFixture
     internal string LiveSourceRuntimeConnectionString => _sourceRuntime?.Connection(_source?.ConnectionString ?? throw new InvalidOperationException("Recovery source is absent.")) ?? throw new InvalidOperationException("Recovery source runtime principal is not provisioned.");
     internal string LiveObserverConnectionString => CloneConnection;
     internal string SourceDatabaseIdentity => _sourceName;
+    internal IReadOnlyList<string> LivePrincipalNames => _principals.Select(principal => principal.Name).ToArray();
     internal string DestinationDatabaseIdentity => _clone;
     internal string SourceRuntimePrincipal => _sourceRuntime?.Name ?? throw new InvalidOperationException("Recovery source runtime principal is not provisioned.");
     internal string RestoredRuntimePrincipal => _runtime?.Name ?? throw new InvalidOperationException("Recovery runtime principal is not provisioned.");

@@ -98,7 +98,8 @@ internal sealed class Web6CutoverSession
 
 internal static class Web6CutoverLifetime
 {
-    internal static async Task Run(Func<Task> execute, Func<Task<bool>> drain, IEnumerable<Func<Task>> disposeAllocations)
+    internal static async Task Run(Func<Task> execute, Func<Task<bool>> drain, IEnumerable<Func<Task>> disposeAllocations,
+        bool stopOnCleanupFailure = false)
     {
         Exception? original = null;
         try { await execute().ConfigureAwait(false); }
@@ -114,7 +115,8 @@ internal static class Web6CutoverLifetime
         catch (Exception failure) { failures.Add(failure); }
         if (drained)
             foreach (var dispose in disposeAllocations)
-                try { await dispose().ConfigureAwait(false); } catch (Exception failure) { failures.Add(failure); }
+                try { await dispose().ConfigureAwait(false); }
+                catch (Exception failure) { failures.Add(failure); if (stopOnCleanupFailure) break; }
         if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
         if (failures.Count > 1) throw new AggregateException("Cutover run and/or cleanup failed.", failures);
     }

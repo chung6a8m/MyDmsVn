@@ -350,7 +350,9 @@ internal sealed class Web6WorkloadTask4Receipt
         var bytes = File.ReadAllBytes(path);
         if (SqlTestPrivateRecord.Hash(bytes) != Web6CandidateInputs.RequireHash(expectedDigest))
             throw new InvalidDataException("Task4 acceptance receipt digest changed.");
-        var json = JObject.Parse(new UTF8Encoding(false, true).GetString(bytes));
+        using var reader = new Newtonsoft.Json.JsonTextReader(new StringReader(new UTF8Encoding(false, true).GetString(bytes)))
+        { DateParseHandling = Newtonsoft.Json.DateParseHandling.None, MaxDepth = 8 };
+        var json = JObject.Load(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
         var expected = new[] { "version", "mode", "status", "candidateId", "backendSha", "frontendSha",
             "frontendDistManifestSha256", "sqlOwnershipReceiptSha256", "manifestSha256", "completedAtUtc" };
         if (!json.Properties().Select(property => property.Name).OrderBy(value => value, StringComparer.Ordinal)

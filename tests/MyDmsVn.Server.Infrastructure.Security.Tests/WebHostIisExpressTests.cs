@@ -1,4 +1,5 @@
 using System;
+using MyDmsVn.Web6.CandidateBootstrap;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -89,6 +90,10 @@ public sealed partial class WebHostIisExpressTests
                 workloadValues["MYDMSVN_WEB6_TASK4_ACCEPTANCE_SHA256"]!);
         }
         if (web6Candidate) Web6CandidateAcceptanceGate.RequireLive(Web6CandidateAcceptanceGate.EnvironmentValues());
+        using var bootstrap = web6Candidate ? Web6SelectorOutput.Open(web6Workload ? "workload" :
+            "pair-" + Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT")) : null;
+        var bootstrapResources = new JArray();
+        JArray? bootstrapProfiles = null;
         if (web6Cutover) Web6CutoverAcceptanceGate.RequireLive(Web6CutoverAcceptanceGate.EnvironmentValues());
         if (web6Cutover && (!web6Candidate || cutoverPlan == null)) throw new InvalidOperationException("WEB6 cutover requires the protected paired candidate fixture and exact handles.");
         if (web6Candidate && (!browser || !receiptPilot || !integratedPilot || !recoveryPilot || !web5Pilot || attended || originalFirstPilot || admissionOnly))
@@ -107,7 +112,9 @@ public sealed partial class WebHostIisExpressTests
             throw new InvalidOperationException("Provide a private existing absolute attended parent directory.");
         var attendedPassword = attended ? "Pilot!" + Guid.NewGuid().ToString("N") : null;
         var admin = Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable)!;
+        using var bootstrapSqlControl = bootstrap == null ? null : SqlTestOwnershipManifest.Create(bootstrap.Plan.Text("sqlControlParent"));
         var database = await SqlTestDatabase.CreateAsync(admin);
+        string? bootstrapSqlReceipt = null;
         var login = new OwnedLogin(admin);
         Process? process = null;
         Web5IisExpressIdentity? hostIdentity = null;
@@ -128,8 +135,15 @@ public sealed partial class WebHostIisExpressTests
         IntegratedCatalog? integrated = null;
         async Task CleanupOwnedSql()
         {
+            if (bootstrap != null)
+            {
+                using var owned = new SqlConnection(database.ConnectionString); await owned.OpenAsync();
+                await database.VerifyOwnershipAsync(owned, CancellationToken.None);
+                bootstrapSqlControl!.Verify();
+            }
             await login.CleanupAsync();
-            await database.DisposeAsync();
+            if (bootstrap != null) await database.DisposeIfQuiescentAsync(); else await database.DisposeAsync();
+            if (bootstrap != null) await database.CompleteOwnershipManifestAsync(bootstrapSqlControl!, CancellationToken.None);
             using var verification = new SqlConnection(new SqlConnectionStringBuilder(admin) { InitialCatalog = "master", Pooling = false }.ConnectionString);
             await verification.OpenAsync();
             var remaining = await verification.QuerySingleAsync<int>("SELECT (CASE WHEN DB_ID(@database) IS NULL THEN 0 ELSE 1 END) + (CASE WHEN SUSER_ID(@login) IS NULL THEN 0 ELSE 1 END);", new { database = database.DatabaseName, login = login.Name });
@@ -138,6 +152,14 @@ public sealed partial class WebHostIisExpressTests
         }
         try
         {
+            if (bootstrap != null)
+            {
+                await database.WriteOwnershipManifestAsync(bootstrapSqlControl!, CancellationToken.None);
+                var allocation = await Web6BootstrapSelectorEvidence.Sql(bootstrap, database, bootstrapSqlControl!);
+                bootstrapSqlReceipt = allocation.Hash;
+                bootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("database", database.DatabaseName, allocation.Hash, allocation.Path));
+                bootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("login", login.Name, allocation.Hash, allocation.Path));
+            }
             var migration = web5Pilot ? new DatabaseMigrationRunner().MigrateWeb5(database.ConnectionString) : recoveryPilot ? new DatabaseMigrationRunner().MigrateWeb(database.ConnectionString) : FrozenWeb11Migration.Install(database.ConnectionString);
             Assert.True(migration.Successful, "Fresh web migration must succeed.");
             await login.CreateAsync();
@@ -182,7 +204,8 @@ public sealed partial class WebHostIisExpressTests
                 var certificateHash = CertificateHash(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_TLS_THUMBPRINT")!);
                 candidateInputs = new Web6CandidateInputs(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!,
                     backendIdentity, frontendIdentity, SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(),
-                    new Uri("https://localhost:44321/"), certificateHash, web6Workload ? "Web6BoundedWorkload" : "Web6PairedCandidate", 600, 60);
+                    new Uri("https://localhost:44321/"), certificateHash, web6Workload ? "Web6BoundedWorkload" : "Web6PairedCandidate", 600, 60,
+                    browsers: bootstrap != null && !web6Workload ? bootstrap.Gate.Substring(5) : "chromium,edge");
                 var candidateRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ROOT")!);
                 if (Directory.Exists(candidateRoot) || File.Exists(candidateRoot)) throw new InvalidOperationException("WEB6 candidate root must be create-new.");
                 candidateManifest = Web6CandidateManifest.CreateNew(candidateRoot, candidateInputs);
@@ -256,6 +279,7 @@ public sealed partial class WebHostIisExpressTests
                 await Web5IisExpressHostAdmission.WaitForAdmissionAsync(hostIdentity, process, TimeSpan.FromSeconds(45), CancellationToken.None);
                 var queue = await Web5IisExpressHostAdmission.VerifyAsync(hostIdentity, CancellationToken.None);
                 admittedQueueName = queue.Name;
+                if (bootstrap != null) Web6BootstrapSelectorEvidence.Host(bootstrapResources, hostIdentity, queue.Name);
                 if (web6Candidate && candidateId == candidateInputs!.CandidateId)
                     candidateManifest!.VerifyBeforeAdmission(process.Id, process.StartTime.ToUniversalTime(), queue.Name, () =>
                         new Web6CandidateObservation((candidateInputs.Backend.Sha, candidateInputs.Backend.Tree, true),
@@ -304,7 +328,8 @@ public sealed partial class WebHostIisExpressTests
                         product, receiptProduct, workloadRootLease,
                         () => process ?? throw new InvalidOperationException("Workload host is absent."),
                         () => hostIdentity ?? throw new InvalidOperationException("Workload host identity is absent."),
-                        admittedQueueName ?? throw new InvalidOperationException("Workload queue identity is absent."));
+                        admittedQueueName ?? throw new InvalidOperationException("Workload queue identity is absent."),
+                        value => bootstrapProfiles = value);
                     workloadValidated = true;
                 }
                 else if (attended)
@@ -440,6 +465,13 @@ public sealed partial class WebHostIisExpressTests
                 {
                     var admittedCleanup = failures.Count == 0 && drained && !GuiTestSafety.IsPoisoned &&
                         runtimeCleanup.CanDelete(false) && runDirectoryLease != null && (!web6Workload || workloadRootLease != null);
+                    if (admittedCleanup && bootstrap != null)
+                    {
+                        await Web6BootstrapSelectorEvidence.PreflightSqlCleanup(admin, new[] { (database, bootstrapSqlControl!) });
+                        bootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("deletedDirectory", bootstrap.Plan.GateRoot(bootstrap.Gate) + "-host-runtime"));
+                        if (web6Workload) bootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("deletedDirectory", bootstrap.Plan.GateRoot(bootstrap.Gate) + "-measurements"));
+                        bootstrap.SealCleanupInventory(bootstrapResources);
+                    }
                     runtimeRootDeleted = await Web6OuterCleanupCoordinator.Execute(admittedCleanup,
                         () => { runDirectoryLease!.DeleteTreeVerified(); return Task.CompletedTask; },
                         CleanupOwnedSql,
@@ -466,10 +498,10 @@ public sealed partial class WebHostIisExpressTests
                             failures.Count == 0 && workloadValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
                     else
                     {
-                        candidateManifest.RecordDisposition(Web6CandidateStage.Chromium,
-                            failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
-                        candidateManifest.RecordDisposition(Web6CandidateStage.Edge,
-                            failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
+                        foreach (var stage in bootstrap == null ? new[] { Web6CandidateStage.Chromium, Web6CandidateStage.Edge } :
+                            new[] { bootstrap.Gate == "pair-edge" ? Web6CandidateStage.Edge : Web6CandidateStage.Chromium })
+                            candidateManifest.RecordDisposition(stage,
+                                failures.Count == 0 && candidateBrowserValidated ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Failed);
                     }
                     candidateManifest.RecordDisposition(Web6CandidateStage.Cleanup,
                         failures.Count == 0 && drained && runtimeRootDeleted ? Web6CandidateOutcome.Passed : Web6CandidateOutcome.Quarantined);
@@ -481,6 +513,10 @@ public sealed partial class WebHostIisExpressTests
         if (web6Candidate && !web6Workload && failures.Count == 0)
             Web6CandidateOracle.ValidateDisposition(candidateBrowserValidated, browserDrained: true, hostDrained: drained, cleanupVerified: runtimeRootDeleted);
         if (failures.Count > 0) throw new AggregateException("Packaged host scenario or owned cleanup failed.", failures);
+        if (bootstrap != null)
+        {
+            Web6BootstrapSelectorEvidence.Complete(bootstrap, bootstrapResources, bootstrapSqlReceipt!, bootstrapProfiles);
+        }
     }
 
     private static string FindRootFile(string relative)
@@ -573,6 +609,7 @@ public sealed partial class WebHostIisExpressTests
     {
         var values = Web6CutoverAcceptanceGate.EnvironmentValues();
         Web6CutoverAcceptanceGate.RequireLive(values);
+        using var bootstrap = Web6SelectorOutput.Open("cutover");
         string Required(string name) => values[name] ?? throw new InvalidOperationException("Cutover prerequisite disappeared.");
         var frontendRoot = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY"));
         var backendRoot = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_BACKEND_ARCHIVE_DIRECTORY"));
@@ -596,6 +633,7 @@ public sealed partial class WebHostIisExpressTests
         SqlTestDatabase? currentDatabase = null, oldDatabase = null, restoredDatabase = null;
         SqlTestOwnershipManifest? currentControl = null, oldControl = null, restoredControl = null;
         var complete = false;
+        var cleanupVerified = false;
         LiveCutoverOperations? operations = null;
         var currentRecorded = false; var oldRecorded = false; var restoredRecorded = false;
         try
@@ -649,7 +687,7 @@ public sealed partial class WebHostIisExpressTests
                 13, 12, currentReceipt, oldReceipt, restoredReceipt, currentEpoch, restoredEpoch);
             plan.VerifyArchives(new Web6CutoverArchive(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact),
                 new Web6CutoverArchive(backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact));
-            operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl);
+            operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl, bootstrap);
             await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None).ConfigureAwait(false);
             complete = true;
             }, async () => operations == null || await operations.Cleanup().ConfigureAwait(false), new Func<Task>[]
@@ -672,10 +710,13 @@ public sealed partial class WebHostIisExpressTests
                     await restoredDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
                     if (restoredRecorded) await restoredDatabase.CompleteOwnershipManifestAsync(restoredControl!, CancellationToken.None).ConfigureAwait(false);
                 },
-            }).ConfigureAwait(false);
-            if (complete) operations!.VerifyFinalDisposition();
+            }, stopOnCleanupFailure: bootstrap != null).ConfigureAwait(false);
+            if (complete) { operations!.VerifyFinalDisposition(); cleanupVerified = true; }
         }
-        finally { currentControl?.Dispose(); oldControl?.Dispose(); restoredControl?.Dispose(); operations?.DisposeManifests(); }
+        finally { currentControl?.Dispose(); oldControl?.Dispose(); restoredControl?.Dispose(); operations?.DisposeManifests(cleanupVerified); }
+        if (bootstrap != null)
+            Web6BootstrapSelectorEvidence.Complete(bootstrap, operations!.BootstrapResources, operations.BootstrapSqlReceipt!,
+                manifestPath: Path.Combine(bootstrap.Plan.EvidenceRoot, "candidate.manifest"), manifestHash: operations.BootstrapManifestHash);
     }
     private static async Task SeedBrowserActors(SqlConnection connection)
     {
@@ -826,7 +867,9 @@ public sealed partial class WebHostIisExpressTests
             }
             if (web6Candidate)
             {
-                foreach (var project in cutoverBrowser == null ? new[] { "chromium", "edge" } : new[] { cutoverBrowser })
+                using var bootstrapPair = web6Cutover ? null : Web6SelectorOutput.Open("pair-" + Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"));
+                foreach (var project in cutoverBrowser != null ? new[] { cutoverBrowser } : bootstrapPair != null ?
+                    new[] { Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT")! } : new[] { "chromium", "edge" })
                 {
                     var initialResult = new JObject
                     {
@@ -1007,11 +1050,28 @@ public sealed partial class WebHostIisExpressTests
         (GitHead(root), Web6CandidateInputs.RequireHash(Git(root, "rev-parse HEAD^{tree}"), 40));
     private static string Git(string root, string arguments)
     {
-        var start = new ProcessStartInfo("git", "-C \"" + root + "\" " + arguments)
+        var bootstrap = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_BOOTSTRAP_RUN_ID") != null;
+        using var bootstrapOutput = bootstrap ? Web6SelectorOutput.Open(Path.GetFileNameWithoutExtension(
+            Environment.GetEnvironmentVariable("MYDMSVN_WEB6_BOOTSTRAP_OUTPUT_PATH") ?? "")) : null;
+        var executable = bootstrap ? BootstrapJson.AbsolutePath(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_BOOTSTRAP_GIT_PATH") ?? "") : "git";
+        if (bootstrap && (bootstrapOutput == null || executable != bootstrapOutput.GitPath ||
+            Environment.GetEnvironmentVariable("MYDMSVN_WEB6_BOOTSTRAP_GIT_SHA256") != bootstrapOutput.Plan.Tool("git", "sha256")))
+            throw new IOException("Bootstrap Git adapter differs from the protected prepared tool.");
+        using var gitParents = bootstrap ? new ProtectedJsonFile.PathLease(executable) : null;
+        using var pinnedGit = gitParents?.OpenRead(installedTool: true);
+        if (bootstrap && BootstrapPathPolicy.HashStream(pinnedGit!) != Environment.GetEnvironmentVariable("MYDMSVN_WEB6_BOOTSTRAP_GIT_SHA256"))
+            throw new IOException("Bootstrap Git executable digest differs.");
+        var start = new ProcessStartInfo(executable, "--no-optional-locks -c core.hooksPath=NUL -c core.fsmonitor=false -c core.ignoreStat=false -c core.excludesFile=NUL -C \"" + root + "\" " + arguments)
         {
             UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
             RedirectStandardOutput = true, RedirectStandardError = true,
         };
+        if (bootstrap)
+        {
+            start.EnvironmentVariables["GIT_CONFIG_NOSYSTEM"] = "1";
+            start.EnvironmentVariables["GIT_CONFIG_GLOBAL"] = "NUL";
+            start.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
+        }
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Git source proof could not start.");
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();

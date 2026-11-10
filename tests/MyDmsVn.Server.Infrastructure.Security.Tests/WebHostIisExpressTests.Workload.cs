@@ -18,9 +18,9 @@ public sealed partial class WebHostIisExpressTests
 {
     private static Task RunCandidateWorkload(SqlTestDatabase database, Web6CandidateManifest manifest, string thumbprint,
         int customer, int warehouse, int employee, int product, int receiptProduct, Web6PrivateDirectoryLease workloadRoot,
-        Func<Process> process, Func<Web5IisExpressIdentity> hostIdentity, string expectedQueueName) =>
+        Func<Process> process, Func<Web5IisExpressIdentity> hostIdentity, string expectedQueueName, Action<JArray> completed) =>
         new Web6CandidateWorkloadRunner(new LiveCandidateWorkload(database, manifest, thumbprint, customer, warehouse,
-            employee, product, receiptProduct, workloadRoot, process, hostIdentity, expectedQueueName)).Execute(CancellationToken.None);
+            employee, product, receiptProduct, workloadRoot, process, hostIdentity, expectedQueueName, completed)).Execute(CancellationToken.None);
 
     private sealed class LiveCandidateWorkload : IWeb6CandidateWorkloadOperations
     {
@@ -33,6 +33,7 @@ public sealed partial class WebHostIisExpressTests
         private readonly Func<Web5IisExpressIdentity> _hostIdentity;
         private readonly Web6PrivateDirectoryLease _workloadRoot;
         private readonly string _expectedQueueName;
+        private readonly Action<JArray> _completed;
         private readonly object _gate = new object();
         private readonly List<Guid> _operations = new List<Guid>();
         private string? _access, _cookie;
@@ -43,12 +44,13 @@ public sealed partial class WebHostIisExpressTests
 
         internal LiveCandidateWorkload(SqlTestDatabase database, Web6CandidateManifest manifest, string thumbprint,
             int customer, int warehouse, int employee, int product, int receiptProduct, Web6PrivateDirectoryLease workloadRoot,
-            Func<Process> process, Func<Web5IisExpressIdentity> hostIdentity, string expectedQueueName)
+            Func<Process> process, Func<Web5IisExpressIdentity> hostIdentity, string expectedQueueName, Action<JArray> completed)
         {
             _database = database; _manifest = manifest; _thumbprint = thumbprint;
             _customer = customer; _warehouse = warehouse; _employee = employee; _product = product;
             _receiptProduct = receiptProduct; _workloadRoot = workloadRoot; _process = process;
             _hostIdentity = hostIdentity; _expectedQueueName = expectedQueueName;
+            _completed = completed;
         }
 
         public async Task<Web6WorkloadAdmission> VerifyAdmission(CancellationToken token)
@@ -168,6 +170,7 @@ public sealed partial class WebHostIisExpressTests
 
         public Task Complete(IReadOnlyList<Web6WorkloadProfileResult> profiles, CancellationToken token)
         {
+            _completed(new JArray(profiles.Where(profile => profile.Concurrency != 0).Select(ProfileJson)));
             Console.WriteLine("WEB6_WORKLOAD_SUMMARY " + new JObject
             {
                 ["scriptVersion"] = 1,

@@ -40,6 +40,7 @@ internal sealed class SelectorProcessRunner
         "MYDMSVN_WEB6_WORKLOAD_ENABLE", "MYDMSVN_WEB6_WORKLOAD_ROOT", "MYDMSVN_WEB6_WORKLOAD_ACTOR_COHORT",
         "MYDMSVN_WEB6_RECOVERY_ENABLE", "MYDMSVN_WEB6_RECOVERY_ROOT",
         "MYDMSVN_WEB6_BOOTSTRAP_RUN_ID", "MYDMSVN_WEB6_BOOTSTRAP_OUTPUT_PATH", "MYDMSVN_WEB6_BOOTSTRAP_OUTPUT_SHA_PATH",
+        "MYDMSVN_WEB6_BOOTSTRAP_GIT_PATH", "MYDMSVN_WEB6_BOOTSTRAP_GIT_SHA256",
     };
 
     private readonly string _dotnet;
@@ -183,6 +184,8 @@ internal sealed class SelectorProcessRunner
         environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
         environment["DOTNET_NOLOGO"] = "1";
         environment["MSBUILDDISABLENODEREUSE"] = "1";
+        environment["MYDMSVN_WEB6_BOOTSTRAP_GIT_PATH"] = _git;
+        environment["MYDMSVN_WEB6_BOOTSTRAP_GIT_SHA256"] = _gitSha256;
         return environment;
     }
 

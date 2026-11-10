@@ -1,4 +1,5 @@
 using System;
+using MyDmsVn.Web6.CandidateBootstrap;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -23,6 +24,7 @@ public sealed partial class WebHostIisExpressTests
     internal static async Task RunCandidateRecovery(IReadOnlyDictionary<string, string?> values,
         Web6WorkloadTask4Receipt task4, string publish, string thumbprint)
     {
+        using var bootstrap = Web6SelectorOutput.Open("recovery");
         var candidateRoot = Web6CandidateFileSystem.CanonicalPath(values["MYDMSVN_WEB6_CANDIDATE_ROOT"]!);
         var recoveryRoot = Path.GetFullPath(values["MYDMSVN_WEB6_RECOVERY_ROOT"]!);
         var frontendRoot = Web6CandidateFileSystem.CanonicalPath(values["MYDMSVN_WEB_TEST_BROWSER_DIRECTORY"]!);
@@ -45,10 +47,14 @@ public sealed partial class WebHostIisExpressTests
             var plan = new Web6CandidateRecoveryPlan(fixture.SourceDatabaseIdentity, fixture.DestinationDatabaseIdentity,
                 fixture.SourceEpoch, fixture.RestoredEpoch, fixture.SourceRuntimePrincipal, fixture.RestoredRuntimePrincipal);
             var operations = new LiveCandidateRecoveryOperations(fixture, publish, thumbprint, task4.CandidateId,
-                recoveryRoot, frontendRoot, backendRoot);
+                recoveryRoot, frontendRoot, backendRoot, bootstrap);
             var result = await new Web6CandidateRecoveryCoordinator(operations).Execute(plan, CancellationToken.None);
             if (!result.TrustedService || result.RpoLostBusinessRows != 0 || result.RpoLostJournalRows != 0)
                 throw new InvalidDataException("WEB6 service recovery result was not trusted and zero-loss.");
+            if (bootstrap != null)
+                Web6BootstrapSelectorEvidence.Complete(bootstrap, operations.BootstrapResources, operations.BootstrapSqlReceipt!,
+                    rpo: checked(result.RpoLostBusinessRows + result.RpoLostJournalRows),
+                    rto: checked((long)Math.Ceiling(result.RtoTicks * 1000d / Stopwatch.Frequency)));
         }
         catch
         {
@@ -74,12 +80,16 @@ public sealed partial class WebHostIisExpressTests
         private bool _sourceDrained, _restoredDrained, _retained;
         private string? _activeRole, _activeSqlReceipt;
         private Guid _saleCreate, _saleUpdate, _salePost, _staleWriter;
+        private readonly Web6SelectorOutput? _bootstrap;
+        internal JArray BootstrapResources { get; } = new JArray();
+        internal string? BootstrapSqlReceipt { get; private set; }
 
         internal LiveCandidateRecoveryOperations(Web6MaintenanceRecoveryFixture fixture, string publish, string thumbprint,
-            string candidateId, string recoveryRoot, string frontendRoot, string backendRoot)
+            string candidateId, string recoveryRoot, string frontendRoot, string backendRoot, Web6SelectorOutput? bootstrap)
         {
             _fixture = fixture; _publish = publish; _thumbprint = thumbprint; _candidateId = candidateId; _recoveryRoot = recoveryRoot;
             _frontendRoot = frontendRoot; _backendRoot = backendRoot;
+            _bootstrap = bootstrap;
             _publishHash = Web6CandidateFileSet.MeasureTree(publish);
             using var random = RandomNumberGenerator.Create(); random.GetBytes(_jwt);
         }
@@ -229,6 +239,7 @@ public sealed partial class WebHostIisExpressTests
                 throw new InvalidOperationException("Recovery host start was not armed.");
             await Web5IisExpressHostAdmission.WaitForAdmissionAsync(_identity, _process, TimeSpan.FromSeconds(45), token);
             var queue = await Web5IisExpressHostAdmission.VerifyAsync(_identity, token);
+            if (_bootstrap != null) Web6BootstrapSelectorEvidence.Host(BootstrapResources, _identity, queue.Name);
             if (_process.HasExited || queue.AttachedProcessCount != 1) throw new IOException("Recovery host admission is not exclusive.");
             var backend = GitIdentity(_backendRoot); var frontend = GitIdentity(_frontendRoot);
             _activeManifest.VerifyBeforeAdmission(_process.Id, _process.StartTime.ToUniversalTime(), queue.Name, () =>
@@ -335,6 +346,24 @@ public sealed partial class WebHostIisExpressTests
         {
             if (!_sourceDrained || !_restoredDrained || _retained) throw new InvalidOperationException("Verified source/restored drain is required before cleanup.");
             token.ThrowIfCancellationRequested();
+            if (_bootstrap != null)
+            {
+                var digest = _fixture.LiveOwnershipReceiptSha256;
+                var bytes = File.ReadAllBytes(_fixture.ManifestPath);
+                if (ProtectedJsonFile.Digest(bytes) != digest) throw new IOException("Recovery original ownership record changed.");
+                var allocationPath = Path.Combine(_bootstrap.Plan.EvidenceRoot, "recovery-allocation.json");
+                BootstrapSqlReceipt = ProtectedJsonFile.WriteNew(allocationPath, BootstrapJson.Serialize(new JObject
+                { ["version"] = 1, ["runId"] = _bootstrap.RunId, ["gate"] = "recovery", ["originalSha256"] = digest,
+                    ["originalAllocationBase64"] = Convert.ToBase64String(bytes) }));
+                foreach (var name in new[] { _fixture.SourceDatabaseIdentity, _fixture.DestinationDatabaseIdentity })
+                    BootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("database", name, BootstrapSqlReceipt, allocationPath));
+                foreach (var name in _fixture.LivePrincipalNames)
+                    BootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("login", name, BootstrapSqlReceipt, allocationPath));
+                foreach (var root in _runtimeRoots)
+                    BootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("deletedDirectory", root.Path));
+                BootstrapResources.Add(Web6BootstrapSelectorEvidence.Resource("deletedDirectory", _recoveryRoot));
+                _bootstrap.SealCleanupInventory(BootstrapResources);
+            }
             await Web6RecoveryCleanupDisposition.Execute(_runtimeRoots, _fixture.PrepareLiveCleanupAsync);
             _runtimeRoots.Clear();
         }

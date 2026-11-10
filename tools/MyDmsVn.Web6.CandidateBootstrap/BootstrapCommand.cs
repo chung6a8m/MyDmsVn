@@ -76,8 +76,27 @@ internal static class BootstrapCommand
                         }
                     }
                 case "run":
-                    BootstrapJson.AbsolutePath(options["--prepared"]);
-                    break;
+                    string? runRoot = null;
+                    try
+                    {
+                        var plan = Web6SelectorPlan.Create(PreparedCandidateReceipt.Read(options["--prepared"], options["--prepared-sha256"]));
+                        runRoot = plan.TaskRoot;
+                        var sql = Environment.GetEnvironmentVariable("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING");
+                        if (string.IsNullOrWhiteSpace(sql)) throw new IOException("Explicit SQL connection is required.");
+                        using var execution = new BootstrapRunExecution(toolchain ?? BootstrapToolchain.Local());
+                        var orchestrator = new Web6CandidateBootstrapOrchestrator(execution.PrepareAsync, execution.InvokeAsync,
+                            (p, state, recovery, receipts, cancellation) => BootstrapDisposition.ObserveAsync(p, state, recovery, receipts, sql!, cancellation));
+                        var result = await orchestrator.RunAsync(plan, "run-" + Guid.NewGuid().ToString("N"), sql!, token).ConfigureAwait(false);
+                        stdout.WriteLine("status=" + result.Stage + " sha256=" + result.Sha256);
+                        return result.Stage == BootstrapRunStage.CandidateVerified ? BootstrapExitCode.Success :
+                            result.Stage == BootstrapRunStage.BlockedNoAllocation ? BootstrapExitCode.BlockedPreflight : BootstrapExitCode.FailedRetainedRun;
+                    }
+                    catch (Exception)
+                    {
+                        var retained = runRoot != null && File.Exists(Path.Combine(runRoot, "run-attempt.json"));
+                        stderr.WriteLine(retained ? "status=FailedRetained" : "status=BLOCKED_PREFLIGHT");
+                        return retained ? BootstrapExitCode.FailedRetainedRun : BootstrapExitCode.BlockedPreflight;
+                    }
             }
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or SecurityException)
@@ -91,7 +110,6 @@ internal static class BootstrapCommand
             return BootstrapExitCode.BlockedPreflight;
         }
 
-        // Selector execution is added by the later bootstrap tasks.
         stderr.WriteLine("status=BLOCKED_PREFLIGHT");
         return BootstrapExitCode.BlockedPreflight;
     }

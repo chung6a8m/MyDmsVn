@@ -13,7 +13,9 @@ public sealed class Web5HttpServiceStateTests
 Snapshot of HTTP service state (Request Queue View):
 -----------------------------------------------------
 ";
-    private const string Owned = @"
+    // Mutation vectors use LF regardless of the checkout's required CRLF encoding.
+    private static string Owned => OwnedRaw.Replace("\r\n", "\n");
+    private const string OwnedRaw = @"
 Snapshot of HTTP service state (Request Queue View):
 -----------------------------------------------------
 

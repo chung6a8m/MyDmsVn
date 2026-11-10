@@ -10,5 +10,6 @@
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <Compile Include="..\..\tests\MyDmsVn.Desktop.Tests\GuiOwnedProcess.cs" Link="Infrastructure\OwnedProcess.cs" />
+    <Compile Include="..\..\tests\MyDmsVn.Server.Infrastructure.Security.Tests\Web5HttpServiceState.cs" Link="Infrastructure\HttpServiceState.cs" />
   </ItemGroup>
 </Project>
