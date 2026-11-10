@@ -58,7 +58,10 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
     }
 
     [Theory]
-    [InlineData("9a1a2ba17414fabadace5edfb16e85ade6ecffbc", "PIN_MATCHED")]
+    [InlineData("56da5b4112366277f85d56fc51bf93bbd3c0c5a8", "PIN_MATCHED")]
+    [InlineData("0b6cefd64046e7f8e83641e71c264b069db3c7ee", "BLOCKED_REVIEWED_FRONTEND_PIN")]
+    [InlineData("989d7dda72915cfaa31644e714ef0ac3ae2126af", "BLOCKED_REVIEWED_FRONTEND_PIN")]
+    [InlineData("9a1a2ba17414fabadace5edfb16e85ade6ecffbc", "BLOCKED_REVIEWED_FRONTEND_PIN")]
     [InlineData("4a6541c419b1293a04c57d67bc6faaf1254ba391", "BLOCKED_REVIEWED_FRONTEND_PIN")]
     [InlineData("ed96b91be42f3155c845d41e67e44b5e80cad701", "BLOCKED_REVIEWED_FRONTEND_PIN")]
     [InlineData("6db4326b17b8da1ba0d02bc089e0cea1c3ea7f34", "BLOCKED_REVIEWED_FRONTEND_PIN")]

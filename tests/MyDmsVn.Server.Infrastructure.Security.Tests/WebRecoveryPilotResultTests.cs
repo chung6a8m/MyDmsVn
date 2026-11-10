@@ -329,6 +329,34 @@ public sealed class WebRecoveryPilotResultTests
         Assert.Throws<InvalidDataException>(() => WebRecoveryPilotControl.Validate(frame, "token", web6: true));
     }
 
+    [Theory]
+    [InlineData(true, null, "Receipt.Create", 1, "expected-operation-absent")]
+    [InlineData(true, null, "Receipt.Create", 0, "expected-operation-absent")]
+    [InlineData(true, "Sales.Create", "Receipt.Create", 1, "operation-kind-mismatch")]
+    [InlineData(false, "Sales.Create", "Receipt.Create", 1, "operation-kind-mismatch")]
+    [InlineData(true, "private operation SQL login", "Receipt.Create", 2, "operation-kind-mismatch")]
+    [InlineData(true, "Receipt.Create", "Receipt.Create", 0, "journal-not-single")]
+    [InlineData(true, "Receipt.Create", "Receipt.Create", 2, "journal-not-single")]
+    [InlineData(false, null, "Receipt.Create", 0, "journal-not-single")]
+    [InlineData(false, null, "Receipt.Create", 2, "journal-not-single")]
+    public void Web6_committed_guard_reports_only_allowlisted_failure_categories(bool requireObserved,
+        string? expectedKind, string candidateKind, int journal, string category)
+    {
+        var failure = Assert.Throws<InvalidDataException>(() =>
+            WebRecoveryPilotControl.ValidateCommittedCandidate(requireObserved, expectedKind, candidateKind, journal));
+        Assert.Equal("WEB6 candidate-commit " + category, failure.Message);
+        Assert.Null(failure.InnerException);
+    }
+
+    [Theory]
+    [InlineData(true, "Receipt.Create")]
+    [InlineData(false, "Receipt.Create")]
+    [InlineData(false, null)]
+    public void Web6_committed_guard_preserves_prior_observation_requirement_only_for_one_effect(bool requireObserved, string? expectedKind)
+    {
+        WebRecoveryPilotControl.ValidateCommittedCandidate(requireObserved, expectedKind, "Receipt.Create", 1);
+    }
+
     [Fact]
     public void Committed_draft_create_matches_original_null_target_and_physical_journal() => Verify(Result());
 

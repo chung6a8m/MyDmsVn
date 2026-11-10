@@ -178,15 +178,15 @@ internal sealed class WebRecoveryPilotControl
                     }
                     else if (action == "verifyCommitted")
                     {
-                        if (journal != 1 || (_web6Operations.TryGetValue(operationId, out var previous) && previous.Kind != candidateIntent.Kind))
-                            throw new InvalidDataException("Candidate committed identity is missing or duplicated.");
+                        _web6Operations.TryGetValue(operationId, out var previous);
+                        ValidateCommittedCandidate(false, previous?.Kind, candidateIntent.Kind, journal);
                         if (!_web6Operations.ContainsKey(operationId)) _web6Operations.Add(operationId, candidateIntent);
                         await Web6CandidateOracle.VerifyOneEffectAsync(sql, operationId, _stop.Token);
                     }
                     else
                     {
-                        if (!_web6Operations.TryGetValue(operationId, out var expected) || expected.Kind != candidateIntent.Kind || journal != 1)
-                            throw new InvalidDataException("Candidate committed identity is missing or duplicated.");
+                        _web6Operations.TryGetValue(operationId, out var expected);
+                        ValidateCommittedCandidate(true, expected?.Kind, candidateIntent.Kind, journal);
                         await Web6CandidateOracle.VerifyOneEffectAsync(sql, operationId, _stop.Token);
                     }
                 }
@@ -297,6 +297,18 @@ internal sealed class WebRecoveryPilotControl
         }
         catch (Exception error) when (_stop.IsCancellationRequested && (error is OperationCanceledException || error is ObjectDisposedException || error is IOException)) { }
         catch { if (_raceManifest != null) Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ControlFailed); throw; }
+    }
+
+    internal static void ValidateCommittedCandidate(bool requireObserved, string? expectedKind, string candidateKind, int journal)
+    {
+        // Static categories only: never copy keys, kinds, row counts, SQL or
+        // underlying exceptions into the browser/control-owner diagnostic.
+        if (requireObserved && expectedKind == null)
+            throw new InvalidDataException("WEB6 candidate-commit expected-operation-absent");
+        if (expectedKind != null && expectedKind != candidateKind)
+            throw new InvalidDataException("WEB6 candidate-commit operation-kind-mismatch");
+        if (journal != 1)
+            throw new InvalidDataException("WEB6 candidate-commit journal-not-single");
     }
 
     internal static string Validate(JObject frame, string token, bool web6 = false)
