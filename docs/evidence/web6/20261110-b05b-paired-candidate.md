@@ -1,6 +1,53 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-10): attempt14 PREPARED / PIN_MATCHED, then FailedRetained in the Chromium selector; Task 6 OPEN.** Nested Chromium passed two tests; candidateMismatchOn prepare failed after 5,000 ms, with a trigger context request and no correlated response observed. Cleanup Quarantined; owned SQL/runtime resources retained. Later gates NOT RUN. No CandidateVerified, live pair PASS, workload or recovery result is claimed.
+**Latest disposition (2026-11-10): attempt15 reached PairPassed (Chromium and Edge native ACCEPTED), then FailedRetained at the cutover build-authority guard; Task 6 OPEN.** Cutover failed before allocation; accepted pair cleanup is recorded. Prepared artifacts/authorities/evidence remain retained. Workload/recovery NOT RUN. No CandidateVerified or staging/production acceptance is claimed.
+
+## Task 6 attempt15 browser pair PASS and cutover build-authority failure
+
+The Owner authorized one fresh attempt after independently reviewed boundary/parent budget hierarchy. Candidate `web6-20261110-f1330b4a` used backend `08123da11f21f57be73cd24992a57d7bce9c6d61` / tree `64e22c22e283ccbcfa19969277458bbbcf266825` and frontend `5f355e4ed3d0ca0778e195b940ecbed67b410dc0` / tree `47dc71f900a4977b953f6850f943fde12d64e632`. Reviewed budgets: boundary 35/50/65s, one-effect dispatch 65s/response 35s, mismatch 170s, third test 32m, controller 39m, browser process 41m, pair gate 44m. No external termination occurred; selectors ran serially once.
+
+Before new roots/approval, four ordinary read-only Edge observations at `14:23:50.4361114Z`–`14:24:20.5493631Z` (30.1132517 seconds) matched identity/version `157.0.4341.46`/SHA-256 `3e2c8557b5ca4d78868d3089346146ceab94f198ce3d58526ce8f6c8d4b4167c`. Full independent Node `22.14.0` / npm `11.6.0` identity/hash/current-owner protected ACL/no-link checks passed for all 2,337 files/572 directories, tree `c55ed76c2333bcb335b2327f639195464c2ed7685b329da812f02c85bed29529`. A bounded query reverified approved effective master/server. No custom lock/copy/updater change, installation or global mutation occurred.
+
+Fresh roots, new four-field `web6-cutover` SQL approval, Owner authority and request used Windows PowerShell/net48 protected create-new publication. Exact current-user-only protected ACL/schema/digest/master binding passed; eight-hour expiry `2026-11-10T22:24:34Z`. No old protected payload/resource was inspected, copied, reused or adopted. Authorize once exited 0. Prepare once ran `14:24:50.0741073Z`–`14:27:36.1663528Z`, exit 0 `PIN_MATCHED`. Independent checks confirmed ordinary null candidate ID/OFF, exact candidate marker, ten-file full dist/wwwroot equality, clean detached pins and zero pre-run live allocation.
+
+| Attempt15 record | SHA-256 |
+|---|---|
+| Release/net48 bootstrap | `cb1cccdaa8a15f16f69143416aa7b0d3ffba61cbcc58ab925fd0c5a64f961d8c` |
+| New SQL approval | `f1a94713d3d433b174361735a321baa630a3d23af4c886693dd14ebcb94667b0` |
+| Owner authority / request | `546a213df0be4fd44a120cddfbd10c2a6b05c1fcdfb510a5c67d643ccb039fca` / `26245a14fa06bb41a3ea61b8d26516743c1ce4c1c916353eb5e4075d3d638514` |
+| Prepared / PairPassed | `6976f8a22906abb9213b4175c5cd8847b97a221d3921db3c3ef547cbc928e3b1` / `121305576939a4acba2872b9c43df7233ceac2a7fe28a7f736daaa7dc6c44d80` |
+| FailedRetained terminal | `03e9cbc1f87284cac0f597752bff681c0e4079448212c9e94491139921fb3bff` |
+| Ordinary dist / manifest | `5c7908157609e24760dcab5da26b170f5194f1918f2343f80aa164aab0ef59ab` / `796d86094b6cfd29efa1d99aac49bd9fd10bb80c73b71d0164d853e74485ef53` |
+| Candidate dist / manifest | `53c88f584e218a6fcb5a30729bb716a1de0dff65abb86608c450a1bbf8bb8473` / `23c4ec5e30801aa4db0733d37d45dfb7157a1e9af7c47604b7229ac73c2e568a` |
+| Current / old backend publish | `6402c9e96445d0eff484bd28da0d1b34fde8b81dbef682171db80b28f171ef73` / `05a64c2412b541f14b4c6a712f70a0cafdada1982d16bdf15dd28a7c5a93f7c5` |
+| Cutover build authority | `2d4e75842aaeadd271dc3bee99e0cdd3b72664f8262c58f3a4de6f0146201732` |
+| Selector DLL | `d2b30b0017f53e4eed8aa82ae8b51c839264a5593d52f90dce16aa40d1479547` |
+
+Run began `14:27:36.9575335Z`, **0.791 seconds** after prepare, and ended `14:32:58.1174857Z`, exit 5 `FailedRetained`; run ID `run-8f075dd55517465bb8b305c1216680d9`. Both browser selectors passed with native `ACCEPTED` receipts and exact hash-bound envelopes. The state reached `PairPassed`, then stopped at cutover; no later selector ran.
+
+| Required selector | Discovered / executed / passed / failed / skipped | Result |
+|---|---:|---|
+| Chromium pair | 1 / 1 / 1 / 0 / 0 | PASS / native ACCEPTED |
+| Edge pair | 1 / 1 / 1 / 0 / 0 | PASS / native ACCEPTED |
+| Cutover | 1 / 1 / 0 / 1 / 0 | FAIL / preallocation build-authority guard |
+| Workload | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+| Recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+Chromium selector ran `14:27:57.8968787Z`–`14:30:23.5935539Z` (TRX duration 134.450s), native acceptance `14:30:22.7879398Z`. Edge ran `14:30:27.1988064Z`–`14:32:44.9546728Z` (TRX duration 129.657s), native acceptance `14:32:42.6470948Z`. Cutover ran `14:32:48.5599954Z`–`14:32:58.0375909Z` (TRX duration 2.416s), child exit 1, `NonzeroExit`; terminal records `processTreeDrained:true` / `requiresDispositionProof:true`.
+
+| Gate receipt | TRX SHA-256 | Native / envelope SHA-256 |
+|---|---|---|
+| pair-chromium | `1db773c0762c45e6a67799949bae32c595e034a5c709ff2505949fa664559e96` | `b903253c458803aa3092c3f48efc451482e80959f61ba86930c3acbe0c47425c` / `133b64d5d5efffa666303387df6d721b306ad5c2aa4017ee89f6c3ab3a2f9a83` |
+| pair-edge | `7aa847c1486683a0dd5c69c17d9dc6e27c6074d3f4d59a6636d958b292ba3c64` | `d7fce4e76974bf6bf886648ccb0df60af437caf7a4b75b6cf979e46cacbe4541` / `f9a01578cce371b4d9b3e84b78384d3fe3c652950329060ea56b821d795764e2` |
+| cutover | `aa44de3020c2cd17881f444251fb6f00c620c7cf158448e0c586160eed880eb1` | absent |
+
+Cutover exception is exactly `System.IO.IOException : Cutover sealed build authority or published artifact drifted.` at `Web6CandidateManifest.cs:361` via `WebHostIisExpressTests.cs:631`. This guard runs before cutover SQL approval/allocation or host launch. No SqlException appears.
+
+Read-only diagnosis remeasured current attempt artifacts with the native `Web6CandidateFileSet.MeasureTree` and compared the protected build authority. Both archive source/tree/clean checks and every artifact-to-sealed-authority comparison passed. The sole failing guard comparison is `actual.Frontend.ArtifactHash != actual.CurrentPublishedHash`: archived frontend dist `da573ea101e95b9a98850cc1b29270d89a24e6f4d54a8c2044949cfdb9289882` versus full current publish `6402c9e96445d0eff484bd28da0d1b34fde8b81dbef682171db80b28f171ef73`. Both still match their separately sealed expected hashes. This identifies an artifact-scope contract mismatch; no changed artifact bytes were observed. No authority/source patch, digest replacement, retry or post-failure SQL query occurred.
+
+Both pair native receipts record `processDrained/httpQueuesAbsent/sqlQuiescent/resourcesVerified:true`. Each inventory contains one database, one login, one deletedDirectory, three process and three queue records. Pair cleanup was accepted by those receipts; both recorded runtime directories are absent and the current SQL control parent has zero children. Inventory `deletionAuthority:false` is non-authorizing evidence, not permission for additional cleanup. Cutover allocation receipt/root are absent; workload/recovery roots and final independent disposition are absent. Prepared worktrees/artifacts, new authorities and receipts remain retained. The overall run is `FailedRetained` after `PairPassed`; do not label the accepted pair cleanup as Quarantined. No manual cleanup, historical-resource inspection/adoption or ownership transfer occurred.
+
+Environment: Windows 11 Home x64 build 26300, SDK `8.0.427`, SQL `14.0.2140.2`, IIS Express `10.0.26013.1000`, Chromium `156.0.8078.4`, Edge `157.0.4341.46`; Node/npm above. Workload sample-floor/percentile evidence, observed RPO/RTO, final independent disposition and CandidateVerified are absent. A reviewed cutover correction plus new explicit Owner authorization is required before another fresh candidate/root/approval chain. Ordinary resend OFF, full IIS/unperformed Narrator NOT RUN, staging NOT ACCEPTED, production NO-GO. Task 6 and B05/F04 remain incomplete.
 
 ## Task 6 attempt14 candidate-mismatch observation failure and quarantine
 
@@ -466,7 +513,7 @@ TRX SHA-256: Application `c7a0a06507e1cadf6fcf6ae37997520b0bf59e42c5d1c93aa7c92b
 
 ## Task 6 controlled bootstrap attempt
 
-**Attempt01 history; the latest disposition is attempt14 above.**
+**Attempt01 history; the latest disposition is attempt15 above.**
 
 Owner approved the nonproduction bootstrap plan and destructive drill scope, including the separate authorization step. Candidate `web6-20261110-25a1cf46`, attempt `attempt01`, ran once at `2026-11-10T05:01:14Z`. The Owner authority covered HTTPS localhost ports 44321/44322, the pair/cutover/workload/recovery drills, new private task/SQL parents, the four exact source pins below and expiry `2026-11-10T13:01:13Z`. That authority is not a pilot-enable decision.
 
