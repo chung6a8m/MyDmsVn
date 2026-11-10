@@ -58,7 +58,9 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
     }
 
     [Theory]
-    [InlineData("a8afa96dd81e3a282c6351fd6d1786d331a6479d", "PIN_MATCHED")]
+    [InlineData("b91aba84b8e42b8aac78bd113c732ad9c5bff715", "PIN_MATCHED")]
+    [InlineData("a8afa96dd81e3a282c6351fd6d1786d331a6479d", "BLOCKED_REVIEWED_FRONTEND_PIN")]
+    [InlineData("03205766a8e361872f1f8dee7fe83b506a6cb08f", "BLOCKED_REVIEWED_FRONTEND_PIN")]
     [InlineData("13179f56a3381275c0652f6edaf29258f18927f2", "BLOCKED_REVIEWED_FRONTEND_PIN")]
     [InlineData("5f7c0051497e8631925b68127ff556d2d066cd5c", "BLOCKED_REVIEWED_FRONTEND_PIN")]
     public async Task FreshPrepareRequiresTheReviewedArtifactCommandPin(string pin, string admission)
