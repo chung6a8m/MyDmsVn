@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
+using System.Xml;
 using Newtonsoft.Json.Linq;
 
 namespace MyDmsVn.Web6.CandidateBootstrap;
@@ -64,15 +64,53 @@ internal sealed class BootstrapArtifactBuilder
         target.Verify();
         var builtBin = new BootstrapTree(bin);
         if (!builtBin.Files.ContainsKey(Host + ".dll")) throw new IOException("Bootstrap build is missing its HTTP host assembly.");
-        var destination = Path.Combine(publish, "Web.config");
-        BootstrapPathPolicy.CopyNewFile(webConfig, destination);
-        if (BootstrapPathPolicy.HashFile(destination) != configHash) throw new IOException("Bootstrap Web.config changed while copying.");
+        var config = MergeWebConfig(webConfig, configHash, builtBin);
+        BootstrapPathPolicy.WriteNewFile(Path.Combine(publish, "Web.config"), output => output.Write(config, 0, config.Length));
         var before = new BootstrapTree(publish);
+        if (!before.Files.TryGetValue("Web.config", out var configDigest) || configDigest != ProtectedJsonFile.Digest(config))
+            throw new IOException("Bootstrap published Web.config differs from the merged configuration.");
         if (frontend != null) frontend.CopyTo(Path.Combine(publish, "wwwroot"));
         var after = new BootstrapTree(publish);
         builtBin.Verify();
         before.VerifyExtension(after, "wwwroot");
         return after;
+    }
+
+    private static byte[] MergeWebConfig(string sourcePath, string sourceHash, BootstrapTree builtBin)
+    {
+        const string generatedPath = Host + ".dll.config";
+        if (!builtBin.Files.TryGetValue(generatedPath, out var generatedHash))
+            throw new IOException("Bootstrap host build is missing the generated runtime configuration.");
+
+        // System.Web loads the host's runtime configuration from Web.config. The
+        // generated assembly redirects must be imported from this exact build.
+        var source = BootstrapPathPolicy.ReadFile(sourcePath, file => ReadConfig(file, sourceHash)).Value;
+        var generated = builtBin.ReadFile(generatedPath, file => ReadConfig(file, generatedHash));
+        source.DocumentElement!.ReplaceChild(source.ImportNode(RequireRuntime(generated), deep: true), RequireRuntime(source));
+        using var output = new MemoryStream();
+        using (var writer = XmlWriter.Create(output, new XmlWriterSettings { Encoding = new UTF8Encoding(false), NewLineHandling = NewLineHandling.Entitize }))
+            source.Save(writer);
+        return output.ToArray();
+    }
+
+    private static XmlDocument ReadConfig(FileStream file, string expectedHash)
+    {
+        if (BootstrapPathPolicy.HashStream(file) != expectedHash)
+            throw new IOException("Bootstrap host configuration changed after measurement.");
+        file.Position = 0;
+        var document = new XmlDocument { PreserveWhitespace = true, XmlResolver = null };
+        using var reader = XmlReader.Create(file, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
+        try { document.Load(reader); }
+        catch (XmlException) { throw new IOException("Bootstrap host configuration contains invalid XML."); }
+        return document;
+    }
+
+    private static XmlNode RequireRuntime(XmlDocument document)
+    {
+        if (document.DocumentElement is not { Name: "configuration", NamespaceURI: "" } configuration ||
+            configuration.SelectNodes("runtime") is not { Count: 1 } runtime)
+            throw new IOException("Bootstrap host configuration requires exactly one runtime element.");
+        return runtime[0]!;
     }
 
     private static string VerifyManifest(string path, BootstrapTree tree, string mode, string? candidate)
@@ -98,7 +136,7 @@ internal sealed class BootstrapArtifactBuilder
 
     private static void VerifyMarkers(BootstrapTree tree, string? candidate)
     {
-        var marker = new JObject { ["version"] = 1, ["candidateId"] = candidate }.ToString(Formatting.None);
+        var marker = new JObject { ["version"] = 1, ["candidateId"] = candidate }.ToString(Newtonsoft.Json.Formatting.None);
         if (!tree.Files.ContainsKey(MarkerPath) || ReadText(tree, MarkerPath) != marker)
             throw new IOException("Bootstrap frontend build marker differs from the approved mode.");
         var markers = 0;

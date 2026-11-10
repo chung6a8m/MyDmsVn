@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Microsoft.CSharp;
 using MyDmsVn.Web6.CandidateBootstrap;
 using Newtonsoft.Json;
@@ -26,6 +27,15 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
     private const string OldBackendSha = Web6CandidateCutoverPlan.BackendArchiveSha;
     private const string OldFrontendSha = Web6CandidateCutoverPlan.FrontendArchiveSha;
     private const string Tree = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    private const string SourceWebConfig = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <!-- Retain the host configuration. -->
+          <appSettings><add key="fixture" value="source" /></appSettings>
+          <system.web><compilation targetFramework="4.8" /></system.web>
+          <runtime />
+        </configuration>
+        """;
     private readonly string _root = Path.Combine(Path.GetTempPath(), "web6 preflight " + Guid.NewGuid().ToString("N").Substring(0, 8));
     private readonly List<BootstrapProcessRequest> _processes = new();
     private readonly Dictionary<string, string> _checkout = new(StringComparer.Ordinal);
@@ -68,6 +78,12 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
     [InlineData("dist drift")]
     [InlineData("publish drift")]
     [InlineData("same-byte artifact swap")]
+    [InlineData("missing generated config")]
+    [InlineData("malformed generated config")]
+    [InlineData("missing generated runtime")]
+    [InlineData("duplicate generated runtime")]
+    [InlineData("missing source runtime")]
+    [InlineData("duplicate source runtime")]
     public async Task RefusesInvalidInputsWithoutPublishingPreparedReceipt(string failure)
     {
         _failure = failure;
@@ -152,6 +168,32 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
         Assert.Equal(Web6CandidateFileSet.MeasureTree(Path.Combine(TaskRoot, "frontend-old", "dist")), (string?)cutover["frontendBuildSha256"]);
         Assert.False(Directory.Exists(Path.Combine(TaskRoot, "pair")));
         Assert.Empty(Directory.GetFileSystemEntries(At("sql")));
+    }
+
+    [Fact]
+    public async Task PublishesEachExactBuildRuntimeAndPreservesTheRestOfWebConfig()
+    {
+        using var authority = Authority();
+        await new BootstrapPreflight(Toolchain()).PrepareAsync(Request(authority), CancellationToken.None);
+
+        AssertPublishedRuntime("current-publish", "13.0.0.0");
+        AssertPublishedRuntime("old-publish", "12.0.0.0");
+    }
+
+    private void AssertPublishedRuntime(string publish, string version)
+    {
+        var published = XElement.Load(Path.Combine(TaskRoot, publish, "Web.config"));
+        var runtime = Assert.Single(published.Elements("runtime"));
+        XNamespace bindings = "urn:schemas-microsoft-com:asm.v1";
+        var redirect = Assert.Single(runtime.Descendants(bindings + "bindingRedirect"));
+        Assert.Equal(version, (string?)redirect.Attribute("newVersion"));
+        Assert.Equal("0.0.0.0-" + version, (string?)redirect.Attribute("oldVersion"));
+        Assert.Equal("Newtonsoft.Json", (string?)redirect.Parent?.Element(bindings + "assemblyIdentity")?.Attribute("name"));
+
+        var expected = XElement.Parse(SourceWebConfig);
+        expected.Element("runtime")!.Remove();
+        runtime.Remove();
+        Assert.True(XNode.DeepEquals(expected, published));
     }
 
     [Fact]
@@ -290,7 +332,7 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
                     var checkout = args[args.Length - 2];
                     _checkout.Add(checkout, args.Last());
                     if (Path.GetFileName(checkout).StartsWith("backend-", StringComparison.Ordinal))
-                        SeedBackend(checkout);
+                        SeedBackend(checkout, _failure);
                 }
                 if (args.Contains("status") && _failure == "dirty checkout") return Task.FromResult(" M tracked.txt");
                 if (args.Contains("--show-toplevel")) return Task.FromResult(root.Replace('\\', '/'));
@@ -308,6 +350,15 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
                     var bin = args[Array.IndexOf(args, "--output") + 1];
                     Directory.CreateDirectory(bin);
                     File.WriteAllText(Path.Combine(bin, "MyDmsVn.Server.HttpHost.dll"), "fixture dll");
+                    var version = root.EndsWith("backend-old", StringComparison.Ordinal) ? "12.0.0.0" : "13.0.0.0";
+                    if (_failure != "missing generated config")
+                        File.WriteAllText(Path.Combine(bin, "MyDmsVn.Server.HttpHost.dll.config"), _failure switch
+                        {
+                            "malformed generated config" => "<configuration><runtime>",
+                            "missing generated runtime" => "<configuration><appSettings /></configuration>",
+                            "duplicate generated runtime" => "<configuration><runtime /><runtime /></configuration>",
+                            _ => GeneratedWebConfig(version),
+                        });
                     if (_failure == "publish drift" && root.EndsWith("backend-old", StringComparison.Ordinal))
                         File.AppendAllText(Path.Combine(TaskRoot, "current-publish", "bin", "MyDmsVn.Server.HttpHost.dll"), "drift");
                 }
@@ -351,12 +402,32 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
         return Task.FromResult("");
     }
 
-    private static void SeedBackend(string root)
+    private static void SeedBackend(string root, string failure = "")
     {
         var host = Path.Combine(root, "src", "MyDmsVn.Server.HttpHost");
         Directory.CreateDirectory(host);
-        File.WriteAllText(Path.Combine(host, "Web.config"), "fixture config");
+        File.WriteAllText(Path.Combine(host, "Web.config"), failure switch
+        {
+            "missing source runtime" => SourceWebConfig.Replace("<runtime />", ""),
+            "duplicate source runtime" => SourceWebConfig.Replace("<runtime />", "<runtime /><runtime />"),
+            _ => SourceWebConfig,
+        });
     }
+
+    private static string GeneratedWebConfig(string version) => $$"""
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <runtime>
+            <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
+              <dependentAssembly>
+                <assemblyIdentity name="Newtonsoft.Json" publicKeyToken="30ad4fe6b2a6aeed" culture="neutral" />
+                <bindingRedirect oldVersion="0.0.0.0-{{version}}" newVersion="{{version}}" />
+              </dependentAssembly>
+            </assemblyBinding>
+          </runtime>
+          <appSettings><add key="fixture" value="generated" /></appSettings>
+        </configuration>
+        """;
 
     private void CompileFakeTools()
     {
@@ -385,7 +456,16 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
                     }
                     if (tool == "dotnet.exe")
                     {
-                        if (args.Contains("build")) File.WriteAllText(Path.Combine(Value(args, "--output"), "MyDmsVn.Server.HttpHost.dll"), "fixture dll");
+                        if (args.Contains("build"))
+                        {
+                            var output = Value(args, "--output");
+                            File.WriteAllText(Path.Combine(output, "MyDmsVn.Server.HttpHost.dll"), "fixture dll");
+                            File.WriteAllText(Path.Combine(output, "MyDmsVn.Server.HttpHost.dll.config"),
+                                "<configuration><runtime><assemblyBinding xmlns=\"urn:schemas-microsoft-com:asm.v1\">" +
+                                "<dependentAssembly><assemblyIdentity name=\"Newtonsoft.Json\" publicKeyToken=\"30ad4fe6b2a6aeed\" culture=\"neutral\" />" +
+                                "<bindingRedirect oldVersion=\"0.0.0.0-13.0.0.0\" newVersion=\"13.0.0.0\" /></dependentAssembly>" +
+                                "</assemblyBinding></runtime></configuration>");
+                        }
                         return 0;
                     }
                     if (args.Contains("build"))

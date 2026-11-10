@@ -62,11 +62,13 @@ internal sealed class BootstrapPathPolicy : IDisposable
         for (var index = _directories.Count - 1; index >= 0; index--) _directories[index].Dispose();
     }
 
-    internal static string HashFile(string path) => ReadFile(path, stream =>
+    internal static string HashFile(string path) => ReadFile(path, HashStream).Value;
+
+    internal static string HashStream(Stream stream)
     {
         using var sha = SHA256.Create();
         return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
-    }).Value;
+    }
 
     internal static (T Value, string Identity) ReadFile<T>(string path, Func<FileStream, T> read, string? expectedIdentity = null)
     {
@@ -87,17 +89,23 @@ internal sealed class BootstrapPathPolicy : IDisposable
     {
         ReadFile(source, input =>
         {
-            using var parent = new ProtectedJsonFile.PathLease(destination);
-            var acl = new FileSecurity();
-            acl.SetOwner(ProtectedJsonFile.CurrentOwner());
-            acl.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
-            acl.AddAccessRule(new FileSystemAccessRule(ProtectedJsonFile.CurrentOwner(), FileSystemRights.FullControl, AccessControlType.Allow));
-            using var handle = parent.CreateNewFile(acl);
-            using var output = new FileStream(handle, FileAccess.Write);
-            input.CopyTo(output);
-            output.Flush(flushToDisk: true);
+            WriteNewFile(destination, input.CopyTo);
             return true;
         }, expectedIdentity);
+    }
+
+    internal static void WriteNewFile(string destination, Action<FileStream> write)
+    {
+        using var parent = new ProtectedJsonFile.PathLease(destination);
+        var owner = ProtectedJsonFile.CurrentOwner();
+        var acl = new FileSecurity();
+        acl.SetOwner(owner);
+        acl.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        acl.AddAccessRule(new FileSystemAccessRule(owner, FileSystemRights.FullControl, AccessControlType.Allow));
+        using var handle = parent.CreateNewFile(acl);
+        using var output = new FileStream(handle, FileAccess.Write);
+        write(output);
+        output.Flush(flushToDisk: true);
     }
 
     internal sealed class PinnedDirectory : IDisposable
