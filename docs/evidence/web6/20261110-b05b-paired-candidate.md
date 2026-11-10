@@ -1,6 +1,49 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-10): attempt11 PREPARED / PIN_MATCHED, then FailedRetained in the Chromium selector; Task 6 OPEN.** Nested Chromium passed two tests; the named `eligibility401` boundary did not reach its expected HTTP/auth/recovery state within the 5-second assertion window. Cleanup is Quarantined; owned SQL/runtime resources remain retained. All later gates are NOT RUN. Prior attempts retain their separate dispositions. No CandidateVerified, live pair PASS, workload or recovery result is claimed.
+**Latest disposition (2026-11-10): attempt12 PREPARED / PIN_MATCHED, then FailedRetained in the Chromium selector; Task 6 OPEN.** Nested Chromium passed two tests; trigger-correlated `eligibility500` returned HTTP 503 while the predicate required 500. Cleanup is Quarantined; owned SQL/runtime resources remain retained. All later gates are NOT RUN. Prior attempts retain their separate dispositions. No CandidateVerified, live pair PASS, workload or recovery result is claimed.
+
+## Task 6 attempt12 correlated eligibility status mismatch and quarantine
+
+The Owner authorized one fresh attempt after independently reviewed request-correlated eligibility observer correction. Candidate `web6-20261110-3fff3d2f` used backend `0711d0b2fcd44b86fef48cc9dae5dadfc0a7089d` / tree `dc1fff8c5462c9a5aa4131b86f296429d75da192` and frontend `4a6541c419b1293a04c57d67bc6faaf1254ba391` / tree `296cae43cea74136b97fee38ffe4e08a20dddea2`. Only request-identity-correlated trigger responses can decide boundary PASS; control/pre-setup/unobserved traffic is excluded. Reviewed 50/170/480-second eligibility401/mismatch-header/third-case budgets remain.
+
+Before new roots/approval, four read-only Edge observations at `12:20:15.6465496Z`–`12:20:45.7694443Z` (30.1228947 seconds) matched identity/version `157.0.4341.46`/SHA-256 `3e2c8557b5ca4d78868d3089346146ceab94f198ce3d58526ce8f6c8d4b4167c`. All 2,337 tool files/572 directories passed independent identity/hash/current-owner protected ACL/no-link checks: Node `22.14.0`, npm `11.6.0`, tree `c55ed76c2333bcb335b2327f639195464c2ed7685b329da812f02c85bed29529`. A bounded query independently reverified approved effective master/server. No custom lock/copy/updater change, installation or global mutation occurred.
+
+Fresh roots, SQL approval, Owner authority and request used Windows PowerShell/net48 protected create-new publication. Exact four-field `web6-cutover` schema/current-user-only protected ACL/digest/master binding passed; eight-hour expiry `2026-11-10T20:21:00Z`. No old protected payload/resource was inspected, copied, reused or adopted. Authorize once exited 0; prepare once ran `12:21:15.6025874Z`–`12:23:53.3579636Z`, exit 0 `PIN_MATCHED`. Independent checks confirmed ordinary null candidate ID/OFF, exact candidate marker, ten-file full dist/wwwroot equality, clean detached pins and zero pre-run live allocation.
+
+| Attempt12 record | SHA-256 |
+|---|---|
+| Release/net48 bootstrap | `4f584f889b01f440ef0147beb11573bc60e6e9c9419c240736a938c4345ce8d7` |
+| New SQL approval | `98c2de524b96e82ff6dc32587b5c831a8e302742b281d4bb2e7de5cb3672ea22` |
+| Owner authority / request | `b5b1c15c33ae6035179db224bca88a3e0be757baa01a9499e06ffb3ffc316828` / `a2207230ec0695bf9e611ed490233f74a0a3674851e1f1d40af3ab621943380d` |
+| Prepared / terminal receipt | `c33ae71822620a90fa247c62505178293a24427486ad8df27b47c233f6a72bd4` / `806abca4f404fa70267ba2dd8ee88c9cad3dacd787eb4c21d4909c6bc3a5470c` |
+| Ordinary dist / manifest | `5c7908157609e24760dcab5da26b170f5194f1918f2343f80aa164aab0ef59ab` / `796d86094b6cfd29efa1d99aac49bd9fd10bb80c73b71d0164d853e74485ef53` |
+| Candidate dist / manifest | `fdd540c464c9e4a80a18a69319fc785db4251ff79d205944638d2052b2ed1dde` / `b1b1af29d29758d46bb3d0e0645f3442e4f065416d41508b3a6a9478d72f74f0` |
+| Current / old backend publish | `31362a3290a13d528987e337cdc9412814b7c9e50f2ea0e83aa282345924d124` / `2cd5c7187fa454dc0e677e05939c4c3fffaea39475a4dda2fe6e06ea68bf5ccb` |
+| Cutover build authority | `e97ce58197136444598298fa8501d947cbd523c9af68e5e489d9d752f402f0c1` |
+| Chromium wrapper TRX / selector DLL | `e0a88f516653b24de29a3977c11af55f87f9859e9305f858e8c603b49ea074ab` / `ad4147f71849e64b7c7b05b897ec35f34e7ed61701ae9619b88cb56050d6dde6` |
+
+Run began `12:23:54.1787260Z`, **0.821 seconds** after prepare, and ended `12:26:07.6925591Z`, exit 5 `FailedRetained`; run ID `run-e88847b49b814cfdb4ed5b5ca0a42c21`. Sole Chromium selector: `12:24:14.9109591Z`–`12:26:07.6643502Z`, wrapper duration 101.689 seconds, child exit 1, `NonzeroExit`, `processTreeDrained:true`, `requiresDispositionProof:true`. No external termination occurred.
+
+| Required selector | Discovered / executed / passed / failed / skipped | Result |
+|---|---:|---|
+| Chromium pair | 1 / 1 / 0 / 1 / 0 | FAIL / FailedRetained |
+| Edge pair | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Cutover | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Workload | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+| Recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+Nested Chromium selected three tests/one worker: **2 passed, 1 failed, 0 did not run**, displayed duration `1.1m`, plus one reporter error outside a test. Six-operation explicit consent and committed-response loss passed. Third case failed `WEB6 boundary=eligibility500 action=prepare HTTP/auth/recovery contract` at spec `260:79`, observer `69:19`, after a 5,000-ms predicate window. Exact sanitized state and observer trace:
+
+~~~json
+{"contextStatus":200,"eligibilityStatus":503,"refreshStatus":null,"loginVisible":false,"recoveryVisible":true,"resendEnabled":true,"confirmationVisible":false,"additionalMutations":0}
+{"phase":"poll","events":["attached","control-start","control-done","trigger-start","trigger-done","poll","request:trigger:context","response:trigger:context:200","request:trigger:eligibility","response:trigger:eligibility:503"],"omittedEvents":0}
+~~~
+
+The observed eligibility response is 503; checked-in predicate requires 500 for this named boundary. Both decision responses are correlated to trigger requests; no control/unobserved response supplied them. The trace shows no additional mutation or confirmation. Reaching this later serial step implies the prior 401 assertion/re-login/protected-draft restore flow completed; this is a control-flow inference, not full pair/native acceptance. Remaining two-tab/grant checks did not complete. Current evidence contains no socket-failure diagnostic or SQL oracle exception. No status broadening, source patch or live rerun occurred.
+
+Candidate records are `Chromium=Failed`, `Cleanup=Quarantined`. One original SQL database/runtime login/control root, host-runtime/config/browser log, candidate manifest/audit/disposition and prepared artifacts remain retained. Allocation receipt `e5cdae3dc44af7007f70cf1e1f804855f8cb068a8c361de8812a3a04e73cd806` binds control digest `f8da4fff2b6ceee878934bd8d42c3890c30d65a8f6292795c2162d6757f03d3d`. Later live roots/native success envelopes are absent. Process drain is not accepted SQL/artifact cleanup or final independent disposition. No post-failure SQL query, manual cleanup, historical-resource inspection/adoption or retry occurred.
+
+Environment: Windows 11 Home x64 build 26300, SDK `8.0.427`, SQL `14.0.2140.2`, IIS Express `10.0.26013.1000`, Chromium `156.0.8078.4`, Edge `157.0.4341.46`; Node/npm above. Workload samples/percentiles, RPO/RTO, Task4 acceptance and CandidateVerified are absent. A reviewed boundary correction and new explicit Owner authorization are required before a fresh attempt. Ordinary resend OFF, full IIS/unperformed Narrator NOT RUN, staging NOT ACCEPTED, production NO-GO. Task 6 and B05/F04 remain incomplete.
 
 ## Task 6 attempt11 named auth-boundary failure and retained quarantine
 
@@ -336,7 +379,7 @@ TRX SHA-256: Application `c7a0a06507e1cadf6fcf6ae37997520b0bf59e42c5d1c93aa7c92b
 
 ## Task 6 controlled bootstrap attempt
 
-**Attempt01 history; the latest disposition is attempt11 above.**
+**Attempt01 history; the latest disposition is attempt12 above.**
 
 Owner approved the nonproduction bootstrap plan and destructive drill scope, including the separate authorization step. Candidate `web6-20261110-25a1cf46`, attempt `attempt01`, ran once at `2026-11-10T05:01:14Z`. The Owner authority covered HTTPS localhost ports 44321/44322, the pair/cutover/workload/recovery drills, new private task/SQL parents, the four exact source pins below and expiry `2026-11-10T13:01:13Z`. That authority is not a pilot-enable decision.
 
