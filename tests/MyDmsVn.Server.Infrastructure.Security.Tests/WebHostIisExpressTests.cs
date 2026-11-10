@@ -690,7 +690,13 @@ public sealed partial class WebHostIisExpressTests
             operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl, bootstrap);
             await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None).ConfigureAwait(false);
             complete = true;
-            }, async () => operations == null || await operations.Cleanup().ConfigureAwait(false), new Func<Task>[]
+            }, async () =>
+            {
+                if (operations == null) return bootstrap == null;
+                var drained = await operations.Cleanup().ConfigureAwait(false);
+                if (drained && bootstrap != null) bootstrap.VerifyCleanupInventory();
+                return drained;
+            }, new Func<Task>[]
             {
                 async () =>
                 {

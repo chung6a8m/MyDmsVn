@@ -550,6 +550,30 @@ public sealed class Web6CandidateCutoverTests
         Assert.Empty(calls);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task Bootstrap_failure_before_operations_creation_retains_every_allocation(int allocatedCount)
+    {
+        var allocated = new HashSet<int>();
+        var evidence = new HashSet<int>();
+        var cleanupCalls = 0;
+        var beforeOperations = new IOException("Injected failure before operations creation.");
+        var observed = await Assert.ThrowsAsync<IOException>(() => Web6CutoverLifetime.Run(() =>
+        {
+            for (var index = 1; index <= allocatedCount; index++) { allocated.Add(index); evidence.Add(index); }
+            throw beforeOperations;
+        }, () => Task.FromResult(true), new Func<Task>[]
+        {
+            () => { cleanupCalls++; allocated.Clear(); evidence.Clear(); return Task.CompletedTask; },
+        }, stopOnCleanupFailure: true));
+        Assert.Same(beforeOperations, observed);
+        Assert.Equal(0, cleanupCalls);
+        Assert.Equal(allocatedCount, allocated.Count);
+        Assert.Equal(allocatedCount, evidence.Count);
+    }
+
     private sealed class RecordingRuntime : IWeb6CutoverRuntime
     {
         internal List<string> Calls { get; } = new List<string>();

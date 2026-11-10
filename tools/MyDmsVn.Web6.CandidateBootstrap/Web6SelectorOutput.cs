@@ -75,13 +75,23 @@ internal sealed class Web6SelectorOutput : IDisposable
         _inventoryHash = ProtectedJsonFile.WriteNew(Path.Combine(Plan.EvidenceRoot, Gate + "-cleanup-inventory.json"),
             BootstrapJson.Serialize(new JObject { ["version"] = 1, ["runId"] = RunId, ["gate"] = Gate,
                 ["deletionAuthority"] = false, ["resources"] = resources.DeepClone() }));
+        VerifyCleanupInventory();
+    }
+
+    internal void VerifyCleanupInventory()
+    {
         Verify();
+        if (_inventoryHash == null) throw new IOException("Bootstrap cleanup requires its sealed inventory.");
+        using var file = ProtectedJsonFile.Open(Path.Combine(Plan.EvidenceRoot, Gate + "-cleanup-inventory.json"), _inventoryHash);
+        var inventory = PreparedCandidateReceipt.ReadCanonical(file.Bytes);
+        if ((string?)inventory["runId"] != RunId || (string?)inventory["gate"] != Gate ||
+            (bool?)inventory["deletionAuthority"] != false || inventory["resources"] is not JArray { Count: > 0 })
+            throw new IOException("Bootstrap cleanup inventory proof differs.");
     }
 
     internal void Complete(JObject payload)
     {
-        Verify();
-        if (_inventoryHash == null) throw new IOException("Bootstrap cleanup inventory was not sealed before cleanup.");
+        VerifyCleanupInventory();
         payload["cleanupInventoryPath"] = Path.Combine(Plan.EvidenceRoot, Gate + "-cleanup-inventory.json");
         payload["cleanupInventorySha256"] = _inventoryHash;
         payload = PreparedCandidateReceipt.ReadCanonical(BootstrapJson.Serialize(payload));

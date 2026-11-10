@@ -18,6 +18,7 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
     private const string Backend = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static readonly string Hash = new string('c', 64);
     private string? _mutation;
+    private bool _acceptedDigestRejected;
     private PreparedCandidateReceipt Prepared()
     {
         Directory.CreateDirectory(_root);
@@ -79,6 +80,20 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
             BootstrapPathPolicy.HashFile(Path.Combine(_root, "evidence", "task4.json")));
         Assert.Equal("candidate-1", task4.CandidateId);
         Assert.Equal(PreparedCandidateReceipt.ReviewedFrontendSha, task4.FrontendSha);
+    }
+
+    [Theory]
+    [InlineData("workload")]
+    [InlineData("recovery")]
+    public async Task Accepted_native_receipt_mutation_before_final_observation_is_retained(string gate)
+    {
+        _mutation = "accepted-" + gate;
+        var result = await Run();
+        Assert.Equal(BootstrapRunStage.FailedRetained, result.Stage);
+        Assert.True(_acceptedDigestRejected);
+        Assert.Equal(new[] { "pair-chromium", "pair-edge", "cutover", "workload", "recovery", "disposition" }, _calls);
+        Assert.DoesNotContain(Directory.GetFiles(_root, "*.json"), path =>
+            File.ReadAllText(path).Contains("\"state\":\"CandidateVerified\""));
     }
 
     [Theory]
@@ -249,6 +264,21 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
             async (p, state, recovery, receipts, token) =>
             {
                 _calls.Add("disposition");
+                if (_mutation is "accepted-workload" or "accepted-recovery")
+                {
+                    Assert.Equal(BootstrapRunStage.RecoveryRecorded, recovery.Stage);
+                    var gate = _mutation.Substring("accepted-".Length);
+                    var nativePath = Path.Combine(_root, "evidence", gate + ".json");
+                    var native = PreparedCandidateReceipt.ReadCanonical(File.ReadAllBytes(nativePath));
+                    if (gate == "workload") native["profiles"]![0]!["classes"]!["SalesCreate"]!["count"] = 1001;
+                    else native["recoveryRtoMilliseconds"] = 51;
+                    var changed = BootstrapJson.Serialize(native);
+                    File.WriteAllBytes(nativePath, changed);
+                    File.WriteAllText(Path.Combine(_root, "evidence", gate + ".sha256"), ProtectedJsonFile.Digest(changed), Encoding.ASCII);
+                    var accepted = receipts.Single(r => r.Receipt.Gate == gate);
+                    try { accepted.Read(p); }
+                    catch (IOException) { _acceptedDigestRejected = accepted.Receipt.NativeSha256 != ProtectedJsonFile.Digest(changed); }
+                }
                 await Task.Delay(20, token); // Separate real observation after the recorded recovery clock tick.
                 var path = Path.Combine(_root, "evidence", "disposition-native.json");
                 var sha = ProtectedJsonFile.WriteNew(path, BootstrapJson.Serialize(new JObject { ["observed"] = DateTimeOffset.UtcNow.ToString("O") }));

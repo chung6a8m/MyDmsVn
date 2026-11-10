@@ -25,12 +25,13 @@ internal static class BootstrapDisposition
     }
 
     internal static async Task<ProtectedDispositionReceipt> ObserveAsync(Web6SelectorPlan plan, BootstrapRunState state,
-        RunTransitionReceipt recovery, IReadOnlyList<JObject> receipts, string connectionString, CancellationToken token)
+        RunTransitionReceipt recovery, IReadOnlyList<AcceptedSelectorReceipt> receipts, string connectionString, CancellationToken token)
     {
         if (recovery.Stage != BootstrapRunStage.RecoveryRecorded || receipts.Count != 5)
             throw new IOException("Bootstrap disposition must follow all five gate receipts.");
-        foreach (var receipt in receipts) RequireOwnershipEvidence(plan, state.RunId, receipt);
-        var rows = receipts.SelectMany(r => (JArray)r["resources"]!).Cast<JObject>().ToArray();
+        var native = receipts.Select(r => r.Read(plan)).ToArray();
+        foreach (var receipt in native) RequireOwnershipEvidence(plan, state.RunId, receipt);
+        var rows = native.SelectMany(r => (JArray)r["resources"]!).Cast<JObject>().ToArray();
         if (rows.Length == 0) throw new IOException("Bootstrap resource inventory is missing.");
         var sql = new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "master", Pooling = false, ConnectRetryCount = 0, ConnectTimeout = 15 };
         using var connection = new SqlConnection(sql.ConnectionString);
@@ -99,8 +100,8 @@ internal static class BootstrapDisposition
             ["version"] = 1, ["runId"] = state.RunId, ["candidateId"] = state.CandidateId,
             ["recoveryTransitionSha256"] = recovery.Sha256, ["observedAtUtc"] = observed.ToString("O", CultureInfo.InvariantCulture),
             ["checkedResourceCount"] = rows.Length,
-            ["gateReceipts"] = new JArray(receipts.Select(r => new JObject { ["gate"] = r["gate"]!.DeepClone(),
-                ["sha256"] = BootstrapPathPolicy.HashFile(Path.Combine(plan.EvidenceRoot, (string)r["gate"]! + ".json")) })),
+            ["gateReceipts"] = new JArray(receipts.Select(r => new JObject { ["gate"] = r.Receipt.Gate,
+                ["sha256"] = r.Receipt.NativeSha256 })),
             ["action"] = "independent-absence-observation",
             ["retainedEvidenceOnly"] = true, ["deletionsPerformed"] = 0,
         }));

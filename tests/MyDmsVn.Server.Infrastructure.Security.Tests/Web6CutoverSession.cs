@@ -113,7 +113,7 @@ internal static class Web6CutoverLifetime
             if (!drained) throw new IOException("Cutover drain is uncertain; all allocations remain quarantined.");
         }
         catch (Exception failure) { failures.Add(failure); }
-        if (drained)
+        if (drained && (!stopOnCleanupFailure || original == null))
             foreach (var dispose in disposeAllocations)
                 try { await dispose().ConfigureAwait(false); }
                 catch (Exception failure) { failures.Add(failure); if (stopOnCleanupFailure) break; }
