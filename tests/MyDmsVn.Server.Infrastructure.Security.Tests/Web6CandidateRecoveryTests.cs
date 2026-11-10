@@ -24,17 +24,7 @@ public sealed class Web6CandidateRecoveryTests
         var thumbprint = values["MYDMSVN_WEB_TEST_TLS_THUMBPRINT"]!;
         if (thumbprint.Length != 40 || thumbprint.Any(value => !Uri.IsHexDigit(value)))
             throw new InvalidDataException("Recovery TLS thumbprint is invalid.");
-        using var recoveryRoot = Web6PrivateDirectoryLease.CreateNew(values["MYDMSVN_WEB6_RECOVERY_ROOT"]!);
-        var fixture = await Web6MaintenanceRecoveryFixture.CreateAsync();
-        var result = await fixture.RunAsync(Web6MaintenanceRecoveryFixture.Failure.None);
-        Assert.True(result.Succeeded, result.Phase);
-        Assert.True(result.PhysicalOracleMatched);
-        Assert.True(result.CopyOnlyChecksummed);
-        Assert.Equal(1, result.EpochRotations);
-        Assert.Equal(3, result.StaleDenials);
-        Assert.Equal(1, result.CurrentOperations);
-        Assert.True(result.ResourcesAbsent);
-        recoveryRoot.DeleteTreeVerified();
+        await WebHostIisExpressTests.RunCandidateRecovery(values, task4, publish, thumbprint);
     }
 
     [Theory]
@@ -62,7 +52,7 @@ public sealed class Web6CandidateRecoveryTests
         Assert.Equal(new[]
         {
             "verify-source", "detect-failure", "drain-source", "backup", "restore-distinct", "oracle",
-            "rotate-epoch", "reprovision-principals", "admit-host", "reject-stale", "authenticated-health",
+            "rotate-epoch", "reprovision-principals", "start-host", "verify-admission", "reject-stale", "authenticated-health",
             "fresh-write", "rpo", "drain-restored", "cleanup"
         }, operations.Calls);
         Assert.True(result.TrustedService);
@@ -96,11 +86,51 @@ public sealed class Web6CandidateRecoveryTests
         var operations = new FakeOperations { Failure = failure };
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             new Web6CandidateRecoveryCoordinator(operations).Execute(ValidPlan(), CancellationToken.None));
-        Assert.Contains("admit-host", operations.Calls);
+        Assert.Contains("start-host", operations.Calls);
         Assert.Contains("drain-restored", operations.Calls);
         Assert.DoesNotContain("cleanup", operations.Calls);
         Assert.True(operations.RetainedEvidence);
         Assert.False(operations.DeletedResources);
+    }
+
+    [Fact]
+    public async Task Host_start_arms_independent_cleanup_before_admission_verification()
+    {
+        var operations = new FakeOperations { Failure = "verify-admission" };
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new Web6CandidateRecoveryCoordinator(operations).Execute(ValidPlan(), CancellationToken.None));
+
+        Assert.Contains("start-host", operations.Calls);
+        Assert.Contains("drain-restored", operations.Calls);
+        Assert.False(operations.DrainTokenWasCanceled);
+        Assert.True(operations.RetainedEvidence);
+    }
+
+    [Fact]
+    public async Task Start_then_throw_still_attempts_independent_host_and_queue_drain()
+    {
+        var operations = new FakeOperations { Failure = "start-host" };
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new Web6CandidateRecoveryCoordinator(operations).Execute(ValidPlan(), CancellationToken.None));
+
+        Assert.Contains("start-host", operations.Calls);
+        Assert.Contains("drain-restored", operations.Calls);
+        Assert.False(operations.DrainTokenWasCanceled);
+        Assert.True(operations.RetainedEvidence);
+    }
+
+    [Fact]
+    public async Task Canceled_main_token_does_not_cancel_restored_host_cleanup()
+    {
+        using var main = new CancellationTokenSource();
+        var operations = new FakeOperations { Failure = "cancel-health", MainCancellation = main };
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new Web6CandidateRecoveryCoordinator(operations).Execute(ValidPlan(), main.Token));
+
+        Assert.True(main.IsCancellationRequested);
+        Assert.Contains("drain-restored", operations.Calls);
+        Assert.False(operations.DrainTokenWasCanceled);
+        Assert.True(operations.RetainedEvidence);
     }
 
     [Fact]
@@ -139,7 +169,8 @@ public sealed class Web6CandidateRecoveryTests
     {
         internal readonly List<string> Calls = new();
         internal string? Failure;
-        internal bool TrustedAdmission, DeletedResources, RetainedEvidence;
+        internal bool TrustedAdmission, DeletedResources, RetainedEvidence, DrainTokenWasCanceled;
+        internal CancellationTokenSource? MainCancellation;
         private long _clock;
 
         public long Timestamp() => ++_clock;
@@ -160,9 +191,19 @@ public sealed class Web6CandidateRecoveryTests
         public Task VerifyRestoreOracle(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("oracle");
         public Task RotateEpoch(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("rotate-epoch");
         public Task ReprovisionPrincipals(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("reprovision-principals");
-        public async Task AdmitHost(Web6CandidateRecoveryPlan plan, CancellationToken token) { await Step("admit-host"); TrustedAdmission = true; }
+        public Task StartRestoredHost(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("start-host");
+        public async Task VerifyRestoredAdmission(Web6CandidateRecoveryPlan plan, CancellationToken token) { await Step("verify-admission"); TrustedAdmission = true; }
         public Task RejectStaleWriterReceiptAndStatus(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("reject-stale");
-        public Task AuthenticatedHealth(CancellationToken token) => Step("authenticated-health");
+        public Task AuthenticatedHealth(CancellationToken token)
+        {
+            if (Failure == "cancel-health")
+            {
+                Calls.Add("authenticated-health");
+                MainCancellation!.Cancel();
+                throw new OperationCanceledException(MainCancellation.Token);
+            }
+            return Step("authenticated-health");
+        }
         public Task FreshWrite(Web6CandidateRecoveryPlan plan, CancellationToken token) => Step("fresh-write");
         public async Task<(Web6RecoveryOracleSnapshot Before, Web6RecoveryOracleSnapshot After)> RecoverySnapshots(CancellationToken token)
         {
@@ -170,7 +211,7 @@ public sealed class Web6CandidateRecoveryTests
             var snapshot = new Web6RecoveryOracleSnapshot(1, 1, 1, 1, 1, 1, "digest");
             return (snapshot, snapshot);
         }
-        public Task DrainRestored(CancellationToken token) => Step("drain-restored");
+        public Task DrainRestored(CancellationToken token) { DrainTokenWasCanceled = token.IsCancellationRequested; return Step("drain-restored"); }
         public async Task CleanupVerified(CancellationToken token) { await Step("cleanup"); DeletedResources = true; }
         public void RetainEvidence() { RetainedEvidence = true; TrustedAdmission = false; }
     }
@@ -270,7 +311,8 @@ internal interface IWeb6CandidateRecoveryOperations
     Task VerifyRestoreOracle(Web6CandidateRecoveryPlan plan, CancellationToken token);
     Task RotateEpoch(Web6CandidateRecoveryPlan plan, CancellationToken token);
     Task ReprovisionPrincipals(Web6CandidateRecoveryPlan plan, CancellationToken token);
-    Task AdmitHost(Web6CandidateRecoveryPlan plan, CancellationToken token);
+    Task StartRestoredHost(Web6CandidateRecoveryPlan plan, CancellationToken token);
+    Task VerifyRestoredAdmission(Web6CandidateRecoveryPlan plan, CancellationToken token);
     Task RejectStaleWriterReceiptAndStatus(Web6CandidateRecoveryPlan plan, CancellationToken token);
     Task AuthenticatedHealth(CancellationToken token);
     Task FreshWrite(Web6CandidateRecoveryPlan plan, CancellationToken token);
@@ -290,7 +332,7 @@ internal sealed class Web6CandidateRecoveryCoordinator
     {
         plan.Validate();
         var timeline = new Web6RecoveryTimeline();
-        var hostAdmitted = false;
+        var hostStartArmed = false;
         var restoredDrained = false;
         try
         {
@@ -305,8 +347,9 @@ internal sealed class Web6CandidateRecoveryCoordinator
             await _operations.VerifyRestoreOracle(plan, token).ConfigureAwait(false);
             await _operations.RotateEpoch(plan, token).ConfigureAwait(false);
             await _operations.ReprovisionPrincipals(plan, token).ConfigureAwait(false);
-            await _operations.AdmitHost(plan, token).ConfigureAwait(false);
-            hostAdmitted = true;
+            hostStartArmed = true;
+            await _operations.StartRestoredHost(plan, token).ConfigureAwait(false);
+            await _operations.VerifyRestoredAdmission(plan, token).ConfigureAwait(false);
             timeline.Record(Web6RecoveryMilestone.HostAdmitted, _operations.Timestamp());
             await _operations.RejectStaleWriterReceiptAndStatus(plan, token).ConfigureAwait(false);
             await _operations.AuthenticatedHealth(token).ConfigureAwait(false);
@@ -315,17 +358,24 @@ internal sealed class Web6CandidateRecoveryCoordinator
             timeline.Record(Web6RecoveryMilestone.FreshWriteAccepted, _operations.Timestamp());
             var snapshots = await _operations.RecoverySnapshots(token).ConfigureAwait(false);
             var rpo = Web6CandidateOracle.CompareRecovery(snapshots.Before, snapshots.After);
-            await _operations.DrainRestored(token).ConfigureAwait(false);
-            restoredDrained = true;
-            await _operations.CleanupVerified(token).ConfigureAwait(false);
+            using (var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
+            {
+                await _operations.DrainRestored(cleanup.Token).ConfigureAwait(false);
+                restoredDrained = true;
+                await _operations.CleanupVerified(cleanup.Token).ConfigureAwait(false);
+            }
             return timeline.Complete(rpo.LostBusinessRows, rpo.LostJournalRows);
         }
         catch (Exception failure)
         {
             Exception? drainFailure = null;
-            if (hostAdmitted && !restoredDrained)
+            if (hostStartArmed && !restoredDrained)
             {
-                try { await _operations.DrainRestored(token).ConfigureAwait(false); }
+                try
+                {
+                    using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    await _operations.DrainRestored(cleanup.Token).ConfigureAwait(false);
+                }
                 catch (Exception error) { drainFailure = error; }
             }
             _operations.RetainEvidence();
@@ -341,7 +391,7 @@ internal static class Web6CandidateRecoveryAcceptanceGate
     private static readonly string[] Required =
     {
         "MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING", "MYDMSVN_SQL_TEST_APPROVAL_FILE",
-        "MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY", "MYDMSVN_WEB_TEST_TLS_THUMBPRINT",
+        "MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY", "MYDMSVN_WEB_TEST_BROWSER_DIRECTORY", "MYDMSVN_WEB_TEST_TLS_THUMBPRINT",
         "MYDMSVN_WEB6_CANDIDATE_ROOT", "MYDMSVN_WEB6_CANDIDATE_ID",
         "MYDMSVN_WEB6_TASK4_ACCEPTANCE_PATH", "MYDMSVN_WEB6_TASK4_ACCEPTANCE_SHA256",
         "MYDMSVN_WEB6_RECOVERY_ROOT"

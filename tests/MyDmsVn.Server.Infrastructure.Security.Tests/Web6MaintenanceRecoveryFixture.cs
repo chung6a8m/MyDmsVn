@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -13,6 +14,7 @@ using MyDmsVn.Desktop.Tests;
 using MyDmsVn.Server.Application.Operations;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
+using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Operations;
 using MyDmsVn.Testing.Sql;
 using MyDmsVn.WebOperation.Operator;
@@ -164,7 +166,7 @@ internal sealed class Web6MaintenanceRecoveryFixture
     private bool _cloneCreated, _done, _started, _failureReturned;
     private Failure _requestedFailure;
     private TestCleanupAuthorization? _testCleanup;
-    private int _actor;
+    private int _actor, _customer, _warehouse, _employee, _product, _receiptProduct;
     private Guid _oldEpoch, _newEpoch;
     private Principal? _runtime, _maintenance;
     private readonly Result _result = new Result();
@@ -174,6 +176,29 @@ internal sealed class Web6MaintenanceRecoveryFixture
     internal string ManifestPath => Path.Combine(_root, "ownership.json");
     internal bool TestCleanupResourcesAbsent { get; private set; }
     private string CloneConnection => new SqlConnectionStringBuilder(_admin) { InitialCatalog = _clone }.ConnectionString;
+    internal string LiveRuntimeConnectionString => _runtime?.Connection(CloneConnection) ?? throw new InvalidOperationException("Recovery runtime principal is not provisioned.");
+    internal string LiveObserverConnectionString => CloneConnection;
+    internal string SourceDatabaseIdentity => _sourceName;
+    internal string DestinationDatabaseIdentity => _clone;
+    internal string SourceRuntimePrincipal => "source-owner-" + _sourceToken;
+    internal string RestoredRuntimePrincipal => _runtime?.Name ?? throw new InvalidOperationException("Recovery runtime principal is not provisioned.");
+    internal Guid SourceEpoch => _oldEpoch;
+    internal Guid RestoredEpoch => _newEpoch;
+    internal Guid OldSession => _oldSession;
+    internal Guid OldCommittedOperation => _draft;
+    internal byte[] OldFingerprint => (byte[])_fingerprint.Clone();
+    internal int CustomerId => _customer;
+    internal int WarehouseId => _warehouse;
+    internal int EmployeeId => _employee;
+    internal int ProductId => _product;
+    internal int ReceiptProductId => _receiptProduct;
+    internal string BackupPath => Backup;
+    internal string BackupSha256 { get { VerifySealed(Backup); return _files[Backup].Hash; } }
+    internal Web6RecoveryOracleSnapshot? SourceRecoverySnapshot { get; private set; }
+    internal Web6RecoveryOracleSnapshot? RestoredRecoverySnapshot { get; private set; }
+    internal long LiveFailureDetectedTimestamp { get; private set; }
+    internal long LiveBackupCompleteTimestamp { get; private set; }
+    internal long LiveRestoreCompleteTimestamp { get; private set; }
 
     private Web6MaintenanceRecoveryFixture(string admin, string root, SecurityIdentifier user, SecurityIdentifier service)
     {
@@ -192,6 +217,9 @@ internal sealed class Web6MaintenanceRecoveryFixture
         Web5BackupFixture.EnsureNewDevice(path);
     }
     internal static async Task<Web6MaintenanceRecoveryFixture> CreateAsync()
+        => await CreateAsync(Path.Combine(Path.GetTempPath(), "web6-recovery-" + Guid.NewGuid().ToString("N")));
+
+    internal static async Task<Web6MaintenanceRecoveryFixture> CreateAsync(string root)
     {
         var options = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable))
         { Pooling = false, ConnectRetryCount = 0, ConnectTimeout = 15 };
@@ -203,12 +231,66 @@ internal sealed class Web6MaintenanceRecoveryFixture
         var account = await sql.QuerySingleAsync<string>("SELECT service_account FROM sys.dm_server_services WHERE servicename=N'SQL Server ('+CONVERT(nvarchar(128),@@SERVICENAME)+N')';");
         var service = (SecurityIdentifier)new NTAccount(account).Translate(typeof(SecurityIdentifier));
         using var identity = WindowsIdentity.GetCurrent();
-        var root = Path.Combine(Path.GetTempPath(), "web6-recovery-" + Guid.NewGuid().ToString("N"));
+        root = Path.GetFullPath(root);
         Web5BackupFixture.EnsureNewDevice(root);
         CreatePrivateDirectory(root, identity.User!, service);
         var fixture = new Web6MaintenanceRecoveryFixture(options.ConnectionString, root, identity.User!, service);
         fixture.Record("allocated-private-directory");
         return fixture;
+    }
+
+    internal async Task PrepareForLiveServiceAsync()
+    {
+        if (_started) throw new InvalidOperationException("One recovery attempt only.");
+        _started = true;
+        _source = await SqlTestDatabase.CreateForSupervisorAsync(_admin, name => { _sourceName = name; EnsureDistinctNames(name, _clone); Record("source-create-intent"); });
+        using (var source = new SqlConnection(_source.ConnectionString))
+        {
+            await source.OpenAsync(); await _source.VerifyOwnershipAsync(source, default);
+            _server = await source.QuerySingleAsync<string>("SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName'));");
+            _adminLogin = await source.QuerySingleAsync<string>("SELECT ORIGINAL_LOGIN();");
+            _sourceIdentity = await ReadIdentity(source, _sourceName);
+            _sourcePaths = (await source.QueryAsync<string>("SELECT physical_name FROM sys.database_files ORDER BY file_id;")).ToArray();
+            _sourceToken = await source.QuerySingleAsync<string>("SELECT CONVERT(nvarchar(128),value) FROM sys.extended_properties WHERE class=0 AND name=N'MyDmsVn.TestOwnership';");
+        }
+        Record("source-owned");
+        if (!new DatabaseMigrationRunner().MigrateWeb5(_source.ConnectionString).Successful) throw new InvalidOperationException("Schema13 migration failed.");
+        using (var source = new SqlConnection(_source.ConnectionString))
+        {
+            await source.OpenAsync(); await Seed(source);
+            _sourceOracle = await Snapshot(source);
+            SourceRecoverySnapshot = await RecoverySnapshot(source);
+        }
+        LiveFailureDetectedTimestamp = Stopwatch.GetTimestamp();
+        await VerifyDrain(); Record("source-drained");
+        await BackupAndRestore(Failure.None);
+        using (var clone = new SqlConnection(CloneConnection))
+        {
+            await clone.OpenAsync(); await VerifyClone(clone);
+            Assert.True((await SqlWeb5SchemaCompatibilityChecker.CheckConnectionAsync(clone, default)).IsCompatible);
+            Assert.Equal(_sourceOracle, await Snapshot(clone));
+            RestoredRecoverySnapshot = await RecoverySnapshot(clone);
+            _result.PhysicalOracleMatched = true; _admission.OracleVerified(); Record("clone-oracle-verified");
+            _newEpoch = Guid.NewGuid();
+            var changed = await clone.ExecuteAsync("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@next,RotatedAtUtc=SYSUTCDATETIME() WHERE Id=1 AND DeploymentEpoch=@previous;",
+                new { next = _newEpoch, previous = _oldEpoch });
+            _admission.Rotated(changed); _result.EpochRotations++; Record("clone-epoch-rotated");
+            await clone.ExecuteAsync("UPDATE dbo.WebAuthSessions SET RevokedAtUtc=SYSUTCDATETIME() WHERE SessionId=@oldSession; DELETE dbo.RolePermissions WHERE RoleId IN(SELECT RoleId FROM dbo.UserRoles WHERE UserId=@actor);",
+                new { oldSession = _oldSession, actor = _actor });
+            await Provision(clone, Failure.None);
+        }
+        _admission.PrincipalsVerified(); Record("fresh-principals-verified");
+        await InspectRecovered();
+    }
+
+    internal void AdmitLiveService() { _admission.Admit(); Record("service-host-admitted"); }
+
+    internal async Task CleanupLiveServiceAsync()
+    {
+        await VerifyDrain();
+        _admission.Drained(); Record("all-workers-sessions-drained");
+        _admission.Cleanup(ManifestPath, () => _result.NormalCleanupCommands++);
+        await CleanupOwned();
     }
     internal async Task<Result> RunAsync(Failure failure)
     {
@@ -303,6 +385,7 @@ internal sealed class Web6MaintenanceRecoveryFixture
         await VerifySource(); VerifySealed(Backup);
         await master.ExecuteAsync(new SqlTestCommand("BACKUP DATABASE [" + _sourceName + "] TO DISK=@backup WITH FORMAT,INIT,COPY_ONLY,CHECKSUM;", new { backup = Backup }, commandTimeout: 120));
         Seal(Backup); Record("backup-complete");
+        if (LiveFailureDetectedTimestamp != 0) LiveBackupCompleteTimestamp = Stopwatch.GetTimestamp();
         using (var header = master.CreateCommand())
         {
             header.CommandText = "RESTORE HEADERONLY FROM DISK=@backup;"; header.CommandTimeout = 120; header.Parameters.AddWithValue("@backup", Backup);
@@ -350,17 +433,22 @@ internal sealed class Web6MaintenanceRecoveryFixture
         _dataCreated = File.GetCreationTimeUtc(Data); _logCreated = File.GetCreationTimeUtc(Log);
         _cloneCreated = true;
         Record("restore-complete");
+        if (LiveFailureDetectedTimestamp != 0) LiveRestoreCompleteTimestamp = Stopwatch.GetTimestamp();
     }
     private async Task Seed(SqlConnection sql)
     {
         await sql.ExecuteAsync("EXEC sys.sp_addextendedproperty @name=N'Web6RecoveryOwner',@value=@marker;", new { marker = _marker });
         _oldEpoch = await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;");
         _actor = await sql.QuerySingleAsync<int>("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(N'recovery',N'RECOVERY',N'Recovery',N'Local',N'hash',N'',N'BCrypt');");
+        await sql.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',@hash,N'',N'BCrypt'); INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';",
+            new { hash = new BcryptPasswordHasher().Hash("IisSmoke_test-only-password_2026!") });
         await sql.ExecuteAsync(@"
 INSERT dbo.Roles(RoleName,NormalizedRoleName) VALUES(N'recovery',N'RECOVERY'); DECLARE @r int=SCOPE_IDENTITY();
 INSERT dbo.UserRoles(UserId,RoleId) VALUES(@actor,@r); INSERT dbo.RolePermissions(RoleId,PermissionKey) VALUES(@r,N'Sales.Receipts.Write');
 DECLARE @now datetime2(7)=SYSUTCDATETIME(); INSERT dbo.WebAuthSessions VALUES(@session,@actor,@now,DATEADD(day,1,@now),DATEADD(day,1,@now),NULL);
 INSERT dbo.Products(Code,Name,Unit) VALUES(N'R5',N'Recovery',N'ea'); DECLARE @p int=SCOPE_IDENTITY();
+INSERT dbo.Products(Code,Name,Unit) VALUES(N'R5-SP',N'Recovery sales',N'ea'); DECLARE @sp int=SCOPE_IDENTITY();
+INSERT dbo.Products(Code,Name,Unit) VALUES(N'R5-RP',N'Recovery receipt',N'ea'); DECLARE @rp int=SCOPE_IDENTITY();
 INSERT dbo.Warehouses(Code,Name) VALUES(N'R5',N'Recovery'); DECLARE @w int=SCOPE_IDENTITY();
 INSERT dbo.Employees(Code,Name) VALUES(N'R5',N'Recovery'); DECLARE @e int=SCOPE_IDENTITY();
 INSERT dbo.Customers(Code,Name) VALUES(N'R5',N'Recovery'); DECLARE @c int=SCOPE_IDENTITY();
@@ -372,6 +460,7 @@ INSERT dbo.GoodsReceiptLines(ReceiptId,[LineNo],ProductId,Quantity,UnitCost,Crea
 INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId) VALUES(@w,@p,'GoodsReceipt',41,@line,10,@t,@actor);
 DECLARE @ledger bigint=SCOPE_IDENTITY(); INSERT dbo.StockValuationEntries VALUES(@ledger,20);
 INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@w,@p,10,20);
+INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@w,@sp,1000,15000);
 SET IDENTITY_INSERT dbo.SalesReceipts ON;
 INSERT dbo.SalesReceipts(SaleId,SaleNo,SaleDate,WarehouseId,EmployeeId,CustomerId,Status,CreatedByUserId) VALUES(42,N'R5-D','20250101',@w,@e,@c,'Draft',@actor);
 SET IDENTITY_INSERT dbo.SalesReceipts OFF;
@@ -379,6 +468,10 @@ INSERT dbo.SalesReceiptLines(SaleId,[LineNo],ProductId,Qty,Unit,IsGift,LineAmoun
 INSERT dbo.WebOperationJournal VALUES(@actor,@post,@epoch,1,1,6,41,@hash,41,'EXPIRED',NULL,@t,@t,DATEADD(day,7,@t));
 INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'COMMITTED',0x7b7d,@t,@t,DATEADD(day,7,@t));",
             new { actor = _actor, session = _oldSession, epoch = _oldEpoch, post = _post, draft = _draft, hash = _fingerprint });
+        var catalog = await sql.QuerySingleAsync<(int Customer, int Warehouse, int Employee, int Product, int ReceiptProduct)>(
+            "SELECT (SELECT CustomerId FROM dbo.Customers WHERE Code=N'R5'),(SELECT WarehouseId FROM dbo.Warehouses WHERE Code=N'R5'),(SELECT EmployeeId FROM dbo.Employees WHERE Code=N'R5'),(SELECT ProductId FROM dbo.Products WHERE Code=N'R5-SP'),(SELECT ProductId FROM dbo.Products WHERE Code=N'R5-RP');");
+        _customer = catalog.Customer; _warehouse = catalog.Warehouse; _employee = catalog.Employee;
+        _product = catalog.Product; _receiptProduct = catalog.ReceiptProduct;
         Record("source-seeded");
     }
     private async Task Provision(SqlConnection sql, Failure failure)
@@ -664,6 +757,27 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
             if (includeJournal || !table.StartsWith("WebOperationJournal", StringComparison.Ordinal))
                 rows.Add(await sql.QuerySingleAsync<string>("SELECT (SELECT * FROM dbo." + table + " FOR JSON PATH,INCLUDE_NULL_VALUES);"));
         return string.Join("|", rows);
+    }
+    private static async Task<Web6RecoveryOracleSnapshot> RecoverySnapshot(SqlConnection sql)
+    {
+        var headers = await sql.QuerySingleAsync<long>("SELECT (SELECT COUNT_BIG(*) FROM dbo.SalesReceipts)+(SELECT COUNT_BIG(*) FROM dbo.GoodsReceipts);");
+        var lines = await sql.QuerySingleAsync<long>("SELECT (SELECT COUNT_BIG(*) FROM dbo.SalesReceiptLines)+(SELECT COUNT_BIG(*) FROM dbo.GoodsReceiptLines);");
+        var journal = await sql.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.WebOperationJournal;");
+        var ledger = await sql.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.StockLedger;");
+        var valuation = await sql.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.StockValuationEntries;");
+        var balances = await sql.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.StockBalances;");
+        var canonical = await sql.QuerySingleAsync<string>(@"SELECT
+(SELECT * FROM dbo.SalesReceipts ORDER BY SaleId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.SalesReceiptLines ORDER BY SaleLineId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.GoodsReceipts ORDER BY ReceiptId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.GoodsReceiptLines ORDER BY ReceiptLineId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.StockBalances ORDER BY WarehouseId,ProductId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.StockLedger ORDER BY LedgerId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.StockValuationEntries ORDER BY LedgerId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.WebOperationJournal ORDER BY ActorUserId,OperationId FOR JSON PATH,INCLUDE_NULL_VALUES);");
+        using var sha = SHA256.Create();
+        return new Web6RecoveryOracleSnapshot(headers, journal, lines, ledger, valuation, balances,
+            "sha256:" + Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(canonical))));
     }
     private static string HashFile(string path) { using var stream = File.OpenRead(path); using var sha = SHA256.Create(); return Hex(sha.ComputeHash(stream)); }
     private static string Hex(byte[] bytes) => string.Concat(bytes.Select(b => b.ToString("x2", CultureInfo.InvariantCulture)));

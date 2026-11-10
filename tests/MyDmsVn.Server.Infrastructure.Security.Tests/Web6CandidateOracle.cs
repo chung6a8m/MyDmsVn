@@ -271,6 +271,19 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE 
         await VerifyResultProjection(sql, row, envelope, cancellationToken).ConfigureAwait(false);
     }
 
+    internal static async Task VerifyRecoveryPostAsync(SqlConnection sql, Guid operationId,
+        Web6StockExpectation stock, CancellationToken cancellationToken)
+    {
+        var row = await sql.QuerySingleAsync<JournalRow>(new SqlTestCommand(@"
+SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes
+FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId
+WHERE j.OperationId=@operation AND j.Disposition='COMMITTED';",
+            new { operation = operationId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        if (row.OperationKind is not (3 or 6)) throw Invalid();
+        await VerifyPhysicalEffect(sql, row, stock ?? throw Invalid(), cancellationToken).ConfigureAwait(false);
+        await VerifyResultProjection(sql, row, ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes), cancellationToken).ConfigureAwait(false);
+    }
+
     internal static async Task<long> VerifyCommittedSetupAsync(SqlConnection sql, Web6CommittedSetup proof, Guid epoch)
     {
         var rows = (await sql.QueryAsync<JournalRow>(@"
