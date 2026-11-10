@@ -1,6 +1,46 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-10): attempt04 PREPARED / PIN_MATCHED, then FailedRetained at the first Chromium selector; Task 6 OPEN.** One owned SQL allocation and runtime login plus host-runtime configuration are retained. IIS/browser launch was not reached, no later selector ran, and no CandidateVerified receipt exists. Attempts01–03 and earlier prerequisite failures remain separate retained history below. No live PASS, performance, RPO or RTO is claimed.
+**Latest disposition (2026-11-10): attempt05 PREPARED / PIN_MATCHED, then BlockedNoAllocation because the installed Edge bytes changed before run; Task 6 OPEN.** All five selectors are NOT RUN. Attempt04 remains FailedRetained with its SQL/runtime resources; all earlier records remain separate history. No CandidateVerified, live PASS, workload or recovery result is claimed.
+
+## Task 6 attempt05 prepared then BlockedNoAllocation
+
+After the reviewed pre-allocation backend source-admission fix and new explicit Owner authorization, candidate `web6-20261110-300ef832` used new private roots, new SQL approval and fresh Owner authority/request. The backend source was `914b2196d41999f6f465ae076e4fcbe4ef524a87`, tree `62632251fb124f85769edde70fd7dd8e688f1051`. The controller distinguished frontend evidence head `cdae4f43cea5a06ea15b5b119622888dbc1faac6` from exact reviewed source `13179f56a3381275c0652f6edaf29258f18927f2`, tree `f493e5911494a3eb4361397e3c65c72ae37b87e9`; prepare created fresh detached worktrees at the latter pin. No pin guard was changed.
+
+The new four-field SQL approval used a fresh read-only effective-master/server query, purpose `web6-cutover`, expiry `2026-11-10T16:14:46Z` (eight hours), and the repository's protected create-new writer. Exact current-user-only owner/ACL, schema, digest and server binding passed. No old approval/request/receipt payload or historical SQL/runtime resource was read or reused. Only the independently supplied existing private Node/npm pointer was reused: all 2,337 files and 572 directories passed identity/hash/ACL/no-link checks, with Node `22.14.0`, npm `11.6.0`, whole-tree SHA-256 `c55ed76c2333bcb335b2327f639195464c2ed7685b329da812f02c85bed29529`.
+
+A preliminary issuance-only root (`issue05a`) is separately retained: using net48 `ProtectedJsonFile` under PowerShell 7 failed at `FileStream.GetAccessControl()`, after creating only a new approval file and diagnostic. Its task/SQL parents stayed empty; authorize/prepare/run were not called. The controller approved a new root (`issue05b`) using existing Windows PowerShell/.NET Framework. No install, browser change, global configuration mutation, old approval copy or source change was performed.
+
+| Attempt05 record | SHA-256 |
+|---|---|
+| Release/net48 bootstrap executable | `47d303a4b30e2ccb63519ca90ae7bf95cbdbc6caade33867706f1566465c1e41` |
+| New SQL approval | `b38ef13bf82f7bd1b8be56e3222f2ef9c58ee14c3d3ca532dc69329ed9acf0f2` |
+| Owner authority / request | `ad94675c3729bad50016354618b4f1c169ca4aff36f950a7ee07843132a06050` / `538641396142353ae7d300602233a78cfa555bc6b0a896b6d04dfc6ff342bbac` |
+| Prepared receipt | `25323e16d014875c8b8e8617749028c05a6d407153f4c7d98fbd184b57b1d042` |
+| Ordinary dist / manifest | `5c7908157609e24760dcab5da26b170f5194f1918f2343f80aa164aab0ef59ab` / `796d86094b6cfd29efa1d99aac49bd9fd10bb80c73b71d0164d853e74485ef53` |
+| Candidate dist / manifest | `bc8efce84e631b52fb4eace9bf42ee8f47414b1577b5cbf4f1926d6d55e190a9` / `ea0dfa8bb3b1385aae5ae8c96355b16277012bb5ea6722030bb0a873314224d2` |
+| Current / old backend publish | `69a337871d09b214cfec188173b38b164ace51b570d3f0c666e0b340e7f5abc0` / `0d16ea13a2499b81d74189bd948344cc8562eeed241d3c1fd005452eaf2d0278` |
+| Cutover build authority | `c2e3ba665e9fdb70c6f2a363cd83fe697d3f1d26c987b15dcc897798d97368e6` |
+| BlockedNoAllocation terminal receipt | `5066422846b7aff633a0cac7093a564816745d689ab2e872d4ad94aacb991844` |
+
+Authorize ran once, exit 0. Prepare ran once, `08:15:31.8016884Z`–`08:18:21.2920865Z`, exit 0, `PREPARED / PIN_MATCHED`. Independent checks confirmed ordinary `candidateId:null` (OFF), the exact candidate marker, all ten dist files equal to the complete published wwwroot, clean detached source pins, empty SQL control parent and absent live roots. The command forms remain `authorize`, `prepare`, then `run` as documented in the [runbook](../../development/WEB6_CANDIDATE_RUNBOOK.md#7-controlled-bootstrap-and-protected-sql-approval).
+
+One run from `08:18:40.2239975Z` to `08:18:40.9365692Z` exited 4 with `BlockedNoAllocation`, run ID `run-823340899eb7478d851dd419bf713092`. Read-only diagnosis found all authority bindings and seven of eight tool digests still matching, but Edge had changed from prepared version `157.0.4341.42` / SHA-256 `d258e512aa24947cfbef0c0033d8c3cd56ecb40f7b2ad59802fa75c4e4f3324d` to observed `157.0.4341.46` / `3e2c8557b5ca4d78868d3089346146ceab94f198ce3d58526ce8f6c8d4b4167c`. `BootstrapRunExecution.PrepareAsync` rejects unequal pinned tool records before selector build/invocation. The agent did not change Edge; the external actor responsible was not established. No guard was bypassed and no run was retried.
+
+| Required selector | Discovered / executed / passed / failed / skipped | Result |
+|---|---:|---|
+| Chromium pair | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Edge pair | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Cutover | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Workload | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+| Recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+The terminal receipt has no selector/TRX and disposition `BlockedBeforeAllocation`. SQL control parent remains empty, all five live roots absent and evidence directory empty. Retained attempt05 resources are authority/request/diagnostics, five prepared worktrees, artifacts and prepared/run receipts; **no new SQL database/login, host-runtime, IIS process/queue or browser context was allocated**. No cleanup or resource-adoption action occurred. The earlier attempt04 SQL/database/login and host-runtime remain untouched FailedRetained resources.
+
+Other observed prepared inputs: Windows 11 Home x64 build 26300, SDK `8.0.427`, SQL Server `14.0.2140.2`, IIS Express `10.0.26013.1000`, Chromium `156.0.8078.4`; certificate digest remains `47985af0a6345e7c8df22aacbea36cf7cb12d924eba42704cb6997745470f647`. Workload has no samples/percentiles and recovery has no RPO/RTO. No Task4 acceptance, final independent disposition or CandidateVerified exists. Any further attempt requires new explicit Owner authorization and a fresh candidate/root/approval chain against independently revalidated machine inputs; do not reopen this terminal attempt or alter its receipt. Ordinary resend OFF, full IIS/unperformed Narrator NOT RUN, staging NOT ACCEPTED and production NO-GO remain unchanged. No roadmap status advances.
+
+### Attempt05 pure verification
+
+At backend `914b2196` and frontend evidence head `cdae4f4`, fresh SQL-free checks passed: Application **363/363**, HttpHost **635/635**, and Security **240/240** (four bootstrap classes 227 plus `Web6CandidateBackendSourceTests` 13), zero failed/skipped with actual TRX totals matching execution. Direct Debug/net48 `dotnet test` used `--no-restore`; child shells removed both SQL connection/approval variables. The Security filter was the four-class filter recorded below plus `FullyQualifiedName~Web6CandidateBackendSourceTests`. Frontend typecheck passed; unit **81 files / 1,558 tests** passed, zero failures. TRX SHA-256: Application `4e71eb2833afc5e3c1e3fe04f653a6e970a603fcb2a06d8bf773af0c15244d18`, HttpHost `9a43c8214947cb37ea4b4342e1172e565c470971572a034063923e4be06e107e`, Security `9eb111438152b319fac6629e126d883bf848baecff362fd48c2f549025bf9fde`. These checks do not replace any missing live result.
 
 ## Task 6 attempt04 prepared then FailedRetained
 
@@ -63,7 +103,7 @@ TRX SHA-256: Application `c7a0a06507e1cadf6fcf6ae37997520b0bf59e42c5d1c93aa7c92b
 
 ## Task 6 controlled bootstrap attempt
 
-**Attempt01 history; the latest disposition is attempt04 above.**
+**Attempt01 history; the latest disposition is attempt05 above.**
 
 Owner approved the nonproduction bootstrap plan and destructive drill scope, including the separate authorization step. Candidate `web6-20261110-25a1cf46`, attempt `attempt01`, ran once at `2026-11-10T05:01:14Z`. The Owner authority covered HTTPS localhost ports 44321/44322, the pair/cutover/workload/recovery drills, new private task/SQL parents, the four exact source pins below and expiry `2026-11-10T13:01:13Z`. That authority is not a pilot-enable decision.
 
