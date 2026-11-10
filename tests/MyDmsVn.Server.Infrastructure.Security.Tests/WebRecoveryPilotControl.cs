@@ -1,4 +1,5 @@
 using System;
+using MyDmsVn.Web6.CandidateBootstrap;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
@@ -21,7 +22,7 @@ internal sealed class WebRecoveryPilotControl
     private readonly string _connectionString;
     private readonly string _name = "mydmsvn-web4-recovery-" + Guid.NewGuid().ToString("N");
     private readonly string _token = Guid.NewGuid().ToString("N");
-    private readonly CancellationTokenSource _stop = new CancellationTokenSource(TimeSpan.FromMinutes(6));
+    private readonly CancellationTokenSource _stop;
     private readonly List<Guid> _epochs = new List<Guid>();
     private Task _serving = Task.CompletedTask;
     private bool _stopped;
@@ -42,8 +43,8 @@ internal sealed class WebRecoveryPilotControl
     private Func<string, Guid?, JObject?, Task<JObject>>? _cutover;
     private bool _eligibilityUserDisabled;
     private bool _eligibilityJournalDenied;
-    private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null, Web6CandidateHostMismatch? candidateMismatch = null)
-    { _connectionString = connectionString; _web5 = web5; _web6 = web6; _runtimeUser = runtimeUser; _candidateMismatch = candidateMismatch; }
+    private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null, Web6CandidateHostMismatch? candidateMismatch = null, bool candidatePair = false)
+    { _stop = new CancellationTokenSource(Web6CandidatePairBudgets.ControllerLifetime(candidatePair)); _connectionString = connectionString; _web5 = web5; _web6 = web6; _runtimeUser = runtimeUser; _candidateMismatch = candidateMismatch; }
     public Guid[] Epochs => _epochs.ToArray();
     public bool NegativeVerified => _negativeSequence.Complete && _negativeIdentities.Count == 6;
     public Web5NegativePilot.Identity[] NegativeIdentities => _negativeIdentities.ToArray();
@@ -65,12 +66,12 @@ internal sealed class WebRecoveryPilotControl
         return control;
     }
 
-    public static async Task<WebRecoveryPilotControl> StartCandidate(string connectionString, string runtimeUser, Web6CandidateHostMismatch candidateMismatch)
+    public static async Task<WebRecoveryPilotControl> StartCandidate(string connectionString, string runtimeUser, Web6CandidateHostMismatch candidateMismatch, bool candidatePair = false)
     {
         if (string.IsNullOrEmpty(runtimeUser) || !runtimeUser.All(character => char.IsLetterOrDigit(character) || character == '_'))
             throw new ArgumentException("Candidate runtime identity is invalid.", nameof(runtimeUser));
         if (candidateMismatch == null) throw new ArgumentNullException(nameof(candidateMismatch));
-        var control = new WebRecoveryPilotControl(connectionString, web5: true, web6: true, runtimeUser: runtimeUser, candidateMismatch: candidateMismatch);
+        var control = new WebRecoveryPilotControl(connectionString, web5: true, web6: true, runtimeUser: runtimeUser, candidateMismatch: candidateMismatch, candidatePair: candidatePair);
         using (var sql = new SqlConnection(connectionString))
             control._epochs.Add(await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;"));
         control._serving = control.Serve();

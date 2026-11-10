@@ -39,7 +39,7 @@ internal sealed class Web6CandidateBootstrapOrchestrator
             {
                 token.ThrowIfCancellationRequested(); root.Verify(); evidence.Verify();
                 var env = plan.EnvironmentFor(gate.Name, runId, sql, task4Path, task4Hash);
-                var invocation = new SelectorInvocation(gate.Name, gate.Filter, env, TimeSpan.FromMinutes(25),
+                var invocation = new SelectorInvocation(gate.Name, gate.Filter, env, Web6CandidatePairBudgets.GateTimeout(gate.Name),
                     Path.Combine(plan.TaskRoot, "trx-" + gate.Name, "result.trx"), plan.SelectorDll);
                 result = await _invoke(plan, invocation, token).ConfigureAwait(false);
                 if (!result.PassedMandatoryTests) return state.Fail(result);

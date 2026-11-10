@@ -409,6 +409,29 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
         Assert.Throws<IOException>(() => state.Accept(retry, gate));
     }
 
+    [Theory]
+    [InlineData("pair-chromium", "chromium", true)]
+    [InlineData("pair-edge", "edge", true)]
+    [InlineData("pair-edge", "chromium", false)]
+    [InlineData("cutover", "chromium", false)]
+    public async Task Long_pair_budget_is_scoped_before_launch_and_forwarded_to_owned_process(string name, string project, bool admitted)
+    {
+        var env = new Dictionary<string, string> { ["MYDMSVN_WEB6_CANDIDATE_ENABLE"] = "1",
+            ["MYDMSVN_WEB_PILOT_PROJECT"] = project, ["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = RunId };
+        var invocation = Invocation(name, Web6CandidatePairBudgets.PairFilter, env, TimeSpan.FromMinutes(43));
+        var called = false;
+        var runner = Runner((request, _) =>
+        {
+            called = true;
+            Assert.True(request.Web6CandidatePair);
+            Assert.Equal(TimeSpan.FromMinutes(43), request.Timeout);
+            return Task.FromResult(new GuiProcessResult(1, "", ""));
+        });
+        if (admitted) await runner.RunAsync(invocation, CancellationToken.None);
+        else await Assert.ThrowsAsync<IOException>(() => runner.RunAsync(invocation, CancellationToken.None));
+        Assert.Equal(admitted, called);
+    }
+
     private SelectorProcessRunner Runner(Func<BootstrapProcessRequest, CancellationToken, Task<GuiProcessResult>> run) =>
         new(Executable, GitExecutable, _gitSha, _root, Project, run);
 

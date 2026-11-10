@@ -768,6 +768,7 @@ public sealed partial class WebHostIisExpressTests
         Web6CandidateBackendSource? backendSource = null)
     {
         var connectionString = database.ConnectionString;
+        var candidatePair = Web6CandidatePairBudgets.IsPairMode(web6Candidate, web6Cutover, Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"));
         var checkout = Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")!);
         var node = Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_NODE") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe");
         var cli = Path.Combine(checkout, "node_modules", "@playwright", "test", "cli.js");
@@ -801,7 +802,7 @@ public sealed partial class WebHostIisExpressTests
         {
             Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web4-recovery-live.spec.ts")));
             if (web5Pilot) Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web5-resolution-live.spec.ts")));
-            recovery = cutoverControl ?? (web6Candidate ? await WebRecoveryPilotControl.StartCandidate(connectionString, runtimeUser!, candidateMismatch!) :
+            recovery = cutoverControl ?? (web6Candidate ? await WebRecoveryPilotControl.StartCandidate(connectionString, runtimeUser!, candidateMismatch!, candidatePair) :
                 originalFirstPilot ? await WebRecoveryPilotControl.StartOriginalFirst(database, Environment.GetEnvironmentVariable("MYDMSVN_WEB5_RACE_PARENT_DIRECTORY")!) :
                 await WebRecoveryPilotControl.Start(connectionString, web5Pilot));
             manifestJson["mode"] = web5Pilot ? "web5-recovery" : "web4-recovery";
@@ -844,7 +845,10 @@ public sealed partial class WebHostIisExpressTests
             try
             {
                 browserDrained = false;
-                var executed = await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5));
+                var budget = Web6CandidatePairBudgets.BrowserTimeout(web6Candidate, web6Cutover, project);
+                var executed = candidatePair
+                    ? await GuiOwnedProcess.RunWeb6CandidatePairAsync(start, budget, selectorProcess: false)
+                    : await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5));
                 browserDrained = true;
                 File.WriteAllText(Path.Combine(runDirectory, outputName), Sanitize(recovery?.Redact(executed.StandardOutput + executed.StandardError) ?? executed.StandardOutput + executed.StandardError), new UTF8Encoding(false));
                 Assert.True(executed.ExitCode == 0, "Browser pilot failed; inspect the sanitized local browser output (redact before sharing).");

@@ -19,14 +19,15 @@ namespace MyDmsVn.Web6.CandidateBootstrap;
 internal sealed class BootstrapProcessRequest
 {
     internal BootstrapProcessRequest(string executable, string directory, string[] arguments,
-        IReadOnlyDictionary<string, string> environment, TimeSpan timeout, bool exactUtf8Stdout = false)
-    { Executable = executable; WorkingDirectory = directory; Arguments = arguments; Environment = environment; Timeout = timeout; ExactUtf8Stdout = exactUtf8Stdout; }
+        IReadOnlyDictionary<string, string> environment, TimeSpan timeout, bool exactUtf8Stdout = false, bool web6CandidatePair = false)
+    { Executable = executable; WorkingDirectory = directory; Arguments = arguments; Environment = environment; Timeout = timeout; ExactUtf8Stdout = exactUtf8Stdout; Web6CandidatePair = web6CandidatePair; }
     internal string Executable { get; }
     internal string WorkingDirectory { get; }
     internal IReadOnlyList<string> Arguments { get; }
     internal IReadOnlyDictionary<string, string> Environment { get; }
     internal TimeSpan Timeout { get; }
     internal bool ExactUtf8Stdout { get; }
+    internal bool Web6CandidatePair { get; }
 }
 
 internal sealed class BootstrapCertificate

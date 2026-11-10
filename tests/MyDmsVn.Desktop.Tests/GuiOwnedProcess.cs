@@ -29,6 +29,12 @@ namespace MyDmsVn.Desktop.Tests
             CancellationToken cancellationToken = default, Encoding? stdoutEncoding = null)
             => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(30), cancellationToken, stdoutEncoding: stdoutEncoding);
 
+        // Only the protected WEB6 pair callers use this exception. Ordinary 5m
+        // and attended 30m ceilings and all job/drain/poison behavior stay intact.
+        public static Task<GuiProcessResult> RunWeb6CandidatePairAsync(ProcessStartInfo start, TimeSpan timeout,
+            bool selectorProcess, CancellationToken cancellationToken = default)
+            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(selectorProcess ? 43 : 40), cancellationToken);
+
         private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout,
             CancellationToken cancellationToken, Action<int>? started = null, Encoding? stdoutEncoding = null)
         {
