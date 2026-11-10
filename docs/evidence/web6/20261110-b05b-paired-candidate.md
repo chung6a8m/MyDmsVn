@@ -1,6 +1,42 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-10): attempt06 PREPARED / PIN_MATCHED, then FailedRetained in the Chromium selector; Task 6 OPEN.** IIS Express and Chromium launched, but candidate control failed on a SQL oracle column mismatch. Cleanup is Quarantined; owned SQL/runtime resources remain retained. All later gates are NOT RUN. Prior attempts retain their separate dispositions. No CandidateVerified, live pair PASS, workload or recovery result is claimed.
+**Latest disposition (2026-11-10): attempt07 PREPARED / PIN_MATCHED, then FailedRetained in the Chromium selector; Task 6 OPEN.** IIS Express/Chromium launched, but candidate control failed on unquoted `LineNo` in the SQL oracle. Cleanup is Quarantined; owned SQL/runtime resources remain retained. All later gates are NOT RUN. Prior attempts retain their separate dispositions. No CandidateVerified, live pair PASS, workload or recovery result is claimed.
+
+## Task 6 attempt07 SQL syntax failure and retained quarantine
+
+The Owner authorized one fresh attempt after review of backend `0e090643e2d9de01bcbd98ae5dcfd08174b29216` (tree `94f931671c9829e8ffd21de209cfcbc8e385863a`), which corrects the Sales header projection to `SaleNo AS SaleNumber`. Candidate `web6-20261110-dc006b02` used that exact backend and frontend source `13179f56a3381275c0652f6edaf29258f18927f2` / tree `f493e5911494a3eb4361397e3c65c72ae37b87e9`; frontend evidence head `e5d0e51` did not retarget the source pin.
+
+Before any new private root/approval/authority, four read-only Edge observations (`09:32:31.2744022Z`–`09:33:01.3951521Z`, 30.12075 seconds) matched file identity, version `157.0.4341.46` and SHA-256 `3e2c8557b5ca4d78868d3089346146ceab94f198ce3d58526ce8f6c8d4b4167c`; metadata/file identity was unchanged during each read. Independently, the approved private Node/npm pointer passed all 2,337-file/572-directory identity/hash/ACL/no-link checks before root creation: Node `22.14.0`, npm `11.6.0`, tree `c55ed76c2333bcb335b2327f639195464c2ed7685b329da812f02c85bed29529`. No Edge lock/copy/updater change, installation or global mutation was introduced.
+
+Fresh roots, independent SQL approval, Owner authority and request were then created with Windows PowerShell/net48 protected create-new publication. Exact four-field `web6-cutover` schema, current-user-only protected ACL, digest and fresh effective-master/server binding passed; expiry `2026-11-10T17:33:55Z` was eight hours. Previous protected payloads/SQL/runtime resources were not read, copied, reused or adopted. Authorize ran once, exit 0. Prepare ran once, `09:34:15.9965825Z`–`09:38:14.6366892Z`, exit 0, `PIN_MATCHED`; ordinary candidate ID null/OFF, exact candidate marker, ten-file full dist/wwwroot equality, clean detached pins and zero pre-run allocation/live roots were independently checked.
+
+| Attempt07 record | SHA-256 |
+|---|---|
+| Release/net48 bootstrap | `8b63fc85bd24a99b4c542948f54952799dbf6f4fcd6a8b5a54a7e79a42889502` |
+| New SQL approval | `2f1da5744b979adfa66865d33a014cb5aa1577be964db8d8ac487383dc4edeae` |
+| Owner authority / request | `62a28aaa9d39b90874185c729dda8aea4a732bd49927278fe0adaff365f0bf9e` / `8599a3390581a7fdf67b935dd96fb52d657f02a4268bc2febe32df637bac1abd` |
+| Prepared / terminal receipt | `33d4e18dad8fb7e41a61e8cd9cec3bf0d994a39e2cd1cac1e38db987fa6f4dcd` / `c879eb79433a040230027eeeda2c8596ab4ff33a9830a8390fe5d7d14e70851d` |
+| Ordinary dist / manifest | `5c7908157609e24760dcab5da26b170f5194f1918f2343f80aa164aab0ef59ab` / `796d86094b6cfd29efa1d99aac49bd9fd10bb80c73b71d0164d853e74485ef53` |
+| Candidate dist / manifest | `04b188b19d5a08da6a285462026d39afae37b3dea33b33f3a00b859ec126a49b` / `59401842df3caae60bcffa7c232c2efcb8b60d104f838a495965ecaee090fd69` |
+| Current / old backend publish | `571d260988cafeddd970411118287c41eba7e9a432e823dcf6d97b2caf87dc2c` / `cb0c12e4006b80acee3b8126bcd043134da6aac0960a3e25b1dd113456c57deb` |
+| Cutover build authority | `2030442e8580ef49470232a77e63bd069d53f4087ab70766cb8a7326cc9b630e` |
+| Chromium wrapper TRX / selector DLL | `7588786a4256faa148610e2e622adb7be92f77ae6d8fae34fed0d2040dc0c909` / `cc57d16c9151920072943ecc4b6ea967212c78d6e93deb8307a264e76e7f9a23` |
+
+Run started `09:38:15.8173560Z`, **1.181 seconds** after prepare ended, and finished `09:39:55.2807593Z`, exit 5 `FailedRetained`. Run ID `run-a12187dd1de340ca8bad488d980fcf46`. The sole exact Chromium selector documented below ran `09:38:39.8783361Z`–`09:39:55.2115509Z`; wrapper test duration 63.050 seconds. It reports `NonzeroExit`, `processTreeDrained:true`, `requiresDispositionProof:true`. No retry/resend or nonessential inter-stage pause occurred.
+
+| Required selector | Discovered / executed / passed / failed / skipped | Result |
+|---|---:|---|
+| Chromium pair | 1 / 1 / 0 / 1 / 0 | FAIL / FailedRetained |
+| Edge pair | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Cutover | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Workload | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+| Recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+IIS Express and Chromium launched. Nested Playwright selected three tests using one worker: **0 passed, 1 failed, 2 did not run**. The first six-operation case reported `Owned WEB6 candidate control failed`; control drain surfaced `SqlException: Incorrect syntax near the keyword 'LineNo'`. The stack reaches `Web6CandidateOracle.VerifyResultProjection:313`, the Sales line query at line 314. Both that query and the Receipt line query at line 324 use unquoted `LineNo` in projection/order clauses; migration010 declares `[LineNo]`. The reviewed header-column correction is present, but this separate syntax defect remains unfixed. Full six-command/projection verification did not complete, and retained SQL may contain committed test effects.
+
+Candidate records are `Chromium=Failed`, `Cleanup=Quarantined`. One newly allocated SQL database/runtime login/control root, host-runtime config/browser log, candidate manifest/audit/disposition and prepared artifacts remain retained. Allocation receipt `9948a31473b199e1c327afbeaca9f70b54f612145da51b7ebd88d92234921e6a` binds original control digest `c19a005cd8d23101bfc200f459bc40b39cbf30ade5cc7e16a43be5497113f1f4`. The harness reports process drain; no accepted SQL/artifact cleanup or final independent disposition exists. The agent performed no post-failure SQL query, manual cleanup, source fix, historical-resource inspection/adoption or retry.
+
+Prepared environment: Windows 11 Home x64 build 26300, SDK `8.0.427`, SQL `14.0.2140.2`, IIS Express `10.0.26013.1000`, Chromium `156.0.8078.4`, Edge `157.0.4341.46`; Node/npm as above. Workload has no samples/percentiles; recovery has no RPO/RTO. No Task4 acceptance or CandidateVerified exists. A future attempt requires a reviewed oracle SQL correction and new explicit Owner authorization with fresh roots/SQL approval/Owner authority/request. Ordinary resend OFF, full IIS/unperformed Narrator NOT RUN, staging NOT ACCEPTED, production NO-GO. Task 6 and B05/F04 remain incomplete.
 
 ## Task 6 attempt06 Chromium failure and retained quarantine
 
@@ -140,7 +176,7 @@ TRX SHA-256: Application `c7a0a06507e1cadf6fcf6ae37997520b0bf59e42c5d1c93aa7c92b
 
 ## Task 6 controlled bootstrap attempt
 
-**Attempt01 history; the latest disposition is attempt06 above.**
+**Attempt01 history; the latest disposition is attempt07 above.**
 
 Owner approved the nonproduction bootstrap plan and destructive drill scope, including the separate authorization step. Candidate `web6-20261110-25a1cf46`, attempt `attempt01`, ran once at `2026-11-10T05:01:14Z`. The Owner authority covered HTTPS localhost ports 44321/44322, the pair/cutover/workload/recovery drills, new private task/SQL parents, the four exact source pins below and expiry `2026-11-10T13:01:13Z`. That authority is not a pilot-enable decision.
 
