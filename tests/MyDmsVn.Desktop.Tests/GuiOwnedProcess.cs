@@ -10,7 +10,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 
+#if WEB6_BOOTSTRAP
+namespace MyDmsVn.Web6.CandidateBootstrap.Processes
+#else
 namespace MyDmsVn.Desktop.Tests
+#endif
 {
     internal static class GuiOwnedProcess
     {

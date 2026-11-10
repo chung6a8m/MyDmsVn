@@ -606,6 +606,7 @@
       "mydmsvn.web6.candidatebootstrap": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.Data.SqlClient": "[7.0.2, )",
           "Newtonsoft.Json": "[13.0.4, )"
         }
       },

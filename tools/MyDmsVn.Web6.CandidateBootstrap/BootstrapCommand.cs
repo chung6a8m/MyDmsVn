@@ -21,10 +21,11 @@ internal static class BootstrapCommand
 {
     private const string Acknowledgement = "I AUTHORIZE WEB6 NONPRODUCTION DESTRUCTIVE DRILLS";
 
-    internal static Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken token) =>
-        Task.FromResult((int)Run(args, stdout, stderr, token));
+    internal static async Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken token,
+        BootstrapToolchain? toolchain = null) => (int)await Run(args, stdout, stderr, token, toolchain).ConfigureAwait(false);
 
-    private static BootstrapExitCode Run(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken token)
+    private static async Task<BootstrapExitCode> Run(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken token,
+        BootstrapToolchain? toolchain)
     {
         if (args.Length == 1 && args[0] == "--help")
         {
@@ -57,11 +58,23 @@ internal static class BootstrapCommand
                     using (var authority = BootstrapAuthority.ReadProtected(
                         options["--authority"], options["--authority-sha256"], DateTimeOffset.UtcNow))
                     {
-                        BootstrapRequest.ReadStrict(options["--request"], authority);
+                        var request = BootstrapRequest.ReadStrict(options["--request"], authority);
                         authority.Verify(DateTimeOffset.UtcNow);
                         token.ThrowIfCancellationRequested();
+                        try
+                        {
+                            var prepared = await new BootstrapPreflight(toolchain ?? BootstrapToolchain.Local())
+                                .PrepareAsync(request, token).ConfigureAwait(false);
+                            stdout.WriteLine("status=PREPARED candidate=" + request.CandidateId + " sha256=" + prepared.Sha256 +
+                                " cutover=" + prepared.CutoverAdmission);
+                            return BootstrapExitCode.Success;
+                        }
+                        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                        {
+                            stderr.WriteLine("status=BLOCKED_PREFLIGHT");
+                            return BootstrapExitCode.BlockedPreflight;
+                        }
                     }
-                    break;
                 case "run":
                     BootstrapJson.AbsolutePath(options["--prepared"]);
                     break;
@@ -78,7 +91,7 @@ internal static class BootstrapCommand
             return BootstrapExitCode.BlockedPreflight;
         }
 
-        // Preparation and selector execution are added by the later bootstrap tasks.
+        // Selector execution is added by the later bootstrap tasks.
         stderr.WriteLine("status=BLOCKED_PREFLIGHT");
         return BootstrapExitCode.BlockedPreflight;
     }

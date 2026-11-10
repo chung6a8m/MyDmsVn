@@ -23,17 +23,17 @@ internal sealed class ProtectedJsonFile : IDisposable
     private readonly (uint Volume, uint IndexHigh, uint IndexLow, long CreationTime) _identity;
     private readonly string _acl;
 
-    private ProtectedJsonFile(string path, string sha256, PathLease parents, FileStream stream)
+    private ProtectedJsonFile(string path, string? sha256, PathLease parents, FileStream stream)
     {
         Path = path;
-        Sha256 = sha256;
         _parents = parents;
         _stream = stream;
         _owner = CurrentOwner();
         _identity = Inspect(stream.SafeFileHandle, path, directory: false);
         _acl = PrivateAcl(stream, _owner);
         Bytes = ReadBytes(stream);
-        if (Digest(Bytes) != sha256)
+        Sha256 = Digest(Bytes);
+        if (sha256 != null && Sha256 != sha256)
             throw new IOException("Protected bootstrap file digest differs.");
         Verify();
     }
@@ -44,9 +44,16 @@ internal sealed class ProtectedJsonFile : IDisposable
 
     internal static ProtectedJsonFile Open(string path, string sha256)
     {
-        path = BootstrapJson.AbsolutePath(path);
         if (!BootstrapJson.IsLowerHex(sha256, 64))
             throw new IOException("Protected bootstrap file digest is invalid.");
+        return OpenCore(path, sha256);
+    }
+
+    internal static ProtectedJsonFile OpenSqlApproval(string path) => OpenCore(path, expectedSha256: null);
+
+    private static ProtectedJsonFile OpenCore(string path, string? expectedSha256)
+    {
+        path = BootstrapJson.AbsolutePath(path);
 
         var parents = new PathLease(path);
         try
@@ -54,7 +61,7 @@ internal sealed class ProtectedJsonFile : IDisposable
             var stream = parents.OpenRead();
             try
             {
-                return new ProtectedJsonFile(path, sha256, parents, stream);
+                return new ProtectedJsonFile(path, expectedSha256, parents, stream);
             }
             catch
             {
@@ -118,7 +125,7 @@ internal sealed class ProtectedJsonFile : IDisposable
         _parents.Dispose();
     }
 
-    private static SecurityIdentifier CurrentOwner()
+    internal static SecurityIdentifier CurrentOwner()
     {
         using var current = WindowsIdentity.GetCurrent();
         return current.User ?? throw new IOException("Bootstrap Owner identity is unavailable.");
@@ -160,7 +167,7 @@ internal sealed class ProtectedJsonFile : IDisposable
             throw new IOException("Bootstrap JSON file exceeds the accepted size boundary.");
     }
 
-    private static string Digest(byte[] bytes)
+    internal static string Digest(byte[] bytes)
     {
         using var sha = SHA256.Create();
         return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
@@ -185,7 +192,7 @@ internal sealed class ProtectedJsonFile : IDisposable
         }
     }
 
-    private static SafeFileHandle OpenRelative(SafeFileHandle parent, string path, bool directory, byte[]? acl = null)
+    private static SafeFileHandle OpenRelative(SafeFileHandle parent, string path, bool directory, byte[]? acl = null, bool installedTool = false)
     {
         const uint fileTraverse = 0x20;
         const uint readAttributes = 0x80;
@@ -240,13 +247,13 @@ internal sealed class ProtectedJsonFile : IDisposable
             // Resolve exactly one component beneath the admitted handle. Absolute
             // path resolution could follow a reparse mutation made via attributes-only access.
             var status = NtCreateFile(out var handle, access, ref attributes, out _, IntPtr.Zero,
-                (uint)FileAttributes.Normal, (uint)(acl == null ? FileShare.Read : FileShare.None),
+                (uint)FileAttributes.Normal, (uint)(acl == null || directory ? FileShare.Read : FileShare.None),
                 acl == null ? fileOpen : fileCreate, options, IntPtr.Zero, 0);
             try
             {
                 if (status != 0 || handle.IsInvalid)
                     throw new IOException($"Bootstrap entry could not be opened or created beneath its pinned directory (NTSTATUS 0x{status:x8}).");
-                Inspect(handle, path, directory);
+                Inspect(handle, path, directory, installedTool);
                 return handle;
             }
             catch
@@ -265,12 +272,13 @@ internal sealed class ProtectedJsonFile : IDisposable
         }
     }
 
-    private static (uint Volume, uint IndexHigh, uint IndexLow, long CreationTime) Inspect(SafeFileHandle handle, string expectedPath, bool directory)
+    internal static (uint Volume, uint IndexHigh, uint IndexLow, long CreationTime) Inspect(SafeFileHandle handle,
+        string expectedPath, bool directory, bool installedTool = false)
     {
         if (handle.IsInvalid || !GetFileInformationByHandle(handle, out var info) ||
-            (info.Attributes & FileAttributes.ReparsePoint) != 0 ||
+            (info.Attributes & (FileAttributes.ReparsePoint | FileAttributes.Device)) != 0 ||
             ((info.Attributes & FileAttributes.Directory) != 0) != directory ||
-            (!directory && info.NumberOfLinks != 1))
+            (!directory && !installedTool && info.NumberOfLinks != 1))
             throw new IOException("Bootstrap file or directory identity is unsafe.");
 
         var finalPath = new StringBuilder(512);
@@ -315,9 +323,9 @@ internal sealed class ProtectedJsonFile : IDisposable
 
         private SafeFileHandle Parent => _ancestors[_ancestors.Count - 1];
 
-        internal FileStream OpenRead()
+        internal FileStream OpenRead(bool installedTool = false)
         {
-            var handle = OpenRelative(Parent, _path, directory: false);
+            var handle = OpenRelative(Parent, _path, directory: false, installedTool: installedTool);
             try
             {
                 return new FileStream(handle, FileAccess.Read, bufferSize: 1);
@@ -331,6 +339,9 @@ internal sealed class ProtectedJsonFile : IDisposable
 
         internal SafeFileHandle CreateNewFile(FileSecurity acl) =>
             OpenRelative(Parent, _path, directory: false, acl.GetSecurityDescriptorBinaryForm());
+
+        internal SafeFileHandle OpenDirectory(DirectorySecurity? createAcl = null) =>
+            OpenRelative(Parent, _path, directory: true, createAcl?.GetSecurityDescriptorBinaryForm());
 
         public void Dispose()
         {

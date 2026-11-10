@@ -1,0 +1,450 @@
+﻿using System;
+using System.CodeDom.Compiler;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.CSharp;
+using MyDmsVn.Web6.CandidateBootstrap;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Xunit;
+
+namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
+
+public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
+{
+    private const string Candidate = "fixture-01";
+    private const string Server = "fixture-nonproduction";
+    private const string Thumbprint = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    private const string BackendSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private const string FrontendSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    private const string OldBackendSha = Web6CandidateCutoverPlan.BackendArchiveSha;
+    private const string OldFrontendSha = Web6CandidateCutoverPlan.FrontendArchiveSha;
+    private const string Tree = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "web6 preflight " + Guid.NewGuid().ToString("N").Substring(0, 8));
+    private readonly List<BootstrapProcessRequest> _processes = new();
+    private readonly Dictionary<string, string> _checkout = new(StringComparer.Ordinal);
+    private string _failure = "";
+    private string _currentBackend = BackendSha;
+    private string _currentFrontend = FrontendSha;
+    private string _oldBackend = OldBackendSha;
+    private string _oldFrontend = OldFrontendSha;
+    private int _masterChecks;
+
+    private string At(string path) => Path.Combine(_root, path);
+    private string TaskRoot => At(@"tasks\attempt");
+
+    public Web6CandidateBootstrapPreflightTests()
+    {
+        foreach (var directory in new[] { "tasks", "backend", "frontend", "sql", "node", @"node\node_modules\npm\bin" })
+            Directory.CreateDirectory(At(directory));
+        foreach (var path in new[] { "git.exe", "dotnet.exe", "iisexpress.exe", "chrome.exe", "headless.exe", "msedge.exe", @"node\node.exe", @"node\node_modules\npm\bin\npm-cli.js" })
+            File.WriteAllBytes(At(path), new byte[] { 1, 2, 3 });
+    }
+
+    [Theory]
+    [InlineData("dirty checkout")]
+    [InlineData("wrong commit")]
+    [InlineData("missing IIS Express")]
+    [InlineData("missing Node")]
+    [InlineData("missing browser")]
+    [InlineData("ambiguous browser")]
+    [InlineData("missing certificate")]
+    [InlineData("ambiguous certificate")]
+    [InlineData("no private key")]
+    [InlineData("wrong catalog")]
+    [InlineData("effective catalog drift")]
+    [InlineData("expired SQL approval")]
+    [InlineData("wrong SQL server")]
+    [InlineData("build failed")]
+    [InlineData("build timeout")]
+    [InlineData("ordinary with ID")]
+    [InlineData("wrong candidate ID")]
+    [InlineData("dist drift")]
+    [InlineData("publish drift")]
+    [InlineData("same-byte artifact swap")]
+    public async Task RefusesInvalidInputsWithoutPublishingPreparedReceipt(string failure)
+    {
+        _failure = failure;
+        using var authority = Authority();
+        var request = Request(authority);
+        await Assert.ThrowsAnyAsync<IOException>(() => new BootstrapPreflight(Toolchain()).PrepareAsync(request, CancellationToken.None));
+        Assert.False(File.Exists(Path.Combine(TaskRoot, "prepared.json")));
+        Assert.All(_processes, process => Assert.Contains(Path.GetFileName(process.Executable), new[] { "git.exe", "dotnet.exe", "node.exe" }));
+        if (failure is "wrong catalog" or "expired SQL approval") Assert.Equal(0, _masterChecks);
+    }
+
+    [Theory]
+    [InlineData("outside authority")]
+    [InlineData("overlapping repository")]
+    [InlineData("quarantine")]
+    public void RefusesUnsafeRootsBeforeToolDiscovery(string failure)
+    {
+        _failure = failure;
+        using var authority = Authority();
+        Assert.ThrowsAny<IOException>(() => Request(authority));
+        Assert.Empty(_processes);
+    }
+
+    [Fact]
+    public async Task RefusesExistingTaskRootWithoutAdoptingIt()
+    {
+        Directory.CreateDirectory(TaskRoot);
+        using var authority = Authority();
+        await Assert.ThrowsAnyAsync<IOException>(() => new BootstrapPreflight(Toolchain()).PrepareAsync(Request(authority), CancellationToken.None));
+        Assert.Empty(_processes);
+        Assert.Empty(Directory.GetFileSystemEntries(TaskRoot));
+    }
+
+    [Fact]
+    public async Task RefusesReparsePointInApprovedInput()
+    {
+        var redirected = At("redirected");
+        File.Move(At("iisexpress.exe"), redirected);
+        Directory.CreateDirectory(At("iisexpress.exe"));
+        var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        using (var link = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(cmd,
+            "/d /c mklink /j \"" + At(@"iisexpress.exe\linked") + "\" \"" + At("node") + "\"")
+        { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true }))
+        {
+            Assert.NotNull(link);
+            Assert.True(link!.WaitForExit(5000));
+            Assert.Equal(0, link.ExitCode);
+        }
+        try
+        {
+            _failure = "junction";
+            using var authority = Authority();
+            await Assert.ThrowsAnyAsync<IOException>(() => new BootstrapPreflight(Toolchain()).PrepareAsync(Request(authority), CancellationToken.None));
+            Assert.Empty(_processes);
+        }
+        finally
+        {
+            Directory.Delete(At(@"iisexpress.exe\linked"));
+        }
+    }
+
+    [Fact]
+    public async Task WritesProtectedReceiptAndExactSelectorAuthorityWithZeroLiveAllocation()
+    {
+        using var authority = Authority();
+        var receipt = await new BootstrapPreflight(Toolchain()).PrepareAsync(Request(authority), CancellationToken.None);
+        Assert.Equal(1, _masterChecks);
+        Assert.All(_processes, process => Assert.Contains(Path.GetFileName(process.Executable), new[] { "git.exe", "dotnet.exe", "node.exe" }));
+        using var protectedReceipt = ProtectedJsonFile.Open(receipt.Path, receipt.Sha256);
+        var json = JObject.Parse(Encoding.UTF8.GetString(protectedReceipt.Bytes));
+        Assert.Equal(Candidate, (string?)json["candidateId"]);
+        Assert.Equal(FrontendSha, (string?)json["frontendSha"]);
+        Assert.Equal("BLOCKED_REVIEWED_FRONTEND_PIN", (string?)json["cutoverAdmission"]);
+        Assert.DoesNotContain(Server, Encoding.UTF8.GetString(protectedReceipt.Bytes));
+        Assert.Equal(receipt.Sha256, File.ReadAllText(Path.Combine(TaskRoot, "prepared.sha256")));
+        _ = Web6CutoverBuildAuthority.ReadProtected(receipt.BuildAuthorityPath, receipt.BuildAuthoritySha256);
+        var cutover = JObject.Parse(File.ReadAllText(receipt.BuildAuthorityPath));
+        Assert.Equal(new[] { "version", "frontendSha", "frontendTree", "frontendBuildSha256", "backendSha", "backendTree", "backendBuildSha256", "currentPublishedSha256", "oldPublishedSha256" },
+            cutover.Properties().Select(property => property.Name));
+        Assert.Equal(Web6CandidateFileSet.MeasureTree(Path.Combine(TaskRoot, "current-publish")), (string?)cutover["currentPublishedSha256"]);
+        Assert.Equal(Web6CandidateFileSet.MeasureTree(Path.Combine(TaskRoot, "old-publish")), (string?)cutover["oldPublishedSha256"]);
+        Assert.Equal(Web6CandidateFileSet.MeasureTree(Path.Combine(TaskRoot, "frontend-old", "dist")), (string?)cutover["frontendBuildSha256"]);
+        Assert.False(Directory.Exists(Path.Combine(TaskRoot, "pair")));
+        Assert.Empty(Directory.GetFileSystemEntries(At("sql")));
+    }
+
+    [Fact]
+    public async Task PrepareCommandBuildsDetachedTemporaryRepositoriesWithFakeExecutables()
+    {
+        var git = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';')
+            .Select(path => Path.Combine(path.Trim().Trim('"'), "git.exe")).First(File.Exists);
+        // Git for Windows resolves its distribution relative to git.exe. Use the actual installation.
+        var processEnvironment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in new[] { "SystemRoot", "WINDIR", "COMSPEC", "TEMP", "TMP", "PATH", "USERPROFILE", "LOCALAPPDATA" })
+            if (Environment.GetEnvironmentVariable(name) is { } value) processEnvironment.Add(name, value);
+        Task<string> Git(string root, params string[] args) => BootstrapToolchain.RunOwnedAsync(
+            new BootstrapProcessRequest(git, root, args, processEnvironment, TimeSpan.FromSeconds(30)), CancellationToken.None);
+        async Task<(string Old, string Current)> Repository(string root)
+        {
+            await Git(root, "init", "--quiet");
+            File.WriteAllText(Path.Combine(root, ".gitignore"), "dist/\nnode_modules/\n");
+            if (root == At("backend")) SeedBackend(root);
+            var tracked = Path.Combine(root, "source.txt");
+            File.WriteAllText(tracked, "archive");
+            await Git(root, "add", "--all");
+            await Git(root, "-c", "user.name=WEB6 Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "archive");
+            var old = await Git(root, "rev-parse", "HEAD");
+            File.WriteAllText(tracked, "current");
+            await Git(root, "add", "--all");
+            await Git(root, "-c", "user.name=WEB6 Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "current");
+            return (old, await Git(root, "rev-parse", "HEAD"));
+        }
+        (_oldBackend, _currentBackend) = await Repository(At("backend"));
+        (_oldFrontend, _currentFrontend) = await Repository(At("frontend"));
+        CompileFakeTools();
+
+        var toolchain = Toolchain(async (process, token) =>
+        {
+            _processes.Add(process);
+            Assert.DoesNotContain("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING", process.Environment.Keys);
+            Assert.Contains(Path.GetFileName(process.Executable), new[] { "git.exe", "dotnet.exe", "node.exe" });
+            if (process.Arguments.Contains("-e"))
+                return new JArray(At("chrome.exe"), At("headless.exe"), At("msedge.exe")).ToString(Formatting.None);
+            return await BootstrapToolchain.RunOwnedAsync(process, token);
+        }, git);
+
+        using var authority = Authority();
+        _ = Request(authority);
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var code = await BootstrapCommand.RunAsync(new[] { "prepare", "--request", At("request.json"), "--authority", authority.Path,
+            "--authority-sha256", authority.Sha256 }, stdout, stderr, CancellationToken.None, toolchain);
+        Assert.True(code == 0, "Prepare failed after child commands " + string.Join(" | ", _processes.Select(process =>
+            Path.GetFileName(process.Executable) + " " + string.Join(" ", process.Arguments))));
+        Assert.Empty(stderr.ToString());
+        var preparedPath = Path.Combine(TaskRoot, "prepared.json");
+        Assert.StartsWith("status=PREPARED candidate=" + Candidate + " sha256=" + Hash(File.ReadAllBytes(preparedPath)), stdout.ToString());
+        Assert.Contains("cutover=BLOCKED_REVIEWED_FRONTEND_PIN", stdout.ToString());
+        var beforeRun = _processes.Count;
+        Assert.Equal(4, await BootstrapCommand.RunAsync(new[] { "run", "--prepared", preparedPath,
+            "--prepared-sha256", Hash(File.ReadAllBytes(preparedPath)) }, TextWriter.Null, TextWriter.Null, CancellationToken.None, toolchain));
+        Assert.Equal(beforeRun, _processes.Count);
+        Assert.Equal(1, _masterChecks);
+        Assert.Empty(Directory.GetFileSystemEntries(At("sql")));
+        Assert.Empty(await Git(At("backend"), "status", "--porcelain"));
+        Assert.Empty(await Git(At("frontend"), "status", "--porcelain"));
+        Assert.Equal("HEAD", await Git(Path.Combine(TaskRoot, "frontend-current"), "rev-parse", "--abbrev-ref", "HEAD"));
+        Assert.Equal(_oldFrontend, await Git(Path.Combine(TaskRoot, "frontend-old"), "rev-parse", "HEAD"));
+        Assert.False(Directory.Exists(Path.Combine(TaskRoot, "cutover")));
+    }
+
+    private BootstrapAuthority Authority()
+    {
+        var path = At("authority.json");
+        var input = new JObject
+        {
+            ["version"] = 1, ["candidateId"] = Candidate, ["taskParent"] = At("tasks"), ["sqlControlParent"] = At("sql"),
+            ["origins"] = new JArray("https://localhost:44321", "https://localhost:44322"),
+            ["drillClasses"] = new JArray("cutover", "pair", "recovery", "workload"),
+            ["backendSha"] = _currentBackend, ["frontendSha"] = _currentFrontend, ["oldBackendSha"] = _oldBackend, ["oldFrontendSha"] = _oldFrontend,
+            ["expiresAtUtc"] = DateTimeOffset.UtcNow.AddHours(3).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
+        };
+        File.WriteAllText(At("authority-input.json"), input.ToString());
+        return BootstrapAuthority.ReadProtected(path, BootstrapAuthority.Authorize(At("authority-input.json"), path, CancellationToken.None), DateTimeOffset.UtcNow);
+    }
+
+    private BootstrapRequest Request(BootstrapAuthority authority)
+    {
+        var approval = new JObject
+        {
+            ["version"] = 1, ["purpose"] = "web6-cutover", ["serverSha256"] = Hash(Encoding.UTF8.GetBytes(Server)),
+            ["expiresUtc"] = DateTimeOffset.UtcNow.AddHours(_failure == "expired SQL approval" ? -1 : 1).ToString("O"),
+        };
+        ProtectedJsonFile.WriteNew(At("approval.json"), Encoding.UTF8.GetBytes(approval.ToString()));
+        var request = new JObject
+        {
+            ["version"] = 1, ["candidateId"] = Candidate, ["backendRepository"] = _failure == "overlapping repository" ? At("tasks") : At("backend"),
+            ["frontendRepository"] = At("frontend"), ["taskRoot"] = _failure switch
+            {
+                "outside authority" => At("outside"), "quarantine" => At(@"tasks\WEB5-HISTORICAL"), _ => TaskRoot,
+            },
+            ["sqlControlParent"] = At("sql"), ["sqlApprovalFile"] = At("approval.json"), ["tlsThumbprint"] = Thumbprint,
+            ["nodePath"] = At(_failure == "missing Node" ? "missing.exe" : @"node\node.exe"),
+            ["iisExpressPath"] = At(_failure switch { "missing IIS Express" => "missing.exe", "junction" => @"iisexpress.exe\linked\node.exe", _ => "iisexpress.exe" }),
+            ["browserProjects"] = new JArray("chromium", "edge"), ["actorCohort"] = "web.smoke", ["workloadSeconds"] = 60,
+            ["recoveryAuthorized"] = true, ["authorityPath"] = authority.Path, ["authoritySha256"] = authority.Sha256,
+        };
+        File.WriteAllText(At("request.json"), request.ToString());
+        return BootstrapRequest.ReadStrict(At("request.json"), authority);
+    }
+
+    private BootstrapToolchain Toolchain(Func<BootstrapProcessRequest, CancellationToken, Task<string>>? run = null, string? git = null) => new(
+        run ?? RunFake, name => new[] { name == "git" && git != null ? git : At(name + ".exe") },
+        _ => _failure switch
+        {
+            "missing certificate" => Array.Empty<BootstrapCertificate>(),
+            "ambiguous certificate" => new[] { Certificate(true), Certificate(true) },
+            _ => new[] { Certificate(_failure != "no private key") },
+        },
+        () => _failure == "ambiguous browser" ? new[] { At("msedge.exe"), At("chrome.exe") } : new[] { At("msedge.exe") },
+        () => "Data Source=fixture;Initial Catalog=" + (_failure == "wrong catalog" ? "production" : "master") + ";Integrated Security=True",
+        (_, _) =>
+        {
+            _masterChecks++;
+            return Task.FromResult((_failure == "effective catalog drift" ? "app" : "master", _failure == "wrong SQL server" ? "other" : Server));
+        });
+
+    private static BootstrapCertificate Certificate(bool key) => new(key, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1), new string('c', 64), new[] { "localhost" });
+
+    private Task<string> RunFake(BootstrapProcessRequest process, CancellationToken token)
+    {
+        _processes.Add(process);
+        var args = process.Arguments.ToArray();
+        var root = process.WorkingDirectory;
+        switch (Path.GetFileName(process.Executable))
+        {
+            case "git.exe":
+                if (args.Contains("worktree"))
+                {
+                    var checkout = args[args.Length - 2];
+                    _checkout.Add(checkout, args.Last());
+                    if (Path.GetFileName(checkout).StartsWith("backend-", StringComparison.Ordinal))
+                        SeedBackend(checkout);
+                }
+                if (args.Contains("status") && _failure == "dirty checkout") return Task.FromResult(" M tracked.txt");
+                if (args.Contains("--show-toplevel")) return Task.FromResult(root.Replace('\\', '/'));
+                if (args.Contains("--abbrev-ref")) return Task.FromResult("HEAD");
+                if (args.Last() == "HEAD") return Task.FromResult(_failure == "wrong commit" ? Tree : _checkout.TryGetValue(root, out var sha) ? sha : BackendSha);
+                if (args.Last() == "HEAD^{tree}") return Task.FromResult(Tree);
+                if (args.Contains("symbolic-ref")) throw new InvalidOperationException("Use a checked Git command for detached verification.");
+                break;
+            case "dotnet.exe":
+                if (args.Contains("--version")) return Task.FromResult("8.0.427");
+                if (args.Contains("build"))
+                {
+                    if (_failure == "build failed") throw new IOException("Fake nonzero exit.");
+                    if (_failure == "build timeout") throw new TimeoutException("Fake timeout.");
+                    var bin = args[Array.IndexOf(args, "--output") + 1];
+                    Directory.CreateDirectory(bin);
+                    File.WriteAllText(Path.Combine(bin, "MyDmsVn.Server.HttpHost.dll"), "fixture dll");
+                    if (_failure == "publish drift" && root.EndsWith("backend-old", StringComparison.Ordinal))
+                        File.AppendAllText(Path.Combine(TaskRoot, "current-publish", "bin", "MyDmsVn.Server.HttpHost.dll"), "drift");
+                }
+                break;
+            case "node.exe":
+                if (args.Length == 1 && args[0] == "--version") return Task.FromResult("v22.14.0");
+                if (args.Last() == "--version") return Task.FromResult("11.6.0");
+                if (args[0] == "-e") return Task.FromResult(new JArray(At("chrome.exe"), At(_failure == "missing browser" ? "missing.exe" : "headless.exe"), At("msedge.exe")).ToString(Formatting.None));
+                process.Environment.TryGetValue("VITE_MYDMSVN_WEB6_CANDIDATE_ID", out var candidate);
+                if (args.Contains("build"))
+                {
+                    var dist = Path.Combine(root, "dist");
+                    Directory.CreateDirectory(dist);
+                    File.WriteAllText(Path.Combine(dist, "index.html"), "fixture html");
+                    if (!root.EndsWith("frontend-old", StringComparison.Ordinal))
+                    {
+                        var marker = new JObject { ["version"] = 1, ["candidateId"] = candidate }.ToString(Formatting.None);
+                        File.WriteAllText(Path.Combine(dist, "app.js"), "app\n/* MyDmsVn WEB6 build marker " + marker + " */\n");
+                        File.WriteAllText(Path.Combine(dist, "web6-candidate-build.json"), marker);
+                    }
+                }
+                if (args.Contains("web6:artifact"))
+                {
+                    var dist = args[Array.IndexOf(args, "--dist") + 1];
+                    var mode = args[Array.IndexOf(args, "--mode") + 1];
+                    var output = args[Array.IndexOf(args, "--output") + 1];
+                    WriteManifest(output, dist, mode, mode == "ordinary" ? (_failure == "ordinary with ID" ? Candidate : null) : (_failure == "wrong candidate ID" ? "other" : Candidate));
+                    if (_failure == "dist drift") File.AppendAllText(Path.Combine(dist, "app.js"), "drift");
+                    if (_failure == "same-byte artifact swap")
+                    {
+                        var path = Path.Combine(dist, "app.js");
+                        var bytes = File.ReadAllBytes(path);
+                        File.Move(path, Path.Combine(TaskRoot, "retained.js"));
+                        File.WriteAllBytes(path, bytes);
+                    }
+                }
+                break;
+            default:
+                throw new InvalidOperationException("An allocator, browser or host process was called.");
+        }
+        return Task.FromResult("");
+    }
+
+    private static void SeedBackend(string root)
+    {
+        var host = Path.Combine(root, "src", "MyDmsVn.Server.HttpHost");
+        Directory.CreateDirectory(host);
+        File.WriteAllText(Path.Combine(host, "Web.config"), "fixture config");
+    }
+
+    private void CompileFakeTools()
+    {
+        const string source = """
+            using System;
+            using System.IO;
+            using System.Linq;
+            using System.Reflection;
+            using System.Security.Cryptography;
+            using System.Text;
+
+            static class Program
+            {
+                static string Value(string[] args, string name) { return args[Array.IndexOf(args, name) + 1]; }
+                static string Hash(byte[] bytes)
+                {
+                    using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
+                }
+                static int Main(string[] args)
+                {
+                    var tool = Path.GetFileName(Assembly.GetExecutingAssembly().Location);
+                    if (args.Contains("--version"))
+                    {
+                        Console.WriteLine(tool == "dotnet.exe" ? "8.0.427" : args.Length == 1 ? "v22.14.0" : "11.6.0");
+                        return 0;
+                    }
+                    if (tool == "dotnet.exe")
+                    {
+                        if (args.Contains("build")) File.WriteAllText(Path.Combine(Value(args, "--output"), "MyDmsVn.Server.HttpHost.dll"), "fixture dll");
+                        return 0;
+                    }
+                    if (args.Contains("build"))
+                    {
+                        Directory.CreateDirectory("dist");
+                        File.WriteAllText("dist/index.html", "fixture html");
+                        if (!Directory.GetCurrentDirectory().EndsWith("frontend-old", StringComparison.Ordinal))
+                        {
+                            var candidate = Environment.GetEnvironmentVariable("VITE_MYDMSVN_WEB6_CANDIDATE_ID");
+                            var marker = "{\"version\":1,\"candidateId\":" + (candidate == null ? "null" : "\"" + candidate + "\"") + "}";
+                            File.WriteAllText("dist/web6-candidate-build.json", marker);
+                            File.WriteAllText("dist/app.js", "fixture\n/* MyDmsVn WEB6 build marker " + marker + " */\n");
+                        }
+                    }
+                    if (args.Contains("web6:artifact"))
+                    {
+                        var mode = Value(args, "--mode");
+                        var id = mode == "candidate" ? "\"" + Value(args, "--candidate-id") + "\"" : "null";
+                        var files = Directory.GetFiles(Value(args, "--dist")).OrderBy(path => path, StringComparer.Ordinal)
+                            .Select(path => "{\"path\":\"" + Path.GetFileName(path) + "\",\"sha256\":\"" + Hash(File.ReadAllBytes(path)) + "\"}");
+                        var payload = "{\"version\":1,\"mode\":\"" + mode + "\",\"candidateId\":" + id + ",\"files\":[" + string.Join(",", files) + "]}";
+                        File.WriteAllText(Value(args, "--output"), payload.Substring(0, payload.Length - 1) +
+                            ",\"manifestSha256\":\"" + Hash(Encoding.UTF8.GetBytes(payload)) + "\"}");
+                    }
+                    return 0;
+                }
+            }
+            """;
+        File.Delete(At("dotnet.exe"));
+        File.Delete(At(@"node\node.exe"));
+        using var compiler = new CSharpCodeProvider();
+        var options = new CompilerParameters(new[] { "System.Core.dll" }, At("dotnet.exe")) { GenerateExecutable = true };
+        var result = compiler.CompileAssemblyFromSource(options, source);
+        Assert.False(result.Errors.HasErrors, string.Join(Environment.NewLine, result.Errors.Cast<CompilerError>()));
+        File.Copy(At("dotnet.exe"), At(@"node\node.exe"));
+    }
+
+    private static void WriteManifest(string output, string dist, string mode, string? candidate)
+    {
+        var manifest = new JObject
+        {
+            ["version"] = 1, ["mode"] = mode, ["candidateId"] = candidate,
+            ["files"] = new JArray(Directory.GetFiles(dist).OrderBy(path => path, StringComparer.Ordinal).Select(path =>
+                new JObject { ["path"] = Path.GetFileName(path), ["sha256"] = Hash(File.ReadAllBytes(path)) })),
+        };
+        manifest["manifestSha256"] = Hash(Encoding.UTF8.GetBytes(manifest.ToString(Formatting.None)));
+        File.WriteAllText(output, manifest.ToString(Formatting.None));
+    }
+
+    private static string Hash(byte[] bytes)
+    {
+        using var sha = SHA256.Create();
+        return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
+    }
+
+    public void Dispose()
+    {
+        foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+            if ((File.GetAttributes(file) & FileAttributes.ReadOnly) != 0) File.SetAttributes(file, FileAttributes.Normal);
+        Directory.Delete(_root, recursive: true);
+    }
+}

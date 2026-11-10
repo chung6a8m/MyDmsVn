@@ -3,8 +3,12 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <IsPackable>false</IsPackable>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <DefineConstants>$(DefineConstants);WEB6_BOOTSTRAP</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <Compile Include="..\..\tests\MyDmsVn.Desktop.Tests\GuiOwnedProcess.cs" Link="Infrastructure\OwnedProcess.cs" />
   </ItemGroup>
 </Project>
