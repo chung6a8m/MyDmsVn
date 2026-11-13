@@ -1,6 +1,58 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-13): attempt16 reached PairPassed (Chromium and Edge native ACCEPTED), then FailedRetained during cutover epoch seed.** Both pair cleanups were accepted. Cutover allocations remain retained. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN.
+**Latest disposition (2026-11-13): attempt17 reached PairPassed, then FailedRetained during cutover baseline snapshot.** Chromium and Edge native ACCEPTED with accepted cleanup. Cutover allocations retained. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN.
+
+## Task 6 attempt17 browser pair PASS and cutover snapshot failure
+
+The Owner authorized one fresh nonproduction attempt for `web6-20261113-0fa528e7`. Backend source `485570368afd64d814d024f0fb435542ff366712` / tree `170acdf7d29701104b0c0978756a063713b8bafb` and frontend source `5f355e4ed3d0ca0778e195b940ecbed67b410dc0` / tree `47dc71f900a4977b953f6850f943fde12d64e632` were prepared in clean detached worktrees. Frontend docs-only HEAD `4240d48c2f866c76aebe56d357ee527199da34f7` was the evidence base.
+
+Four Edge identity/version/hash observations matched over 30.089 seconds. A bounded effective-master query matched the approved server fingerprint. The separate private Node 22.14.0 and npm 11.6.0 layout was found using locator metadata and independently revalidated for exact contents, protected owner-only ACLs and no links. The 2,337 files and 572 directories matched the reviewed whole-tree SHA-256 `c55ed76c2333bcb335b2327f639195464c2ed7685b329da812f02c85bed29529` and npm subtree SHA-256 `e254ea5bde41caff094a51ea37c52114e5075d4ea4d5c1864944676c4620eb58`. Windows PowerShell/net48 created a fresh protected `web6-cutover` approval with expiry `2026-11-13T19:17:58Z`. Authorize ran once, exit 0.
+
+Prepare ran once from 11:17:59.4793548Z to 11:20:34.2690535Z, exit 0 / `PIN_MATCHED`. Independent checks confirmed ordinary resend OFF, the exact candidate marker, all ten dist files equal to the complete published wwwroot and zero live allocation. Run began 0.695 seconds later and exited 5 / `FailedRetained` at 11:24:55.6297394Z. The reviewed browser-pair bounds applied throughout.
+
+| Selector | Discovered / executed / passed / failed / skipped | Outcome |
+| --- | --- | --- |
+| Chromium pair | 1 / 1 / 1 / 0 / 0 | PASS / native ACCEPTED |
+| Edge pair | 1 / 1 / 1 / 0 / 0 | PASS / native ACCEPTED |
+| Cutover | 1 / 1 / 0 / 1 / 0 | FAIL / current baseline SQL snapshot |
+| Workload | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+| Recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+Cutover admitted the exact `PairPassed` digest and sealed artifact/source scopes. All current, old and restored database seed calls returned, which includes the revised one-row scalar guard for the current and restored epochs. This follows from `VerifyAuthority` reaching the first current baseline read after all three seed calls. The TRX then reports `System.ArgumentNullException: Value cannot be null.`, parameter `s`, in `StringReader` through `JArray.Parse` at `WebHostIisExpressTests.Cutover.cs:486`. The snapshot loop passes a SQL JSON scalar directly to the parser. The stack does not identify which table returned null. It records no `SqlException`. A cutover manifest, IIS worker and cutover browser lifecycle were not reached.
+
+| Receipt or artifact | SHA-256 |
+| --- | --- |
+| Release/net48 bootstrap | `1d7b2858d0cae4ab96920c9bad765c350145c9ed5508965d2ea7e43dcd72ce57` |
+| New SQL approval | `6dee61a1fabf45276d79f54d4889867518526d341691a5cf7ce204aea482992e` |
+| Owner authority / request | `957f56b665b7b3059cb568b1061929e97aa2238427b1f71a16f89f13c60f6dfe` / `6325b6319e342e4d31e221829108f2b079fec878dcb905e6e1f22f68ee6c1617` |
+| Prepared / PairPassed | `0004c675924dee2627778a64f8d04557ca349020431d3b2be6eabb5db901a148` / `d5ef840228c4c93a354556e6beafcaad4bb680fbc218b34b17e81263f9181b16` |
+| FailedRetained | `5042f06f3e890d92b6c0ebab249e80d8a02fd3a814973ed92aa78f4f07d9a7e3` |
+| Ordinary dist / manifest | `5c7908157609e24760dcab5da26b170f5194f1918f2343f80aa164aab0ef59ab` / `796d86094b6cfd29efa1d99aac49bd9fd10bb80c73b71d0164d853e74485ef53` |
+| Candidate dist / manifest | `b5a0a88e0f43c211d10736730bf296ae0038f5b5496e232352b0a45f166296b1` / `2aedf43a7917c9cdacb950aa40a4d3dc9dfaf67d8419de7ce176b68a9e79843b` |
+| Current / archived backend publish | `841465ac3198b970414ccdec3876085dbb319e4cd6a95c0edc219e955f47fa8d` / `4359b5c9923415e44b40ad429c65d52c2311d150b6a122cb29cb85e9b57df5b8` |
+| Archived frontend dist / cutover build authority | `da573ea101e95b9a98850cc1b29270d89a24e6f4d54a8c2044949cfdb9289882` / `9da3167b80342934ba49abb0c95ed7fd6451f277f39bded4023e68026cb94f6d` |
+| TLS certificate / selector DLL | `47985af0a6345e7c8df22aacbea36cf7cb12d924eba42704cb6997745470f647` / `3cc5f25279a1e44cccebe8bc88f78ec85ca78266fc52dc365b440414fbf80ac3` |
+
+| Selector | TRX SHA-256 | Native / envelope SHA-256 | Cleanup inventory SHA-256 |
+| --- | --- | --- | --- |
+| pair-chromium | `dbd37d263dd31f98ca6718619273c43cb644f6e17310d8eec12526682e9f1780` | `34fdd475c9aa101429981a9b9b4a814c08050aa35f0d50af82af7f272be9a25f` / `8edd2dd54604cd387a0fe8c0dc8aae3e4bcc98b8dadb9e042289f50ec2f981ef` | `c14d8a832c4d75f53923b513b272f508a2df54ecf67bf9b5d128156a8fd4422b` |
+| pair-edge | `20b7d7dde48e8a225e6476c63ada37f05943a22e4982f8941311c686b3bda7d0` | `e13ba6d13d0f16793d669731ddcef2a097601f725c9f369e902b30b2a6286696` / `dfa59c49ca7d98d2c4ce7be626cf7067d42a56c001d211f8811a3f4b457d3df1` | `c087fc1ee85f8710ac3618aa1c43617a45dfdc1d42ced45c4ca5aca866a0e172` |
+| cutover | `935bfd88be34406d47ddab3bafc38ae25f7b7dbcbdb065435c18621b5bfa67e8` | Absent | Absent |
+
+| Cutover allocation | Intent SHA-256 | Confirmation SHA-256 |
+| --- | --- | --- |
+| current database | `27d92c3f44ef6dfaa2ec62fd4ff18539b5cd2b6c3ca5fe02345865f33e1c0ff9` | `a8433075d62544f4b4ccce7d6c555bee653f403338422cfd464d574f9b87cb21` |
+| current login | `8e90e0329d35badee7c98240f3fa83ce15db6af25363556c0206dc140e0eb30d` | `a13383dbf2ebca88f58a88a9c1880cae462a3614184cc812fc3e0e7867e05aeb` |
+| old database | `5480df24079a74881af991cf30d64aca4066e240b42b8ce2b4f7b88c8dd37bdd` | `7c89fe8724f1d5d3cfa01ac9fd9c7aa47af1c3a2e12509dd0934a1527f362fe8` |
+| old login | `393dc0e5d1ae7b25f5b3cca877e6dc14923f640cfb229a74fcb4fa53ed6b7f67` | `77140cebd95229e33b84b8e65c8f289973b4b7d5b144476ba7d9b6cc222e0318` |
+| restored database | `202b4011af905283240d0cd08f5de90474411a355d1a33891cdd97f65283d1bd` | `cb6a22b7ae4bcda7bc23f1f19189ad210bd26d32a4a1de0a5a40e448d8a17362` |
+| restored login | `4535f6f8059a682b59969671a4f310d29decff4fbb5d12e1fa6c40fc702844c5` | `3c7c2a2011c57cd54b07182bb6f355f803b4326548d9cd482b87d51c0d07099d` |
+
+Both pair receipts and inventories certify accepted cleanup. Each inventory binds one database, one login, three processes, three HTTP queues and one deleted runtime directory. Both pair runtime directories are absent. Cutover wrote all 12 intent/confirmation records for three databases and three runtime logins. Each confirmation matches its intent hash. The incomplete-cutover cleanup refused deletion after bounded drain. Three SQL control roots remain, and all nine expected cutover control/runtime/browser directories are absent. The records carry no deletion authority. Prepared worktrees, artifacts, approvals and private evidence are retained. No retry, post-failure SQL query, manual cleanup, external termination or earlier protected resource access occurred.
+
+Workload and recovery are NOT RUN. No workload floor or percentile, recovery RPO/RTO, final independent disposition or `CandidateVerified` is available. Task 6 and B05/F04 remain open. Ordinary resend stays OFF. Full IIS and unperformed Narrator remain NOT RUN. Staging remains NOT ACCEPTED and production NO-GO.
+
+Windows 11 x64 build 26300, .NET SDK 8.0.428, SQL Server 14.0.2150.2, IIS Express 10.0.26013.1000, Chromium 156.0.8078.4, Edge 157.0.4341.46, Node 22.14.0 and npm 11.6.0. [Frontend attempt17 evidence](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/codex/web6-f04-paired-cutover/docs/evidence/web6/20261110-f04b-measured-quality.md#task-6-attempt17-browser-pair-pass-and-cutover-snapshot-failure).
 
 ## Task 6 attempt16 browser pair PASS and cutover epoch seed failure
 
@@ -567,7 +619,7 @@ TRX SHA-256: Application `c7a0a06507e1cadf6fcf6ae37997520b0bf59e42c5d1c93aa7c92b
 
 ## Task 6 controlled bootstrap attempt
 
-**Attempt01 history; the latest disposition is attempt16 above.**
+**Attempt01 history; the latest disposition is attempt17 above.**
 
 Owner approved the nonproduction bootstrap plan and destructive drill scope, including the separate authorization step. Candidate `web6-20261110-25a1cf46`, attempt `attempt01`, ran once at `2026-11-10T05:01:14Z`. The Owner authority covered HTTPS localhost ports 44321/44322, the pair/cutover/workload/recovery drills, new private task/SQL parents, the four exact source pins below and expiry `2026-11-10T13:01:13Z`. That authority is not a pilot-enable decision.
 
