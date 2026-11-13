@@ -42,19 +42,28 @@ internal sealed class WebRecoveryPilotControl
     private readonly Dictionary<Guid, WebOperationHttpSqlTests.Intent> _web6Operations = new Dictionary<Guid, WebOperationHttpSqlTests.Intent>();
     private readonly Web6CandidateHostMismatch? _candidateMismatch;
     private readonly Func<Web6CutoverRequest, CancellationToken, Task<JObject>>? _cutover;
+    private readonly Action<NamedPipeServerStream>? _closeCutoverResponse;
     private readonly Stopwatch? _cutoverLifetime;
+    private readonly TimeSpan _cutoverControllerLifetime;
+    private readonly OwnedCancellation? _cutoverController;
     private readonly object _cutoverDrainLock = new object();
-    private Task? _cutoverCancellation;
+    private OwnedCancellation? _cutoverPhase;
+    private Exception? _cutoverPrimary;
+    private bool _cutoverJoinUncertain;
     private IOException? _cutoverDrainFailure;
     private bool _eligibilityUserDisabled;
     private bool _eligibilityJournalDenied;
     private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null,
         Web6CandidateHostMismatch? candidateMismatch = null, bool candidatePair = false,
-        Func<Web6CutoverRequest, CancellationToken, Task<JObject>>? cutover = null)
+        Func<Web6CutoverRequest, CancellationToken, Task<JObject>>? cutover = null,
+        Action<NamedPipeServerStream>? closeCutoverResponse = null, TimeSpan? cutoverControllerLifetime = null)
     {
         _cutover = cutover;
+        _closeCutoverResponse = closeCutoverResponse;
         _cutoverLifetime = cutover == null ? null : Stopwatch.StartNew();
-        _stop = new CancellationTokenSource(cutover == null ? Web6CandidatePairBudgets.ControllerLifetime(candidatePair) : Web6CutoverBudgets.Controller);
+        _cutoverControllerLifetime = cutoverControllerLifetime ?? Web6CutoverBudgets.Controller;
+        _cutoverController = cutover == null ? null : new OwnedCancellation(_cutoverControllerLifetime);
+        _stop = _cutoverController?.Source ?? new CancellationTokenSource(Web6CandidatePairBudgets.ControllerLifetime(candidatePair));
         _connectionString = connectionString;
         _web5 = web5;
         _web6 = web6;
@@ -94,10 +103,15 @@ internal sealed class WebRecoveryPilotControl
         return control;
     }
 
-    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<Web6CutoverRequest, CancellationToken, Task<JObject>> handler)
+    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<Web6CutoverRequest, CancellationToken, Task<JObject>> handler) =>
+        StartCutover(epoch, handler, closeResponse: null);
+
+    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<Web6CutoverRequest, CancellationToken, Task<JObject>> handler,
+        Action<NamedPipeServerStream>? closeResponse, TimeSpan? controllerLifetime = null)
     {
         var control = new WebRecoveryPilotControl("", web5: true, web6: true,
-            cutover: handler ?? throw new ArgumentNullException(nameof(handler)));
+            cutover: handler ?? throw new ArgumentNullException(nameof(handler)), closeCutoverResponse: closeResponse,
+            cutoverControllerLifetime: controllerLifetime);
         control._epochs.Add(epoch);
         control._serving = control.Serve();
         return control;
@@ -156,44 +170,51 @@ internal sealed class WebRecoveryPilotControl
 
     internal bool CutoverJoined
     {
-        get { lock (_cutoverDrainLock) return _serving.IsCompleted && (_cutoverCancellation?.IsCompleted ?? true); }
+        get { lock (_cutoverDrainLock) return _serving.IsCompleted && (_cutoverController?.CallbacksJoined ?? true); }
+    }
+
+    internal bool CutoverJoinUncertain
+    {
+        get { lock (_cutoverDrainLock) return _cutoverJoinUncertain; }
     }
 
     private async Task StopCutover(bool browserDrained)
     {
-        // Cancel callbacks may run synchronously. Own and join that task as well as Serve.
-        Task cancellation;
-        lock (_cutoverDrainLock)
-        {
-            cancellation = _cutoverCancellation ??= Task.Run(() => _stop.Cancel());
-            if (!browserDrained) RecordUncertainDrain();
-        }
+        var controller = _cutoverController!;
+        controller.RequestCancellation();
+        if (!browserDrained) RecordUncertainDrain(unjoined: false);
 
         using var wait = new CancellationTokenSource();
         var timeout = Task.Delay(Web6CutoverBudgets.ControllerJoin, wait.Token);
         if (await Task.WhenAny(_serving, timeout).ConfigureAwait(false) != _serving ||
-            await Task.WhenAny(cancellation, timeout).ConfigureAwait(false) != cancellation)
-            RecordUncertainDrain();
+            await Task.WhenAny(controller.Completion, timeout).ConfigureAwait(false) != controller.Completion)
+            RecordUncertainDrain(unjoined: true);
         wait.Cancel();
 
+        var serveFailure = _serving.Exception;
         var failures = new List<Exception>();
-        if (_serving.Exception is { } handler) failures.AddRange(handler.InnerExceptions);
-        if (_serving.IsCanceled) failures.Add(CutoverDeadline("controller-cancelled"));
-        if (cancellation.Exception is { } callbacks) failures.AddRange(callbacks.InnerExceptions);
         lock (_cutoverDrainLock)
         {
+            if (_cutoverPrimary != null) failures.Add(_cutoverPrimary);
+            else if (serveFailure != null) failures.AddRange(serveFailure.InnerExceptions);
+            else if (_serving.IsCanceled) failures.Add(CutoverDeadline("controller-cancelled"));
+            if (_cutoverPhase != null) failures.AddRange(_cutoverPhase.Failures);
+            failures.AddRange(controller.Failures);
             if (_cutoverDrainFailure != null) failures.Add(_cutoverDrainFailure);
         }
         if (failures.Count != 0) throw new AggregateException("Cutover controller drain failed.", failures);
     }
 
-    private void RecordUncertainDrain()
+    private void RecordUncertainDrain(bool unjoined)
     {
         lock (_cutoverDrainLock)
+        {
+            _cutoverJoinUncertain |= unjoined;
             _cutoverDrainFailure ??= new IOException("WEB6 cutover drain-uncertain.");
+        }
     }
 
-    private TimeSpan CutoverControllerRemaining => Web6CutoverBudgets.Controller - _cutoverLifetime!.Elapsed;
+    private TimeSpan CutoverControllerRemaining => _cutoverControllerLifetime - _cutoverLifetime!.Elapsed;
 
     private async Task ServeCutover(NamedPipeServerStream pipe, JObject frame, Stopwatch elapsed, TimeSpan controllerRemaining)
     {
@@ -205,42 +226,58 @@ internal sealed class WebRecoveryPilotControl
             throw CutoverDeadline("controller-cancelled");
         if (workRemaining <= TimeSpan.Zero) throw CutoverDeadline("action-deadline");
 
-        using var work = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
-        work.CancelAfter(workRemaining);
-        JObject reply;
-        using (work.Token.Register(pipe.Dispose))
-        {
-            try
-            {
-                work.Token.ThrowIfCancellationRequested();
-                reply = await _cutover!(request, work.Token).ConfigureAwait(false);
-                work.Token.ThrowIfCancellationRequested();
-            }
-            catch (OperationCanceledException) when (work.IsCancellationRequested)
-            {
-                throw CutoverDeadline(_stop.IsCancellationRequested ? "controller-cancelled" : "action-deadline");
-            }
-        }
+        var reply = await RunCutoverPhase(workRemaining, pipe.Dispose, "action-deadline",
+            token => _cutover!(request, token)).ConfigureAwait(false);
         if (_stop.IsCancellationRequested || CutoverControllerRemaining <= TimeSpan.Zero) throw CutoverDeadline("controller-cancelled");
-        if (work.IsCancellationRequested || elapsed.Elapsed >= workAllowance) throw CutoverDeadline("action-deadline");
+        if (elapsed.Elapsed >= workAllowance) throw CutoverDeadline("action-deadline");
 
         var responseRemaining = Web6CutoverBudgets.PhaseAllowance(Web6CutoverBudgets.ResponseReserve, allowance - elapsed.Elapsed);
         if (responseRemaining <= TimeSpan.Zero) throw CutoverDeadline("response-timeout");
-        using var response = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
-        response.CancelAfter(responseRemaining);
-        using var close = response.Token.Register(pipe.Dispose);
+        await RunCutoverPhase(responseRemaining, _closeCutoverResponse == null ? (Action)pipe.Dispose : () => _closeCutoverResponse(pipe),
+            "response-timeout", async token =>
+            {
+                reply["id"] = frame["id"]!.DeepClone();
+                reply["ok"] = true;
+                await WebFrontendPortBridge.WriteFrame(pipe, reply, token).ConfigureAwait(false);
+                return true;
+            }).ConfigureAwait(false);
+    }
+
+    private async Task<T> RunCutoverPhase<T>(TimeSpan allowance, Action closePipe, string deadline, Func<CancellationToken, Task<T>> operation)
+    {
+        var phase = new OwnedCancellation(allowance, closePipe);
+        lock (_cutoverDrainLock) _cutoverPhase = phase;
+        using var parent = _stop.Token.Register(phase.RequestCancellation);
+        Exception? primary = null;
+        T result = default!;
         try
         {
-            response.Token.ThrowIfCancellationRequested();
-            reply["id"] = frame["id"]!.DeepClone();
-            reply["ok"] = true;
-            await WebFrontendPortBridge.WriteFrame(pipe, reply, response.Token).ConfigureAwait(false);
-            response.Token.ThrowIfCancellationRequested();
+            _stop.Token.ThrowIfCancellationRequested();
+            phase.Token.ThrowIfCancellationRequested();
+            result = await operation(phase.Token).ConfigureAwait(false);
         }
-        catch (Exception error) when (response.IsCancellationRequested && (error is OperationCanceledException || error is ObjectDisposedException || error is IOException))
+        catch (Exception error)
         {
-            throw CutoverDeadline(_stop.IsCancellationRequested ? "controller-cancelled" : "response-timeout");
+            primary = error;
         }
+        // If the monotonic deadline won before disarm, run its owned cancellation even if the timer was delayed.
+        phase.Disarm();
+        if (phase.CancellationRequested || _stop.IsCancellationRequested)
+        {
+            if (primary == null || primary is OperationCanceledException ||
+                (deadline == "response-timeout" && (primary is ObjectDisposedException || primary is IOException)))
+                primary = CutoverDeadline(_stop.IsCancellationRequested ? "controller-cancelled" : deadline);
+        }
+
+        // Publish a completed operation's failure even if cancellation callbacks still hold the join.
+        if (primary != null) lock (_cutoverDrainLock) _cutoverPrimary = primary;
+        await phase.Completion.ConfigureAwait(false);
+        parent.Dispose();
+        phase.Source.Dispose();
+        if (primary != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
+        if (phase.Failures.Count != 0) throw new IOException("WEB6 cutover cancellation callback failed.");
+        lock (_cutoverDrainLock) _cutoverPhase = null;
+        return result;
     }
 
     private static TimeoutException CutoverDeadline(string category) => new TimeoutException("WEB6 cutover " + category + ".");
@@ -252,15 +289,20 @@ internal sealed class WebRecoveryPilotControl
         {
             for (var count = 0; count < (_web6 || _raceManifest != null ? 64 : 32) && !_stop.IsCancellationRequested; count++)
             {
+                if (_cutover != null && CutoverControllerRemaining <= TimeSpan.Zero)
+                    throw CutoverDeadline("controller-cancelled");
                 using var identity = WindowsIdentity.GetCurrent();
                 var security = new PipeSecurity();
                 security.SetAccessRuleProtection(true, false);
                 security.AddAccessRule(new PipeAccessRule(identity.User!, PipeAccessRights.FullControl, AccessControlType.Allow));
                 using var pipe = new NamedPipeServerStream(_name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous, 4096, 4096, security, HandleInheritability.None);
-                using var close = _stop.Token.Register(() => pipe.Dispose());
-                await pipe.WaitForConnectionAsync(_stop.Token).ConfigureAwait(false);
-                var frame = await WebFrontendPortBridge.ReadFrame(pipe, _stop.Token).ConfigureAwait(false);
+                JObject frame;
+                using (_stop.Token.Register(pipe.Dispose))
+                {
+                    await pipe.WaitForConnectionAsync(_stop.Token).ConfigureAwait(false);
+                    frame = await WebFrontendPortBridge.ReadFrame(pipe, _stop.Token).ConfigureAwait(false);
+                }
                 if (_cutover != null)
                 {
                     cutoverDispatched = true;
@@ -269,6 +311,7 @@ internal sealed class WebRecoveryPilotControl
                     cutoverDispatched = false;
                     continue;
                 }
+                using var close = _stop.Token.Register(pipe.Dispose);
                 var action = Validate(frame, _token, _web6);
                 using var sql = new SqlConnection(_connectionString);
                 await sql.OpenAsync(_stop.Token).ConfigureAwait(false);
@@ -411,6 +454,80 @@ internal sealed class WebRecoveryPilotControl
         }
         catch (Exception error) when (!cutoverDispatched && _stop.IsCancellationRequested && (error is OperationCanceledException || error is ObjectDisposedException || error is IOException)) { }
         catch { if (_raceManifest != null) Web5OriginalFirstTelemetry.Record(Web5OriginalFirstStage.ControlFailed); throw; }
+    }
+
+    private sealed class OwnedCancellation
+    {
+        private readonly object _sync = new object();
+        private readonly List<Exception> _callbackFailures = new List<Exception>();
+        private readonly List<Exception> _closeFailures = new List<Exception>();
+        private readonly TaskCompletionSource<bool> _stopTimer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly Stopwatch _elapsed = Stopwatch.StartNew();
+        private readonly TimeSpan _allowance;
+        private readonly Action? _close;
+        private bool _disarmed;
+        private Task? _cancellation;
+
+        internal OwnedCancellation(TimeSpan allowance, Action? close = null)
+        {
+            _allowance = allowance;
+            _close = close;
+            Completion = Run();
+        }
+
+        internal CancellationTokenSource Source { get; } = new CancellationTokenSource();
+        internal CancellationToken Token => Source.Token;
+        internal Task Completion { get; }
+        internal bool CancellationRequested { get { lock (_sync) return _cancellation != null; } }
+        internal bool CallbacksJoined { get { lock (_sync) return _cancellation == null || Completion.IsCompleted; } }
+        internal IReadOnlyList<Exception> Failures { get { lock (_sync) return _callbackFailures.Concat(_closeFailures).ToArray(); } }
+
+        internal void RequestCancellation()
+        {
+            lock (_sync)
+            {
+                if (!_disarmed && _cancellation == null)
+                {
+                    _cancellation = Task.Run(Cancel);
+                    _stopTimer.TrySetResult(true);
+                }
+            }
+        }
+
+        internal void Disarm()
+        {
+            lock (_sync)
+            {
+                if (_elapsed.Elapsed >= _allowance) RequestCancellation();
+                _disarmed = true;
+                _stopTimer.TrySetResult(true);
+            }
+        }
+
+        private async Task Run()
+        {
+            using var timerStop = new CancellationTokenSource();
+            var timer = Task.Delay(_allowance, timerStop.Token);
+            if (await Task.WhenAny(timer, _stopTimer.Task).ConfigureAwait(false) == timer) RequestCancellation();
+            timerStop.Cancel();
+            Task? cancellation;
+            lock (_sync) cancellation = _cancellation;
+            if (cancellation != null) await cancellation.ConfigureAwait(false);
+        }
+
+        private void Cancel()
+        {
+            // Closing is the first cancellation callback, including when an operation callback blocks.
+            using var close = _close == null ? default : Source.Token.Register(() => Record(_closeFailures, _close));
+            try { Source.Cancel(); }
+            catch (AggregateException failure) { lock (_sync) _callbackFailures.AddRange(failure.InnerExceptions); }
+        }
+
+        private void Record(List<Exception> failures, Action action)
+        {
+            try { action(); }
+            catch (Exception failure) { lock (_sync) failures.Add(failure); }
+        }
     }
 
     internal static void ValidateCommittedCandidate(bool requireObserved, string? expectedKind, string candidateKind, int journal)

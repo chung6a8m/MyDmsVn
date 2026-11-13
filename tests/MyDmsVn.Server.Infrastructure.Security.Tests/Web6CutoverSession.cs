@@ -223,6 +223,32 @@ internal sealed class Web6CutoverSession
     }
 }
 
+internal sealed class Web6CutoverCleanupGate
+{
+    private volatile bool _retainForContainment;
+
+    internal bool RetainForContainment => _retainForContainment;
+
+    internal async Task Stop(Func<Task> stop, Func<bool> joined)
+    {
+        ThrowIfRetained();
+        try { await stop().ConfigureAwait(false); }
+        finally { if (!joined()) _retainForContainment = true; }
+        ThrowIfRetained();
+    }
+
+    internal Task DrainHost(Func<Task> drain)
+    {
+        ThrowIfRetained();
+        return drain();
+    }
+
+    internal void ThrowIfRetained()
+    {
+        if (_retainForContainment) throw new IOException("WEB6 cutover drain-uncertain; allocations remain retained.");
+    }
+}
+
 internal static class Web6CutoverLifetime
 {
     internal static async Task Run(Func<Task> execute, Func<Task<bool>> drain, IEnumerable<Func<Task>> disposeAllocations,

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using MyDmsVn.Web6.CandidateBootstrap;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -724,8 +724,11 @@ public sealed partial class WebHostIisExpressTests
         }
         finally
         {
-            foreach (var control in controls.Values) control.Dispose();
-            operations?.DisposeManifests(cleanupVerified);
+            if (operations?.RetainForContainment != true)
+            {
+                foreach (var control in controls.Values) control.Dispose();
+                operations?.DisposeManifests(cleanupVerified);
+            }
         }
         Web6BootstrapSelectorEvidence.Complete(bootstrap, operations!.BootstrapResources, operations.BootstrapSqlReceipt!,
             manifestPath: Path.Combine(bootstrap.Plan.EvidenceRoot, "candidate.manifest"), manifestHash: operations.BootstrapManifestHash);

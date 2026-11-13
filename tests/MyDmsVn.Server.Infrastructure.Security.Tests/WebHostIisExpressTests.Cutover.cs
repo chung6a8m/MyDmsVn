@@ -111,6 +111,9 @@ public sealed partial class WebHostIisExpressTests
         private Web6CandidateCutoverCoordinator _coordinator;
         private Web6CutoverSession? _session;
         private WebRecoveryPilotControl? _control;
+        private readonly Web6CutoverCleanupGate _cleanupGate = new Web6CutoverCleanupGate();
+
+        internal bool RetainForContainment => _cleanupGate.RetainForContainment;
         private Process? _process;
         private Web5IisExpressIdentity? _identity;
         private Web6CutoverAdmission? _admission;
@@ -292,6 +295,7 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token)
         {
+            _cleanupGate.ThrowIfRetained();
             await VerifyLifecycle(token);
             _committedSetup = null; _committedCanonical = null; _committedCanonicalHash = null;
             _session = new Web6CutoverSession(_plan, this);
@@ -337,6 +341,7 @@ public sealed partial class WebHostIisExpressTests
                 start.EnvironmentVariables["MYDMSVN_WEB6_CANDIDATE_ROOT"] = deployment.Root;
                 start.EnvironmentVariables["MYDMSVN_WEB_SECURITY_AUDIT_PATH"] = deployment.Manifest!.AuditPath;
             }
+            _cleanupGate.ThrowIfRetained();
             _process = new Process { StartInfo = start }; _active = pair;
             _process.OutputDataReceived += (_, _) => { }; _process.ErrorDataReceived += (_, _) => { };
             _hostDrained = false;
@@ -399,7 +404,9 @@ public sealed partial class WebHostIisExpressTests
             await VerifyLifecycle(token);
         }
 
-        private async Task DrainHost()
+        private Task DrainHost() => _cleanupGate.DrainHost(DrainOwnedHost);
+
+        private async Task DrainOwnedHost()
         {
             if (_process == null) return;
             if (!_process.HasExited) { try { _process.StandardInput.WriteLine("q"); } catch (IOException) { } if (!_process.WaitForExit(10000)) _process.Kill(); }
@@ -411,6 +418,7 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task<Web6CutoverBrowserResult> RunAndValidate(string browser, Web6CutoverPair pair, CancellationToken token)
         {
+            _cleanupGate.ThrowIfRetained();
             Web6CutoverBrowserResult? result = null;
             _control = WebRecoveryPilotControl.StartCutover(_plan.CurrentEpoch, _session!.Handle);
             try
@@ -431,11 +439,19 @@ public sealed partial class WebHostIisExpressTests
                 return result ?? throw new IOException("Cutover result missing.");
             }
             catch { _browserDrained = !GuiTestSafety.IsPoisoned; throw; }
-            finally { await _control.Stop(_browserDrained); _control = null; }
+            finally { await StopController(); _control = null; }
+        }
+
+        private Task StopController()
+        {
+            var control = _control;
+            return control == null ? Task.CompletedTask : _cleanupGate.Stop(() => control.Stop(_browserDrained),
+                () => control.CutoverJoined && !control.CutoverJoinUncertain);
         }
 
         public async Task VerifyOperation(Guid operation, bool committed, CancellationToken token)
         {
+            _cleanupGate.ThrowIfRetained();
             using var sql = new SqlConnection(_current.ConnectionString); await sql.OpenAsync();
             var identity = await sql.QuerySingleAsync<string>("SELECT (SELECT ActorUserId,OperationId,DeploymentEpoch,ContractVersion,CodecVersion,OperationKind,RequestTargetId,RequestFingerprint,ResultDocumentId,Disposition FROM dbo.WebOperationJournal WHERE OperationId=@operation ORDER BY ActorUserId FOR JSON PATH,INCLUDE_NULL_VALUES);", new { operation });
             if (_operationIdentities.TryGetValue(operation, out var prior) && prior != identity) throw new IOException("Cutover operation identity changed across lifecycle.");
@@ -452,6 +468,7 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task SetGrant(bool granted, CancellationToken token)
         {
+            _cleanupGate.ThrowIfRetained();
             using var sql = new SqlConnection(_current.ConnectionString);
             if (await sql.ExecuteAsync("UPDATE p SET Granted=@granted FROM dbo.UserPermissions p JOIN dbo.Users u ON u.UserId=p.UserId WHERE u.Username=N'integratedEditor' AND p.PermissionKey=N'Sales.Receipts.Write';", new { granted }) != 1)
                 throw new IOException("Cutover original write grant was not found.");
@@ -459,6 +476,7 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task VerifyCommittedSetup(Web6CommittedSetup proof, CancellationToken token)
         {
+            _cleanupGate.ThrowIfRetained();
             if (_committedSetup != null || _active != Web6CutoverPair.Current) throw new InvalidDataException("Unexpected cutover setup.");
             using var sql = new SqlConnection(_current.ConnectionString); await sql.OpenAsync();
             var document = await Web6CandidateOracle.VerifyCommittedSetupAsync(sql, proof, _plan.CurrentEpoch);
@@ -538,6 +556,7 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task VerifyLifecycle(CancellationToken token)
         {
+            _cleanupGate.ThrowIfRetained();
             _browserLease?.Verify();
             foreach (var deployment in _deployments.Values) { deployment.ControlLease?.Verify(); deployment.RuntimeLease?.Verify(); }
             Web6CutoverDelta.VerifyZero(_currentSnapshot!, await LifecycleSnapshot(_current.ConnectionString, true));
@@ -564,7 +583,8 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task<Web6CutoverDrain> Drain(string browser, Web6CutoverPair pair, CancellationToken token)
         { await DrainHost(); await VerifyLifecycle(token); return new Web6CutoverDrain(_hostDrained, _hostDrained); }
-        public Task VerifyRestore(string browser, CancellationToken token) { _session!.VerifyComplete(); return Task.CompletedTask; }
+        public Task VerifyRestore(string browser, CancellationToken token)
+        { _cleanupGate.ThrowIfRetained(); _session!.VerifyComplete(); return Task.CompletedTask; }
         public async Task Complete(CancellationToken token)
         {
             await VerifyLifecycle(token);
@@ -574,8 +594,9 @@ public sealed partial class WebHostIisExpressTests
 
         internal async Task<bool> Cleanup()
         {
+            _cleanupGate.ThrowIfRetained();
             var failures = new List<Exception>();
-            try { if (_control != null) await _control.Stop(_browserDrained); } catch (Exception error) { failures.Add(error); }
+            try { await StopController(); } catch (Exception error) when (!RetainForContainment) { failures.Add(error); }
             try { await DrainHost(); } catch (Exception error) { failures.Add(error); }
             if (!_complete)
                 throw new IOException("Incomplete bootstrap cutover retains every allocation after bounded drain.");
@@ -602,6 +623,7 @@ public sealed partial class WebHostIisExpressTests
 
         internal void VerifyFinalDisposition()
         {
+            _cleanupGate.ThrowIfRetained();
             Web6CutoverOracle.ValidateDisposition(_complete, _complete, _complete, _browserDrained, _hostDrained, true);
             Web6CutoverOracle.ValidateAllocationDisposition(_plan, _verifiedSetups, _restoredAdmissions, _currentReadmissions);
             _deployments["current"].Manifest!.RecordDisposition(Web6CandidateStage.Cutover, Web6CandidateOutcome.Passed);
@@ -611,6 +633,7 @@ public sealed partial class WebHostIisExpressTests
         }
         internal void DisposeManifests(bool allowDeletion)
         {
+            _cleanupGate.ThrowIfRetained();
             var failures = new List<Exception>();
             void Attempt(Action action) { try { action(); } catch (Exception error) { failures.Add(error); } }
             foreach (var deployment in _deployments.Values)

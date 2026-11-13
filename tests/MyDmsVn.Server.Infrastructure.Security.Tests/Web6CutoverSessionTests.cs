@@ -179,6 +179,32 @@ public sealed class Web6CutoverSessionTests
         Assert.Equal((Web6CutoverPair.Current, false, runtime.Plan.CurrentEpoch), runtime.Host);
     }
 
+    [Fact]
+    public async Task Unjoined_controller_stop_blocks_host_drain_and_allocation_cleanup_even_after_late_join()
+    {
+        var gate = new Web6CutoverCleanupGate();
+        var stopFailure = new IOException("Injected unjoined controller Stop.");
+        var joined = false;
+        var hostDrains = 0;
+        var allocationCleanups = 0;
+
+        var failure = await Assert.ThrowsAsync<AggregateException>(() => Web6CutoverLifetime.Run(
+            () => gate.Stop(() => Task.FromException(stopFailure), () => joined),
+            async () =>
+            {
+                joined = true;
+                await gate.DrainHost(() => { hostDrains++; return Task.CompletedTask; });
+                return true;
+            },
+            new Func<Task>[] { () => { allocationCleanups++; return Task.CompletedTask; } }, stopOnCleanupFailure: true));
+
+        Assert.Collection(failure.InnerExceptions, error => Assert.Same(stopFailure, error),
+            error => Assert.Contains("drain-uncertain", error.Message));
+        Assert.True(gate.RetainForContainment);
+        Assert.Equal(0, hostDrains);
+        Assert.Equal(0, allocationCleanups);
+    }
+
     private static Web6CutoverRequest Request(string action, Guid? operation = null) =>
         new Web6CutoverRequest(action, operation, null, TimeSpan.FromSeconds(10));
 
