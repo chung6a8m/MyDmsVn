@@ -11,6 +11,12 @@ using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 
 #if WEB6_BOOTSTRAP
+using CutoverBudgets = MyDmsVn.Web6.CandidateBootstrap.Web6CutoverBudgets;
+#elif WEB6_SECURITY
+using CutoverBudgets = MyDmsVn.Server.Infrastructure.IntegrationTests.Web6CutoverBudgets;
+#endif
+
+#if WEB6_BOOTSTRAP
 namespace MyDmsVn.Web6.CandidateBootstrap.Processes
 #else
 namespace MyDmsVn.Desktop.Tests
@@ -35,8 +41,17 @@ namespace MyDmsVn.Desktop.Tests
             bool selectorProcess, CancellationToken cancellationToken = default)
             => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(selectorProcess ? 44 : 41), cancellationToken);
 
+#if WEB6_BOOTSTRAP || WEB6_SECURITY
+        // Exact protected cutover callers only. The selector's extra minute is
+        // termination/output join, never execution time; all other routes retain 5s cleanup.
+        public static Task<GuiProcessResult> RunWeb6CutoverAsync(ProcessStartInfo start, TimeSpan timeout,
+            bool selectorProcess, CancellationToken cancellationToken = default)
+            => RunCoreAsync(start, timeout, selectorProcess ? CutoverBudgets.SelectorGate : CutoverBudgets.BrowserPack, cancellationToken,
+                cleanupBudget: selectorProcess ? CutoverBudgets.SelectorProcessMaximum - CutoverBudgets.SelectorGate : CleanupBudget);
+#endif
+
         private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout,
-            CancellationToken cancellationToken, Action<int>? started = null, Encoding? stdoutEncoding = null)
+            CancellationToken cancellationToken, Action<int>? started = null, Encoding? stdoutEncoding = null, TimeSpan? cleanupBudget = null)
         {
             GuiTestSafety.ThrowIfPoisoned();
             cancellationToken.ThrowIfCancellationRequested();
@@ -97,18 +112,19 @@ namespace MyDmsVn.Desktop.Tests
                 }
 
                 Exception? cleanup = null;
+                var teardown = cleanupBudget ?? CleanupBudget;
                 var cleanupClock = Stopwatch.StartNew();
                 try
                 {
                     child.Terminate();
                     while (child.ActiveProcesses != 0 || !child.RootExited)
                     {
-                        if (cleanupClock.Elapsed >= CleanupBudget)
+                        if (cleanupClock.Elapsed >= teardown)
                             throw new TimeoutException("Owned GUI process tree did not drain within the cleanup budget.");
                         await Task.Delay(20).ConfigureAwait(false);
                     }
                     var drains = Task.WhenAll(output, error);
-                    var remaining = CleanupBudget - cleanupClock.Elapsed;
+                    var remaining = teardown - cleanupClock.Elapsed;
                     if (remaining <= TimeSpan.Zero || await Task.WhenAny(drains, Task.Delay(remaining)).ConfigureAwait(false) != drains)
                         throw new TimeoutException("Owned stdout/stderr did not reach EOF after process-tree termination.");
                     await drains.ConfigureAwait(false);

@@ -159,7 +159,8 @@ public sealed partial class WebHostIisExpressTests
         private WebRecoveryPilotControl? _control;
         private readonly Web6CutoverCleanupGate _cleanupGate = new Web6CutoverCleanupGate();
 
-        internal bool RetainForContainment => _cleanupGate.RetainForContainment;
+        public bool RetainForContainment => _cleanupGate.RetainForContainment;
+        public void RetainAfterDeadline() => _cleanupGate.RetainAfterDeadline();
         private Process? _process;
         private Web5IisExpressIdentity? _identity;
         private Web6CutoverAdmission? _admission;
@@ -575,33 +576,38 @@ public sealed partial class WebHostIisExpressTests
         {
             _cleanupGate.ThrowIfRetained();
             Web6CutoverBrowserResult? result = null;
-            _control = WebRecoveryPilotControl.StartCutover(_plan.CurrentEpoch, _session!.Handle);
-            try
+            _control = WebRecoveryPilotControl.StartCutover(_plan.CurrentEpoch, _session!.Handle, closeResponse: null, parent: token);
+            return await Web6CutoverLifetime.RunWithStop(async () =>
             {
-                _browserDrained = false;
-                await RunBrowser(_current, BrowserRoot, _customer, _warehouse, _employee, _product, _receiptProduct, _integrated,
-                    true, true, false, true, _currentLogin.Name, null, _deployments["current"].Manifest, null, true, _plan, _control, browser,
-                    (count, output) => result = new Web6CutoverBrowserResult((int)count["discovered"]!, (int)count["passed"]!, (int)count["failed"]!,
-                        (int)count["skipped"]!, (int)count["retries"]!, ((JArray)output["checks"]!).Values<string>()!),
-                    _currentBackend, _bootstrap.Plan.Text("candidateDistSha256"));
-                _browserDrained = true;
-                _session.VerifyComplete();
-                await VerifyLifecycle(new Web6CutoverDeadline(Web6CutoverBudgets.LifecyclePhase), token);
-                Web6CutoverOracle.ValidateSetupEvidence(_session.CommittedSetup, _committedSetup, _restoredAdmissions == _browsers + 1);
-                _verifiedSetups.Add(_committedSetup!);
-                _deployments["current"].Manifest!.RecordDisposition(browser == "chromium" ? Web6CandidateStage.Chromium : Web6CandidateStage.Edge, Web6CandidateOutcome.Passed);
-                _browsers++;
-                return result ?? throw new IOException("Cutover result missing.");
-            }
-            catch { _browserDrained = !GuiTestSafety.IsPoisoned; throw; }
-            finally { await StopController(); _control = null; }
+                try
+                {
+                    _browserDrained = false;
+                    await RunBrowser(_current, BrowserRoot, _customer, _warehouse, _employee, _product, _receiptProduct, _integrated,
+                        true, true, false, true, _currentLogin.Name, null, _deployments["current"].Manifest, null, true, _plan, _control, browser,
+                        (count, output) => result = new Web6CutoverBrowserResult((int)count["discovered"]!, (int)count["passed"]!, (int)count["failed"]!,
+                            (int)count["skipped"]!, (int)count["retries"]!, ((JArray)output["checks"]!).Values<string>()!),
+                        _currentBackend, _bootstrap.Plan.Text("candidateDistSha256"), token,
+                        drained => { _browserDrained = drained; return StopController(); });
+                    _browserDrained = true;
+                    _session.VerifyComplete();
+                    await VerifyLifecycle(new Web6CutoverDeadline(Web6CutoverBudgets.LifecyclePhase), token);
+                    Web6CutoverOracle.ValidateSetupEvidence(_session.CommittedSetup, _committedSetup, _restoredAdmissions == _browsers + 1);
+                    _verifiedSetups.Add(_committedSetup!);
+                    _deployments["current"].Manifest!.RecordDisposition(browser == "chromium" ? Web6CandidateStage.Chromium : Web6CandidateStage.Edge, Web6CandidateOutcome.Passed);
+                    _browsers++;
+                    return result ?? throw new IOException("Cutover result missing.");
+                }
+                catch { _browserDrained = !GuiTestSafety.IsPoisoned; throw; }
+            }, StopController);
         }
 
-        private Task StopController()
+        private async Task StopController()
         {
             var control = _control;
-            return control == null ? Task.CompletedTask : _cleanupGate.Stop(() => control.Stop(_browserDrained),
-                () => control.CutoverJoined && !control.CutoverJoinUncertain);
+            if (control == null || RetainForContainment) return;
+            try { await _cleanupGate.Stop(() => control.Stop(_browserDrained),
+                () => control.CutoverJoined && !control.CutoverJoinUncertain); }
+            finally { if (!RetainForContainment) _control = null; }
         }
 
         public async Task VerifyOperation(Guid operation, bool committed, Web6CutoverDeadline deadline, CancellationToken token)

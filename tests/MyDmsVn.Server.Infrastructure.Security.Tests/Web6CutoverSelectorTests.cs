@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using MyDmsVn.Web6.CandidateBootstrap;
@@ -15,6 +16,145 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web6CutoverSelectorTests : IDisposable
 {
+    [Theory]
+    [InlineData("exact", 3600)]
+    [InlineData("name", 1500)]
+    [InlineData("filter", 1500)]
+    [InlineData("project", 1500)]
+    [InlineData("directory", 1500)]
+    [InlineData("enable-missing", 1500)]
+    [InlineData("enable-value", 1500)]
+    [InlineData("run-missing", 1500)]
+    [InlineData("run-empty", 1500)]
+    [InlineData("pair-missing", 1500)]
+    [InlineData("pair-invalid", 1500)]
+    [InlineData("candidate", 1500)]
+    [InlineData("browser", 1500)]
+    [InlineData("workload", 1500)]
+    [InlineData("recovery", 1500)]
+    public void Extended_gate_requires_the_entire_protected_cutover_tuple(string drift, int seconds)
+    {
+        var directory = Path.GetFullPath(_root);
+        var project = Path.Combine(directory, "tests", Web6SelectorPlan.Owner, Web6SelectorPlan.Owner + ".csproj");
+        var env = CutoverEnvironment();
+        var name = drift == "name" ? "default" : "cutover";
+        var filter = drift == "filter" ? Web6CandidatePairBudgets.PairFilter : Web6CutoverSelectorBudgets.Filter;
+        if (drift == "project") project = Path.Combine(directory, "different.csproj");
+        if (drift == "directory") directory = Path.Combine(directory, "other");
+        if (drift == "enable-missing") env.Remove("MYDMSVN_WEB6_CUTOVER_ENABLE");
+        if (drift == "enable-value") env["MYDMSVN_WEB6_CUTOVER_ENABLE"] = "true";
+        if (drift == "run-missing") env.Remove("MYDMSVN_WEB6_BOOTSTRAP_RUN_ID");
+        if (drift == "run-empty") env["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = "";
+        if (drift == "pair-missing") env.Remove(Web6SelectorPlan.PairPassedDigestVariable);
+        if (drift == "pair-invalid") env[Web6SelectorPlan.PairPassedDigestVariable] = "invalid";
+        if (drift == "candidate") env["MYDMSVN_WEB6_CANDIDATE_ENABLE"] = "1";
+        if (drift == "browser") env["MYDMSVN_WEB_PILOT_PROJECT"] = "chromium";
+        if (drift == "workload") env["MYDMSVN_WEB6_WORKLOAD_ENABLE"] = "1";
+        if (drift == "recovery") env["MYDMSVN_WEB6_RECOVERY_ENABLE"] = "1";
+        Assert.Equal(drift == "exact", Web6CutoverSelectorBudgets.IsExact(name, filter, env, project, directory));
+        Assert.Equal(TimeSpan.FromSeconds(seconds), Web6CutoverSelectorBudgets.GateTimeout(name, filter, env, project, directory));
+        Assert.Equal(TimeSpan.FromSeconds(3660), Web6CutoverSelectorBudgets.ProcessMaximum);
+    }
+
+    [Theory]
+    [InlineData("pair-chromium", 2640, 2640)]
+    [InlineData("pair-edge", 2640, 2640)]
+    [InlineData("workload", 1500, 1800)]
+    [InlineData("recovery", 1500, 1800)]
+    [InlineData("default", 1500, 1800)]
+    [InlineData("legacy", 1500, 1800)]
+    [InlineData("cutover", 1500, 1800)]
+    public void Neighbor_gate_and_process_ceilings_are_unchanged(string name, int gate, int process)
+    {
+        var env = new Dictionary<string, string>();
+        if (name.StartsWith("pair-", StringComparison.Ordinal))
+        {
+            env["MYDMSVN_WEB6_CANDIDATE_ENABLE"] = "1";
+            env["MYDMSVN_WEB_PILOT_PROJECT"] = name.Substring(5);
+            env["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = "fixture-run";
+        }
+        Assert.Equal(TimeSpan.FromSeconds(gate), Web6CutoverSelectorBudgets.GateTimeout(name, Web6CandidatePairBudgets.PairFilter, env, Path.Combine(_root, "other.csproj"), _root));
+        Assert.Equal(TimeSpan.FromSeconds(process), Web6CandidatePairBudgets.SelectorMaximum(name, Web6CandidatePairBudgets.PairFilter, env));
+    }
+
+    [Fact]
+    public async Task Browser_primary_is_first_then_stop_and_drain_and_no_allocations_are_disposed()
+    {
+        var primary = new IOException("browser primary");
+        var stop = new IOException("controller stop");
+        var drain = new IOException("host drain");
+        var disposals = 0;
+        var error = await Assert.ThrowsAsync<AggregateException>(() => Web6CutoverLifetime.Run(
+            () => Web6CutoverLifetime.RunWithStop<int>(() => Task.FromException<int>(primary), () => Task.FromException(stop)),
+            () => Task.FromException<bool>(drain), new Func<Task>[] { () => { disposals++; return Task.CompletedTask; } }));
+        Assert.Equal(new Exception[] { primary, stop, drain }, error.InnerExceptions);
+        Assert.Equal(0, disposals);
+    }
+
+    [Fact]
+    public async Task Unjoined_stop_is_sticky_and_refuses_all_later_cleanup_and_success()
+    {
+        var gate = new Web6CutoverCleanupGate();
+        var primary = new IOException("browser primary");
+        var calls = new List<string>();
+        var error = await Assert.ThrowsAsync<AggregateException>(() => Web6CutoverLifetime.RunWithStop<int>(
+            () => Task.FromException<int>(primary),
+            () => gate.Stop(() => { calls.Add("stop"); return Task.CompletedTask; }, () => false)));
+        Assert.Same(primary, error.InnerExceptions[0]);
+        Assert.True(gate.RetainForContainment);
+        foreach (var action in new[] { "drain", "disposition", "allocation", "control", "manifest", "next-browser", "success" })
+            Assert.Throws<IOException>(() => { gate.ThrowIfRetained(); calls.Add(action); });
+        await Assert.ThrowsAsync<IOException>(() => gate.Stop(() => { calls.Add("second-stop"); return Task.CompletedTask; }, () => true));
+        Assert.Equal(new[] { "stop" }, calls);
+    }
+
+    [Fact]
+    public void Source_routes_preserve_separate_controllers_owned_termination_and_sticky_cleanup_guards()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root != null && !File.Exists(Path.Combine(root.FullName, "AGENTS.md"))) root = root.Parent;
+        Assert.NotNull(root);
+        string Source(string path) => File.ReadAllText(Path.Combine(root!.FullName, path));
+        const string tests = "tests/MyDmsVn.Server.Infrastructure.Security.Tests/";
+        var live = Source(tests + "WebHostIisExpressTests.Cutover.cs");
+        var run = live.Substring(live.IndexOf("public async Task<Web6CutoverBrowserResult> RunAndValidate", StringComparison.Ordinal));
+        Assert.Contains("StartCutover(_plan.CurrentEpoch, _session!.Handle, closeResponse: null, parent: token)", run);
+        Assert.Contains("Web6CutoverLifetime.RunWithStop", run);
+        Assert.Contains("drained => { _browserDrained = drained; return StopController(); }", run);
+        foreach (var method in new[] { "internal async Task<bool> Cleanup()", "internal void VerifyFinalDisposition()", "internal void DisposeManifests(bool allowDeletion)" })
+        {
+            var body = live.Substring(live.IndexOf(method, StringComparison.Ordinal) + method.Length).TrimStart();
+            Assert.StartsWith("{\r\n            _cleanupGate.ThrowIfRetained();", body);
+        }
+        var orchestration = Source(tests + "Web6CandidateManifest.cs");
+        Assert.Contains("new Web6CutoverDeadline(Web6CutoverBudgets.AggregateParent, _clock)", orchestration);
+        Assert.Contains("foreach (var browser in new[] { \"chromium\", \"edge\" })", orchestration);
+        Assert.Contains("if (started && !_operations.RetainForContainment)", orchestration);
+        var browser = Source(tests + "WebHostIisExpressTests.cs");
+        Assert.Contains("if (operations?.RetainForContainment != true)", browser);
+        Assert.Contains("if (!web6Cutover || (cutoverControl?.CutoverJoined == true && !cutoverControl.CutoverJoinUncertain))", browser);
+        Assert.Contains("GuiOwnedProcess.RunWeb6CutoverAsync(start, Web6CutoverBudgets.BrowserPack, selectorProcess: false, cancellationToken: cutoverParent)", browser);
+        var runner = Source("tools/MyDmsVn.Web6.CandidateBootstrap/SelectorProcessRunner.cs");
+        Assert.Contains("Web6CutoverSelectorBudgets.IsExact(invocation.Name, invocation.Filter, invocation.Environment, _project, _directory)", runner);
+        Assert.Contains("command.Web6Cutover", runner);
+        Assert.Contains("GuiOwnedProcess.RunWeb6CutoverAsync(info, command.Timeout, selectorProcess: true", runner);
+        var owned = Source("tests/MyDmsVn.Desktop.Tests/GuiOwnedProcess.cs");
+        Assert.Contains("#if WEB6_BOOTSTRAP || WEB6_SECURITY", owned);
+        Assert.Contains("selectorProcess ? CutoverBudgets.SelectorGate : CutoverBudgets.BrowserPack", owned);
+        Assert.Contains("cleanupBudget: selectorProcess ? CutoverBudgets.SelectorProcessMaximum - CutoverBudgets.SelectorGate : CleanupBudget", owned);
+        Assert.Contains("child.Terminate();", owned);
+        Assert.Contains("while (child.ActiveProcesses != 0 || !child.RootExited)", owned);
+        Assert.Contains("await drains.ConfigureAwait(false);", owned);
+        Assert.Contains("TerminateJobObject(_job", owned);
+        Assert.DoesNotContain("Process.GetProcessById", owned);
+    }
+
+    private static Dictionary<string, string> CutoverEnvironment() => new Dictionary<string, string>
+    {
+        ["MYDMSVN_WEB6_CUTOVER_ENABLE"] = "1", ["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = "fixture-run",
+        [Web6SelectorPlan.PairPassedDigestVariable] = new string('a', 64),
+    };
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), "w6-selector-" + Guid.NewGuid().ToString("N"));
     private const string Tree = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     private string FrontendRoot => Path.Combine(_root, "frontend");

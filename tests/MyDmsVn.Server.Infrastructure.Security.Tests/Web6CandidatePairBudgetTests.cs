@@ -11,6 +11,19 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web6CandidatePairBudgetTests
 {
+    [Theory]
+    [InlineData(false, 1560)]
+    [InlineData(true, 3600)]
+    public async Task Cutover_owned_route_reserves_teardown_and_rejects_any_extra_live_work(bool selector, int seconds)
+    {
+        var invalid = new ProcessStartInfo("not-an-absolute-executable") { UseShellExecute = false };
+        await Assert.ThrowsAsync<ArgumentException>(() => GuiOwnedProcess.RunWeb6CutoverAsync(invalid, TimeSpan.FromSeconds(seconds), selector));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => GuiOwnedProcess.RunWeb6CutoverAsync(invalid, TimeSpan.FromSeconds(seconds).Add(TimeSpan.FromMilliseconds(1)), selector));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => GuiOwnedProcess.RunWeb6CutoverAsync(invalid, TimeSpan.FromSeconds(3660), selector));
+        Assert.Equal(Web6CutoverBudgets.SelectorGate, Web6CutoverSelectorBudgets.Gate);
+        Assert.Equal(Web6CutoverBudgets.SelectorProcessMaximum, Web6CutoverSelectorBudgets.ProcessMaximum);
+    }
+
     [Fact]
     public void Cutover_phase_and_response_budgets_match_the_deadline_contract()
     {

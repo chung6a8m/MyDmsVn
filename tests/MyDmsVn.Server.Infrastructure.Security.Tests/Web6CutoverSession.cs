@@ -228,6 +228,7 @@ internal sealed class Web6CutoverCleanupGate
     private volatile bool _retainForContainment;
 
     internal bool RetainForContainment => _retainForContainment;
+    internal void RetainAfterDeadline() => _retainForContainment = true;
 
     internal async Task Stop(Func<Task> stop, Func<bool> joined)
     {
@@ -251,6 +252,37 @@ internal sealed class Web6CutoverCleanupGate
 
 internal static class Web6CutoverLifetime
 {
+    internal static AggregateException Combine(string message, params Exception[] failures)
+    {
+        var ordered = new List<Exception>();
+        void Append(Exception failure)
+        {
+            // Flatten depth first: AggregateException.Flatten uses breadth first
+            // and can move a later drain ahead of a nested browser primary.
+            if (failure is AggregateException aggregate)
+                foreach (var inner in aggregate.InnerExceptions) Append(inner);
+            else ordered.Add(failure);
+        }
+        foreach (var failure in failures) Append(failure);
+        return new AggregateException(message, ordered);
+    }
+
+    internal static async Task<T> RunWithStop<T>(Func<Task<T>> run, Func<Task> stop)
+    {
+        Exception? primary = null;
+        T result = default!;
+        try { result = await run().ConfigureAwait(false); }
+        catch (Exception failure) { primary = failure; }
+        try { await stop().ConfigureAwait(false); }
+        catch (Exception failure)
+        {
+            if (primary != null) throw Combine("Cutover browser and controller stop failed.", primary, failure);
+            throw;
+        }
+        if (primary != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
+        return result;
+    }
+
     internal static async Task Run(Func<Task> execute, Func<Task<bool>> drain, IEnumerable<Func<Task>> disposeAllocations,
         bool stopOnCleanupFailure = false)
     {
@@ -271,6 +303,6 @@ internal static class Web6CutoverLifetime
                 try { await dispose().ConfigureAwait(false); }
                 catch (Exception failure) { failures.Add(failure); if (stopOnCleanupFailure) break; }
         if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
-        if (failures.Count > 1) throw new AggregateException("Cutover run and/or cleanup failed.", failures);
+        if (failures.Count > 1) throw Combine("Cutover run and/or cleanup failed.", failures.ToArray());
     }
 }

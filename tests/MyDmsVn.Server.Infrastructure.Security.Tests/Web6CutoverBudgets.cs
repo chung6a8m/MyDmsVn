@@ -1,7 +1,11 @@
 ﻿using System;
 using System.IO;
 
+#if WEB6_BOOTSTRAP
+namespace MyDmsVn.Web6.CandidateBootstrap;
+#else
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
+#endif
 
 internal static class Web6CutoverBudgets
 {

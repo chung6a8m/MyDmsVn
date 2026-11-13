@@ -56,13 +56,13 @@ internal sealed class WebRecoveryPilotControl
     private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null,
         Web6CandidateHostMismatch? candidateMismatch = null, bool candidatePair = false,
         Func<Web6CutoverRequest, Web6CutoverDeadline, CancellationToken, Task<JObject>>? cutover = null,
-        Action<NamedPipeServerStream>? closeCutoverResponse = null, TimeSpan? cutoverControllerLifetime = null)
+        Action<NamedPipeServerStream>? closeCutoverResponse = null, TimeSpan? cutoverControllerLifetime = null, CancellationToken cutoverParent = default)
     {
         _cutover = cutover;
         _closeCutoverResponse = closeCutoverResponse;
         _cutoverLifetime = cutover == null ? null : Stopwatch.StartNew();
         _cutoverControllerLifetime = cutoverControllerLifetime ?? Web6CutoverBudgets.Controller;
-        _cutoverController = cutover == null ? null : new OwnedCancellation(_cutoverControllerLifetime);
+        _cutoverController = cutover == null ? null : new OwnedCancellation(_cutoverControllerLifetime, parent: cutoverParent);
         _stop = _cutoverController?.Source ?? new CancellationTokenSource(Web6CandidatePairBudgets.ControllerLifetime(candidatePair));
         _connectionString = connectionString;
         _web5 = web5;
@@ -107,11 +107,11 @@ internal sealed class WebRecoveryPilotControl
         StartCutover(epoch, handler, closeResponse: null);
 
     internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<Web6CutoverRequest, Web6CutoverDeadline, CancellationToken, Task<JObject>> handler,
-        Action<NamedPipeServerStream>? closeResponse, TimeSpan? controllerLifetime = null)
+        Action<NamedPipeServerStream>? closeResponse, TimeSpan? controllerLifetime = null, CancellationToken parent = default)
     {
         var control = new WebRecoveryPilotControl("", web5: true, web6: true,
             cutover: handler ?? throw new ArgumentNullException(nameof(handler)), closeCutoverResponse: closeResponse,
-            cutoverControllerLifetime: controllerLifetime);
+            cutoverControllerLifetime: controllerLifetime, cutoverParent: parent);
         control._epochs.Add(epoch);
         control._serving = control.Serve();
         return control;
@@ -466,13 +466,15 @@ internal sealed class WebRecoveryPilotControl
         private readonly Stopwatch _elapsed = Stopwatch.StartNew();
         private readonly TimeSpan _allowance;
         private readonly Action? _close;
+        private readonly CancellationToken _parent;
         private bool _disarmed;
         private Task? _cancellation;
 
-        internal OwnedCancellation(TimeSpan allowance, Action? close = null)
+        internal OwnedCancellation(TimeSpan allowance, Action? close = null, CancellationToken parent = default)
         {
             _allowance = allowance;
             _close = close;
+            _parent = parent;
             Completion = Run();
         }
 
@@ -507,6 +509,9 @@ internal sealed class WebRecoveryPilotControl
 
         private async Task Run()
         {
+            // Parent callbacks only schedule cancellation; the owned Completion joins
+            // all handler callbacks, including noncooperative ones, through Stop.
+            using var parentRegistration = _parent.Register(RequestCancellation);
             using var timerStop = new CancellationTokenSource();
             var timer = Task.Delay(_allowance, timerStop.Token);
             if (await Task.WhenAny(timer, _stopTimer.Task).ConfigureAwait(false) == timer) RequestCancellation();

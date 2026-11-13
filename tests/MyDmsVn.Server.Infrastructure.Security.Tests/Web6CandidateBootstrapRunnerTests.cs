@@ -432,6 +432,68 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
         Assert.Equal(admitted, called);
     }
 
+    [Theory]
+    [InlineData(3600, true)]
+    [InlineData(3601, false)]
+    [InlineData(3660, false)]
+    public async Task Cutover_work_gate_never_borrows_termination_minute(int seconds, bool admitted)
+    {
+        var project = Path.Combine(_root, "tests", Web6SelectorPlan.Owner, Web6SelectorPlan.Owner + ".csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(project)!);
+        File.WriteAllText(project, "fixture project");
+        var env = new Dictionary<string, string>
+        {
+            ["MYDMSVN_WEB6_CUTOVER_ENABLE"] = "1", ["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = RunId,
+            [Web6SelectorPlan.PairPassedDigestVariable] = new string('a', 64),
+        };
+        var invocation = Invocation("cutover", "FullyQualifiedName=MyDmsVn.Server.Infrastructure.IntegrationTests.WebHostIisExpressTests.Web6_pinned_cutover_runs_protected_IIS_and_browser_lifecycle", env, TimeSpan.FromSeconds(seconds));
+        var called = false;
+        var runner = new SelectorProcessRunner(Executable, GitExecutable, _gitSha, _root, project, (request, _) =>
+        {
+            called = true;
+            Assert.Equal(TimeSpan.FromSeconds(3600), request.Timeout);
+            Assert.False(request.Web6CandidatePair);
+            Assert.True(request.Web6Cutover);
+            return Task.FromResult(new GuiProcessResult(1, "", ""));
+        });
+        if (admitted) await runner.RunAsync(invocation, CancellationToken.None);
+        else await Assert.ThrowsAsync<IOException>(() => runner.RunAsync(invocation, CancellationToken.None));
+        Assert.Equal(admitted, called);
+    }
+
+    [Theory]
+    [InlineData("TimedOut", true)]
+    [InlineData("TimedOut", false)]
+    [InlineData("Canceled", true)]
+    [InlineData("Canceled", false)]
+    [InlineData("CleanupFailed", false)]
+    public async Task Exact_cutover_containment_failure_never_becomes_mandatory_success(string reason, bool drained)
+    {
+        var project = Path.Combine(_root, "tests", Web6SelectorPlan.Owner, Web6SelectorPlan.Owner + ".csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(project)!);
+        File.WriteAllText(project, "fixture project");
+        var env = new Dictionary<string, string>
+        {
+            ["MYDMSVN_WEB6_CUTOVER_ENABLE"] = "1", ["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = RunId,
+            [Web6SelectorPlan.PairPassedDigestVariable] = new string('a', 64),
+        };
+        var invocation = Invocation("cutover", Web6CutoverSelectorBudgets.Filter, env, TimeSpan.FromSeconds(3600));
+        var calls = 0;
+        var runner = new SelectorProcessRunner(Executable, GitExecutable, _gitSha, _root, project, (request, _) =>
+        {
+            calls++;
+            Assert.True(request.Web6Cutover);
+            throw new GuiProcessException(reason, drained, "private-output", "private-error", -1, new TimeoutException());
+        });
+        var result = await runner.RunAsync(invocation, CancellationToken.None);
+        Assert.Equal(1, calls);
+        Assert.False(result.PassedMandatoryTests);
+        Assert.Equal(reason == "TimedOut" ? SelectorDisposition.TimedOut : reason == "Canceled" ? SelectorDisposition.Canceled : SelectorDisposition.ProcessUncertain, result.Disposition);
+        Assert.True(result.RequiresDispositionProof);
+        Assert.Equal(drained, result.ProcessTreeDrained);
+        Assert.Equal(0, result.Executed);
+    }
+
     private SelectorProcessRunner Runner(Func<BootstrapProcessRequest, CancellationToken, Task<GuiProcessResult>> run) =>
         new(Executable, GitExecutable, _gitSha, _root, Project, run);
 

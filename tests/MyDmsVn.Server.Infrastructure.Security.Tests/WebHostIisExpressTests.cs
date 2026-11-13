@@ -767,7 +767,8 @@ public sealed partial class WebHostIisExpressTests
         Web6CandidateManifest? candidateManifest = null, Web6CandidateHostMismatch? candidateMismatch = null,
         bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null,
         WebRecoveryPilotControl? cutoverControl = null, string? cutoverBrowser = null, Action<JObject, JObject>? cutoverResult = null,
-        Web6CandidateBackendSource? backendSource = null, string? cutoverFrontendHash = null)
+        Web6CandidateBackendSource? backendSource = null, string? cutoverFrontendHash = null,
+        CancellationToken cutoverParent = default, Func<bool, Task>? stopCutover = null)
     {
         var connectionString = database.ConnectionString;
         var candidatePair = Web6CandidatePairBudgets.IsPairMode(web6Candidate, web6Cutover, Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"));
@@ -849,7 +850,9 @@ public sealed partial class WebHostIisExpressTests
             {
                 browserDrained = false;
                 var budget = Web6CandidatePairBudgets.BrowserTimeout(web6Candidate, web6Cutover, project);
-                var executed = candidatePair
+                var executed = web6Cutover && cutoverControl != null && stopCutover != null && project == cutoverBrowser && project is "chromium" or "edge"
+                    ? await GuiOwnedProcess.RunWeb6CutoverAsync(start, Web6CutoverBudgets.BrowserPack, selectorProcess: false, cancellationToken: cutoverParent)
+                    : candidatePair
                     ? await GuiOwnedProcess.RunWeb6CandidatePairAsync(start, budget, selectorProcess: false)
                     : await GuiOwnedProcess.RunAsync(start, TimeSpan.FromMinutes(5));
                 browserDrained = true;
@@ -984,15 +987,27 @@ public sealed partial class WebHostIisExpressTests
         catch (Exception error) { browserFailure = error; throw; }
         finally
         {
-            try { if (recovery != null) await recovery.Stop(browserDrained); }
-            catch (Exception cleanup) when (browserFailure != null) { throw new AggregateException("Browser scenario and recovery control drain failed.", browserFailure, cleanup); }
+            try
+            {
+                if (web6Cutover && stopCutover != null) await stopCutover(browserDrained);
+                else if (recovery != null) await recovery.Stop(browserDrained);
+            }
+            catch (Exception cleanup) when (browserFailure != null)
+            {
+                throw web6Cutover
+                    ? Web6CutoverLifetime.Combine("Cutover browser and recovery control drain failed.", browserFailure, cleanup)
+                    : new AggregateException("Browser scenario and recovery control drain failed.", browserFailure, cleanup);
+            }
             finally
             {
-                try { if (privateInput != null) privateInput.Dispose(); else File.Delete(manifestPath); }
-                finally
+                if (!web6Cutover || (cutoverControl?.CutoverJoined == true && !cutoverControl.CutoverJoinUncertain))
                 {
-                    try { privateResult?.Dispose(); }
-                    finally { try { privateCount?.Dispose(); } finally { privateNetwork?.Dispose(); File.Delete(certificatePath); } }
+                    try { if (privateInput != null) privateInput.Dispose(); else File.Delete(manifestPath); }
+                    finally
+                    {
+                        try { privateResult?.Dispose(); }
+                        finally { try { privateCount?.Dispose(); } finally { privateNetwork?.Dispose(); File.Delete(certificatePath); } }
+                    }
                 }
             }
         }

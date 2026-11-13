@@ -42,7 +42,7 @@ internal sealed class Web6CandidateBootstrapOrchestrator
                     throw new IOException("Cutover requires the accepted PairPassed transition.");
                 var env = plan.EnvironmentFor(gate.Name, runId, sql, task4Path, task4Hash,
                     gate.Name == "cutover" ? transition!.Sha256 : null);
-                var invocation = new SelectorInvocation(gate.Name, gate.Filter, env, Web6CandidatePairBudgets.GateTimeout(gate.Name),
+                var invocation = new SelectorInvocation(gate.Name, gate.Filter, env, Web6CutoverSelectorBudgets.GateTimeout(gate.Name, gate.Filter, env, plan.Project, plan.Text("backendWorktree")),
                     Path.Combine(plan.TaskRoot, "trx-" + gate.Name, "result.trx"), plan.SelectorDll);
                 result = await _invoke(plan, invocation, token).ConfigureAwait(false);
                 if (!result.PassedMandatoryTests) return state.Fail(result);

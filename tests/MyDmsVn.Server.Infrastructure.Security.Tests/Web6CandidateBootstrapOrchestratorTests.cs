@@ -306,6 +306,16 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
         Assert.All(commands, c => Assert.DoesNotContain("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING", c.Environment.Keys));
     }
 
+    [Fact]
+    public async Task Cutover_timeout_even_with_verified_process_drain_is_retained_without_disposition_or_Task4()
+    {
+        _mutation = "cutover-timeout";
+        Assert.Equal(BootstrapRunStage.FailedRetained, (await Run()).Stage);
+        Assert.Equal(new[] { "pair-chromium", "pair-edge", "cutover" }, _calls);
+        Assert.False(File.Exists(Path.Combine(_root, "evidence", "task4.json")));
+        Assert.DoesNotContain(Directory.GetFiles(_root, "*.json"), path => File.ReadAllText(path).Contains("\"state\":\"CandidateVerified\""));
+    }
+
     private Task<RunTransitionReceipt> Run()
     {
         var prepared = Prepared();
@@ -345,7 +355,9 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
         if (invocation.Name == "cutover")
             Assert.Equal(BootstrapPathPolicy.HashFile(Path.Combine(_root, "run-PairPassed.json")),
                 invocation.Environment[Web6SelectorPlan.PairPassedDigestVariable]);
-        Assert.Equal(TimeSpan.FromMinutes(invocation.Name is "pair-chromium" or "pair-edge" ? 44 : 25), invocation.Timeout);
+        Assert.Equal(TimeSpan.FromMinutes(invocation.Name is "pair-chromium" or "pair-edge" ? 44 : invocation.Name == "cutover" ? 60 : 25), invocation.Timeout);
+        if (invocation.Name == "cutover" && _mutation == "cutover-timeout")
+            return Task.FromResult(new SelectorResult(invocation, SelectorDisposition.TimedOut, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, processTreeDrained: true));
         var task4Path = Path.Combine(_root, "evidence", "task4.json");
         Assert.Equal(invocation.Name is "workload" or "recovery", File.Exists(task4Path));
         var started = DateTimeOffset.UtcNow;

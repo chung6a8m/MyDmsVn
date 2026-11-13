@@ -825,8 +825,54 @@ public sealed class Web6CandidateCutoverTests
             ""web6-cutover-same-epoch-restart"",""web6-cutover-restored-epoch-rejected""]
     }");
 
+    [Fact]
+    public async Task Cancelled_aggregate_refuses_between_browser_handoff_and_completion()
+    {
+        using var parent = new CancellationTokenSource();
+        var operations = new RecordingCutoverOperations(Plan()) { AfterRestore = parent.Cancel };
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new Web6CandidateCutoverOrchestrator(operations).Execute(parent.Token));
+        Assert.DoesNotContain("edge:current:start", operations.Calls);
+        Assert.DoesNotContain("complete", operations.Calls);
+        Assert.True(operations.RetainForContainment);
+    }
+
+    [Fact]
+    public async Task Aggregate_deadline_covers_handoff_after_first_controller_and_stops_second_browser()
+    {
+        var now = TimeSpan.Zero;
+        var operations = new RecordingCutoverOperations(Plan()) { AfterRestore = () => now = TimeSpan.FromSeconds(3300) };
+        await Assert.ThrowsAsync<TimeoutException>(() => new Web6CandidateCutoverOrchestrator(operations, () => now).Execute(CancellationToken.None));
+        Assert.Contains("chromium:restore", operations.Calls);
+        Assert.DoesNotContain("edge:current:start", operations.Calls);
+        Assert.DoesNotContain("complete", operations.Calls);
+        Assert.True(operations.RetainForContainment);
+    }
+
+    [Fact]
+    public async Task Aggregate_expiry_after_final_observation_still_retains_allocations()
+    {
+        var now = TimeSpan.Zero;
+        var operations = new RecordingCutoverOperations(Plan()) { AfterComplete = () => now = TimeSpan.FromSeconds(3300) };
+        await Assert.ThrowsAsync<TimeoutException>(() => new Web6CandidateCutoverOrchestrator(operations, () => now).Execute(CancellationToken.None));
+        Assert.True(operations.RetainForContainment);
+    }
+
+    [Fact]
+    public async Task Unjoined_browser_failure_does_not_even_invoke_host_drain_or_handoff()
+    {
+        var failure = new IOException("unjoined controller");
+        var operations = new RecordingCutoverOperations(Plan()) { RunFailure = failure, RetainForContainment = true };
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None)));
+        Assert.DoesNotContain("chromium:current:drain", operations.Calls);
+        Assert.DoesNotContain("chromium:restore", operations.Calls);
+        Assert.DoesNotContain("edge:current:start", operations.Calls);
+        Assert.DoesNotContain("complete", operations.Calls);
+    }
+
     private sealed class RecordingCutoverOperations : IWeb6CandidateCutoverOperations
     {
+        public bool RetainForContainment { get; set; }
+        public void RetainAfterDeadline() => RetainForContainment = true;
         private readonly Web6CandidateCutoverPlan _plan;
         internal RecordingCutoverOperations(Web6CandidateCutoverPlan plan) => _plan = plan;
         internal List<string> Calls { get; } = new List<string>();
@@ -834,6 +880,9 @@ public sealed class Web6CandidateCutoverTests
         internal bool DriftAdmission { get; set; }
         internal bool FailStart { get; set; }
         internal bool FailEdgeStart { get; set; }
+        internal Action? AfterRestore { get; set; }
+        internal Action? AfterComplete { get; set; }
+        internal Exception? RunFailure { get; set; }
         public Task<Web6CandidateCutoverPlan> VerifyAuthority(CancellationToken token) { Calls.Add("authority"); return Task.FromResult(_plan); }
         public Task SealProtectedManifest(JObject handles, CancellationToken token) { Calls.Add("manifest"); return Task.CompletedTask; }
         public Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token)
@@ -846,6 +895,7 @@ public sealed class Web6CandidateCutoverTests
         public Task<Web6CutoverBrowserResult> RunAndValidate(string browser, Web6CutoverPair pair, CancellationToken token)
         {
             Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":validate");
+            if (RunFailure != null) throw RunFailure;
             return Task.FromResult(new Web6CutoverBrowserResult(3, SkipChromium && browser == "chromium" ? 2 : 3,
                 0, SkipChromium && browser == "chromium" ? 1 : 0, 0, new[]
                 {
@@ -855,7 +905,7 @@ public sealed class Web6CandidateCutoverTests
                 }));
         }
         public Task<Web6CutoverDrain> Drain(string browser, Web6CutoverPair pair, CancellationToken token) { Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":drain"); return Task.FromResult(new Web6CutoverDrain(true, true)); }
-        public Task VerifyRestore(string browser, CancellationToken token) { Calls.Add(browser + ":restore"); return Task.CompletedTask; }
-        public Task Complete(CancellationToken token) { Calls.Add("complete"); return Task.CompletedTask; }
+        public Task VerifyRestore(string browser, CancellationToken token) { Calls.Add(browser + ":restore"); AfterRestore?.Invoke(); return Task.CompletedTask; }
+        public Task Complete(CancellationToken token) { Calls.Add("complete"); AfterComplete?.Invoke(); return Task.CompletedTask; }
     }
 }

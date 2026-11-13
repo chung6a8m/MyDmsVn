@@ -5,6 +5,7 @@
     <IsTestProject>true</IsTestProject>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <DefineConstants>$(DefineConstants);WEB6_SECURITY</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />

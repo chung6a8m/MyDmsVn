@@ -534,6 +534,8 @@ internal static class Web6CutoverControl
 
 internal interface IWeb6CandidateCutoverOperations
 {
+    bool RetainForContainment { get; }
+    void RetainAfterDeadline();
     Task<Web6CandidateCutoverPlan> VerifyAuthority(CancellationToken token);
     Task SealProtectedManifest(JObject handles, CancellationToken token);
     Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token);
@@ -552,50 +554,66 @@ internal sealed class Web6CandidateCutoverOrchestrator
         "web6-cutover-same-epoch-restart", "web6-cutover-restored-epoch-rejected",
     };
     private readonly IWeb6CandidateCutoverOperations _operations;
-    internal Web6CandidateCutoverOrchestrator(IWeb6CandidateCutoverOperations operations) =>
-        _operations = operations ?? throw new ArgumentNullException(nameof(operations));
+    private readonly Func<TimeSpan>? _clock;
+    internal Web6CandidateCutoverOrchestrator(IWeb6CandidateCutoverOperations operations, Func<TimeSpan>? clock = null)
+    { _operations = operations ?? throw new ArgumentNullException(nameof(operations)); _clock = clock; }
 
     internal async Task Execute(CancellationToken token)
     {
         var plan = await _operations.VerifyAuthority(token).ConfigureAwait(false);
         await _operations.SealProtectedManifest(plan.FrontendHandles(), token).ConfigureAwait(false);
-        foreach (var browser in new[] { "chromium", "edge" })
+        var deadline = new Web6CutoverDeadline(Web6CutoverBudgets.AggregateParent, _clock);
+        using var aggregate = deadline.Link(token);
+        token = aggregate.Token;
+        try
         {
-            var coordinator = new Web6CandidateCutoverCoordinator(plan);
-            // The frontend pack switches hosts over the owned IPC channel. Run it once per browser.
-            foreach (var pair in new[] { Web6CutoverPair.Current })
+            foreach (var browser in new[] { "chromium", "edge" })
             {
-                Exception? failure = null;
-                var started = false;
-                var admitted = false;
-                try
+                deadline.ThrowIfExpired(token);
+                var coordinator = new Web6CandidateCutoverCoordinator(plan);
+                // The frontend pack switches hosts over the owned IPC channel. Run it once per browser.
+                foreach (var pair in new[] { Web6CutoverPair.Current })
                 {
-                    started = true; // Start can fail after creating a process: cleanup is already armed.
-                    var admission = await _operations.StartAndObserve(browser, pair, token).ConfigureAwait(false);
-                    coordinator.Admit(pair, admission);
-                    admitted = true;
-                    var result = await _operations.RunAndValidate(browser, pair, token).ConfigureAwait(false);
-                    if (result.Discovered != 3 || result.Passed != 3 || result.Failed != 0 || result.Skipped != 0 || result.Retries != 0 ||
-                        !new HashSet<string>(result.Markers, StringComparer.Ordinal).SetEquals(RequiredMarkers))
-                        throw new IOException("Cutover browser result did not prove every mandatory zero-skip/retry marker.");
-                }
-                catch (Exception error) { failure = error; throw; }
-                finally
-                {
-                    if (started) try
+                    Exception? failure = null;
+                    var started = false;
+                    var admitted = false;
+                    try
                     {
-                        var drain = await _operations.Drain(browser, pair, token).ConfigureAwait(false);
-                        if (admitted) coordinator.Drain(pair, drain.WorkerExited, drain.QueueAbsent);
-                        else if (!drain.WorkerExited || !drain.QueueAbsent)
-                            throw new IOException("Cutover failed admission and did not drain its armed host/queue.");
+                        started = true; // Start can fail after creating a process: cleanup is already armed.
+                        var admission = await _operations.StartAndObserve(browser, pair, token).ConfigureAwait(false);
+                        coordinator.Admit(pair, admission);
+                        admitted = true;
+                        var result = await _operations.RunAndValidate(browser, pair, token).ConfigureAwait(false);
+                        if (result.Discovered != 3 || result.Passed != 3 || result.Failed != 0 || result.Skipped != 0 || result.Retries != 0 ||
+                            !new HashSet<string>(result.Markers, StringComparer.Ordinal).SetEquals(RequiredMarkers))
+                            throw new IOException("Cutover browser result did not prove every mandatory zero-skip/retry marker.");
                     }
-                    catch (Exception cleanup) when (failure != null)
-                    { throw new AggregateException("Cutover browser result and pair drain both failed.", failure, cleanup); }
+                    catch (Exception error) { failure = error; throw; }
+                    finally
+                    {
+                        if (started && !_operations.RetainForContainment) try
+                        {
+                            var drain = await _operations.Drain(browser, pair, token).ConfigureAwait(false);
+                            if (admitted) coordinator.Drain(pair, drain.WorkerExited, drain.QueueAbsent);
+                            else if (!drain.WorkerExited || !drain.QueueAbsent)
+                                throw new IOException("Cutover failed admission and did not drain its armed host/queue.");
+                        }
+                        catch (Exception cleanup) when (failure != null)
+                        { throw Web6CutoverLifetime.Combine("Cutover browser result and pair drain both failed.", failure, cleanup); }
+                    }
                 }
+                deadline.ThrowIfExpired(token);
+                await _operations.VerifyRestore(browser, token).ConfigureAwait(false);
+                deadline.ThrowIfExpired(token);
             }
-            await _operations.VerifyRestore(browser, token).ConfigureAwait(false);
+            await _operations.Complete(token).ConfigureAwait(false);
+            deadline.ThrowIfExpired(token);
         }
-        await _operations.Complete(token).ConfigureAwait(false);
+        catch (Exception) when (token.IsCancellationRequested || deadline.Remaining == TimeSpan.Zero)
+        {
+            _operations.RetainAfterDeadline();
+            throw;
+        }
     }
 }
 

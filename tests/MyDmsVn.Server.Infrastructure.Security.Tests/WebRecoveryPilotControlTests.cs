@@ -12,6 +12,52 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class WebRecoveryPilotControlTests
 {
     [Fact]
+    public async Task Separate_controllers_observe_one_parent_and_join_their_own_cancellation_callbacks()
+    {
+        using var parent = new CancellationTokenSource();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+        var entered = new[] { Signal(), Signal() };
+        var cancelled = new[] { Signal(), Signal() };
+        var controls = new WebRecoveryPilotControl[2];
+        var pipes = new NamedPipeClientStream[2];
+        try
+        {
+            for (var i = 0; i < 2; i++)
+            {
+                var index = i;
+                controls[i] = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (_, _, token) =>
+                {
+                    entered[index].TrySetResult(true);
+                    using (token.Register(() => cancelled[index].TrySetResult(true))) await cancelled[index].Task;
+                    return new JObject();
+                }, closeResponse: null, parent: parent.Token);
+                pipes[i] = await Send(controls[i], "oldClientNewHostOn", 12000, timeout.Token);
+                await WaitFor(entered[i].Task, timeout.Token);
+            }
+            Assert.NotSame(controls[0], controls[1]);
+            parent.Cancel();
+            using var promptCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            for (var i = 0; i < 2; i++)
+            {
+                await WaitFor(cancelled[i].Task, promptCancellation.Token);
+                await Assert.ThrowsAsync<AggregateException>(() => controls[i].Stop());
+                Assert.True(controls[i].CutoverJoined);
+                Assert.False(controls[i].CutoverJoinUncertain);
+                await Assert.ThrowsAsync<EndOfStreamException>(() => WebFrontendPortBridge.ReadFrame(pipes[i], timeout.Token));
+            }
+        }
+        finally
+        {
+            for (var i = 0; i < 2; i++)
+            {
+                cancelled[i].TrySetResult(true);
+                pipes[i]?.Dispose();
+                if (controls[i] != null) try { await controls[i].Stop(); } catch (AggregateException) { }
+            }
+        }
+    }
+
+    [Fact]
     public async Task Successful_handler_writes_one_correlated_final_frame_after_completion()
     {
         var started = Signal();

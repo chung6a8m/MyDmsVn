@@ -75,10 +75,11 @@ internal sealed class SelectorProcessRunner
         var trxPath = BootstrapJson.AbsolutePath(invocation.TrxPath);
         var trxDirectory = Path.GetDirectoryName(trxPath)!;
         var selectorDll = BootstrapJson.AbsolutePath(invocation.SelectorDllPath);
+        var cutover = Web6CutoverSelectorBudgets.IsExact(invocation.Name, invocation.Filter, invocation.Environment, _project, _directory);
         if (!BootstrapJson.IsChild(selectorDll, _directory) || !string.Equals(Path.GetExtension(selectorDll), ".dll", StringComparison.OrdinalIgnoreCase))
             throw new IOException("Bootstrap selector DLL must be inside its source checkout.");
         if (Path.GetExtension(trxPath) != ".trx" || Path.GetFileName(trxPath).IndexOfAny(new[] { ';', '=' }) >= 0 ||
-            invocation.Timeout <= TimeSpan.Zero || invocation.Timeout > Web6CandidatePairBudgets.SelectorMaximum(invocation.Name, invocation.Filter, invocation.Environment))
+            invocation.Timeout <= TimeSpan.Zero || invocation.Timeout > (cutover ? Web6CutoverSelectorBudgets.Gate : Web6CandidatePairBudgets.SelectorMaximum(invocation.Name, invocation.Filter, invocation.Environment)))
             throw new IOException("Bootstrap selector result file or timeout is invalid.");
 
         var environment = ChildEnvironment(invocation.Environment);
@@ -107,7 +108,7 @@ internal sealed class SelectorProcessRunner
         GuiProcessResult child;
         try
         {
-            child = await _run(new BootstrapProcessRequest(_dotnet, _directory, arguments, environment, invocation.Timeout, web6CandidatePair: Web6CandidatePairBudgets.IsPairSelector(invocation.Name, invocation.Filter, invocation.Environment)), token)
+            child = await _run(new BootstrapProcessRequest(_dotnet, _directory, arguments, environment, invocation.Timeout, web6CandidatePair: Web6CandidatePairBudgets.IsPairSelector(invocation.Name, invocation.Filter, invocation.Environment), web6Cutover: cutover), token)
                 .ConfigureAwait(false);
         }
         catch (GuiProcessException error)
@@ -196,7 +197,9 @@ internal sealed class SelectorProcessRunner
         { WorkingDirectory = command.WorkingDirectory, UseShellExecute = false };
         info.EnvironmentVariables.Clear();
         foreach (var variable in command.Environment) info.EnvironmentVariables.Add(variable.Key, variable.Value);
-        return command.Web6CandidatePair
+        return command.Web6Cutover
+            ? GuiOwnedProcess.RunWeb6CutoverAsync(info, command.Timeout, selectorProcess: true, cancellationToken: token)
+            : command.Web6CandidatePair
             ? GuiOwnedProcess.RunWeb6CandidatePairAsync(info, command.Timeout, selectorProcess: true, cancellationToken: token)
             : GuiOwnedProcess.RunAttendedAsync(info, command.Timeout, token);
     }
