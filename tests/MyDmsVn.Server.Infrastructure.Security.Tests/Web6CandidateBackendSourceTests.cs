@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -9,7 +10,10 @@ using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CSharp;
+using MyDmsVn.Desktop.Tests;
 using MyDmsVn.Web6.CandidateBootstrap;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -170,6 +174,105 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         Git(_root, "init --quiet");
         File.WriteAllBytes(Path.Combine(_root, "source.txt"), bytes);
         return Git(_root, "hash-object -w source.txt");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Paired_git_join_waits_for_both_delayed_readers_even_on_termination_failure(bool failTermination)
+    {
+        var stdout = new TaskCompletionSource<bool>();
+        var stderr = new TaskCompletionSource<bool>();
+        var terminationFailure = new IOException("fixture termination observation failed");
+        var joined = GuiOwnedProcess.JoinPairedGitAsync(
+            () => failTermination ? Task.FromException(terminationFailure) : Task.CompletedTask, stdout.Task, stderr.Task);
+        var returnedBeforeOutput = joined.IsCompleted;
+        stdout.SetResult(true);
+        var returnedBeforeError = joined.IsCompleted;
+        stderr.SetResult(true);
+        if (failTermination)
+            Assert.Same(terminationFailure, await Assert.ThrowsAsync<IOException>(() => joined));
+        else
+            await joined;
+        Assert.False(returnedBeforeOutput);
+        Assert.False(returnedBeforeError);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Paired_git_runner_terminates_and_drains_the_disposable_child(bool cancel)
+    {
+        var start = CompilePairedGitFixture("hang");
+        using var cancellation = new CancellationTokenSource();
+        var work = GuiOwnedProcess.RunPairedGitAsync(start, TimeSpan.FromSeconds(cancel ? 10 : 3), cancellation.Token, PairedGitBytes);
+        var pidFile = Path.Combine(_root, "child.pid");
+        var clock = Stopwatch.StartNew();
+        while (!File.Exists(pidFile) && clock.Elapsed < TimeSpan.FromSeconds(2)) await Task.Delay(20);
+        if (cancel) cancellation.Cancel();
+        var failure = await Assert.ThrowsAsync<GuiProcessException>(() => work);
+        Assert.True(failure.CleanupVerified);
+        Assert.Equal(cancel ? "Canceled" : "TimedOut", failure.Reason);
+        Assert.Equal("first-second", failure.StandardOutput);
+        Assert.Equal("error-later", failure.StandardError);
+        var pid = int.Parse(File.ReadAllText(pidFile), CultureInfo.InvariantCulture);
+        Assert.False(IsPairedFixtureRunning(pid));
+    }
+
+    [Fact]
+    public async Task Paired_git_runner_joins_success_and_reports_start_failure()
+    {
+        var start = CompilePairedGitFixture("success");
+        var result = await GuiOwnedProcess.RunPairedGitAsync(start, TimeSpan.FromSeconds(5), default, PairedGitBytes);
+        Assert.True(result.CleanupVerified);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal("first-second", result.StandardOutput);
+        Assert.Equal("error-later", result.StandardError);
+
+        var invalid = Path.Combine(_root, "invalid.exe");
+        File.WriteAllText(invalid, "synthetic invalid executable");
+        var failure = new ProcessStartInfo(invalid) { WorkingDirectory = _root, UseShellExecute = false };
+        await Assert.ThrowsAsync<System.ComponentModel.Win32Exception>(() =>
+            GuiOwnedProcess.RunPairedGitAsync(failure, TimeSpan.FromSeconds(5), default, PairedGitBytes));
+    }
+
+    private ProcessStartInfo CompilePairedGitFixture(string mode)
+    {
+        var executable = Path.Combine(_root, "paired-git-fixture.exe");
+        using var compiler = new CSharpCodeProvider();
+        var result = compiler.CompileAssemblyFromSource(new CompilerParameters(new[] { "System.dll" }, executable)
+        {
+            GenerateExecutable = true,
+        }, """
+            using System;
+            using System.Diagnostics;
+            using System.IO;
+            using System.Threading;
+            public static class Fixture
+            {
+                public static void Main(string[] args)
+                {
+                    Console.Write("first");
+                    Console.Error.Write("error");
+                    Thread.Sleep(50);
+                    Console.Write("-second");
+                    Console.Error.Write("-later");
+                    Console.Out.Flush();
+                    Console.Error.Flush();
+                    File.WriteAllText("child.pid.tmp", Process.GetCurrentProcess().Id.ToString());
+                    File.Move("child.pid.tmp", "child.pid");
+                    if (args[0] == "hang") Thread.Sleep(Timeout.Infinite);
+                }
+            }
+            """);
+        Assert.False(result.Errors.HasErrors);
+        return new ProcessStartInfo(executable, mode) { WorkingDirectory = _root, UseShellExecute = false };
+    }
+
+    private static bool IsPairedFixtureRunning(int pid)
+    {
+        try { using var process = Process.GetProcessById(pid); return !process.HasExited; }
+        catch (ArgumentException) { return false; }
     }
 
     [Web6PairedSourceFact]
@@ -655,10 +758,14 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
     }
 
     private static readonly UTF8Encoding PairedUtf8 = new UTF8Encoding(false, true);
+    private static readonly Encoding PairedGitBytes = Encoding.GetEncoding(28591);
 
     private static ProcessStartInfo PairedGitStart(string root, string arguments)
     {
         var start = GitStart(root, arguments);
+        start.FileName = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';')
+            .Select(path => path.Trim().Trim('"')).Where(Path.IsPathRooted)
+            .Select(path => Path.Combine(path, "git.exe")).First(File.Exists);
         start.Arguments = "--no-replace-objects --no-optional-locks -c core.fsmonitor=false -c core.autocrlf=false " +
             "-c core.ignoreStat=false -c core.excludesFile=NUL -c core.attributesFile=NUL -c submodule.recurse=false " + start.Arguments;
         start.EnvironmentVariables["GIT_NO_REPLACE_OBJECTS"] = "1";
@@ -691,15 +798,19 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
 
     private static byte[] ReadPairedGit(string root, string arguments)
     {
-        using var process = Process.Start(PairedGitStart(root, arguments)) ?? throw new IOException("Paired Git did not start.");
-        using var bytes = new MemoryStream();
-        var output = process.StandardOutput.BaseStream.CopyToAsync(bytes);
-        var errors = process.StandardError.ReadToEndAsync();
-        if (!process.WaitForExit(10000) || !Task.WaitAll(new Task[] { output, errors }, 10000))
-            throw new IOException("Paired Git did not complete and drain.");
-        if (process.ExitCode != 0 || errors.Result.Length != 0)
+        GuiProcessResult result;
+        try
+        {
+            result = GuiOwnedProcess.RunPairedGitAsync(PairedGitStart(root, arguments), TimeSpan.FromSeconds(10), default, PairedGitBytes)
+                .GetAwaiter().GetResult();
+        }
+        catch (Exception failure) when (failure is GuiProcessException or System.ComponentModel.Win32Exception)
+        {
+            throw new IOException("Paired Git source verification did not complete with verified cleanup.");
+        }
+        if (result.ExitCode != 0 || result.StandardError.Length != 0 || result.StandardOutput.Length >= GuiOwnedProcess.OutputLimit)
             throw new IOException("Paired Git source verification failed.");
-        return bytes.ToArray();
+        return PairedGitBytes.GetBytes(result.StandardOutput);
     }
 
     private static void RequirePairedGitConfig(string root)

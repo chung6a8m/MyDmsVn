@@ -8,7 +8,8 @@
 | --- | --- | --- |
 | Backend reviewed base | `21a7188eaf24cc139c875865568cb23b647c57aa` | `e3265b1da017397aa8f81a69c54f8cf27bdff17e` |
 | Initial Task 6 backend | `c99f426d98853dbd3f9a48ff6a769bba615ef8e9` | `460a3f51439ed7c3f5fbdb7a1d3fcae775b615d8` |
-| Backend verified source and tests, before this documentation delta | Review correction staged over initial Task 6 | `eaa6f3c30b4864cd8464c9459dcc87f16f746c1b` |
+| Backend paired provenance correction | `6dddc17eca0bfc7970a81fa21bd3c14dc15a6682` | `c8e6a81578811bfb05573c60d626be6e08a47783` |
+| Backend verified source and tests, before this documentation delta | Paired Git process cleanup correction | `dcdc8edda5a630fec191b5766ba78cd76d3490ba` |
 | Frontend exact reviewed pin | `96842a6329191713282b3212e5420872eb0f3a41` | `a8095060d0c578d8556a58c5301e11df4b4aff97` |
 
 The only change to bootstrap execution in Task 6 is the `ReviewedFrontendSha` pin. The review correction changes the paired source test and evidence. The vendor gitlink remains `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`.
@@ -16,6 +17,8 @@ The only change to bootstrap execution in Task 6 is the `ReviewedFrontendSha` pi
 The real `BootstrapPreflight.PrepareAsync` path ran with synthetic Git/build/SQL-master toolchain inputs and disposable protected files. It accepted `96842a6329191713282b3212e5420872eb0f3a41` as `PIN_MATCHED`. It blocked the prior pin `66b935488d00ee78ec3ffbd183f474da06aa3404` and immediate frontend base `447e39f03b2b22398d30324c8cec992fc93ce83c` as `BLOCKED_REVIEWED_FRONTEND_PIN`. Only the admitted receipt opened a selector plan in the pin matrix.
 
 The paired test verifies the configured frontend checkout's commit/tree with replacement lookup disabled and Git config isolated. It independently hashes each blob's original bytes as a Git object before copying the three tracked TypeScript sources into the temporary prepared root. The test inspects those sources as text and validates synthetic frames against the real backend parser. It checks 11 action caps, both `revokeGrantOff` forms, the strict allowance field, the 5,000-ms response reserve, the three scenario/reset budgets, one reset hook and the pack/controller/aggregate/selector hierarchy. The paired test executes no frontend code or compiler. The separate full frontend unit run provides behavior coverage for cumulative accounting, framing, transport timing and the cleanup hook. This fixture uses no real host, database or browser.
+
+Paired Git starts suspended and enters a Windows job before resuming. On timeout or cancellation, the runner requests termination of that exact job and waits for root exit, zero active job processes and both stdout/stderr reader tasks before it releases their resources. Disposable child tests cover timeout, cancellation, delayed output on both streams, successful exit and start failure. A separate controlled test holds each reader open to verify that completion waits for both. If Windows permanently cannot prove exit or EOF, the paired test remains pending and retains ownership.
 
 ## Verification
 
@@ -27,7 +30,9 @@ Windows 10.0.26300, .NET SDK 8.0.428, VSTest 17.11.2, net48 Release, Node 22.14.
 | Fresh Prepare pin GREEN, TRX | 23 / 23 | 23 / 0 / 0 | `d5b59abcfd62a3e963da32b70c2ece8c1df6c8b00d4c81716a2214ed536dffe3` |
 | Review correction RED, TRX | 10 / 10 | 0 / 10 / 0 | `8ded5eb0a7e7cb477dd29013725fd514f0a83930630d72c9aae5728e76c2d8a3` |
 | Review correction focused GREEN, TRX | 11 / 11 | 11 / 0 / 0 | `e8f6b79f5a68c9016afbbd9bfc1aad9c35a51487bce3d6703e8e667bf05a02fe` |
-| Final integrated backend after review, TRX | 724 / 724 | 724 / 0 / 0 | `415b054fae0fe69986256846b97d9881224ef8f50f75632caeba9879a51724c0` |
+| Process cleanup RED, TRX | 2 / 2 | 0 / 2 / 0 | `6673f3c0211833f368e20777538eb021bd592800d1a3a596613b8c2e224126c4` |
+| Process cleanup focused GREEN, TRX | 16 / 16 | 16 / 0 / 0 | `daae348ee7ca236583e2eba344141819d2e9aba7cfca8c3a1a528a237038b47e` |
+| Final integrated backend after review, TRX | 729 / 729 | 729 / 0 / 0 | `cdde1ef8eb99db7d6cb1d8e9f08c895794691a2e795d9faf7de49edafc96cd0c` |
 | Frontend typecheck log at the reviewed SHA | — | exit 0, zero diagnostics | `6a56be18103da1ff832d9eb9529790860e2aa12dbceef7417852378e41ef748d` |
 | Frontend full unit log at the reviewed SHA, 90 files | 1,791 / 1,791 | 1,791 / 0 / 0 | `c2dfc50dab3f105307de361e2658de8428f3bec1826dede1d75f644f0e6971ef` |
 
@@ -39,11 +44,11 @@ dotnet test $project -c Release -f net48 --filter 'FullyQualifiedName~FreshPrepa
 
 # For the paired source test, point to the exact reviewed checkout.
 $env:MYDMSVN_WEB6_PAIRED_SOURCE_ROOT = '<reviewed frontend checkout>'
-$focused = '(FullyQualifiedName~Paired_source_|FullyQualifiedName~Prepared_frontend_cutover_matches_backend_wire_and_deadline_hierarchy)'
-dotnet test $project -c Release -f net48 --no-build --no-restore --filter $focused --logger 'trx;LogFileName=round1-final-focused.trx'
+$focused = '(FullyQualifiedName~Paired_git_|FullyQualifiedName~Paired_source_|FullyQualifiedName~Prepared_frontend_cutover_matches_backend_wire_and_deadline_hierarchy)'
+dotnet test $project -c Release -f net48 --no-build --no-restore --filter $focused --logger 'trx;LogFileName=round2-verified-focused.trx'
 $filter = '(FullyQualifiedName~Web6CandidateBootstrap|FullyQualifiedName~Web6CandidateBackendSourceTests|FullyQualifiedName~Web6CandidateCutoverTests|FullyQualifiedName~Web6Cutover|FullyQualifiedName~Web6CandidatePairBudgetTests|FullyQualifiedName~WebRecoveryPilotControlTests|FullyQualifiedName~Web5IisExpressHostAdmissionTests|FullyQualifiedName~Web5HttpServiceStateTests)&FullyQualifiedName!~WebHostIisExpressTests.&FullyQualifiedName!~Deadline_terminates_the_owned_process_tree&FullyQualifiedName!~Live_IIS_Express_queue_is_exclusive&Category!=FastSQL&Category!=MigrationSchema&Category!=SecurityProvisioning&Category!=SqlConcurrency&Category!=Web5OwnedHostAdmission&Category!=Web6CandidateRecovery'
 dotnet test $project -c Release -f net48 --no-build --no-restore --list-tests --filter $filter
-dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --logger 'trx;LogFileName=round1-integrated.trx'
+dotnet test $project -c Release -f net48 --no-build --no-restore --filter $filter --logger 'trx;LogFileName=round2-verified-integrated.trx'
 
 # From the reviewed frontend checkout.
 npm.cmd run typecheck
@@ -56,8 +61,8 @@ Each project below passed `dotnet restore <project> --locked-mode` and `dotnet b
 | --- | --- | --- |
 | `MyDmsVn.Server.Application` | `8c25b70ef8d67666047621bcf69f04ccdcc4e2eeeedab2bd773a22239154630c` | `852443fc48326cb50ee280d576865dc1ebd32adac691431e2fbf9fe545a4d8e2` |
 | `MyDmsVn.Server.HttpHost` | `de8b3a3776bada2a834d1969ddaf23cade6118f10d96539a7897023b2637b23d` | `e415809ffd9971e46383ed770cc8a3f2186d4b64e378aa8ef69a9a9a40d16f36` |
-| `MyDmsVn.Web6.CandidateBootstrap` | `44c33f4d489793efca30c690c4687f814213f9a4d0b88d27de758b4c6b5a9d75` | `5dbe9c432c1ce36f9545a6e28a4390579cd81135408517aeac83acbd1878c5da` |
-| `MyDmsVn.Server.Infrastructure.Security.Tests` | `d9d5ff9806b229746d9bba61c46b15b12d5de34faf04d01e176f022cc3d60a39` | `d3c948ec7736bfbd29ca86aadb8e11420fcb64c47d6805d2c7df17270544f9c4` |
+| `MyDmsVn.Web6.CandidateBootstrap` | `92b4fb464952f11d96d13652a17af4ce2523eed8c3638e32fb480767ff3ff163` | `5dbe9c432c1ce36f9545a6e28a4390579cd81135408517aeac83acbd1878c5da` |
+| `MyDmsVn.Server.Infrastructure.Security.Tests` | `7167ed91830a0e01a85ec13bb037e53ee71bef0ade96c8c8d82bd6945d539948` | `d3c948ec7736bfbd29ca86aadb8e11420fcb64c47d6805d2c7df17270544f9c4` |
 
 Frontend `package-lock.json` SHA-256 is `283593a2d944b2031ce57c8c8a59f18755e51b25ab6767571ef3ffdd341f55e9`. The installed Playwright worker used by the unit source assertion has SHA-256 `b7ae55d578fb3a2a6bd4d9acc0abf93146ae1d9062330bbc0e3f82acbff751b8`. The candidate checks use existing locked dependencies. Both worktrees passed `git diff --check`.
 
