@@ -34,6 +34,80 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
 ";
 
     [Fact]
+    public void Cutover_start_info_and_WMI_share_the_exact_native_launch_plan_through_drain()
+    {
+        using var fixture = new IdentityFixture();
+        var plan = WebHostIisExpressTests.CreateCutoverIisLaunch(fixture.ConfigurationPath, new Uri("https://localhost:44321/"));
+        var start = plan.CreateStartInfo();
+        var executable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "IIS Express", "iisexpress.exe");
+        Assert.Contains(" ", start.FileName);
+        Assert.Contains(" ", fixture.ConfigurationPath);
+        Assert.Equal(executable, start.FileName);
+        Assert.Equal(Path.GetFullPath(start.FileName), start.FileName);
+        Assert.DoesNotContain(Path.AltDirectorySeparatorChar, start.FileName);
+        Assert.Equal("/config:\"" + fixture.ConfigurationPath + "\" /site:Web2Smoke /systray:false", start.Arguments);
+        Assert.Equal("\"" + start.FileName + "\" " + start.Arguments, plan.CommandLine);
+        Assert.False(start.UseShellExecute);
+        Assert.True(start.CreateNoWindow);
+        Assert.Equal(ProcessWindowStyle.Hidden, start.WindowStyle);
+        Assert.True(start.RedirectStandardInput && start.RedirectStandardOutput && start.RedirectStandardError);
+        start.Arguments += " /trace:error";
+        Assert.DoesNotContain("/trace:error", plan.CommandLine, StringComparison.Ordinal);
+        Assert.Equal("/config:\"" + fixture.ConfigurationPath + "\" /site:Web2Smoke /systray:false", plan.CreateStartInfo().Arguments);
+
+        var original = fixture.Observation();
+        var observed = new Web5IisExpressProcessObservation(original.ProcessId, original.StartTimeUtc, executable, plan.CommandLine);
+        var identity = Web5IisExpressHostAdmission.Capture(original.ProcessId, original.StartTimeUtc.AddTicks(9), observed, plan);
+        Assert.Same(plan, identity.Launch);
+        Assert.Equal(original.ProcessId, Web5IisExpressHostAdmission.ValidateEvidence(identity, observed, QueueSnapshot).ProcessIds[0]);
+        Assert.Throws<InvalidDataException>(() => Web5IisExpressHostAdmission.ValidateAbsent(identity, observed, EmptyQueues));
+        Assert.Throws<InvalidDataException>(() => Web5IisExpressHostAdmission.ValidateAbsent(identity, null, QueueSnapshot));
+        Web5IisExpressHostAdmission.ValidateAbsent(identity, null, EmptyQueues);
+    }
+
+    [Theory]
+    [InlineData("alternate-separator")]
+    [InlineData("image")]
+    [InlineData("command-executable")]
+    [InlineData("configuration")]
+    [InlineData("site")]
+    [InlineData("extra-argument")]
+    [InlineData("quote")]
+    [InlineData("pid")]
+    [InlineData("start")]
+    public void Cutover_launch_capture_refuses_altered_process_evidence(string drift)
+    {
+        using var fixture = new IdentityFixture();
+        var plan = WebHostIisExpressTests.CreateCutoverIisLaunch(fixture.ConfigurationPath, new Uri("https://localhost:44321/"));
+        var original = fixture.Observation();
+        var executable = drift == "image" ? Path.Combine(Path.GetDirectoryName(fixture.ConfigurationPath)!, "iisexpress.exe") : plan.ExecutablePath;
+        var command = drift switch
+        {
+            "alternate-separator" => plan.CommandLine.Replace("IIS Express\\iisexpress.exe", "IIS Express/iisexpress.exe"),
+            "command-executable" => plan.CommandLine.Replace("iisexpress.exe", "other.exe"),
+            "configuration" => plan.CommandLine.Replace("applicationhost.config", "other.config"),
+            "site" => plan.CommandLine.Replace("Web2Smoke", "OtherSite"),
+            "extra-argument" => plan.CommandLine + " /trace:error",
+            "quote" => plan.CommandLine.Replace("/config:\"", "/config:"),
+            _ => plan.CommandLine,
+        };
+        var observed = new Web5IisExpressProcessObservation(drift == "pid" ? original.ProcessId + 1 : original.ProcessId,
+            drift == "start" ? original.StartTimeUtc.AddTicks(10) : original.StartTimeUtc, executable, command);
+        var failure = Assert.Throws<InvalidDataException>(() =>
+            Web5IisExpressHostAdmission.Capture(original.ProcessId, original.StartTimeUtc, observed, plan));
+        Assert.DoesNotContain(fixture.ConfigurationPath, failure.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cutover_launch_refuses_configuration_that_can_break_quoting()
+    {
+        using var fixture = new IdentityFixture();
+        var origin = new Uri("https://localhost:44321/");
+        Assert.Throws<ArgumentException>(() => WebHostIisExpressTests.CreateCutoverIisLaunch(fixture.ConfigurationPath + "\" /extra", origin));
+        Assert.Throws<ArgumentException>(() => WebHostIisExpressTests.CreateCutoverIisLaunch(fixture.ConfigurationPath + "\n", origin));
+    }
+
+    [Fact]
     public void Exact_process_config_command_and_queue_are_admitted()
     {
         using var fixture = new IdentityFixture();
@@ -182,8 +256,7 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
     public void Absence_accepts_valid_empty_request_queue_snapshot()
     {
         using var fixture = new IdentityFixture();
-        Web5IisExpressHostAdmission.ValidateAbsent(fixture.Capture(), null,
-            "Snapshot of HTTP service state (Request Queue View):\n-----------------------------------------------------\n");
+        Web5IisExpressHostAdmission.ValidateAbsent(fixture.Capture(), null, EmptyQueues);
     }
 
     [Fact]
@@ -203,7 +276,7 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
 
     private sealed class IdentityFixture : IDisposable
     {
-        private readonly string _directory = Path.Combine(Path.GetTempPath(), "web5-host-" + Guid.NewGuid().ToString("N"));
+        private readonly string _directory = Path.Combine(Path.GetTempPath(), "web5 host " + Guid.NewGuid().ToString("N"));
         private readonly DateTime _start = new DateTime(638977248000000000, DateTimeKind.Utc);
         internal IdentityFixture()
         {
@@ -217,7 +290,7 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
         internal Web5IisExpressProcessObservation Observation(string? mutation = null)
         {
             var executable = Web5IisExpressHostAdmission.ExpectedExecutablePath;
-            var command = Web5IisExpressHostAdmission.ExpectedCommandLine(executable, ConfigurationPath, "Web5Owned");
+            var command = "\"" + executable + "\" /config:\"" + ConfigurationPath + "\" /site:Web5Owned /systray:false";
             return new Web5IisExpressProcessObservation(
                 mutation == "pid" ? 19000 : 18404,
                 mutation == "start" ? _start.AddSeconds(1) : _start,
@@ -226,6 +299,8 @@ Request queue name: IISExpressAppPool{11111111-1111-1111-1111-111111111111}
         }
         public void Dispose() => Directory.Delete(_directory, true);
     }
+
+    private const string EmptyQueues = "Snapshot of HTTP service state (Request Queue View):\n-----------------------------------------------------\n";
 
     private sealed class Web5OwnedHostFactAttribute : FactAttribute
     {

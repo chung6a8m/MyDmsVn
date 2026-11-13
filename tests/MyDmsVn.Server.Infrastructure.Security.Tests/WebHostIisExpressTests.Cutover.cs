@@ -23,6 +23,9 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed partial class WebHostIisExpressTests
 {
+    internal static Web5IisExpressLaunch CreateCutoverIisLaunch(string configuration, Uri origin) =>
+        new Web5IisExpressLaunch(configuration, "Web2Smoke", origin);
+
     internal static async Task<JObject> ReadCutoverLifecycleSnapshot(SqlConnection sql, bool current,
         Func<SqlCommand, Task<object?>>? executeScalar = null)
     {
@@ -316,9 +319,8 @@ public sealed partial class WebHostIisExpressTests
                 if (current && await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;") != epoch)
                     throw new IOException("Cutover current epoch changed; refusing rewind.");
             var origin = (current ? _plan.CurrentOrigin : _plan.OldOrigin).GetLeftPart(UriPartial.Authority);
-            var start = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "IIS Express/iisexpress.exe"),
-                "/config:\"" + deployment.Configuration + "\" /site:Web2Smoke /systray:false")
-            { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            var launch = CreateCutoverIisLaunch(deployment.Configuration, new Uri(origin + "/"));
+            var start = launch.CreateStartInfo();
             foreach (var name in start.EnvironmentVariables.Keys.Cast<string>().Where(name => name.StartsWith("MYDMSVN_", StringComparison.OrdinalIgnoreCase)).ToArray()) start.EnvironmentVariables.Remove(name);
             start.EnvironmentVariables["MYDMSVN_WEB_ORIGIN"] = origin;
             start.EnvironmentVariables["MYDMSVN_WEB_OPERATION_MODE"] = current ? "web5" : "web4";
@@ -340,7 +342,7 @@ public sealed partial class WebHostIisExpressTests
             _hostDrained = false;
             if (!_process.Start()) throw new IOException("Cutover IIS process did not start.");
             _process.BeginOutputReadLine(); _process.BeginErrorReadLine();
-            _identity = Web5IisExpressHostAdmission.Capture(_process, deployment.Configuration, "Web2Smoke", new Uri(origin + "/"));
+            _identity = Web5IisExpressHostAdmission.Capture(_process, launch);
             await Web5IisExpressHostAdmission.WaitForAdmissionAsync(_identity, _process, TimeSpan.FromSeconds(45), CancellationToken.None);
             var queue = await Web5IisExpressHostAdmission.VerifyAsync(_identity, CancellationToken.None);
             Web6BootstrapSelectorEvidence.Host(BootstrapResources, _identity, queue.Name);
