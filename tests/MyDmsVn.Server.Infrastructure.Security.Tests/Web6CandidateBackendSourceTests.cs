@@ -5,7 +5,12 @@ using System.IO;
 using System.Linq;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using MyDmsVn.Web6.CandidateBootstrap;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -92,6 +97,153 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         Assert.True(File.Exists(Path.Combine(root, "MyDmsVn.sln")));
         Assert.True(File.Exists(Path.Combine(root, "src", "MyDmsVn.Server.HttpHost", "MyDmsVn.Server.HttpHost.csproj")));
         Assert.True(File.Exists(Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Security.Tests", "MyDmsVn.Server.Infrastructure.Security.Tests.csproj")));
+    }
+
+    [Web6PairedSourceFact]
+    public async Task Prepared_frontend_cutover_matches_backend_wire_and_deadline_hierarchy()
+    {
+        const string reviewedSha = "96842a6329191713282b3212e5420872eb0f3a41";
+        const string reviewedTree = "a8095060d0c578d8556a58c5301e11df4b4aff97";
+        var root = Path.GetFullPath(Environment.GetEnvironmentVariable(Web6PairedSourceFactAttribute.RootVariable)!);
+        Assert.Equal(root, Path.GetFullPath(Git(root, "rev-parse --show-toplevel")), ignoreCase: true);
+        Assert.Equal(reviewedSha, Git(root, "rev-parse --verify HEAD"));
+        Assert.Equal(reviewedTree, Git(root, "rev-parse --verify HEAD^{tree}"));
+        Assert.Empty(Git(root, "--no-optional-locks status --porcelain --untracked-files=all --ignore-submodules=none"));
+
+        const string liveSpec = "tests/pilot/web6-cutover-live.spec.ts";
+        var sources = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (var path in new[] { liveSpec, "tests/pilot/web6-cutover-deadline.ts", "tests/pilot/web6-cutover-control.ts" })
+        {
+            // Read the verified commit's blobs so index flags or a later edit cannot change the tested source.
+            var blob = Git(root, "rev-parse " + reviewedSha + ":" + path);
+            sources.Add(path, Encoding.UTF8.GetBytes(Git(root, "cat-file blob " + blob, trim: false)));
+        }
+
+        using var fixture = new Web6CandidateBootstrapPreflightTests();
+        var receipt = await fixture.PrepareWithFrontendSources(reviewedSha, reviewedTree, sources);
+        Assert.Equal("PIN_MATCHED", receipt.CutoverAdmission);
+        var plan = Web6SelectorPlan.Create(receipt);
+        Assert.Equal(reviewedSha, plan.Text("frontendSha"));
+        Assert.Equal(reviewedTree, plan.Text("frontendTree"));
+        var preparedRoot = plan.Text("frontendWorktree");
+        Assert.Equal(Path.Combine(plan.TaskRoot, "frontend-current"), preparedRoot);
+        var frontend = await ReadFrontendWireAsync(root, preparedRoot);
+        Assert.Equal(Web6CutoverBudgets.ResponseReserve.TotalMilliseconds, (double)frontend["responseReserve"]!);
+        Assert.Equal(3, ((JArray)frontend["scenarios"]!).Count);
+        var frames = (JArray)frontend["frames"]!;
+        Assert.Equal(11, frames.Select(frame => (string)frame["action"]!).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(12, frames.Count); // revokeGrantOff is exercised both with and without an operation ID.
+        foreach (var emitted in frames)
+        {
+            var bytes = Convert.FromBase64String((string)emitted["frame"]!);
+            Assert.Equal(bytes.Length - sizeof(int), BitConverter.ToInt32(bytes, 0));
+            var frame = JObject.Parse(Encoding.UTF8.GetString(bytes, sizeof(int), bytes.Length - sizeof(int)));
+            var request = Web6CutoverControl.Validate(frame, "fixture-token");
+            Assert.Equal((string)emitted["action"]!, request.Action);
+            Assert.Equal(Web6CutoverBudgets.ActionCap(request.Action), request.RequestAllowance);
+            Assert.Equal(request.RequestAllowance - Web6CutoverBudgets.ResponseReserve, request.WorkAllowance);
+            Assert.True(request.WorkAllowance < Web6CutoverBudgets.FirstScenario);
+
+            frame["requestAllowanceMs"] = (int)request.RequestAllowance.TotalMilliseconds + 1;
+            Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "fixture-token"));
+            frame["requestAllowanceMs"] = (int)Web6CutoverBudgets.ResponseReserve.TotalMilliseconds;
+            Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "fixture-token"));
+            frame.Remove("requestAllowanceMs");
+            frame["remainingMs"] = (int)request.RequestAllowance.TotalMilliseconds;
+            Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "fixture-token"));
+        }
+
+        var spec = File.ReadAllText(Path.Combine(preparedRoot, liveSpec));
+        var budgetRows = Regex.Matches(spec, @"\[\s*(\w+)\s*,\s*\[\s*([0-9_]+)\s*,\s*([0-9_]+)\s*\]\s*\]");
+        var expected = new[]
+        {
+            ("cachedWeb4", Web6CutoverBudgets.FirstScenario, Web6CutoverBudgets.FirstResetReserve),
+            ("currentClient", Web6CutoverBudgets.SecondScenario, Web6CutoverBudgets.SecondResetReserve),
+            ("restartRevokeRestore", Web6CutoverBudgets.ThirdScenario, Web6CutoverBudgets.ThirdResetReserve),
+        };
+        var actual = budgetRows.Cast<Match>().Select(row => (row.Groups[1].Value,
+            ReadMilliseconds(row.Groups[2].Value), ReadMilliseconds(row.Groups[3].Value))).ToArray();
+        Assert.Equal(expected, actual);
+        Assert.Equal(actual.Select(row => row.Item3.TotalMilliseconds), ((JArray)frontend["scenarios"]!).Select(row => (double)row!));
+        var pack = TimeSpan.FromMilliseconds(actual.Sum(row => row.Item2.TotalMilliseconds));
+        Assert.True(pack < Web6CutoverBudgets.BrowserPack);
+        Assert.True(Web6CutoverBudgets.BrowserPack < Web6CutoverBudgets.Controller);
+        Assert.True(Web6CutoverBudgets.Controller + Web6CutoverBudgets.Controller < Web6CutoverBudgets.AggregateParent);
+        Assert.True(Web6CutoverBudgets.AggregateParent < Web6CutoverSelectorBudgets.Gate);
+        Assert.True(Web6CutoverSelectorBudgets.Gate < Web6CutoverSelectorBudgets.ProcessMaximum);
+        Assert.Equal(TimeSpan.FromSeconds(60), Web6CutoverSelectorBudgets.ProcessMaximum - Web6CutoverSelectorBudgets.Gate);
+
+        Assert.Single(Regex.Matches(spec, @"\btest\s*\.\s*afterEach\s*\(").Cast<Match>());
+        var resetHook = Assert.Single(Regex.Matches(spec, @"\btest\s*\.\s*afterEach\s*\((?<body>[\s\S]*?)^\s*\}\s*\)\s*;",
+            RegexOptions.Multiline).Cast<Match>()).Groups["body"].Value;
+        const string resetFrame = @"\bsendCutoverFrame\s*\(\s*""resetCutover""\s*,";
+        Assert.Single(Regex.Matches(spec, resetFrame).Cast<Match>());
+        Assert.Matches(@"\bscenario\s*\.\s*reset\s*\([^;]+" + resetFrame, resetHook);
+        Assert.Matches(@"\btestInfo\s*\.\s*setTimeout\s*\(\s*Math\s*\.\s*max\s*\(\s*1\s*,\s*scenario\s*\.\s*remainingTotalMs\s*\(\s*\)\s*\)\s*\)", resetHook);
+        Assert.DoesNotMatch(@"\b(?:oldClientNewHostOff|newClientOldHostOff|revokeGrantOff)\b", resetHook);
+    }
+
+    private static TimeSpan ReadMilliseconds(string value) => TimeSpan.FromMilliseconds(int.Parse(value.Replace("_", ""),
+        System.Globalization.CultureInfo.InvariantCulture));
+
+    private static async Task<JObject> ReadFrontendWireAsync(string frontendRoot, string preparedRoot)
+    {
+        // Execute only the committed pure deadline module and frame builder. The builder never needs a transport.
+        const string script = """
+            const fs = require('node:fs');
+            const ts = require(process.argv[1]);
+            function load(file, imports) {
+              const source = fs.readFileSync(`tests/pilot/${file}.ts`, 'utf8');
+              const { outputText } = ts.transpileModule(source, { compilerOptions: {
+                module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
+              } });
+              const exports = {};
+              new Function('exports', 'require', outputText)(exports, name => {
+                if (Object.hasOwn(imports, name)) return imports[name];
+                throw Error(`Unexpected cutover module import: ${name}`);
+              });
+              return exports;
+            }
+            const deadlines = load('web6-cutover-deadline', {});
+            const { createCutoverControlFrame } = load('web6-cutover-control', {
+              './web6-cutover-deadline': deadlines, './web6-control-transport': {},
+            });
+            const operationId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+            const operationActions = new Set(['sameEpochRestart', 'revokeGrantOn', 'revokeGrantOff',
+              'restoreEpoch', 'committedUnavailable', 'verifyNoCutoverMutation']);
+            const proof = { operationId, operationKind: 'Sales.Create', requestFingerprint: 'a'.repeat(64),
+              authorizedBusinessEffects: 1, checkId: 'web6-cutover-authentic-committed-setup' };
+            const frames = Object.entries(deadlines.cutoverActionCaps).map(([action, cap]) => ({
+              action, frame: createCutoverControlFrame(7, 'fixture-token', action, cap,
+                operationActions.has(action) ? operationId : undefined,
+                action === 'committedUnavailable' ? proof : undefined).toString('base64'),
+            }));
+            const off = 'revokeGrantOff';
+            frames.push({ action: off, frame: createCutoverControlFrame(7, 'fixture-token', off,
+              deadlines.cutoverActionCaps[off]).toString('base64') });
+            async function resetAllowances() {
+              const scenarios = [];
+              for (const [total, reserve] of [[420000, 180000], [420000, 180000], [690000, 60000]]) {
+                let now = 0;
+                const owner = deadlines.createCutoverScenarioDeadline(total, reserve, () => now);
+                now = total - reserve;
+                await owner.reset(async allowance => scenarios.push(allowance));
+              }
+              return scenarios;
+            }
+            resetAllowances().then(scenarios => process.stdout.write(JSON.stringify({
+              responseReserve: deadlines.CUTOVER_RESPONSE_RESERVE_MS, frames, scenarios,
+            })));
+            """;
+        var node = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';')
+            .Select(path => Path.Combine(path.Trim().Trim('"'), "node.exe")).First(File.Exists);
+        var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in new[] { "SystemRoot", "WINDIR", "TEMP", "TMP" })
+            if (Environment.GetEnvironmentVariable(name) is { } value) environment.Add(name, value);
+        var output = await BootstrapToolchain.RunOwnedAsync(new BootstrapProcessRequest(node, preparedRoot,
+            new[] { "--input-type=commonjs", "-e", script, Path.Combine(frontendRoot, "node_modules", "typescript") },
+            environment, TimeSpan.FromSeconds(30)), CancellationToken.None);
+        return JObject.Parse(output);
     }
 
     [Theory]
@@ -440,13 +592,13 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         return leaf;
     }
 
-    private static string Git(string root, string arguments)
+    private static string Git(string root, string arguments, bool trim = true)
     {
         var start = new ProcessStartInfo("git",
             "-c user.name=Fixture -c user.email=fixture@example.invalid -c core.hooksPath=NUL " + arguments)
         {
             WorkingDirectory = root, UseShellExecute = false, RedirectStandardOutput = true,
-            RedirectStandardError = true, CreateNoWindow = true,
+            RedirectStandardError = true, CreateNoWindow = true, StandardOutputEncoding = Encoding.UTF8,
         };
         foreach (var key in new List<string>(start.EnvironmentVariables.Keys.Cast<string>()))
             if (key.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase)) start.EnvironmentVariables.Remove(key);
@@ -456,7 +608,7 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         var output = process.StandardOutput.ReadToEnd();
         Assert.True(process.WaitForExit(5000));
         Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd());
-        return output.Trim();
+        return trim ? output.Trim() : output;
     }
 
     public void Dispose()
@@ -464,5 +616,16 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         foreach (var path in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
             File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
         Directory.Delete(_root, true);
+    }
+}
+
+internal sealed class Web6PairedSourceFactAttribute : FactAttribute
+{
+    internal const string RootVariable = "MYDMSVN_WEB6_PAIRED_SOURCE_ROOT";
+
+    public Web6PairedSourceFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(RootVariable)))
+            Skip = "Set " + RootVariable + " to the reviewed frontend checkout with its locked dependencies installed.";
     }
 }

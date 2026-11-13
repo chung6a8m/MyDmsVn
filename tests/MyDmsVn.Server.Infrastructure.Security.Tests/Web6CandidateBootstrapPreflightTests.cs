@@ -44,6 +44,8 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
     private string _currentFrontend = FrontendSha;
     private string _oldBackend = OldBackendSha;
     private string _oldFrontend = OldFrontendSha;
+    private string _currentFrontendTree = Tree;
+    private IReadOnlyDictionary<string, byte[]>? _frontendSources;
     private int _masterChecks;
 
     private string At(string path) => Path.Combine(_root, path);
@@ -58,7 +60,9 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
     }
 
     [Theory]
-    [InlineData("66b935488d00ee78ec3ffbd183f474da06aa3404", "PIN_MATCHED")]
+    [InlineData("96842a6329191713282b3212e5420872eb0f3a41", "PIN_MATCHED")]
+    [InlineData("66b935488d00ee78ec3ffbd183f474da06aa3404", "BLOCKED_REVIEWED_FRONTEND_PIN")]
+    [InlineData("447e39f03b2b22398d30324c8cec992fc93ce83c", "BLOCKED_REVIEWED_FRONTEND_PIN")]
     [InlineData("888dd3bb0c79c054234bb851ba0c98bd80134c50", "BLOCKED_REVIEWED_FRONTEND_PIN")]
     [InlineData("5f355e4ed3d0ca0778e195b940ecbed67b410dc0", "BLOCKED_REVIEWED_FRONTEND_PIN")]
     [InlineData("c1e07ba7d03297ea0061cd5a0800b2f6df302bf1", "BLOCKED_REVIEWED_FRONTEND_PIN")]
@@ -87,7 +91,22 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
         var receipt = await new BootstrapPreflight(Toolchain()).PrepareAsync(request, CancellationToken.None);
         Assert.Equal(admission, receipt.CutoverAdmission);
         Assert.Equal(_currentFrontend, receipt.Payload["frontendSha"]);
+        if (admission == "PIN_MATCHED")
+            Assert.Equal(_currentFrontend, Web6SelectorPlan.Create(receipt).Text("frontendSha"));
+        else
+            Assert.Throws<IOException>(() => Web6SelectorPlan.Create(receipt));
         Assert.Empty(Directory.GetFileSystemEntries(At("sql")));
+    }
+
+    internal async Task<PreparedCandidateReceipt> PrepareWithFrontendSources(string sha, string tree, IReadOnlyDictionary<string, byte[]> sources)
+    {
+        _currentFrontend = sha;
+        _currentFrontendTree = tree;
+        _frontendSources = sources;
+        using var authority = Authority();
+        var receipt = await new BootstrapPreflight(Toolchain()).PrepareAsync(Request(authority), CancellationToken.None);
+        Assert.Empty(Directory.GetFileSystemEntries(At("sql")));
+        return receipt;
     }
 
     [Fact]
@@ -444,12 +463,20 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
                     _checkout.Add(checkout, args.Last());
                     if (Path.GetFileName(checkout).StartsWith("backend-", StringComparison.Ordinal))
                         SeedBackend(checkout, _failure);
+                    if (checkout == Path.Combine(TaskRoot, "frontend-current") && _frontendSources != null)
+                        foreach (var source in _frontendSources)
+                        {
+                            var path = Path.Combine(checkout, source.Key);
+                            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                            File.WriteAllBytes(path, source.Value);
+                        }
                 }
                 if (args.Contains("status") && _failure == "dirty checkout") return Task.FromResult(" M tracked.txt");
                 if (args.Contains("--show-toplevel")) return Task.FromResult(root.Replace('\\', '/'));
                 if (args.Contains("--abbrev-ref")) return Task.FromResult("HEAD");
                 if (args.Last() == "HEAD") return Task.FromResult(_failure == "wrong commit" ? Tree : _checkout.TryGetValue(root, out var sha) ? sha : BackendSha);
-                if (args.Last() == "HEAD^{tree}") return Task.FromResult(Tree);
+                if (args.Last() == "HEAD^{tree}") return Task.FromResult(
+                    Path.GetFileName(root) is "frontend-current" or "frontend-ordinary" ? _currentFrontendTree : Tree);
                 if (args.Contains("symbolic-ref")) throw new InvalidOperationException("Use a checked Git command for detached verification.");
                 break;
             case "dotnet.exe":
