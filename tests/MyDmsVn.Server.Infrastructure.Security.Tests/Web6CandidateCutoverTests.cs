@@ -869,10 +869,21 @@ public sealed class Web6CandidateCutoverTests
         Assert.DoesNotContain("complete", operations.Calls);
     }
 
+    [Fact]
+    public async Task Aggregate_expiry_immediately_after_browser_result_prevents_inner_drain()
+    {
+        var now = TimeSpan.Zero;
+        var operations = new RecordingCutoverOperations(Plan()) { AfterRun = () => now = TimeSpan.FromSeconds(3300) };
+        await Assert.ThrowsAsync<TimeoutException>(() => new Web6CandidateCutoverOrchestrator(operations, () => now).Execute(CancellationToken.None));
+        Assert.DoesNotContain("chromium:current:drain", operations.Calls);
+        Assert.True(operations.RetainForContainment);
+    }
+
     private sealed class RecordingCutoverOperations : IWeb6CandidateCutoverOperations
     {
         public bool RetainForContainment { get; set; }
         public void RetainAfterDeadline() => RetainForContainment = true;
+        public void BindDeadline(Web6CutoverDeadline deadline, CancellationToken token) { }
         private readonly Web6CandidateCutoverPlan _plan;
         internal RecordingCutoverOperations(Web6CandidateCutoverPlan plan) => _plan = plan;
         internal List<string> Calls { get; } = new List<string>();
@@ -883,6 +894,7 @@ public sealed class Web6CandidateCutoverTests
         internal Action? AfterRestore { get; set; }
         internal Action? AfterComplete { get; set; }
         internal Exception? RunFailure { get; set; }
+        internal Action? AfterRun { get; set; }
         public Task<Web6CandidateCutoverPlan> VerifyAuthority(CancellationToken token) { Calls.Add("authority"); return Task.FromResult(_plan); }
         public Task SealProtectedManifest(JObject handles, CancellationToken token) { Calls.Add("manifest"); return Task.CompletedTask; }
         public Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token)
@@ -895,6 +907,7 @@ public sealed class Web6CandidateCutoverTests
         public Task<Web6CutoverBrowserResult> RunAndValidate(string browser, Web6CutoverPair pair, CancellationToken token)
         {
             Calls.Add(browser + ":" + pair.ToString().ToLowerInvariant() + ":validate");
+            AfterRun?.Invoke();
             if (RunFailure != null) throw RunFailure;
             return Task.FromResult(new Web6CutoverBrowserResult(3, SkipChromium && browser == "chromium" ? 2 : 3,
                 0, SkipChromium && browser == "chromium" ? 1 : 0, 0, new[]

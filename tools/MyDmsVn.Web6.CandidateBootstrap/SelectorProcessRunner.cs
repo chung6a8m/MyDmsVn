@@ -163,12 +163,12 @@ internal sealed class SelectorProcessRunner
             throw new IOException("Bootstrap requires a single exact fully qualified selector.");
     }
 
-    private Dictionary<string, string> ChildEnvironment(IReadOnlyDictionary<string, string> input)
+    internal Dictionary<string, string> ChildEnvironment(IReadOnlyDictionary<string, string> input)
     {
         var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var name in PlatformVariables)
             if (Environment.GetEnvironmentVariable(name) is { } value) environment.Add(name, value);
-        foreach (var variable in input)
+        foreach (var variable in Web6CutoverSelectorBudgets.NormalizeEnvironment(input))
         {
             if (!SelectorVariables.Contains(variable.Key)) continue;
             if (variable.Value == null || variable.Value.IndexOf('\0') >= 0 || environment.ContainsKey(variable.Key))

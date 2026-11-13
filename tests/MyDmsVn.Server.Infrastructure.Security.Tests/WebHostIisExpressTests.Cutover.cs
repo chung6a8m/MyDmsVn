@@ -157,10 +157,12 @@ public sealed partial class WebHostIisExpressTests
         private Web6CandidateCutoverCoordinator _coordinator;
         private Web6CutoverSession? _session;
         private WebRecoveryPilotControl? _control;
+        private bool _controllerStopAttempted;
         private readonly Web6CutoverCleanupGate _cleanupGate = new Web6CutoverCleanupGate();
 
         public bool RetainForContainment => _cleanupGate.RetainForContainment;
         public void RetainAfterDeadline() => _cleanupGate.RetainAfterDeadline();
+        public void BindDeadline(Web6CutoverDeadline deadline, CancellationToken token) => _cleanupGate.BindDeadline(deadline, token);
         private Process? _process;
         private Web5IisExpressIdentity? _identity;
         private Web6CutoverAdmission? _admission;
@@ -577,6 +579,7 @@ public sealed partial class WebHostIisExpressTests
             _cleanupGate.ThrowIfRetained();
             Web6CutoverBrowserResult? result = null;
             _control = WebRecoveryPilotControl.StartCutover(_plan.CurrentEpoch, _session!.Handle, closeResponse: null, parent: token);
+            _controllerStopAttempted = false;
             return await Web6CutoverLifetime.RunWithStop(async () =>
             {
                 try
@@ -587,7 +590,7 @@ public sealed partial class WebHostIisExpressTests
                         (count, output) => result = new Web6CutoverBrowserResult((int)count["discovered"]!, (int)count["passed"]!, (int)count["failed"]!,
                             (int)count["skipped"]!, (int)count["retries"]!, ((JArray)output["checks"]!).Values<string>()!),
                         _currentBackend, _bootstrap.Plan.Text("candidateDistSha256"), token,
-                        drained => { _browserDrained = drained; return StopController(); });
+                        drained => { _browserDrained = drained; return StopController(); }, () => RetainForContainment);
                     _browserDrained = true;
                     _session.VerifyComplete();
                     await VerifyLifecycle(new Web6CutoverDeadline(Web6CutoverBudgets.LifecyclePhase), token);
@@ -604,10 +607,11 @@ public sealed partial class WebHostIisExpressTests
         private async Task StopController()
         {
             var control = _control;
-            if (control == null || RetainForContainment) return;
+            if (control == null || _controllerStopAttempted) return;
+            _controllerStopAttempted = true;
             try { await _cleanupGate.Stop(() => control.Stop(_browserDrained),
                 () => control.CutoverJoined && !control.CutoverJoinUncertain); }
-            finally { if (!RetainForContainment) _control = null; }
+            finally { if (control.CutoverJoined && !control.CutoverJoinUncertain) _control = null; }
         }
 
         public async Task VerifyOperation(Guid operation, bool committed, Web6CutoverDeadline deadline, CancellationToken token)

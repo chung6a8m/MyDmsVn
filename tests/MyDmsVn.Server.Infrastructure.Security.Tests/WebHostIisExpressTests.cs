@@ -768,7 +768,7 @@ public sealed partial class WebHostIisExpressTests
         bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null,
         WebRecoveryPilotControl? cutoverControl = null, string? cutoverBrowser = null, Action<JObject, JObject>? cutoverResult = null,
         Web6CandidateBackendSource? backendSource = null, string? cutoverFrontendHash = null,
-        CancellationToken cutoverParent = default, Func<bool, Task>? stopCutover = null)
+        CancellationToken cutoverParent = default, Func<bool, Task>? stopCutover = null, Func<bool>? retainCutover = null)
     {
         var connectionString = database.ConnectionString;
         var candidatePair = Web6CandidatePairBudgets.IsPairMode(web6Candidate, web6Cutover, Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"));
@@ -837,6 +837,19 @@ public sealed partial class WebHostIisExpressTests
         Web6CandidateManifest.PrivateInput? privateInput = null;
         Web6CandidateManifest.PrivateOutput? privateResult = null, privateCount = null, privateNetwork = null;
         var browserDrained = true;
+        var cutoverCleanup = web6Cutover ? new Web6CutoverBrowserCleanup(
+            stopCutover ?? throw new InvalidOperationException("Cutover Stop owner is absent."),
+            retainCutover ?? throw new InvalidOperationException("Cutover deadline owner is absent."),
+            () => cutoverControl?.CutoverJoined == true && !cutoverControl.CutoverJoinUncertain) : null;
+        void DisposeBrowserArtifacts()
+        {
+            try { if (privateInput != null) privateInput.Dispose(); else File.Delete(manifestPath); }
+            finally
+            {
+                try { privateResult?.Dispose(); }
+                finally { try { privateCount?.Dispose(); } finally { privateNetwork?.Dispose(); File.Delete(certificatePath); } }
+            }
+        }
         async Task<GuiProcessResult> ExecuteBrowser(string project, string outputName)
         {
             var start = new ProcessStartInfo(node, "\"" + cli + "\" test --config playwright.pilot.config.ts --workers=1 --max-failures=1 --project=" + project)
@@ -922,7 +935,8 @@ public sealed partial class WebHostIisExpressTests
                     }
                     Console.WriteLine("WEB6_BROWSER_COUNT browser=" + project + " " + count.ToString(Formatting.None));
                 }
-                await recovery!.Stop(browserDrained);
+                if (cutoverCleanup != null) await cutoverCleanup.Stop(browserDrained);
+                else await recovery!.Stop(browserDrained);
                 var health = await Request("https://localhost:44321/api/v1/health", Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_TLS_THUMBPRINT")!);
                 if (health.Status != 200 || !browserDrained) throw new InvalidDataException("WEB6 audit readiness or browser drain failed.");
                 candidateValidated?.Invoke();
@@ -933,7 +947,8 @@ public sealed partial class WebHostIisExpressTests
             await ExecuteBrowser(selectedProject!, "browser-output.log");
             if (recovery != null)
             {
-                await recovery.Stop(browserDrained);
+                if (cutoverCleanup != null) await cutoverCleanup.Stop(browserDrained);
+                else await recovery.Stop(browserDrained);
                 if (web5Pilot)
                 {
                     Assert.True(recovery.NegativeVerified);
@@ -989,7 +1004,7 @@ public sealed partial class WebHostIisExpressTests
         {
             try
             {
-                if (web6Cutover && stopCutover != null) await stopCutover(browserDrained);
+                if (cutoverCleanup != null) await cutoverCleanup.Finish(browserDrained, DisposeBrowserArtifacts);
                 else if (recovery != null) await recovery.Stop(browserDrained);
             }
             catch (Exception cleanup) when (browserFailure != null)
@@ -1000,15 +1015,7 @@ public sealed partial class WebHostIisExpressTests
             }
             finally
             {
-                if (!web6Cutover || (cutoverControl?.CutoverJoined == true && !cutoverControl.CutoverJoinUncertain))
-                {
-                    try { if (privateInput != null) privateInput.Dispose(); else File.Delete(manifestPath); }
-                    finally
-                    {
-                        try { privateResult?.Dispose(); }
-                        finally { try { privateCount?.Dispose(); } finally { privateNetwork?.Dispose(); File.Delete(certificatePath); } }
-                    }
-                }
+                if (cutoverCleanup == null) DisposeBrowserArtifacts();
             }
         }
     }

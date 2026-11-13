@@ -494,6 +494,34 @@ public sealed class Web6CandidateBootstrapRunnerTests : IDisposable
         Assert.Equal(0, result.Executed);
     }
 
+    [Theory]
+    [InlineData("mydmsvn_web6_candidate_enable")]
+    [InlineData("mydmsvn_web_pilot_project")]
+    [InlineData("MyDmsVn_Web6_Workload_Enable")]
+    [InlineData("mydmsvn_web6_recovery_enable")]
+    public async Task Child_windows_environment_cannot_normalize_an_extended_route_bypass(string flag)
+    {
+        var project = Path.Combine(_root, "tests", Web6SelectorPlan.Owner, Web6SelectorPlan.Owner + ".csproj");
+        var env = new Dictionary<string, string>
+        {
+            ["mydmsvn_web6_cutover_enable"] = "1", ["MyDmsVn_Web6_Bootstrap_Run_Id"] = RunId,
+            [Web6SelectorPlan.PairPassedDigestVariable.ToLowerInvariant()] = new string('a', 64), [flag] = "1",
+        };
+        var called = false;
+        var runner = new SelectorProcessRunner(Executable, GitExecutable, _gitSha, _root, project, (_, _) =>
+        { called = true; return Task.FromResult(new GuiProcessResult(0, "", "")); });
+        var child = runner.ChildEnvironment(env);
+        Assert.Equal("1", child[flag.ToUpperInvariant()]);
+        Assert.Equal(TimeSpan.FromMinutes(25), Web6CutoverSelectorBudgets.GateTimeout("cutover", Web6CutoverSelectorBudgets.Filter, env, project, _root));
+        Assert.False(Web6CutoverSelectorBudgets.IsExact("cutover", Web6CutoverSelectorBudgets.Filter, child, project, _root));
+        await Assert.ThrowsAsync<IOException>(() => runner.RunAsync(Invocation("cutover", Web6CutoverSelectorBudgets.Filter, env, TimeSpan.FromHours(1)), CancellationToken.None));
+        Assert.False(called);
+        env.Remove(flag);
+        Assert.True(Web6CutoverSelectorBudgets.IsExact("cutover", Web6CutoverSelectorBudgets.Filter, runner.ChildEnvironment(env), project, _root));
+        env["MYDMSVN_WEB6_CUTOVER_ENABLE"] = "1";
+        Assert.Throws<IOException>(() => runner.ChildEnvironment(env));
+    }
+
     private SelectorProcessRunner Runner(Func<BootstrapProcessRequest, CancellationToken, Task<GuiProcessResult>> run) =>
         new(Executable, GitExecutable, _gitSha, _root, Project, run);
 

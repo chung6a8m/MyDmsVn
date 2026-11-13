@@ -536,6 +536,7 @@ internal interface IWeb6CandidateCutoverOperations
 {
     bool RetainForContainment { get; }
     void RetainAfterDeadline();
+    void BindDeadline(Web6CutoverDeadline deadline, CancellationToken token);
     Task<Web6CandidateCutoverPlan> VerifyAuthority(CancellationToken token);
     Task SealProtectedManifest(JObject handles, CancellationToken token);
     Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token);
@@ -565,6 +566,7 @@ internal sealed class Web6CandidateCutoverOrchestrator
         var deadline = new Web6CutoverDeadline(Web6CutoverBudgets.AggregateParent, _clock);
         using var aggregate = deadline.Link(token);
         token = aggregate.Token;
+        _operations.BindDeadline(deadline, token);
         try
         {
             foreach (var browser in new[] { "chromium", "edge" })
@@ -584,6 +586,7 @@ internal sealed class Web6CandidateCutoverOrchestrator
                         coordinator.Admit(pair, admission);
                         admitted = true;
                         var result = await _operations.RunAndValidate(browser, pair, token).ConfigureAwait(false);
+                        deadline.ThrowIfExpired(token);
                         if (result.Discovered != 3 || result.Passed != 3 || result.Failed != 0 || result.Skipped != 0 || result.Retries != 0 ||
                             !new HashSet<string>(result.Markers, StringComparer.Ordinal).SetEquals(RequiredMarkers))
                             throw new IOException("Cutover browser result did not prove every mandatory zero-skip/retry marker.");
@@ -591,6 +594,7 @@ internal sealed class Web6CandidateCutoverOrchestrator
                     catch (Exception error) { failure = error; throw; }
                     finally
                     {
+                        if (token.IsCancellationRequested || deadline.Remaining == TimeSpan.Zero) _operations.RetainAfterDeadline();
                         if (started && !_operations.RetainForContainment) try
                         {
                             var drain = await _operations.Drain(browser, pair, token).ConfigureAwait(false);

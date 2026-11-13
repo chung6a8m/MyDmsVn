@@ -226,16 +226,30 @@ internal sealed class Web6CutoverSession
 internal sealed class Web6CutoverCleanupGate
 {
     private volatile bool _retainForContainment;
+    private volatile bool _joinUncertain;
+    private Web6CutoverDeadline? _deadline;
+    private CancellationToken _deadlineToken;
 
-    internal bool RetainForContainment => _retainForContainment;
+    internal bool RetainForContainment
+    {
+        get
+        {
+            if (_deadline != null && (_deadlineToken.IsCancellationRequested || _deadline.Remaining == TimeSpan.Zero))
+                _retainForContainment = true;
+            return _retainForContainment;
+        }
+    }
+    internal void BindDeadline(Web6CutoverDeadline deadline, CancellationToken token)
+    { _deadline = deadline; _deadlineToken = token; }
     internal void RetainAfterDeadline() => _retainForContainment = true;
 
     internal async Task Stop(Func<Task> stop, Func<bool> joined)
     {
-        ThrowIfRetained();
+        // Deadline retention forbids cleanup, but the first controller Stop must still join its owner.
+        if (_joinUncertain) ThrowIfRetained();
         try { await stop().ConfigureAwait(false); }
-        finally { if (!joined()) _retainForContainment = true; }
-        ThrowIfRetained();
+        finally { if (!joined()) { _joinUncertain = true; _retainForContainment = true; } }
+        if (_joinUncertain) ThrowIfRetained();
     }
 
     internal Task DrainHost(Func<Task> drain)
@@ -246,8 +260,28 @@ internal sealed class Web6CutoverCleanupGate
 
     internal void ThrowIfRetained()
     {
-        if (_retainForContainment) throw new IOException("WEB6 cutover drain-uncertain; allocations remain retained.");
+        if (RetainForContainment) throw new IOException("WEB6 cutover drain-uncertain; allocations remain retained.");
     }
+}
+
+internal sealed class Web6CutoverBrowserCleanup
+{
+    private readonly Func<bool, Task> _stop;
+    private readonly Func<bool> _retained;
+    private readonly Func<bool> _joined;
+    private bool _stopAttempted;
+    internal Web6CutoverBrowserCleanup(Func<bool, Task> stop, Func<bool> retained, Func<bool> joined)
+    { _stop = stop; _retained = retained; _joined = joined; }
+    internal async Task Stop(bool drained)
+    {
+        if (_stopAttempted) return;
+        _stopAttempted = true; // Consumption precedes dispatch, including first-call failure/uncertain join.
+        await _stop(drained).ConfigureAwait(false);
+        if (_retained()) throw new IOException("WEB6 cutover deadline retained; cleanup is not admitted.");
+    }
+    internal Task Finish(bool drained, Action dispose) => Web6CutoverLifetime.RunWithStop(async () =>
+    { await Stop(drained).ConfigureAwait(false); return true; }, () =>
+    { if (!_retained() && _joined()) dispose(); return Task.CompletedTask; });
 }
 
 internal static class Web6CutoverLifetime

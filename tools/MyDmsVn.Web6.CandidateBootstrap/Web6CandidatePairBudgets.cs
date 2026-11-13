@@ -37,14 +37,28 @@ internal static class Web6CutoverSelectorBudgets
     internal const string Filter = "FullyQualifiedName=MyDmsVn.Server.Infrastructure.IntegrationTests.WebHostIisExpressTests.Web6_pinned_cutover_runs_protected_IIS_and_browser_lifecycle";
     internal static readonly TimeSpan Gate = Web6CutoverBudgets.SelectorGate;
     internal static readonly TimeSpan ProcessMaximum = Web6CutoverBudgets.SelectorProcessMaximum;
-    internal static bool IsExact(string name, string filter, IReadOnlyDictionary<string, string> environment, string project, string directory) =>
-        name == "cutover" && filter == Filter && BootstrapJson.SamePath(project,
+    internal static Dictionary<string, string> NormalizeEnvironment(IReadOnlyDictionary<string, string> input)
+    {
+        var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in input)
+        {
+            if (normalized.ContainsKey(entry.Key)) throw new IOException("Bootstrap environment repeats a Windows variable name.");
+            normalized.Add(entry.Key.ToUpperInvariant(), entry.Value);
+        }
+        return normalized;
+    }
+
+    internal static bool IsExact(string name, string filter, IReadOnlyDictionary<string, string> environment, string project, string directory)
+    {
+        environment = NormalizeEnvironment(environment);
+        return name == "cutover" && filter == Filter && BootstrapJson.SamePath(project,
             Path.Combine(directory, "tests", Web6SelectorPlan.Owner, Web6SelectorPlan.Owner + ".csproj")) &&
         environment.TryGetValue("MYDMSVN_WEB6_CUTOVER_ENABLE", out var enabled) && enabled == "1" &&
         environment.TryGetValue("MYDMSVN_WEB6_BOOTSTRAP_RUN_ID", out var run) && !string.IsNullOrEmpty(run) &&
         environment.TryGetValue(Web6SelectorPlan.PairPassedDigestVariable, out var pair) && BootstrapJson.IsLowerHex(pair, 64) &&
         !environment.ContainsKey("MYDMSVN_WEB6_CANDIDATE_ENABLE") && !environment.ContainsKey("MYDMSVN_WEB_PILOT_PROJECT") &&
         !environment.ContainsKey("MYDMSVN_WEB6_WORKLOAD_ENABLE") && !environment.ContainsKey("MYDMSVN_WEB6_RECOVERY_ENABLE");
+    }
 
     internal static TimeSpan GateTimeout(string name, string filter, IReadOnlyDictionary<string, string> environment, string project, string directory) =>
         IsExact(name, filter, environment, project, directory) ? Gate : Web6CandidatePairBudgets.GateTimeout(name);

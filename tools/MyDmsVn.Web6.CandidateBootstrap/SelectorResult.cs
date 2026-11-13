@@ -12,8 +12,7 @@ internal sealed class SelectorInvocation
     {
         Name = name;
         Filter = filter;
-        Environment = new ReadOnlyDictionary<string, string>(environment.ToDictionary(pair => pair.Key, pair => pair.Value,
-            StringComparer.OrdinalIgnoreCase));
+        Environment = new ReadOnlyDictionary<string, string>(Web6CutoverSelectorBudgets.NormalizeEnvironment(environment));
         Timeout = timeout;
         TrxPath = trxPath;
         SelectorDllPath = selectorDllPath;

@@ -42,16 +42,39 @@ namespace MyDmsVn.Desktop.Tests
             => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(selectorProcess ? 44 : 41), cancellationToken);
 
 #if WEB6_BOOTSTRAP || WEB6_SECURITY
+        // Extracted observation seam; the same decision path is used by the cutover runner.
+        internal static async Task<(string Reason, Exception Error)?> ObserveCutoverRoot(Func<bool> rootExited,
+            Func<TimeSpan> elapsed, TimeSpan timeout, CancellationToken token, Func<Task> poll)
+        {
+            while (true)
+            {
+                var exited = rootExited();
+                var failure = CheckCutoverCompletion(elapsed, timeout, token);
+                if (failure != null) return failure;
+                if (exited) return null;
+                await poll().ConfigureAwait(false);
+            }
+        }
+
+        internal static (string Reason, Exception Error)? CheckCutoverCompletion(Func<TimeSpan> elapsed, TimeSpan timeout, CancellationToken token)
+        {
+            if (token.IsCancellationRequested) return ("Canceled", new OperationCanceledException(token));
+            if (elapsed() >= timeout) return ("TimedOut", new TimeoutException("Owned child work deadline."));
+            return null;
+        }
+
         // Exact protected cutover callers only. The selector's extra minute is
         // termination/output join, never execution time; all other routes retain 5s cleanup.
         public static Task<GuiProcessResult> RunWeb6CutoverAsync(ProcessStartInfo start, TimeSpan timeout,
             bool selectorProcess, CancellationToken cancellationToken = default)
             => RunCoreAsync(start, timeout, selectorProcess ? CutoverBudgets.SelectorGate : CutoverBudgets.BrowserPack, cancellationToken,
-                cleanupBudget: selectorProcess ? CutoverBudgets.SelectorProcessMaximum - CutoverBudgets.SelectorGate : CleanupBudget);
+                cleanupBudget: selectorProcess ? CutoverBudgets.SelectorProcessMaximum - CutoverBudgets.SelectorGate : CleanupBudget,
+                strictCompletion: true);
 #endif
 
         private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout,
-            CancellationToken cancellationToken, Action<int>? started = null, Encoding? stdoutEncoding = null, TimeSpan? cleanupBudget = null)
+            CancellationToken cancellationToken, Action<int>? started = null, Encoding? stdoutEncoding = null, TimeSpan? cleanupBudget = null,
+            bool strictCompletion = false)
         {
             GuiTestSafety.ThrowIfPoisoned();
             cancellationToken.ThrowIfCancellationRequested();
@@ -73,6 +96,15 @@ namespace MyDmsVn.Desktop.Tests
                 try
                 {
                     started?.Invoke(child.ProcessId);
+#if WEB6_BOOTSTRAP || WEB6_SECURITY
+                    if (strictCompletion)
+                    {
+                        var observed = await ObserveCutoverRoot(() => child.RootExited, () => clock.Elapsed, timeout,
+                            cancellationToken, () => Task.Delay(20)).ConfigureAwait(false);
+                        if (observed is { } failure) { reason = failure.Reason; initial = failure.Error; }
+                    }
+                    else
+#endif
                     while (!child.RootExited)
                     {
                         if (cancellationToken.IsCancellationRequested)
@@ -137,6 +169,14 @@ namespace MyDmsVn.Desktop.Tests
 
                 var stdout = outputCapture.Snapshot();
                 var stderr = errorCapture.Snapshot();
+#if WEB6_BOOTSTRAP || WEB6_SECURITY
+                // Teardown may use its reserve, but cannot turn late completion/cancellation into success.
+                if (strictCompletion && initial == null)
+                {
+                    var completion = CheckCutoverCompletion(() => clock.Elapsed, timeout, cancellationToken);
+                    if (completion is { } failure) { reason = failure.Reason; initial = failure.Error; }
+                }
+#endif
                 if (initial != null || cleanup != null)
                 {
                     var cause = initial == null ? cleanup! : cleanup == null ? initial : new AggregateException(initial, cleanup);

@@ -12,6 +12,43 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class WebRecoveryPilotControlTests
 {
     [Fact]
+    public async Task Aggregate_retention_still_joins_first_owned_controller_without_disposal_or_second_stop()
+    {
+        using var parent = new CancellationTokenSource();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+        var entered = Signal(); var cancelled = Signal();
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (_, _, token) =>
+        {
+            entered.TrySetResult(true);
+            using (token.Register(() => cancelled.TrySetResult(true))) await cancelled.Task;
+            return new JObject();
+        }, closeResponse: null, parent: parent.Token);
+        var gate = new Web6CutoverCleanupGate();
+        gate.BindDeadline(new Web6CutoverDeadline(Web6CutoverBudgets.AggregateParent), parent.Token);
+        var stops = 0; var disposed = 0; Task? stopping = null;
+        var cleanup = new Web6CutoverBrowserCleanup(_ => gate.Stop(() =>
+        { stops++; return stopping = control.Stop(); }, () => control.CutoverJoined && !control.CutoverJoinUncertain),
+            () => gate.RetainForContainment, () => control.CutoverJoined);
+        try
+        {
+            using var pipe = await Send(control, "oldClientNewHostOn", 12000, timeout.Token);
+            await WaitFor(entered.Task, timeout.Token);
+            parent.Cancel();
+            Assert.True(gate.RetainForContainment);
+            await Assert.ThrowsAsync<AggregateException>(() => cleanup.Finish(true, () => disposed++));
+            await cleanup.Finish(true, () => disposed++);
+            Assert.True(control.CutoverJoined);
+            Assert.Equal(1, stops);
+            Assert.Equal(0, disposed);
+        }
+        finally
+        {
+            cancelled.TrySetResult(true);
+            try { await (stopping ?? control.Stop()); } catch (AggregateException) { }
+        }
+    }
+
+    [Fact]
     public async Task Separate_controllers_observe_one_parent_and_join_their_own_cancellation_callbacks()
     {
         using var parent = new CancellationTokenSource();

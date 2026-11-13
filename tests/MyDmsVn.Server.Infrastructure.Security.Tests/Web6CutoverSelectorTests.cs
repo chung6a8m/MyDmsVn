@@ -120,7 +120,7 @@ public sealed class Web6CutoverSelectorTests : IDisposable
         var run = live.Substring(live.IndexOf("public async Task<Web6CutoverBrowserResult> RunAndValidate", StringComparison.Ordinal));
         Assert.Contains("StartCutover(_plan.CurrentEpoch, _session!.Handle, closeResponse: null, parent: token)", run);
         Assert.Contains("Web6CutoverLifetime.RunWithStop", run);
-        Assert.Contains("drained => { _browserDrained = drained; return StopController(); }", run);
+        Assert.Contains("drained => { _browserDrained = drained; return StopController(); }, () => RetainForContainment", run);
         foreach (var method in new[] { "internal async Task<bool> Cleanup()", "internal void VerifyFinalDisposition()", "internal void DisposeManifests(bool allowDeletion)" })
         {
             var body = live.Substring(live.IndexOf(method, StringComparison.Ordinal) + method.Length).TrimStart();
@@ -132,7 +132,7 @@ public sealed class Web6CutoverSelectorTests : IDisposable
         Assert.Contains("if (started && !_operations.RetainForContainment)", orchestration);
         var browser = Source(tests + "WebHostIisExpressTests.cs");
         Assert.Contains("if (operations?.RetainForContainment != true)", browser);
-        Assert.Contains("if (!web6Cutover || (cutoverControl?.CutoverJoined == true && !cutoverControl.CutoverJoinUncertain))", browser);
+        Assert.Contains("cutoverCleanup.Finish(browserDrained, DisposeBrowserArtifacts)", browser);
         Assert.Contains("GuiOwnedProcess.RunWeb6CutoverAsync(start, Web6CutoverBudgets.BrowserPack, selectorProcess: false, cancellationToken: cutoverParent)", browser);
         var runner = Source("tools/MyDmsVn.Web6.CandidateBootstrap/SelectorProcessRunner.cs");
         Assert.Contains("Web6CutoverSelectorBudgets.IsExact(invocation.Name, invocation.Filter, invocation.Environment, _project, _directory)", runner);
@@ -154,6 +154,108 @@ public sealed class Web6CutoverSelectorTests : IDisposable
         ["MYDMSVN_WEB6_CUTOVER_ENABLE"] = "1", ["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"] = "fixture-run",
         [Web6SelectorPlan.PairPassedDigestVariable] = new string('a', 64),
     };
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Browser_cleanup_decision_stops_once_and_first_uncertainty_is_sticky(bool unjoined)
+    {
+        var gate = new Web6CutoverCleanupGate();
+        var calls = 0; var disposed = 0;
+        var failure = new IOException("first controller failure");
+        var cleanup = new Web6CutoverBrowserCleanup(_ => gate.Stop(() =>
+        { calls++; return Task.FromException(failure); }, () => !unjoined), () => gate.RetainForContainment, () => !unjoined);
+        var observed = await Assert.ThrowsAsync<IOException>(() => cleanup.Stop(true));
+        Assert.Same(failure, observed);
+        await cleanup.Finish(true, () => disposed++);
+        Assert.Equal(1, calls);
+        Assert.Equal(unjoined, gate.RetainForContainment);
+        Assert.Equal(unjoined ? 0 : 1, disposed);
+    }
+
+    [Fact]
+    public async Task Browser_deadline_retention_prevents_private_disposal_even_after_cooperative_join()
+    {
+        var retained = true; var stopped = 0; var disposed = 0;
+        var cleanup = new Web6CutoverBrowserCleanup(_ => { stopped++; return Task.CompletedTask; }, () => retained, () => true);
+        await Assert.ThrowsAsync<IOException>(() => cleanup.Finish(true, () => disposed++));
+        Assert.Equal(1, stopped);
+        Assert.Equal(0, disposed);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Active_browser_or_stop_deadline_is_sticky_before_any_disposal(bool cancel, bool duringStop)
+    {
+        var now = TimeSpan.Zero;
+        using var parent = new CancellationTokenSource();
+        var gate = new Web6CutoverCleanupGate();
+        gate.BindDeadline(new Web6CutoverDeadline(TimeSpan.FromSeconds(3300), () => now), parent.Token);
+        void Expire() { if (cancel) parent.Cancel(); else now = TimeSpan.FromSeconds(3300); }
+        var stops = 0; var disposals = 0; var drains = 0; var joined = false;
+        var cleanup = new Web6CutoverBrowserCleanup(_ => gate.Stop(() =>
+        {
+            stops++;
+            if (duringStop) Expire();
+            joined = true;
+            return Task.CompletedTask;
+        }, () => joined), () => gate.RetainForContainment, () => joined);
+        if (!duringStop) Expire();
+        await Assert.ThrowsAsync<IOException>(() => cleanup.Finish(true, () => disposals++));
+        await cleanup.Finish(true, () => disposals++); // consumed first Stop never retries
+        await Assert.ThrowsAsync<IOException>(() => gate.DrainHost(() => { drains++; return Task.CompletedTask; }));
+        Assert.True(joined);
+        Assert.True(gate.RetainForContainment);
+        Assert.Equal(1, stops);
+        Assert.Equal(0, disposals);
+        Assert.Equal(0, drains);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Browser_cleanup_error_order_contains_each_original_once(bool browserFailsFirst)
+    {
+        var browser = new IOException("browser"); var controller = new IOException("controller");
+        var stops = 0;
+        var cleanup = new Web6CutoverBrowserCleanup(_ => { stops++; return Task.FromException(controller); }, () => false, () => true);
+        var result = await Record.ExceptionAsync(() => Web6CutoverLifetime.RunWithStop(async () =>
+        {
+            if (browserFailsFirst) throw browser;
+            await cleanup.Stop(true); // the in-body decision uses the exact same consumed owner as finally
+            return true;
+        }, () => cleanup.Finish(true, () => { })));
+        if (browserFailsFirst)
+            Assert.Equal(new Exception[] { browser, controller }, Assert.IsType<AggregateException>(result).InnerExceptions);
+        else Assert.Same(controller, result);
+        Assert.Equal(1, stops);
+    }
+
+    [Theory]
+    [InlineData("mydmsvn_web6_candidate_enable")]
+    [InlineData("mydmsvn_web_pilot_project")]
+    [InlineData("MyDmsVn_Web6_Workload_Enable")]
+    [InlineData("mydmsvn_web6_recovery_enable")]
+    public void Windows_environment_aliases_cannot_acquire_the_extended_gate(string flag)
+    {
+        var env = CutoverEnvironment(); env[flag] = "1";
+        var project = Path.Combine(_root, "tests", Web6SelectorPlan.Owner, Web6SelectorPlan.Owner + ".csproj");
+        Assert.False(Web6CutoverSelectorBudgets.IsExact("cutover", Web6CutoverSelectorBudgets.Filter, env, project, _root));
+        Assert.Equal(TimeSpan.FromMinutes(25), Web6CutoverSelectorBudgets.GateTimeout("cutover", Web6CutoverSelectorBudgets.Filter, env, project, _root));
+    }
+
+    [Fact]
+    public void Duplicate_windows_aliases_are_rejected_consistently_before_admission()
+    {
+        var env = CutoverEnvironment(); env["mydmsvn_web6_cutover_enable"] = "1";
+        var project = Path.Combine(_root, "tests", Web6SelectorPlan.Owner, Web6SelectorPlan.Owner + ".csproj");
+        Assert.Throws<IOException>(() => Web6CutoverSelectorBudgets.IsExact("cutover", Web6CutoverSelectorBudgets.Filter, env, project, _root));
+        Assert.Throws<IOException>(() => new SelectorInvocation("cutover", Web6CutoverSelectorBudgets.Filter, env,
+            TimeSpan.FromMinutes(60), Path.Combine(_root, "result.trx"), Path.Combine(_root, "fixture.dll")));
+    }
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), "w6-selector-" + Guid.NewGuid().ToString("N"));
     private const string Tree = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";

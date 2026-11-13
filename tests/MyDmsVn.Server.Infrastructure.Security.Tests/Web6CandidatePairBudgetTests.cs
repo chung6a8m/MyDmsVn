@@ -12,6 +12,38 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 public sealed class Web6CandidatePairBudgetTests
 {
     [Theory]
+    [InlineData(3600, false, "TimedOut")]
+    [InlineData(3601, false, "TimedOut")]
+    [InlineData(3599, true, "Canceled")]
+    [InlineData(3599, false, null)]
+    public async Task Cutover_root_completion_rechecks_clock_and_concurrent_cancellation(int seconds, bool cancel, string? expected)
+    {
+        var now = TimeSpan.Zero;
+        using var cancellation = new System.Threading.CancellationTokenSource();
+        var result = await GuiOwnedProcess.ObserveCutoverRoot(() =>
+        {
+            now = TimeSpan.FromSeconds(seconds);
+            if (cancel) cancellation.Cancel();
+            return true;
+        }, () => now, TimeSpan.FromSeconds(3600), cancellation.Token,
+            () => throw new InvalidOperationException("A completed root must not be polled again."));
+        Assert.Equal(expected, result?.Reason);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cutover_success_after_output_join_rechecks_the_same_work_gate(bool cancel)
+    {
+        var now = TimeSpan.FromSeconds(3599);
+        using var cancellation = new System.Threading.CancellationTokenSource();
+        Assert.Null(await GuiOwnedProcess.ObserveCutoverRoot(() => true, () => now, TimeSpan.FromSeconds(3600), cancellation.Token,
+            () => throw new InvalidOperationException()));
+        if (cancel) cancellation.Cancel(); else now = TimeSpan.FromSeconds(3601);
+        Assert.Equal(cancel ? "Canceled" : "TimedOut", GuiOwnedProcess.CheckCutoverCompletion(() => now, TimeSpan.FromSeconds(3600), cancellation.Token)?.Reason);
+    }
+
+    [Theory]
     [InlineData(false, 1560)]
     [InlineData(true, 3600)]
     public async Task Cutover_owned_route_reserves_teardown_and_rejects_any_extra_live_work(bool selector, int seconds)
