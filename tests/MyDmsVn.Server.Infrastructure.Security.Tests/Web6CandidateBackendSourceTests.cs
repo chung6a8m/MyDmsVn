@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.AccessControl;
+using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using MyDmsVn.Web6.CandidateBootstrap;
 using Newtonsoft.Json.Linq;
@@ -99,25 +100,102 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         Assert.True(File.Exists(Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Security.Tests", "MyDmsVn.Server.Infrastructure.Security.Tests.csproj")));
     }
 
+    [Fact]
+    public void Paired_source_ignores_a_disposable_replacement_ref()
+    {
+        var original = Encoding.UTF8.GetBytes("verified bytes with CRLF\r\n");
+        var oid = SeedPairedBlob(original);
+        File.WriteAllText(Path.Combine(_root, "other.txt"), "separate fixture object");
+        var other = Git(_root, "hash-object -w other.txt");
+        var marker = "refs/replace/" + oid;
+        Git(_root, "update-ref " + marker + " " + other);
+        Assert.Equal(other, Git(_root, "rev-parse --verify " + marker));
+
+        var settings = PairedGitStart(_root, "cat-file blob " + oid);
+        Assert.Contains("--no-replace-objects", settings.Arguments);
+        Assert.Contains("-c core.fsmonitor=false", settings.Arguments);
+        Assert.Contains("-c core.hooksPath=NUL", settings.Arguments);
+        Assert.Equal("1", settings.EnvironmentVariables["GIT_NO_REPLACE_OBJECTS"]);
+        Assert.Equal("1", settings.EnvironmentVariables["GIT_CONFIG_NOSYSTEM"]);
+        Assert.Equal("NUL", settings.EnvironmentVariables["GIT_CONFIG_SYSTEM"]);
+        Assert.Equal("NUL", settings.EnvironmentVariables["GIT_CONFIG_GLOBAL"]);
+        Assert.Equal(original, ReadPairedBlob(_root, oid));
+    }
+
+    [Fact]
+    public void Paired_source_refuses_bytes_with_a_different_blob_identity()
+    {
+        var original = new byte[] { 0xff, 0x00, 0x0d, 0x0a };
+        var oid = SeedPairedBlob(original);
+        Assert.Equal(original, RequirePairedBlobIdentity(oid, original));
+        Assert.Equal(original, ReadPairedBlob(_root, oid));
+        Assert.Throws<IOException>(() => RequirePairedBlobIdentity(oid, Encoding.UTF8.GetBytes("different\r\n")));
+    }
+
+    [Theory]
+    [InlineData("CoRe.FsMoNiToR", "disabled-fixture-path")]
+    [InlineData("core.hooksPath", "unused-fixture-path")]
+    [InlineData("AlIaS.StAtUs", "version")]
+    [InlineData("include.path", "absent-fixture-config")]
+    [InlineData("filter.fixture.clean", "unused-fixture-command")]
+    [InlineData("core.worktree", ".")]
+    public void Paired_source_refuses_external_git_configuration(string key, string value)
+    {
+        SeedPairedBlob(Encoding.UTF8.GetBytes("fixture"));
+        Git(_root, "config --local " + key + " " + value);
+        Assert.Throws<IOException>(() => RequirePairedGitConfig(_root));
+    }
+
+    [Fact]
+    public void Paired_source_refuses_worktree_git_configuration()
+    {
+        SeedPairedBlob(Encoding.UTF8.GetBytes("fixture"));
+        Git(_root, "config --local extensions.worktreeConfig true");
+        Git(_root, "config --worktree core.fsmonitor false");
+        Assert.Throws<IOException>(() => RequirePairedGitConfig(_root));
+    }
+
+    [Fact]
+    public void Paired_source_does_not_execute_external_node_or_typescript()
+    {
+        var backend = Web6CandidateBackendSource.ResolveRoot(AppContext.BaseDirectory);
+        var path = Path.Combine(backend, "tests", "MyDmsVn.Server.Infrastructure.Security.Tests", nameof(Web6CandidateBackendSourceTests) + ".cs");
+        var source = File.ReadAllText(path);
+        var prohibited = @"\b(?:BootstrapToolchain\s*\.\s*RunOwnedAsync|transpile" + @"Module|node[.]exe|node_" + @"modules)\b";
+        Assert.DoesNotMatch(prohibited, source);
+    }
+
+    private string SeedPairedBlob(byte[] bytes)
+    {
+        Git(_root, "init --quiet");
+        File.WriteAllBytes(Path.Combine(_root, "source.txt"), bytes);
+        return Git(_root, "hash-object -w source.txt");
+    }
+
     [Web6PairedSourceFact]
     public async Task Prepared_frontend_cutover_matches_backend_wire_and_deadline_hierarchy()
     {
         const string reviewedSha = "96842a6329191713282b3212e5420872eb0f3a41";
         const string reviewedTree = "a8095060d0c578d8556a58c5301e11df4b4aff97";
         var root = Path.GetFullPath(Environment.GetEnvironmentVariable(Web6PairedSourceFactAttribute.RootVariable)!);
-        Assert.Equal(root, Path.GetFullPath(Git(root, "rev-parse --show-toplevel")), ignoreCase: true);
-        Assert.Equal(reviewedSha, Git(root, "rev-parse --verify HEAD"));
-        Assert.Equal(reviewedTree, Git(root, "rev-parse --verify HEAD^{tree}"));
-        Assert.Empty(Git(root, "--no-optional-locks status --porcelain --untracked-files=all --ignore-submodules=none"));
+        using var sourceRoot = new BootstrapPathPolicy.PinnedDirectory(root);
+        RequirePairedGitConfig(root);
+        Assert.Equal(root, Path.GetFullPath(PairedGitText(root, "rev-parse --show-toplevel")), ignoreCase: true);
+        Assert.Equal(reviewedSha, PairedGitText(root, "rev-parse --verify HEAD"));
+        Assert.Equal(reviewedTree, PairedGitText(root, "rev-parse --verify HEAD^{tree}"));
+        Assert.Empty(PairedGitText(root, "status --porcelain --untracked-files=all --ignore-submodules=all"));
 
         const string liveSpec = "tests/pilot/web6-cutover-live.spec.ts";
+        const string deadlineSource = "tests/pilot/web6-cutover-deadline.ts";
+        const string controlSource = "tests/pilot/web6-cutover-control.ts";
         var sources = new Dictionary<string, byte[]>(StringComparer.Ordinal);
-        foreach (var path in new[] { liveSpec, "tests/pilot/web6-cutover-deadline.ts", "tests/pilot/web6-cutover-control.ts" })
+        foreach (var path in new[] { liveSpec, deadlineSource, controlSource })
         {
             // Read the verified commit's blobs so index flags or a later edit cannot change the tested source.
-            var blob = Git(root, "rev-parse " + reviewedSha + ":" + path);
-            sources.Add(path, Encoding.UTF8.GetBytes(Git(root, "cat-file blob " + blob, trim: false)));
+            var blob = PairedGitText(root, "rev-parse --verify " + reviewedSha + ":" + path);
+            sources.Add(path, ReadPairedBlob(root, blob));
         }
+        sourceRoot.Verify();
 
         using var fixture = new Web6CandidateBootstrapPreflightTests();
         var receipt = await fixture.PrepareWithFrontendSources(reviewedSha, reviewedTree, sources);
@@ -127,33 +205,15 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         Assert.Equal(reviewedTree, plan.Text("frontendTree"));
         var preparedRoot = plan.Text("frontendWorktree");
         Assert.Equal(Path.Combine(plan.TaskRoot, "frontend-current"), preparedRoot);
-        var frontend = await ReadFrontendWireAsync(root, preparedRoot);
-        Assert.Equal(Web6CutoverBudgets.ResponseReserve.TotalMilliseconds, (double)frontend["responseReserve"]!);
-        Assert.Equal(3, ((JArray)frontend["scenarios"]!).Count);
-        var frames = (JArray)frontend["frames"]!;
-        Assert.Equal(11, frames.Select(frame => (string)frame["action"]!).Distinct(StringComparer.Ordinal).Count());
-        Assert.Equal(12, frames.Count); // revokeGrantOff is exercised both with and without an operation ID.
-        foreach (var emitted in frames)
+        string ReadPrepared(string path)
         {
-            var bytes = Convert.FromBase64String((string)emitted["frame"]!);
-            Assert.Equal(bytes.Length - sizeof(int), BitConverter.ToInt32(bytes, 0));
-            var frame = JObject.Parse(Encoding.UTF8.GetString(bytes, sizeof(int), bytes.Length - sizeof(int)));
-            var request = Web6CutoverControl.Validate(frame, "fixture-token");
-            Assert.Equal((string)emitted["action"]!, request.Action);
-            Assert.Equal(Web6CutoverBudgets.ActionCap(request.Action), request.RequestAllowance);
-            Assert.Equal(request.RequestAllowance - Web6CutoverBudgets.ResponseReserve, request.WorkAllowance);
-            Assert.True(request.WorkAllowance < Web6CutoverBudgets.FirstScenario);
-
-            frame["requestAllowanceMs"] = (int)request.RequestAllowance.TotalMilliseconds + 1;
-            Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "fixture-token"));
-            frame["requestAllowanceMs"] = (int)Web6CutoverBudgets.ResponseReserve.TotalMilliseconds;
-            Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "fixture-token"));
-            frame.Remove("requestAllowanceMs");
-            frame["remainingMs"] = (int)request.RequestAllowance.TotalMilliseconds;
-            Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "fixture-token"));
+            var bytes = File.ReadAllBytes(Path.Combine(preparedRoot, path));
+            Assert.Equal(sources[path], bytes);
+            return PairedUtf8.GetString(bytes);
         }
+        VerifyPairedControlSource(ReadPrepared(deadlineSource), ReadPrepared(controlSource));
 
-        var spec = File.ReadAllText(Path.Combine(preparedRoot, liveSpec));
+        var spec = ReadPrepared(liveSpec);
         var budgetRows = Regex.Matches(spec, @"\[\s*(\w+)\s*,\s*\[\s*([0-9_]+)\s*,\s*([0-9_]+)\s*\]\s*\]");
         var expected = new[]
         {
@@ -164,7 +224,6 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         var actual = budgetRows.Cast<Match>().Select(row => (row.Groups[1].Value,
             ReadMilliseconds(row.Groups[2].Value), ReadMilliseconds(row.Groups[3].Value))).ToArray();
         Assert.Equal(expected, actual);
-        Assert.Equal(actual.Select(row => row.Item3.TotalMilliseconds), ((JArray)frontend["scenarios"]!).Select(row => (double)row!));
         var pack = TimeSpan.FromMilliseconds(actual.Sum(row => row.Item2.TotalMilliseconds));
         Assert.True(pack < Web6CutoverBudgets.BrowserPack);
         Assert.True(Web6CutoverBudgets.BrowserPack < Web6CutoverBudgets.Controller);
@@ -184,66 +243,69 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
     }
 
     private static TimeSpan ReadMilliseconds(string value) => TimeSpan.FromMilliseconds(int.Parse(value.Replace("_", ""),
-        System.Globalization.CultureInfo.InvariantCulture));
+        CultureInfo.InvariantCulture));
 
-    private static async Task<JObject> ReadFrontendWireAsync(string frontendRoot, string preparedRoot)
+    private static void VerifyPairedControlSource(string deadlines, string control)
     {
-        // Execute only the committed pure deadline module and frame builder. The builder never needs a transport.
-        const string script = """
-            const fs = require('node:fs');
-            const ts = require(process.argv[1]);
-            function load(file, imports) {
-              const source = fs.readFileSync(`tests/pilot/${file}.ts`, 'utf8');
-              const { outputText } = ts.transpileModule(source, { compilerOptions: {
-                module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
-              } });
-              const exports = {};
-              new Function('exports', 'require', outputText)(exports, name => {
-                if (Object.hasOwn(imports, name)) return imports[name];
-                throw Error(`Unexpected cutover module import: ${name}`);
-              });
-              return exports;
+        var reserve = Assert.Single(Regex.Matches(deadlines, @"\bCUTOVER_RESPONSE_RESERVE_MS\s*=\s*([0-9_]+)\s*;")
+            .Cast<Match>());
+        Assert.Equal(Web6CutoverBudgets.ResponseReserve, ReadMilliseconds(reserve.Groups[1].Value));
+        var map = Assert.Single(Regex.Matches(deadlines, @"\bcutoverActionCaps\s*=\s*\{([^}]*)\}").Cast<Match>());
+        var caps = map.Groups[1].Value.Split(',').Where(entry => !string.IsNullOrWhiteSpace(entry))
+            .Select(entry => Assert.Single(Regex.Matches(entry, @"\A\s*(\w+)\s*:\s*([0-9_]+)\s*\z").Cast<Match>()))
+            .ToDictionary(entry => entry.Groups[1].Value, entry => ReadMilliseconds(entry.Groups[2].Value), StringComparer.Ordinal);
+        Assert.Equal(11, caps.Count);
+        Assert.Matches(@"\bbodyDeadline\s*=\s*totalDeadline\s*-\s*resetReserveMs\b", deadlines);
+        Assert.Matches(@"\bMath\s*\.\s*min\s*\(\s*cutoverActionCaps\s*\.\s*resetCutover\s*,\s*resetReserveMs\s*\)", deadlines);
+
+        var operationSet = Assert.Single(Regex.Matches(control,
+            @"\boperationActions\s*=\s*new\s+Set\s*<CutoverAction>\s*\(\s*\[([^]]*)\]").Cast<Match>());
+        var operationActions = Regex.Matches(operationSet.Groups[1].Value, @"""(\w+)""").Cast<Match>()
+            .Select(entry => entry.Groups[1].Value).ToArray();
+        Assert.All(operationActions, action => Assert.True(caps.ContainsKey(action)));
+        Assert.Matches(@"\baction\s*!==\s*""revokeGrantOff""\s*&&\s*operationActions\s*\.\s*has", control);
+        Assert.Matches(@"\baction\s*===\s*""committedUnavailable""", control);
+        Assert.Matches(@"\bJSON\s*\.\s*stringify\s*\(\s*\{\s*id\s*,\s*token\s*,\s*action\s*,\s*requestAllowanceMs\s*," +
+            @"\s*\.\.\.\s*\(\s*hasOperation\s*\?\s*\{\s*operationId\s*\}\s*:\s*\{\s*\}\s*\)\s*," +
+            @"\s*\.\.\.\s*\(\s*committedSetup\s*===\s*undefined\s*\?\s*\{\s*\}\s*:\s*\{\s*committedSetup\s*\}\s*\)\s*,?\s*\}\s*\)", control);
+
+        const string token = "fixture-token";
+        const string operation = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+        foreach (var cap in caps)
+        {
+            var frame = new JObject
+            {
+                ["id"] = 7, ["token"] = token, ["action"] = cap.Key, ["requestAllowanceMs"] = (int)cap.Value.TotalMilliseconds,
+            };
+            if (operationActions.Contains(cap.Key))
+                frame["operationId"] = operation;
+            if (cap.Key == "committedUnavailable")
+                frame["committedSetup"] = new JObject
+                {
+                    ["operationId"] = operation, ["operationKind"] = "Sales.Create", ["requestFingerprint"] = new string('a', 64),
+                    ["authorizedBusinessEffects"] = 1, ["checkId"] = "web6-cutover-authentic-committed-setup",
+                };
+
+            var request = Web6CutoverControl.Validate(frame, token);
+            Assert.Equal(cap.Key, request.Action);
+            Assert.Equal(Web6CutoverBudgets.ActionCap(request.Action), request.RequestAllowance);
+            Assert.Equal(request.RequestAllowance - Web6CutoverBudgets.ResponseReserve, request.WorkAllowance);
+            Assert.True(request.WorkAllowance < Web6CutoverBudgets.FirstScenario);
+            if (cap.Key == "revokeGrantOff")
+            {
+                Assert.Null(request.Operation);
+                frame["operationId"] = operation;
+                Assert.Equal(Guid.Parse(operation), Web6CutoverControl.Validate(frame, token).Operation);
             }
-            const deadlines = load('web6-cutover-deadline', {});
-            const { createCutoverControlFrame } = load('web6-cutover-control', {
-              './web6-cutover-deadline': deadlines, './web6-control-transport': {},
-            });
-            const operationId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
-            const operationActions = new Set(['sameEpochRestart', 'revokeGrantOn', 'revokeGrantOff',
-              'restoreEpoch', 'committedUnavailable', 'verifyNoCutoverMutation']);
-            const proof = { operationId, operationKind: 'Sales.Create', requestFingerprint: 'a'.repeat(64),
-              authorizedBusinessEffects: 1, checkId: 'web6-cutover-authentic-committed-setup' };
-            const frames = Object.entries(deadlines.cutoverActionCaps).map(([action, cap]) => ({
-              action, frame: createCutoverControlFrame(7, 'fixture-token', action, cap,
-                operationActions.has(action) ? operationId : undefined,
-                action === 'committedUnavailable' ? proof : undefined).toString('base64'),
-            }));
-            const off = 'revokeGrantOff';
-            frames.push({ action: off, frame: createCutoverControlFrame(7, 'fixture-token', off,
-              deadlines.cutoverActionCaps[off]).toString('base64') });
-            async function resetAllowances() {
-              const scenarios = [];
-              for (const [total, reserve] of [[420000, 180000], [420000, 180000], [690000, 60000]]) {
-                let now = 0;
-                const owner = deadlines.createCutoverScenarioDeadline(total, reserve, () => now);
-                now = total - reserve;
-                await owner.reset(async allowance => scenarios.push(allowance));
-              }
-              return scenarios;
-            }
-            resetAllowances().then(scenarios => process.stdout.write(JSON.stringify({
-              responseReserve: deadlines.CUTOVER_RESPONSE_RESERVE_MS, frames, scenarios,
-            })));
-            """;
-        var node = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';')
-            .Select(path => Path.Combine(path.Trim().Trim('"'), "node.exe")).First(File.Exists);
-        var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var name in new[] { "SystemRoot", "WINDIR", "TEMP", "TMP" })
-            if (Environment.GetEnvironmentVariable(name) is { } value) environment.Add(name, value);
-        var output = await BootstrapToolchain.RunOwnedAsync(new BootstrapProcessRequest(node, preparedRoot,
-            new[] { "--input-type=commonjs", "-e", script, Path.Combine(frontendRoot, "node_modules", "typescript") },
-            environment, TimeSpan.FromSeconds(30)), CancellationToken.None);
-        return JObject.Parse(output);
+
+            frame["requestAllowanceMs"] = (int)cap.Value.TotalMilliseconds + 1;
+            Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, token));
+            frame["requestAllowanceMs"] = (int)Web6CutoverBudgets.ResponseReserve.TotalMilliseconds;
+            Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, token));
+            frame.Remove("requestAllowanceMs");
+            frame["remainingMs"] = (int)cap.Value.TotalMilliseconds;
+            Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, token));
+        }
     }
 
     [Theory]
@@ -592,7 +654,74 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         return leaf;
     }
 
-    private static string Git(string root, string arguments, bool trim = true)
+    private static readonly UTF8Encoding PairedUtf8 = new UTF8Encoding(false, true);
+
+    private static ProcessStartInfo PairedGitStart(string root, string arguments)
+    {
+        var start = GitStart(root, arguments);
+        start.Arguments = "--no-replace-objects --no-optional-locks -c core.fsmonitor=false -c core.autocrlf=false " +
+            "-c core.ignoreStat=false -c core.excludesFile=NUL -c core.attributesFile=NUL -c submodule.recurse=false " + start.Arguments;
+        start.EnvironmentVariables["GIT_NO_REPLACE_OBJECTS"] = "1";
+        start.EnvironmentVariables["GIT_NO_LAZY_FETCH"] = "1";
+        start.EnvironmentVariables["GIT_CONFIG_SYSTEM"] = "NUL";
+        start.EnvironmentVariables["GIT_ATTR_NOSYSTEM"] = "1";
+        start.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
+        return start;
+    }
+
+    private static byte[] RequirePairedBlobIdentity(string oid, byte[] bytes)
+    {
+        var header = Encoding.ASCII.GetBytes("blob " + bytes.Length.ToString(CultureInfo.InvariantCulture) + "\0");
+        using var sha = SHA1.Create(); // Git SHA-1 object identity, not an application signing algorithm.
+        sha.TransformBlock(header, 0, header.Length, null, 0);
+        sha.TransformFinalBlock(bytes, 0, bytes.Length);
+        var actual = BitConverter.ToString(sha.Hash!).Replace("-", "").ToLowerInvariant();
+        if (!string.Equals(actual, oid, StringComparison.Ordinal))
+            throw new IOException("Paired Git blob bytes differ from the expected object ID.");
+        return bytes;
+    }
+
+    private static byte[] ReadPairedBlob(string root, string oid)
+    {
+        if (!BootstrapJson.IsLowerHex(oid, 40)) throw new IOException("Paired Git returned an invalid blob object ID.");
+        return RequirePairedBlobIdentity(oid, ReadPairedGit(root, "cat-file blob " + oid));
+    }
+
+    private static string PairedGitText(string root, string arguments) => PairedUtf8.GetString(ReadPairedGit(root, arguments)).Trim();
+
+    private static byte[] ReadPairedGit(string root, string arguments)
+    {
+        using var process = Process.Start(PairedGitStart(root, arguments)) ?? throw new IOException("Paired Git did not start.");
+        using var bytes = new MemoryStream();
+        var output = process.StandardOutput.BaseStream.CopyToAsync(bytes);
+        var errors = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(10000) || !Task.WaitAll(new Task[] { output, errors }, 10000))
+            throw new IOException("Paired Git did not complete and drain.");
+        if (process.ExitCode != 0 || errors.Result.Length != 0)
+            throw new IOException("Paired Git source verification failed.");
+        return bytes.ToArray();
+    }
+
+    private static void RequirePairedGitConfig(string root)
+    {
+        var local = PairedGitText(root, "config --local --no-includes --null --list");
+        var worktree = PairedGitText(root, "config --worktree --no-includes --null --list");
+        foreach (var entry in (local + "\0" + worktree).Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var newline = entry.IndexOf('\n');
+            var key = (newline < 0 ? entry : entry.Substring(0, newline)).ToLowerInvariant();
+            var value = newline < 0 ? "" : entry.Substring(newline + 1);
+            var harmless = key is "core.filemode" or "core.bare" or "core.logallrefupdates" or "core.symlinks" or
+                "core.ignorecase" or "codex.localenvironmentconfigpath" ||
+                (key == "core.repositoryformatversion" && value == "0") || key == "extensions.worktreeconfig" ||
+                key.StartsWith("branch.", StringComparison.Ordinal) ||
+                (key.StartsWith("remote.", StringComparison.Ordinal) &&
+                    (key.EndsWith(".url", StringComparison.Ordinal) || key.EndsWith(".fetch", StringComparison.Ordinal)));
+            if (!harmless) throw new IOException("Paired checkout has unsupported local or worktree Git configuration.");
+        }
+    }
+
+    private static ProcessStartInfo GitStart(string root, string arguments)
     {
         var start = new ProcessStartInfo("git",
             "-c user.name=Fixture -c user.email=fixture@example.invalid -c core.hooksPath=NUL " + arguments)
@@ -604,11 +733,17 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
             if (key.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase)) start.EnvironmentVariables.Remove(key);
         start.EnvironmentVariables["GIT_CONFIG_NOSYSTEM"] = "1";
         start.EnvironmentVariables["GIT_CONFIG_GLOBAL"] = "NUL";
+        return start;
+    }
+
+    private static string Git(string root, string arguments)
+    {
+        var start = GitStart(root, arguments);
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEnd();
         Assert.True(process.WaitForExit(5000));
         Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd());
-        return trim ? output.Trim() : output;
+        return output.Trim();
     }
 
     public void Dispose()
@@ -626,6 +761,6 @@ internal sealed class Web6PairedSourceFactAttribute : FactAttribute
     public Web6PairedSourceFactAttribute()
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(RootVariable)))
-            Skip = "Set " + RootVariable + " to the reviewed frontend checkout with its locked dependencies installed.";
+            Skip = "Set " + RootVariable + " to the reviewed frontend checkout.";
     }
 }
