@@ -255,13 +255,20 @@ public sealed class Web6CandidateBootstrapPreflightTests : IDisposable
         Assert.Equal("BLOCKED_REVIEWED_FRONTEND_PIN", (string?)json["cutoverAdmission"]);
         Assert.DoesNotContain(Server, Encoding.UTF8.GetString(protectedReceipt.Bytes));
         Assert.Equal(receipt.Sha256, File.ReadAllText(Path.Combine(TaskRoot, "prepared.sha256")));
-        _ = Web6CutoverBuildAuthority.ReadProtected(receipt.BuildAuthorityPath, receipt.BuildAuthoritySha256);
+        var buildAuthority = Web6CutoverBuildAuthority.ReadProtected(receipt.BuildAuthorityPath, receipt.BuildAuthoritySha256);
         var cutover = JObject.Parse(File.ReadAllText(receipt.BuildAuthorityPath));
         Assert.Equal(new[] { "version", "frontendSha", "frontendTree", "frontendBuildSha256", "backendSha", "backendTree", "backendBuildSha256", "currentPublishedSha256", "oldPublishedSha256" },
             cutover.Properties().Select(property => property.Name));
         Assert.Equal(Web6CandidateFileSet.MeasureTree(Path.Combine(TaskRoot, "current-publish")), (string?)cutover["currentPublishedSha256"]);
         Assert.Equal(Web6CandidateFileSet.MeasureTree(Path.Combine(TaskRoot, "old-publish")), (string?)cutover["oldPublishedSha256"]);
         Assert.Equal(Web6CandidateFileSet.MeasureTree(Path.Combine(TaskRoot, "frontend-old", "dist")), (string?)cutover["frontendBuildSha256"]);
+        buildAuthority.Verify(new Web6CutoverBuildObservation(
+            (string)json["oldFrontendSha"]!, (string)json["oldFrontendTree"]!, true,
+            Web6CandidateFileSet.MeasureTree((string)json["oldFrontendDist"]!),
+            (string)json["oldBackendSha"]!, (string)json["oldBackendTree"]!, true,
+            Web6CandidateFileSet.MeasureTree((string)json["oldPublish"]!),
+            Web6CandidateFileSet.MeasureTree((string)json["currentPublish"]!),
+            Web6CandidateFileSet.MeasureTree((string)json["oldPublish"]!)));
         Assert.False(Directory.Exists(Path.Combine(TaskRoot, "pair")));
         Assert.Empty(Directory.GetFileSystemEntries(At("sql")));
     }

@@ -297,9 +297,10 @@ internal sealed class Web6CutoverBuildObservation
     internal string OldPublishedHash { get; }
 }
 
-// Expected build hashes are sealed before copying into either published root. Verification
-// consumes a fresh measurement and therefore cannot bless an arbitrary directory by measuring
-// it and reusing that same value as its expectation.
+// PreparedCandidateReceipt seals the archived frontend dist and each full backend publish
+// independently. The full current publish includes bin, Web.config and wwwroot.
+// Backend artifact and old publish describe the same normalized full old-publish
+// file set, so their fresh observations must also agree.
 internal sealed class Web6CutoverBuildAuthority
 {
     private readonly Web6CutoverBuildObservation _expected;
@@ -347,6 +348,12 @@ internal sealed class Web6CutoverBuildAuthority
         { throw new IOException("Cutover build authority values are invalid.", error); }
     }
 
+    internal Task<T> AllocateAsync<T>(Func<Web6CutoverBuildObservation> observe, Func<Task<T>> allocate)
+    {
+        Verify(observe());
+        return allocate();
+    }
+
     internal void Verify(Web6CutoverBuildObservation actual)
     {
         if (actual == null || !actual.Frontend.Clean || !actual.Backend.Clean ||
@@ -356,7 +363,6 @@ internal sealed class Web6CutoverBuildAuthority
             actual.Backend.ArtifactHash != _expected.Backend.ArtifactHash ||
             actual.CurrentPublishedHash != _expected.CurrentPublishedHash ||
             actual.OldPublishedHash != _expected.OldPublishedHash ||
-            actual.Frontend.ArtifactHash != actual.CurrentPublishedHash ||
             actual.Backend.ArtifactHash != actual.OldPublishedHash)
             throw new IOException("Cutover sealed build authority or published artifact drifted.");
     }

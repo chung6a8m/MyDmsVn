@@ -620,21 +620,32 @@ public sealed partial class WebHostIisExpressTests
         string Required(string name) => values[name] ?? throw new InvalidOperationException("Cutover prerequisite disappeared.");
         var frontendRoot = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY"));
         var backendRoot = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_BACKEND_ARCHIVE_DIRECTORY"));
-        var frontendIdentity = GitIdentity(frontendRoot);
-        var backendIdentity = GitIdentity(backendRoot);
-        var frontendArtifact = Web6CandidateFileSet.MeasureTree(Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_DIST_DIRECTORY")));
-        var oldArtifact = Web6CandidateFileSet.MeasureTree(Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_OLD_PUBLISH_DIRECTORY")));
-        var currentArtifact = Web6CandidateFileSet.MeasureTree(Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_PUBLISH_DIRECTORY")));
+        var frontendDist = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_DIST_DIRECTORY"));
+        var oldPublish = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_OLD_PUBLISH_DIRECTORY"));
+        var currentPublish = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_PUBLISH_DIRECTORY"));
+        Web6CutoverBuildObservation ObserveBuild()
+        {
+            var frontend = GitIdentity(frontendRoot);
+            var backend = GitIdentity(backendRoot);
+            var archivedDist = Web6CandidateFileSet.MeasureTree(frontendDist);
+            var fullOldPublish = Web6CandidateFileSet.MeasureTree(oldPublish);
+            var fullCurrentPublish = Web6CandidateFileSet.MeasureTree(currentPublish);
+            return new Web6CutoverBuildObservation(frontend.Sha, frontend.Tree, true, archivedDist,
+                backend.Sha, backend.Tree, true, fullOldPublish, fullCurrentPublish, fullOldPublish);
+        }
+
+        var buildObservation = ObserveBuild();
         var buildAuthority = Web6CutoverBuildAuthority.ReadProtected(
             Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_PATH")),
             Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_SHA256"));
-        buildAuthority.Verify(new Web6CutoverBuildObservation(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact,
-            backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact, currentArtifact, oldArtifact));
+        buildAuthority.Verify(buildObservation);
         if (!Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_EPOCH"), "D", out var currentEpoch) ||
             !Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_RESTORED_EPOCH"), "D", out var restoredEpoch))
             throw new InvalidOperationException("Cutover deployment epochs are invalid.");
         var admin = Required("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING");
         var controlParent = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_SQL_CONTROL_PARENT"));
+        Task<SqlTestDatabase> AllocateDatabase() => buildAuthority.AllocateAsync(ObserveBuild,
+            () => currentBackend.AllocateAsync(() => SqlTestDatabase.CreateAsync(admin)));
         await Web6CutoverSqlApproval.VerifyFileAsync(Path.GetFullPath(Required("MYDMSVN_SQL_TEST_APPROVAL_FILE")),
             admin, CancellationToken.None).ConfigureAwait(false);
         SqlTestDatabase? currentDatabase = null, oldDatabase = null, restoredDatabase = null;
@@ -650,9 +661,9 @@ public sealed partial class WebHostIisExpressTests
             currentControl = SqlTestOwnershipManifest.Create(controlParent);
             oldControl = SqlTestOwnershipManifest.Create(controlParent);
             restoredControl = SqlTestOwnershipManifest.Create(controlParent);
-            currentDatabase = await currentBackend.AllocateAsync(() => SqlTestDatabase.CreateAsync(admin)).ConfigureAwait(false);
-            oldDatabase = await currentBackend.AllocateAsync(() => SqlTestDatabase.CreateAsync(admin)).ConfigureAwait(false);
-            restoredDatabase = await currentBackend.AllocateAsync(() => SqlTestDatabase.CreateAsync(admin)).ConfigureAwait(false);
+            currentDatabase = await AllocateDatabase().ConfigureAwait(false);
+            oldDatabase = await AllocateDatabase().ConfigureAwait(false);
+            restoredDatabase = await AllocateDatabase().ConfigureAwait(false);
             if (new[] { currentDatabase.DatabaseName, oldDatabase.DatabaseName, restoredDatabase.DatabaseName }.Distinct(StringComparer.OrdinalIgnoreCase).Count() != 3) throw new InvalidOperationException("Cutover SQL allocations collided.");
             if (!new DatabaseMigrationRunner().MigrateWeb5(currentDatabase.ConnectionString).Successful ||
                 !new DatabaseMigrationRunner().MigrateWeb(oldDatabase.ConnectionString).Successful ||
@@ -687,13 +698,14 @@ public sealed partial class WebHostIisExpressTests
                 SqlSchemaDefinitionFingerprint.Schema13, "current-allocation").Digest;
             var oldReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(oldControl, oldControl.VerifiedDigest(),
                 SqlSchemaDefinitionFingerprint.Schema12, "old-allocation").Digest;
+            var frontend = buildObservation.Frontend;
+            var backend = buildObservation.Backend;
             var plan = new Web6CandidateCutoverPlan(Required("MYDMSVN_WEB6_CANDIDATE_ID"), "web4-old", "web6-restored",
                 new Uri("https://localhost:44321/"), new Uri("https://localhost:44322/"),
-                frontendIdentity.Sha, frontendIdentity.Tree, frontendArtifact,
-                backendIdentity.Sha, backendIdentity.Tree, oldArtifact, currentArtifact,
+                frontend.Sha, frontend.Tree, frontend.ArtifactHash,
+                backend.Sha, backend.Tree, backend.ArtifactHash, buildObservation.CurrentPublishedHash,
                 13, 12, currentReceipt, oldReceipt, restoredReceipt, currentEpoch, restoredEpoch);
-            plan.VerifyArchives(new Web6CutoverArchive(frontendIdentity.Sha, frontendIdentity.Tree, true, frontendArtifact),
-                new Web6CutoverArchive(backendIdentity.Sha, backendIdentity.Tree, true, oldArtifact));
+            plan.VerifyArchives(frontend, backend);
             operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl, currentBackend, bootstrap);
             await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None).ConfigureAwait(false);
             complete = true;

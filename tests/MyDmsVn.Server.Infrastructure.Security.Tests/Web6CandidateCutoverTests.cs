@@ -317,12 +317,13 @@ public sealed class Web6CandidateCutoverTests
     [Fact]
     public void Independently_sealed_build_authority_rejects_arbitrary_published_artifact()
     {
+        var currentPublish = new string('9', 64);
         var authority = new Web6CutoverBuildAuthority(FrontendArchive, FrontendTree, FrontendArtifact,
-            BackendArchive, BackendTree, BackendArtifact, FrontendArtifact, BackendArtifact);
+            BackendArchive, BackendTree, BackendArtifact, currentPublish, BackendArtifact);
         authority.Verify(new Web6CutoverBuildObservation(FrontendArchive, FrontendTree, true, FrontendArtifact,
-            BackendArchive, BackendTree, true, BackendArtifact, FrontendArtifact, BackendArtifact));
+            BackendArchive, BackendTree, true, BackendArtifact, currentPublish, BackendArtifact));
         Assert.Throws<IOException>(() => authority.Verify(new Web6CutoverBuildObservation(FrontendArchive, FrontendTree, true,
-            new string('7', 64), BackendArchive, BackendTree, true, BackendArtifact, FrontendArtifact, BackendArtifact)));
+            new string('7', 64), BackendArchive, BackendTree, true, BackendArtifact, currentPublish, BackendArtifact)));
     }
 
     [Fact]
