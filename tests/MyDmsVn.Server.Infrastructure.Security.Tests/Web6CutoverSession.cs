@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
@@ -8,14 +9,17 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 internal interface IWeb6CutoverRuntime
 {
-    Task Switch(Web6CutoverPair pair, bool cached, Guid epoch);
-    Task VerifyOperation(Guid operation, bool committed);
-    Task VerifyCommittedSetup(Web6CommittedSetup proof);
-    Task VerifyLifecycle();
-    Task SetGrant(bool granted);
-    Task MakeCommittedUnavailable(Guid operation);
-    Task VerifyZeroMutation(Guid operation);
+    Task Switch(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token);
+    Task VerifyStableAdmission(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token);
+    Task VerifyOperation(Guid operation, bool committed, CancellationToken token);
+    Task VerifyCommittedSetup(Web6CommittedSetup proof, CancellationToken token);
+    Task VerifyLifecycle(CancellationToken token);
+    Task SetGrant(bool granted, CancellationToken token);
+    Task MakeCommittedUnavailable(Guid operation, CancellationToken token);
+    Task VerifyZeroMutation(Guid operation, CancellationToken token);
 }
+
+internal enum Web6CutoverJournalState { Stable, Transitioning, Uncertain }
 
 // Called only by the serialized owned pipe. Browser markers alone never constitute host evidence.
 internal sealed class Web6CutoverSession
@@ -23,76 +27,199 @@ internal sealed class Web6CutoverSession
     private readonly Web6CandidateCutoverPlan _plan;
     private readonly IWeb6CutoverRuntime _runtime;
     private readonly HashSet<string> _observed = new HashSet<string>(StringComparer.Ordinal);
-    private Guid _epoch;
-    private bool _cached, _old, _revoked;
+    private readonly object _journalLock = new object();
+    private Web6CutoverJournalState _journalState = Web6CutoverJournalState.Uncertain;
+    private (Web6CutoverPair Pair, bool Cached, Guid Epoch)? _stableHost;
+    private (Web6CutoverPair Pair, bool Cached, Guid Epoch) _transitionTarget;
+    private bool _begun;
+    private bool _revoked;
     private Guid? _protectedOperation;
     internal Web6CutoverSession(Web6CandidateCutoverPlan plan, IWeb6CutoverRuntime runtime)
-    { _plan = plan; _runtime = runtime; _epoch = plan.CurrentEpoch; }
-    internal Task Begin() => _runtime.Switch(Web6CutoverPair.Current, false, _epoch);
+    { _plan = plan; _runtime = runtime; }
+
+    internal Web6CutoverJournalState JournalState
+    {
+        get { lock (_journalLock) return _journalState; }
+    }
+
+    private (Web6CutoverPair Pair, bool Cached, Guid Epoch) Current => (Web6CutoverPair.Current, false, _plan.CurrentEpoch);
+
+    internal async Task Begin(CancellationToken token)
+    {
+        EnterTransition(begin: true);
+        try
+        {
+            await Switch(Current, token).ConfigureAwait(false);
+            await VerifyPostLifecycle(token).ConfigureAwait(false);
+            MarkStable(token);
+        }
+        catch
+        {
+            MarkUncertain();
+            throw;
+        }
+    }
 
     internal Web6CommittedSetup? CommittedSetup { get; private set; }
 
-    internal async Task<JObject> Handle(string action, Guid? operation, JObject? committedSetup = null)
+    internal async Task<JObject> Handle(Web6CutoverRequest request, CancellationToken token)
     {
-        var reply = new JObject();
-        Guid Required() => operation.HasValue && operation != Guid.Empty ? operation.Value : throw new InvalidDataException("Cutover operation is required.");
-        if (action != "committedUnavailable")
+        var host = EnterTransition();
+        try
         {
-            if (committedSetup != null) throw new InvalidDataException("Unexpected committed proof.");
-            await _runtime.VerifyLifecycle();
+            var (marker, epoch) = await Execute(request, host, token).ConfigureAwait(false);
+            await VerifyPostLifecycle(token).ConfigureAwait(false);
+            var reply = new JObject();
+            if (marker != null) reply["marker"] = marker;
+            if (epoch.HasValue) reply["deploymentEpoch"] = epoch.Value.ToString("D");
+            MarkStable(token);
+            return reply;
         }
-        switch (action)
+        catch
         {
+            MarkUncertain();
+            throw;
+        }
+    }
+
+    private async Task<(string? Marker, Guid? Epoch)> Execute(Web6CutoverRequest request,
+        (Web6CutoverPair Pair, bool Cached, Guid Epoch) host, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var operation = request.Operation;
+        Guid Required() => operation.HasValue && operation != Guid.Empty ? operation.Value : throw new InvalidDataException("Cutover operation is required.");
+        if (request.Action != "committedUnavailable" && request.Action != "resetCutover")
+        {
+            if (request.CommittedSetup != null) throw new InvalidDataException("Unexpected committed proof.");
+            await _runtime.VerifyLifecycle(token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+        }
+        switch (request.Action)
+        {
+            case "resetCutover":
+                if (_revoked) throw new InvalidDataException("Cutover reset requires the original write grant.");
+                if (host.Cached || host.Pair == Web6CutoverPair.Old)
+                    await Switch(Current, token).ConfigureAwait(false);
+                else
+                    await _runtime.VerifyStableAdmission(host.Pair, host.Cached, host.Epoch, token).ConfigureAwait(false);
+                break;
             case "oldClientNewHostOn":
-                await _runtime.Switch(Web6CutoverPair.Current, true, _epoch); _cached = true; _old = false;
-                reply["marker"] = "old-client-new-host"; break;
+                await Switch((Web6CutoverPair.Current, true, host.Epoch), token).ConfigureAwait(false);
+                return ("old-client-new-host", null);
             case "oldClientNewHostOff":
-                if (_cached) { await _runtime.Switch(Web6CutoverPair.Current, false, _epoch); _cached = false; }
+                if (host.Cached) await Switch(Current, token).ConfigureAwait(false);
                 break;
             case "newClientOldHostOn":
-                await _runtime.Switch(Web6CutoverPair.Old, false, Guid.Empty); _old = true; _cached = false;
-                reply["marker"] = "new-client-old-host"; break;
+                await Switch((Web6CutoverPair.Old, false, Guid.Empty), token).ConfigureAwait(false);
+                return ("new-client-old-host", null);
             case "newClientOldHostOff":
-                if (_old) { await _runtime.Switch(Web6CutoverPair.Current, false, _epoch); _old = false; }
+                if (host.Pair == Web6CutoverPair.Old) await Switch(Current, token).ConfigureAwait(false);
                 break;
             case "sameEpochRestart":
-                if (_cached || _old || _protectedOperation.HasValue) throw new InvalidDataException("Cutover restart order changed.");
+                if (host != Current || _protectedOperation.HasValue) throw new InvalidDataException("Cutover restart order changed.");
                 _protectedOperation = Required();
-                await _runtime.VerifyOperation(Required(), false);
-                await _runtime.Switch(Web6CutoverPair.Current, false, _epoch);
-                await _runtime.VerifyOperation(Required(), false);
-                _observed.Add("restart"); reply["deploymentEpoch"] = _epoch.ToString("D"); break;
+                await _runtime.VerifyOperation(Required(), false, token).ConfigureAwait(false);
+                await Switch(Current, token).ConfigureAwait(false);
+                await _runtime.VerifyOperation(Required(), false, token).ConfigureAwait(false);
+                _observed.Add("restart");
+                return (null, host.Epoch);
             case "revokeGrantOn":
                 if (_protectedOperation != Required()) throw new InvalidDataException("Cutover operation changed.");
-                await _runtime.SetGrant(false); _revoked = true; _observed.Add("revoke"); break;
+                await _runtime.SetGrant(false, token).ConfigureAwait(false);
+                _revoked = true;
+                _observed.Add("revoke");
+                break;
             case "revokeGrantOff":
                 if (operation.HasValue && _protectedOperation != operation) throw new InvalidDataException("Cutover operation changed.");
-                if (_revoked) { await _runtime.SetGrant(true); _revoked = false; _observed.Add("grant-restored"); }
+                if (_revoked)
+                {
+                    await _runtime.SetGrant(true, token).ConfigureAwait(false);
+                    _revoked = false;
+                    _observed.Add("grant-restored");
+                }
                 break;
             case "committedUnavailable":
-                if (CommittedSetup != null || _cached || _old || _protectedOperation.HasValue) throw new InvalidDataException("Committed setup order changed.");
-                var proof = Web6CommittedSetup.Parse(committedSetup, Required());
-                await _runtime.VerifyCommittedSetup(proof);
-                await _runtime.MakeCommittedUnavailable(Required());
-                CommittedSetup = proof; _observed.Add("unavailable"); reply["marker"] = "committed-unavailable"; break;
+                if (CommittedSetup != null || host != Current || _protectedOperation.HasValue) throw new InvalidDataException("Committed setup order changed.");
+                var proof = Web6CommittedSetup.Parse(request.CommittedSetup, Required());
+                await _runtime.VerifyCommittedSetup(proof, token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
+                await _runtime.MakeCommittedUnavailable(Required(), token).ConfigureAwait(false);
+                CommittedSetup = proof;
+                _observed.Add("unavailable");
+                return ("committed-unavailable", null);
             case "restoreEpoch":
-                if (_protectedOperation != Required() || !_observed.Contains("restart") || _epoch != _plan.CurrentEpoch)
+                if (_protectedOperation != Required() || !_observed.Contains("restart") || host != Current ||
+                    _revoked || !_observed.Contains("grant-restored"))
                     throw new InvalidDataException("Cutover restore order or identity changed.");
-                await _runtime.Switch(Web6CutoverPair.Restored, false, _plan.RestoredEpoch);
-                _epoch = _plan.RestoredEpoch; _observed.Add("restore"); reply["deploymentEpoch"] = _epoch.ToString("D"); break;
+                await Switch((Web6CutoverPair.Restored, false, _plan.RestoredEpoch), token).ConfigureAwait(false);
+                _observed.Add("restore");
+                return (null, _plan.RestoredEpoch);
             case "verifyNoCutoverMutation":
-                await _runtime.VerifyZeroMutation(Required());
-                _observed.Add(_cached ? "old-client" : _old ? "old-host" : CommittedSetup?.Operation == operation ? "committed" : _protectedOperation == operation && _epoch == _plan.RestoredEpoch ? "protected" : "invalid"); break;
+                await _runtime.VerifyZeroMutation(Required(), token).ConfigureAwait(false);
+                _observed.Add(host.Cached ? "old-client" : host.Pair == Web6CutoverPair.Old ? "old-host" :
+                    CommittedSetup?.Operation == operation ? "committed" :
+                    _protectedOperation == operation && host.Pair == Web6CutoverPair.Restored ? "protected" : "invalid");
+                break;
             default: throw new InvalidDataException("Unknown cutover action.");
         }
-        await _runtime.VerifyLifecycle();
-        return reply;
+        return (null, null);
+    }
+
+    private (Web6CutoverPair Pair, bool Cached, Guid Epoch) EnterTransition(bool begin = false)
+    {
+        lock (_journalLock)
+        {
+            if (begin ? _begun : _journalState != Web6CutoverJournalState.Stable)
+                throw new InvalidDataException("Cutover session has no joined, stable admission.");
+            _begun = true;
+            _journalState = Web6CutoverJournalState.Transitioning;
+            _transitionTarget = _stableHost ?? Current;
+            return _transitionTarget;
+        }
+    }
+
+    private async Task Switch((Web6CutoverPair Pair, bool Cached, Guid Epoch) target, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        _transitionTarget = target;
+        await _runtime.Switch(target.Pair, target.Cached, target.Epoch, token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+    }
+
+    private async Task VerifyPostLifecycle(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        await _runtime.VerifyLifecycle(token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+    }
+
+    private void MarkStable(CancellationToken token)
+    {
+        lock (_journalLock)
+        {
+            token.ThrowIfCancellationRequested();
+            _stableHost = _transitionTarget;
+            _journalState = Web6CutoverJournalState.Stable;
+        }
+    }
+
+    private void MarkUncertain()
+    {
+        lock (_journalLock)
+        {
+            _stableHost = null;
+            _journalState = Web6CutoverJournalState.Uncertain;
+        }
     }
 
     internal void VerifyComplete()
     {
-        if (CommittedSetup == null || _revoked || _cached || _old || !_observed.SetEquals(new[] { "old-client", "old-host", "restart", "revoke", "grant-restored", "unavailable", "committed", "restore", "protected" }))
-            throw new InvalidDataException("Cutover admissions, transitions and zero-mutation evidence are incomplete.");
+        lock (_journalLock)
+        {
+            if (_journalState != Web6CutoverJournalState.Stable || _stableHost != (Web6CutoverPair.Restored, false, _plan.RestoredEpoch) ||
+                CommittedSetup == null || _revoked || !_observed.SetEquals(new[] { "old-client", "old-host", "restart", "revoke", "grant-restored", "unavailable", "committed", "restore", "protected" }))
+                throw new InvalidDataException("Cutover admissions, transitions and zero-mutation evidence are incomplete.");
+        }
     }
 }
 

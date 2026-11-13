@@ -17,6 +17,7 @@ internal static class Web6CutoverBudgets
     internal static readonly TimeSpan ThirdResetReserve = TimeSpan.FromSeconds(60);
     internal static readonly TimeSpan BrowserPack = TimeSpan.FromSeconds(1560);
     internal static readonly TimeSpan Controller = TimeSpan.FromSeconds(1620);
+    internal static readonly TimeSpan ControllerJoin = TimeSpan.FromSeconds(5);
     internal static readonly TimeSpan AggregateParent = TimeSpan.FromSeconds(3300);
     internal static readonly TimeSpan SelectorGate = TimeSpan.FromSeconds(3600);
     internal static readonly TimeSpan SelectorProcessMaximum = TimeSpan.FromSeconds(3660);

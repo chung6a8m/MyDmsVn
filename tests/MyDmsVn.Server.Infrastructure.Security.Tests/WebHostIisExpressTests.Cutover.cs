@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using MyDmsVn.Web6.CandidateBootstrap;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -292,15 +292,15 @@ public sealed partial class WebHostIisExpressTests
 
         public async Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token)
         {
-            await VerifyLifecycle();
+            await VerifyLifecycle(token);
             _committedSetup = null; _committedCanonical = null; _committedCanonicalHash = null;
             _session = new Web6CutoverSession(_plan, this);
-            await _session.Begin();
+            await _session.Begin(token);
             if (browser == "edge") _currentReadmissions++;
             return _admission ?? throw new IOException("Cutover host admission is absent.");
         }
 
-        public async Task Switch(Web6CutoverPair pair, bool cached, Guid epoch)
+        public async Task Switch(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token)
         {
             await DrainHost();
             var current = pair != Web6CutoverPair.Old;
@@ -310,8 +310,8 @@ public sealed partial class WebHostIisExpressTests
             var database = pair == Web6CutoverPair.Restored ? _restored : current ? _current : _old;
             var login = pair == Web6CutoverPair.Restored ? _restoredLogin : current ? _currentLogin : _oldLogin;
             var receipt = pair == Web6CutoverPair.Restored ? _plan.RestoredDatabaseReceipt : current ? _plan.CurrentDatabaseReceipt : _plan.OldDatabaseReceipt;
-            await VerifyDatabase(database, pair == Web6CutoverPair.Restored ? _restoredControl : current ? _currentControl : _oldControl, pair, CancellationToken.None);
-            if (pair == Web6CutoverPair.Restored) await CopyRestoredSession();
+            await VerifyDatabase(database, pair == Web6CutoverPair.Restored ? _restoredControl : current ? _currentControl : _oldControl, pair, token);
+            if (pair == Web6CutoverPair.Restored) await CopyRestoredSession(token);
             var expectedSource = current ? _plan.CurrentArtifactHash : _plan.OldArtifactHash;
             if (Web6CandidateFileSet.MeasureTree(deployment.Source) != expectedSource || Web6CandidateFileSet.MeasureTree(deployment.Host) != deployment.Hash ||
                 HashText(File.ReadAllText(deployment.Configuration)) != deployment.ConfigHash) throw new IOException("Cutover deployment/configuration drift.");
@@ -343,8 +343,8 @@ public sealed partial class WebHostIisExpressTests
             if (!_process.Start()) throw new IOException("Cutover IIS process did not start.");
             _process.BeginOutputReadLine(); _process.BeginErrorReadLine();
             _identity = Web5IisExpressHostAdmission.Capture(_process, launch);
-            await Web5IisExpressHostAdmission.WaitForAdmissionAsync(_identity, _process, TimeSpan.FromSeconds(45), CancellationToken.None);
-            var queue = await Web5IisExpressHostAdmission.VerifyAsync(_identity, CancellationToken.None);
+            await Web5IisExpressHostAdmission.WaitForAdmissionAsync(_identity, _process, TimeSpan.FromSeconds(45), token);
+            var queue = await Web5IisExpressHostAdmission.VerifyAsync(_identity, token);
             Web6BootstrapSelectorEvidence.Host(BootstrapResources, _identity, queue.Name);
             if (current)
             {
@@ -368,13 +368,16 @@ public sealed partial class WebHostIisExpressTests
             throw new IOException("Admitted cutover host did not become healthy.");
         }
 
-        private async Task CopyRestoredSession()
+        public Task VerifyStableAdmission(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token) =>
+            throw new IOException("Cutover stable admission verification is unavailable.");
+
+        private async Task CopyRestoredSession(CancellationToken token)
         {
             // Fixture metadata only: keep the browser's valid bearer session across the separate allocation.
             // No JWT, password or refresh-token/hash is copied, and the source allocation is read-only.
             if (!_hostDrained || _process != null) throw new IOException("Session copy requires verified host drain.");
-            await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, CancellationToken.None);
-            await VerifyDatabase(_restored, _restoredControl, Web6CutoverPair.Restored, CancellationToken.None);
+            await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, token);
+            await VerifyDatabase(_restored, _restoredControl, Web6CutoverPair.Restored, token);
             using var source = new SqlConnection(_current.ConnectionString); await source.OpenAsync();
             using var target = new SqlConnection(_restored.ConnectionString); await target.OpenAsync();
             var actor = await source.QuerySingleAsync<int>("SELECT UserId FROM dbo.Users WHERE Username=N'integratedEditor' AND IsActive=1;");
@@ -393,7 +396,7 @@ public sealed partial class WebHostIisExpressTests
                     throw new IOException("Restored fixture session copy failed.");
             }
             Web6CutoverSessionCopy.Verify(row, (JObject)(await ReadTarget()).Single(), targetActor, DateTime.UtcNow);
-            await VerifyLifecycle();
+            await VerifyLifecycle(token);
         }
 
         private async Task DrainHost()
@@ -420,7 +423,7 @@ public sealed partial class WebHostIisExpressTests
                     _currentBackend, _bootstrap.Plan.Text("candidateDistSha256"));
                 _browserDrained = true;
                 _session.VerifyComplete();
-                await VerifyLifecycle();
+                await VerifyLifecycle(token);
                 Web6CutoverOracle.ValidateSetupEvidence(_session.CommittedSetup, _committedSetup, _restoredAdmissions == _browsers + 1);
                 _verifiedSetups.Add(_committedSetup!);
                 _deployments["current"].Manifest!.RecordDisposition(browser == "chromium" ? Web6CandidateStage.Chromium : Web6CandidateStage.Edge, Web6CandidateOutcome.Passed);
@@ -431,7 +434,7 @@ public sealed partial class WebHostIisExpressTests
             finally { await _control.Stop(_browserDrained); _control = null; }
         }
 
-        public async Task VerifyOperation(Guid operation, bool committed)
+        public async Task VerifyOperation(Guid operation, bool committed, CancellationToken token)
         {
             using var sql = new SqlConnection(_current.ConnectionString); await sql.OpenAsync();
             var identity = await sql.QuerySingleAsync<string>("SELECT (SELECT ActorUserId,OperationId,DeploymentEpoch,ContractVersion,CodecVersion,OperationKind,RequestTargetId,RequestFingerprint,ResultDocumentId,Disposition FROM dbo.WebOperationJournal WHERE OperationId=@operation ORDER BY ActorUserId FOR JSON PATH,INCLUDE_NULL_VALUES);", new { operation });
@@ -442,19 +445,19 @@ public sealed partial class WebHostIisExpressTests
                     throw new InvalidDataException("Cutover committed-unavailable requires an authentic committed operation; pre-dispatch absence is not COMMITTED.");
                 if (_committedSetup?.Operation == operation && _committedCanonical != null && HashBytes(_committedCanonical) != _committedCanonicalHash)
                     throw new IOException("Retained canonical cutover result changed.");
-                await Web6CandidateOracle.VerifyOneEffectAsync(sql, operation, CancellationToken.None, _committedSetup?.Operation == operation ? _committedCanonical : null);
+                await Web6CandidateOracle.VerifyOneEffectAsync(sql, operation, token, _committedSetup?.Operation == operation ? _committedCanonical : null);
             }
             _operationIdentities[operation] = identity;
         }
 
-        public async Task SetGrant(bool granted)
+        public async Task SetGrant(bool granted, CancellationToken token)
         {
             using var sql = new SqlConnection(_current.ConnectionString);
             if (await sql.ExecuteAsync("UPDATE p SET Granted=@granted FROM dbo.UserPermissions p JOIN dbo.Users u ON u.UserId=p.UserId WHERE u.Username=N'integratedEditor' AND p.PermissionKey=N'Sales.Receipts.Write';", new { granted }) != 1)
                 throw new IOException("Cutover original write grant was not found.");
         }
 
-        public async Task VerifyCommittedSetup(Web6CommittedSetup proof)
+        public async Task VerifyCommittedSetup(Web6CommittedSetup proof, CancellationToken token)
         {
             if (_committedSetup != null || _active != Web6CutoverPair.Current) throw new InvalidDataException("Unexpected cutover setup.");
             using var sql = new SqlConnection(_current.ConnectionString); await sql.OpenAsync();
@@ -466,16 +469,16 @@ public sealed partial class WebHostIisExpressTests
             _currentSnapshot = observed; _committedSetup = proof;
             _committedCanonical = Convert.FromBase64String((string)((JArray)observed["journal"]!).Single(row => string.Equals((string?)row["OperationId"], proof.Operation.ToString("D"), StringComparison.OrdinalIgnoreCase))["ResultBytes"]!);
             _committedCanonicalHash = HashBytes(_committedCanonical);
-            await VerifyOperation(proof.Operation, true);
+            await VerifyOperation(proof.Operation, true, token);
         }
 
-        public async Task MakeCommittedUnavailable(Guid operation)
+        public async Task MakeCommittedUnavailable(Guid operation, CancellationToken token)
         {
             if (_committedSetup?.Operation != operation) throw new InvalidDataException("Committed setup proof is absent.");
-            await VerifyLifecycle();
-            await VerifyOperation(operation, true);
+            await VerifyLifecycle(token);
+            await VerifyOperation(operation, true, token);
             await DrainHost();
-            await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, CancellationToken.None);
+            await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, token);
             _corruptionHealthy = false;
             Exception? corruptionFailure = null;
             try
@@ -519,9 +522,9 @@ public sealed partial class WebHostIisExpressTests
             var observed = await LifecycleSnapshot(_current.ConnectionString, true);
             Web6CutoverDelta.VerifyUnavailable(_currentSnapshot!, observed, operation);
             _currentSnapshot = observed;
-            await VerifyOperation(operation, true);
+            await VerifyOperation(operation, true, token);
             Console.WriteLine("WEB6_CUTOVER_FIXTURE_CORRUPTION authenticated-committed-result-only");
-            await Switch(Web6CutoverPair.Current, false, _plan.CurrentEpoch);
+            await Switch(Web6CutoverPair.Current, false, _plan.CurrentEpoch, token);
         }
 
         private static string HashBytes(byte[] value)
@@ -533,7 +536,7 @@ public sealed partial class WebHostIisExpressTests
             return await ReadCutoverLifecycleSnapshot(sql, current);
         }
 
-        public async Task VerifyLifecycle()
+        public async Task VerifyLifecycle(CancellationToken token)
         {
             _browserLease?.Verify();
             foreach (var deployment in _deployments.Values) { deployment.ControlLease?.Verify(); deployment.RuntimeLease?.Verify(); }
@@ -547,10 +550,10 @@ public sealed partial class WebHostIisExpressTests
                 throw new IOException("Cutover allocation epoch changed.");
         }
 
-        public async Task VerifyZeroMutation(Guid operation)
+        public async Task VerifyZeroMutation(Guid operation, CancellationToken token)
         {
-            await VerifyLifecycle();
-            if (_committedSetup?.Operation == operation) { await VerifyOperation(operation, true); return; }
+            await VerifyLifecycle(token);
+            if (_committedSetup?.Operation == operation) { await VerifyOperation(operation, true, token); return; }
             foreach (var database in new[] { _current, _old, _restored })
             {
                 using var sql = new SqlConnection(database.ConnectionString);
@@ -560,11 +563,11 @@ public sealed partial class WebHostIisExpressTests
         }
 
         public async Task<Web6CutoverDrain> Drain(string browser, Web6CutoverPair pair, CancellationToken token)
-        { await DrainHost(); await VerifyLifecycle(); return new Web6CutoverDrain(_hostDrained, _hostDrained); }
+        { await DrainHost(); await VerifyLifecycle(token); return new Web6CutoverDrain(_hostDrained, _hostDrained); }
         public Task VerifyRestore(string browser, CancellationToken token) { _session!.VerifyComplete(); return Task.CompletedTask; }
         public async Task Complete(CancellationToken token)
         {
-            await VerifyLifecycle();
+            await VerifyLifecycle(token);
             Web6CutoverOracle.ValidateAllocationDisposition(_plan, _verifiedSetups, _restoredAdmissions, _currentReadmissions);
             _complete = _browsers == 2; if (!_complete) throw new IOException("Both browsers are required.");
         }

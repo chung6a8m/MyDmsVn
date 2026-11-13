@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Threading;
@@ -324,11 +324,13 @@ public sealed class Web6CandidateCutoverTests
     public async Task Restored_admission_failure_cannot_complete_lifecycle()
     {
         var runtime = new RecordingRuntime { FailRestored = true };
-        var session = new Web6CutoverSession(Plan(), runtime); await session.Begin();
+        var session = new Web6CutoverSession(Plan(), runtime); await session.Begin(CancellationToken.None);
         var committed = Guid.NewGuid(); var unknown = Guid.NewGuid();
-        await session.Handle("committedUnavailable", committed, Proof(committed));
-        await session.Handle("sameEpochRestart", unknown);
-        await Assert.ThrowsAsync<IOException>(() => session.Handle("restoreEpoch", unknown));
+        await Handle(session, "committedUnavailable", committed, Proof(committed));
+        await Handle(session, "sameEpochRestart", unknown);
+        await Handle(session, "revokeGrantOn", unknown);
+        await Handle(session, "revokeGrantOff", unknown);
+        await Assert.ThrowsAsync<IOException>(() => Handle(session, "restoreEpoch", unknown));
         Assert.Throws<InvalidDataException>(session.VerifyComplete);
     }
 
@@ -337,6 +339,9 @@ public sealed class Web6CandidateCutoverTests
         ["operationId"] = id.ToString("D"), ["operationKind"] = "Sales.Create", ["requestFingerprint"] = new string('a', 64),
         ["authorizedBusinessEffects"] = 1, ["checkId"] = "web6-cutover-authentic-committed-setup",
     };
+
+    private static Task<JObject> Handle(Web6CutoverSession session, string action, Guid? operation, JObject? proof = null) =>
+        session.Handle(new Web6CutoverRequest(action, operation, proof, TimeSpan.FromSeconds(10)), CancellationToken.None);
 
     [Fact]
     public void Cutover_acceptance_gate_cannot_turn_missing_prerequisites_into_a_pass()
@@ -614,29 +619,29 @@ public sealed class Web6CandidateCutoverTests
     {
         var runtime = new RecordingRuntime();
         var session = new Web6CutoverSession(Plan(), runtime);
-        await session.Begin();
+        await session.Begin(CancellationToken.None);
         var id = Guid.NewGuid();
-        await session.Handle("oldClientNewHostOn", null);
-        await session.Handle("verifyNoCutoverMutation", Guid.NewGuid());
-        await session.Handle("oldClientNewHostOff", null);
-        await session.Handle("newClientOldHostOn", null);
-        await session.Handle("verifyNoCutoverMutation", Guid.NewGuid());
-        await session.Handle("newClientOldHostOff", null);
+        await Handle(session, "oldClientNewHostOn", null);
+        await Handle(session, "verifyNoCutoverMutation", Guid.NewGuid());
+        await Handle(session, "oldClientNewHostOff", null);
+        await Handle(session, "newClientOldHostOn", null);
+        await Handle(session, "verifyNoCutoverMutation", Guid.NewGuid());
+        await Handle(session, "newClientOldHostOff", null);
         var committed = Guid.NewGuid();
-        await session.Handle("committedUnavailable", committed, Proof(committed));
-        await session.Handle("verifyNoCutoverMutation", committed);
-        await session.Handle("sameEpochRestart", id);
-        await session.Handle("revokeGrantOn", id);
-        await session.Handle("revokeGrantOff", id);
+        await Handle(session, "committedUnavailable", committed, Proof(committed));
+        await Handle(session, "verifyNoCutoverMutation", committed);
+        await Handle(session, "sameEpochRestart", id);
+        await Handle(session, "revokeGrantOn", id);
+        await Handle(session, "revokeGrantOff", id);
 
-        await session.Handle("restoreEpoch", id);
-        await session.Handle("verifyNoCutoverMutation", id);
+        await Handle(session, "restoreEpoch", id);
+        await Handle(session, "verifyNoCutoverMutation", id);
         session.VerifyComplete();
         Assert.Equal(new[] { "Current:current", "Current:cached", "zero", "Current:current", "Old:current", "zero",
             "Current:current", "committed", "unavailable", "zero", "identity", "Current:current", "identity", "grant:False", "grant:True",
             "Restored:current", "zero" }, runtime.Calls);
         var incomplete = new Web6CutoverSession(Plan(), new RecordingRuntime());
-        await incomplete.Begin();
+        await incomplete.Begin(CancellationToken.None);
         Assert.Throws<InvalidDataException>(incomplete.VerifyComplete);
     }
 
@@ -645,9 +650,9 @@ public sealed class Web6CandidateCutoverTests
     {
         var runtime = new RecordingRuntime { RejectCommitted = true };
         var session = new Web6CutoverSession(Plan(), runtime);
-        await session.Begin();
+        await session.Begin(CancellationToken.None);
         var id = Guid.NewGuid();
-        await Assert.ThrowsAsync<InvalidDataException>(() => session.Handle("committedUnavailable", id, Proof(id)));
+        await Assert.ThrowsAsync<InvalidDataException>(() => Handle(session, "committedUnavailable", id, Proof(id)));
         Assert.DoesNotContain("unavailable", runtime.Calls);
     }
 
@@ -697,13 +702,14 @@ public sealed class Web6CandidateCutoverTests
         internal List<string> Calls { get; } = new List<string>();
         internal bool RejectCommitted;
         internal bool FailRestored;
-        public Task Switch(Web6CutoverPair pair, bool cached, Guid epoch) { Calls.Add(pair + (cached ? ":cached" : ":current")); if (FailRestored && pair == Web6CutoverPair.Restored) throw new IOException("restored admission failed"); return Task.CompletedTask; }
-        public Task VerifyOperation(Guid id, bool committed) { Calls.Add(committed ? "committed" : "identity"); if (committed && RejectCommitted) throw new InvalidDataException(); return Task.CompletedTask; }
-        public Task VerifyCommittedSetup(Web6CommittedSetup proof) => VerifyOperation(proof.Operation, true);
-        public Task VerifyLifecycle() => Task.CompletedTask;
-        public Task SetGrant(bool granted) { Calls.Add("grant:" + granted); return Task.CompletedTask; }
-        public Task MakeCommittedUnavailable(Guid id) { Calls.Add("unavailable"); return Task.CompletedTask; }
-        public Task VerifyZeroMutation(Guid id) { Calls.Add("zero"); return Task.CompletedTask; }
+        public Task Switch(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token) { Calls.Add(pair + (cached ? ":cached" : ":current")); if (FailRestored && pair == Web6CutoverPair.Restored) throw new IOException("restored admission failed"); return Task.CompletedTask; }
+        public Task VerifyStableAdmission(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token) => Task.CompletedTask;
+        public Task VerifyOperation(Guid id, bool committed, CancellationToken token) { Calls.Add(committed ? "committed" : "identity"); if (committed && RejectCommitted) throw new InvalidDataException(); return Task.CompletedTask; }
+        public Task VerifyCommittedSetup(Web6CommittedSetup proof, CancellationToken token) => VerifyOperation(proof.Operation, true, token);
+        public Task VerifyLifecycle(CancellationToken token) => Task.CompletedTask;
+        public Task SetGrant(bool granted, CancellationToken token) { Calls.Add("grant:" + granted); return Task.CompletedTask; }
+        public Task MakeCommittedUnavailable(Guid id, CancellationToken token) { Calls.Add("unavailable"); return Task.CompletedTask; }
+        public Task VerifyZeroMutation(Guid id, CancellationToken token) { Calls.Add("zero"); return Task.CompletedTask; }
     }
 
     private static Web6CandidateExpected CurrentExpected() => new Web6CandidateExpected("web6-current",
