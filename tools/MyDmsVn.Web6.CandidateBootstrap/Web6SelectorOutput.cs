@@ -49,6 +49,7 @@ internal sealed class Web6SelectorOutput : IDisposable
                     .ToDictionary(n => n, n => Environment.GetEnvironmentVariable(n)!, StringComparer.OrdinalIgnoreCase));
                 _parent = new BootstrapPathPolicy.PinnedDirectory(Plan.EvidenceRoot);
                 _parentAcl = RequirePrivateParent(Plan.EvidenceRoot);
+                if (gate == "cutover") VerifyPairPassed(Plan, RunId);
                 if (gate is "workload" or "recovery")
                     VerifyTask4(Plan, RunId, Environment.GetEnvironmentVariable("MYDMSVN_WEB6_TASK4_ACCEPTANCE_PATH") ?? "",
                         Environment.GetEnvironmentVariable("MYDMSVN_WEB6_TASK4_ACCEPTANCE_SHA256") ?? "");
@@ -190,6 +191,43 @@ internal sealed class Web6SelectorOutput : IDisposable
                     throw new IOException("Task4 cutover ownership or manifest binding differs.");
                 using var manifest = ProtectedJsonFile.Open(Path.Combine(plan.EvidenceRoot, "candidate.manifest"), (string)task4["manifestSha256"]!);
             }
+        }
+    }
+
+    internal static void VerifyPairPassed(Web6SelectorPlan plan, string runId)
+    {
+        using var transitionFile = ProtectedJsonFile.OpenSqlApproval(Path.Combine(plan.TaskRoot, "run-PairPassed.json"));
+        var transition = PreparedCandidateReceipt.ReadCanonical(transitionFile.Bytes);
+        if ((string?)transition["state"] != "PairPassed" || (string?)transition["runId"] != runId ||
+            (string?)transition["candidateId"] != plan.Text("candidateId") ||
+            (string?)transition["previousSha256"] != plan.Prepared.Sha256 ||
+            (string?)transition["backendSha"] != plan.Text("backendSha") ||
+            (string?)transition["frontendSha"] != plan.Text("frontendSha") ||
+            (string?)transition["backendPublishSha256"] != plan.Text("currentPublishSha256") ||
+            (string?)transition["frontendDistSha256"] != plan.Text("candidateDistSha256"))
+            throw new IOException("Cutover PairPassed transition differs from the protected prepared candidate.");
+        foreach (var (gate, pathKey, hashKey) in new[]
+        {
+            ("pair-chromium", "pairChromiumPrivatePath", "pairChromiumSha256"),
+            ("pair-edge", "gatePrivatePath", "gateSha256"),
+        })
+        {
+            var envelopePath = Path.Combine(plan.EvidenceRoot, gate + "-envelope.json");
+            if ((string?)transition[pathKey] != envelopePath)
+                throw new IOException("Cutover pair envelope path differs from the admitted gate.");
+            using var envelopeFile = ProtectedJsonFile.Open(envelopePath, BootstrapJson.Text(transition, hashKey));
+            var envelope = PreparedCandidateReceipt.ReadCanonical(envelopeFile.Bytes);
+            var nativePath = Path.Combine(plan.EvidenceRoot, gate + ".json");
+            if ((string?)envelope["gate"] != gate || (string?)envelope["runId"] != runId ||
+                (string?)envelope["nativePath"] != nativePath)
+                throw new IOException("Cutover pair envelope belongs to another run or gate.");
+            using var file = ProtectedJsonFile.Open(nativePath, BootstrapJson.Text(envelope, "nativeSha256"));
+            var native = PreparedCandidateReceipt.ReadCanonical(file.Bytes);
+            var expected = CreatePayload(plan, gate, runId);
+            foreach (var key in new[] { "gate", "runId", "candidateId", "backendSha", "frontendSha", "frontendDistSha256",
+                "backendPublishSha256", "preparedSha256", "status", "browser" })
+                if ((string?)native[key] != (string?)expected[key])
+                    throw new IOException("Cutover pair native receipt differs from the admitted candidate.");
         }
     }
 

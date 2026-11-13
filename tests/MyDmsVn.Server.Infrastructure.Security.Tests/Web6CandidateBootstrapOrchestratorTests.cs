@@ -176,6 +176,23 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
     }
 
     [Theory]
+    [InlineData("foreign-run")]
+    [InlineData("missing-transition")]
+    [InlineData("changed-chromium")]
+    [InlineData("changed-edge")]
+    public async Task Cutover_requires_the_same_prepared_pair_and_both_native_receipts(string drift)
+    {
+        Assert.Equal(BootstrapRunStage.CandidateVerified, (await Run()).Stage);
+        var prepared = Path.Combine(_root, "prepared.json");
+        var plan = Web6SelectorPlan.Create(PreparedCandidateReceipt.Read(prepared, BootstrapPathPolicy.HashFile(prepared)));
+        Web6SelectorOutput.VerifyPairPassed(plan, "run-1");
+        if (drift == "missing-transition") File.Delete(Path.Combine(_root, "run-PairPassed.json"));
+        if (drift is "changed-chromium" or "changed-edge")
+            File.AppendAllText(Path.Combine(plan.EvidenceRoot, "pair-" + drift.Substring("changed-".Length) + ".json"), "drift");
+        Assert.ThrowsAny<IOException>(() => Web6SelectorOutput.VerifyPairPassed(plan, drift == "foreign-run" ? "other-run" : "run-1"));
+    }
+
+    [Theory]
     [InlineData("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY")]
     [InlineData("MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY")]
     [InlineData("MYDMSVN_WEB6_CANDIDATE_ROOT")]

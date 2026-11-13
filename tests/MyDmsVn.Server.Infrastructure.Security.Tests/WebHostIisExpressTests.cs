@@ -615,7 +615,8 @@ public sealed partial class WebHostIisExpressTests
     {
         var values = Web6CutoverAcceptanceGate.EnvironmentValues();
         Web6CutoverAcceptanceGate.RequireLive(values);
-        using var bootstrap = Web6SelectorOutput.Open("cutover");
+        using var bootstrap = Web6SelectorOutput.Open("cutover")
+            ?? throw new IOException("Cutover requires the protected prepared candidate binding.");
         var currentBackend = AdmitCurrentBackend(bootstrap);
         string Required(string name) => values[name] ?? throw new InvalidOperationException("Cutover prerequisite disappeared.");
         var frontendRoot = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY"));
@@ -623,47 +624,49 @@ public sealed partial class WebHostIisExpressTests
         var frontendDist = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_DIST_DIRECTORY"));
         var oldPublish = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_OLD_PUBLISH_DIRECTORY"));
         var currentPublish = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_PUBLISH_DIRECTORY"));
-        Web6CutoverBuildObservation ObserveBuild()
-        {
-            var frontend = GitIdentity(frontendRoot);
-            var backend = GitIdentity(backendRoot);
-            var archivedDist = Web6CandidateFileSet.MeasureTree(frontendDist);
-            var fullOldPublish = Web6CandidateFileSet.MeasureTree(oldPublish);
-            var fullCurrentPublish = Web6CandidateFileSet.MeasureTree(currentPublish);
-            return new Web6CutoverBuildObservation(frontend.Sha, frontend.Tree, true, archivedDist,
-                backend.Sha, backend.Tree, true, fullOldPublish, fullCurrentPublish, fullOldPublish);
-        }
-
-        var buildObservation = ObserveBuild();
         var buildAuthority = Web6CutoverBuildAuthority.ReadProtected(
             Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_PATH")),
             Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_SHA256"));
-        buildAuthority.Verify(buildObservation);
+        var selector = new Web6CutoverSelector(buildAuthority, frontendRoot, backendRoot, frontendDist, oldPublish, currentPublish,
+            bootstrap.Plan.Text("currentPublishSha256"), bootstrap.Plan.Text("candidateDistSha256"), CutoverArchiveIdentity);
+        var buildObservation = selector.Verify();
         if (!Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_EPOCH"), "D", out var currentEpoch) ||
             !Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_RESTORED_EPOCH"), "D", out var restoredEpoch))
             throw new InvalidOperationException("Cutover deployment epochs are invalid.");
         var admin = Required("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING");
         var controlParent = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_SQL_CONTROL_PARENT"));
-        Task<SqlTestDatabase> AllocateDatabase() => buildAuthority.AllocateAsync(ObserveBuild,
-            () => currentBackend.AllocateAsync(() => SqlTestDatabase.CreateAsync(admin)));
         await Web6CutoverSqlApproval.VerifyFileAsync(Path.GetFullPath(Required("MYDMSVN_SQL_TEST_APPROVAL_FILE")),
             admin, CancellationToken.None).ConfigureAwait(false);
-        SqlTestDatabase? currentDatabase = null, oldDatabase = null, restoredDatabase = null;
-        SqlTestOwnershipManifest? currentControl = null, oldControl = null, restoredControl = null;
+        var databases = new Dictionary<Web6CutoverPair, SqlTestDatabase>();
+        var controls = new Dictionary<Web6CutoverPair, SqlTestOwnershipManifest>();
+        var intentHashes = new Dictionary<Web6CutoverPair, string>();
+        var receipts = new Dictionary<Web6CutoverPair, (string Path, string Hash)>();
         var complete = false;
         var cleanupVerified = false;
         LiveCutoverOperations? operations = null;
-        var currentRecorded = false; var oldRecorded = false; var restoredRecorded = false;
         try
         {
             await Web6CutoverLifetime.Run(async () =>
             {
-            currentControl = SqlTestOwnershipManifest.Create(controlParent);
-            oldControl = SqlTestOwnershipManifest.Create(controlParent);
-            restoredControl = SqlTestOwnershipManifest.Create(controlParent);
-            currentDatabase = await AllocateDatabase().ConfigureAwait(false);
-            oldDatabase = await AllocateDatabase().ConfigureAwait(false);
-            restoredDatabase = await AllocateDatabase().ConfigureAwait(false);
+            await selector.AllocateAsync(() => currentBackend.Verify(),
+                pair => SqlTestDatabase.CreateWithRetainedOwnershipAsync(admin, controls[pair], (name, server, token) =>
+                {
+                    var intent = Web6BootstrapSelectorEvidence.CutoverOwnership(bootstrap.Plan.EvidenceRoot, bootstrap.RunId,
+                        pair, "database", "intent", name,
+                        new JObject { ["serverName"] = server, ["originalToken"] = token, ["controlPath"] = controls[pair].ControlPath });
+                    intentHashes.Add(pair, intent.Hash);
+                }), (pair, database) =>
+                {
+                    databases.Add(pair, database);
+                    receipts.Add(pair, Web6BootstrapSelectorEvidence.SealCutoverDatabase(bootstrap, pair, database, controls[pair], intentHashes[pair]));
+                    return Task.CompletedTask;
+                }, prepare: pair => controls.Add(pair, SqlTestOwnershipManifest.Create(controlParent))).ConfigureAwait(false);
+            var currentDatabase = databases[Web6CutoverPair.Current];
+            var oldDatabase = databases[Web6CutoverPair.Old];
+            var restoredDatabase = databases[Web6CutoverPair.Restored];
+            var currentControl = controls[Web6CutoverPair.Current];
+            var oldControl = controls[Web6CutoverPair.Old];
+            var restoredControl = controls[Web6CutoverPair.Restored];
             if (new[] { currentDatabase.DatabaseName, oldDatabase.DatabaseName, restoredDatabase.DatabaseName }.Distinct(StringComparer.OrdinalIgnoreCase).Count() != 3) throw new InvalidOperationException("Cutover SQL allocations collided.");
             if (!new DatabaseMigrationRunner().MigrateWeb5(currentDatabase.ConnectionString).Successful ||
                 !new DatabaseMigrationRunner().MigrateWeb(oldDatabase.ConnectionString).Successful ||
@@ -686,12 +689,6 @@ public sealed partial class WebHostIisExpressTests
                     await SqlSchemaDefinitionFingerprint.ReadAsync(oldSql, CancellationToken.None).ConfigureAwait(false),
                     SqlSchemaDefinitionFingerprint.Schema12);
             }
-            await currentDatabase.WriteOwnershipManifestAsync(currentControl, CancellationToken.None).ConfigureAwait(false);
-            currentRecorded = true;
-            await oldDatabase.WriteOwnershipManifestAsync(oldControl, CancellationToken.None).ConfigureAwait(false);
-            oldRecorded = true;
-            await restoredDatabase.WriteOwnershipManifestAsync(restoredControl, CancellationToken.None).ConfigureAwait(false);
-            restoredRecorded = true;
             var restoredReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(restoredControl, restoredControl.VerifiedDigest(),
                 SqlSchemaDefinitionFingerprint.Schema13, "restored-allocation").Digest;
             var currentReceipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(currentControl, currentControl.VerifiedDigest(),
@@ -706,42 +703,31 @@ public sealed partial class WebHostIisExpressTests
                 backend.Sha, backend.Tree, backend.ArtifactHash, buildObservation.CurrentPublishedHash,
                 13, 12, currentReceipt, oldReceipt, restoredReceipt, currentEpoch, restoredEpoch);
             plan.VerifyArchives(frontend, backend);
-            operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl, currentBackend, bootstrap);
+            operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl,
+                currentBackend, bootstrap, selector, receipts);
             await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None).ConfigureAwait(false);
             complete = true;
             }, async () =>
             {
-                if (operations == null) return bootstrap == null;
+                if (operations == null) return false;
                 var drained = await operations.Cleanup().ConfigureAwait(false);
-                if (drained && bootstrap != null) bootstrap.VerifyCleanupInventory();
+                if (drained) bootstrap.VerifyCleanupInventory();
                 return drained;
-            }, new Func<Task>[]
+            }, Web6CutoverSelector.Pairs.Select<Web6CutoverPair, Func<Task>>(pair => async () =>
             {
-                async () =>
-                {
-                    if (currentDatabase == null) return;
-                    await currentDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
-                    if (currentRecorded) await currentDatabase.CompleteOwnershipManifestAsync(currentControl!, CancellationToken.None).ConfigureAwait(false);
-                },
-                async () =>
-                {
-                    if (oldDatabase == null) return;
-                    await oldDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
-                    if (oldRecorded) await oldDatabase.CompleteOwnershipManifestAsync(oldControl!, CancellationToken.None).ConfigureAwait(false);
-                },
-                async () =>
-                {
-                    if (restoredDatabase == null) return;
-                    await restoredDatabase.DisposeIfQuiescentAsync().ConfigureAwait(false);
-                    if (restoredRecorded) await restoredDatabase.CompleteOwnershipManifestAsync(restoredControl!, CancellationToken.None).ConfigureAwait(false);
-                },
-            }, stopOnCleanupFailure: bootstrap != null).ConfigureAwait(false);
+                var database = databases[pair];
+                await database.DisposeIfQuiescentAsync().ConfigureAwait(false);
+                await database.CompleteOwnershipManifestAsync(controls[pair], CancellationToken.None).ConfigureAwait(false);
+            }), stopOnCleanupFailure: true).ConfigureAwait(false);
             if (complete) { operations!.VerifyFinalDisposition(); cleanupVerified = true; }
         }
-        finally { currentControl?.Dispose(); oldControl?.Dispose(); restoredControl?.Dispose(); operations?.DisposeManifests(cleanupVerified); }
-        if (bootstrap != null)
-            Web6BootstrapSelectorEvidence.Complete(bootstrap, operations!.BootstrapResources, operations.BootstrapSqlReceipt!,
-                manifestPath: Path.Combine(bootstrap.Plan.EvidenceRoot, "candidate.manifest"), manifestHash: operations.BootstrapManifestHash);
+        finally
+        {
+            foreach (var control in controls.Values) control.Dispose();
+            operations?.DisposeManifests(cleanupVerified);
+        }
+        Web6BootstrapSelectorEvidence.Complete(bootstrap, operations!.BootstrapResources, operations.BootstrapSqlReceipt!,
+            manifestPath: Path.Combine(bootstrap.Plan.EvidenceRoot, "candidate.manifest"), manifestHash: operations.BootstrapManifestHash);
     }
     private static async Task SeedBrowserActors(SqlConnection connection)
     {
@@ -777,7 +763,7 @@ public sealed partial class WebHostIisExpressTests
         Web6CandidateManifest? candidateManifest = null, Web6CandidateHostMismatch? candidateMismatch = null,
         bool web6Cutover = false, Web6CandidateCutoverPlan? cutoverPlan = null,
         WebRecoveryPilotControl? cutoverControl = null, string? cutoverBrowser = null, Action<JObject, JObject>? cutoverResult = null,
-        Web6CandidateBackendSource? backendSource = null)
+        Web6CandidateBackendSource? backendSource = null, string? cutoverFrontendHash = null)
     {
         var connectionString = database.ConnectionString;
         var candidatePair = Web6CandidatePairBudgets.IsPairMode(web6Candidate, web6Cutover, Environment.GetEnvironmentVariable("MYDMSVN_WEB_PILOT_PROJECT"));
@@ -826,10 +812,11 @@ public sealed partial class WebHostIisExpressTests
             Assert.True(File.Exists(Path.Combine(checkout, "tests", "pilot", "web6-manual-resend-live.spec.ts")));
             var frontendSha = GitHead(checkout);
             var backendSha = (backendSource ?? throw new IOException("Candidate backend source was not admitted before SQL allocation.")).Verify().Sha;
-            var sourceDist = Path.Combine(checkout, "dist");
             var publishedDist = Path.Combine(Path.GetFullPath(Environment.GetEnvironmentVariable("MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY")!), "wwwroot");
-            var sourceHash = Web6CandidateFileSet.MeasureTree(sourceDist);
             var publishedHash = Web6CandidateFileSet.MeasureTree(publishedDist);
+            var sourceHash = web6Cutover
+                ? cutoverFrontendHash ?? throw new IOException("Cutover requires the prepared frontend digest.")
+                : Web6CandidateFileSet.MeasureTree(Path.Combine(checkout, "dist"));
             Assert.Equal(sourceHash, publishedHash);
             web6Expected = new Web6CandidateExpected(Environment.GetEnvironmentVariable("MYDMSVN_WEB6_CANDIDATE_ID")!,
                 frontendSha, backendSha, sourceHash, new Web6StockExpectation(warehouse, product, receiptProduct));
@@ -1084,6 +1071,15 @@ public sealed partial class WebHostIisExpressTests
     }
     private static (string Sha, string Tree) GitIdentity(string root) =>
         (GitHead(root), Web6CandidateInputs.RequireHash(Git(root, "rev-parse HEAD^{tree}"), 40));
+
+    private static (string Root, string Sha, string Tree) CutoverArchiveIdentity(string root)
+    {
+        var gitRoot = Git(root, "rev-parse --show-toplevel").Replace('/', '\\');
+        if (Git(root, "status --porcelain --untracked-files=all --ignore-submodules=none").Length != 0)
+            throw new IOException("Cutover archive checkout is dirty.");
+        return (gitRoot, Web6CandidateInputs.RequireHash(Git(root, "rev-parse --verify HEAD"), 40),
+            Web6CandidateInputs.RequireHash(Git(root, "rev-parse --verify HEAD^{tree}"), 40));
+    }
     private static string Git(string root, string arguments)
     {
         var bootstrap = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_BOOTSTRAP_RUN_ID") != null;
@@ -1211,7 +1207,7 @@ public sealed partial class WebHostIisExpressTests
         public OwnedLogin(string admin) { _admin = admin; }
         public string Name { get; } = "WEB2_Smoke_" + Guid.NewGuid().ToString("N");
         public string ConnectionString(string database) => new SqlConnectionStringBuilder(_admin) { InitialCatalog = database, IntegratedSecurity = false, Authentication = SqlAuthenticationMethod.NotSpecified, UserID = Name, Password = _password, Pooling = false }.ConnectionString;
-        public async Task CreateAsync()
+        public async Task CreateAsync(Func<string, string, Func<Task>, Task>? cutoverOwnership = null)
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             using var connection = new SqlConnection(_admin); await connection.OpenAsync(timeout.Token);
@@ -1219,8 +1215,24 @@ public sealed partial class WebHostIisExpressTests
             command.CommandText = "SELECT CONVERT(nvarchar(256),SERVERPROPERTY(N'ServerName'));";
             _instance = (string)await command.ExecuteScalarAsync(timeout.Token);
             if (string.IsNullOrWhiteSpace(_instance)) throw new InvalidOperationException("Test login instance identity is missing.");
-            command.CommandText = "CREATE LOGIN [" + Name + "] WITH PASSWORD=N'" + _password + "', SID=0x" + BitConverter.ToString(_sid).Replace("-", "") + ", CHECK_POLICY=OFF;";
-            _attempted = true; await command.ExecuteNonQueryAsync(timeout.Token);
+            var sid = BitConverter.ToString(_sid).Replace("-", "");
+            if (cutoverOwnership == null) await Create();
+            else await cutoverOwnership(_instance!, sid, async () =>
+            {
+                await Create();
+                command.Parameters.AddWithValue("@name", Name);
+                command.Parameters.AddWithValue("@sid", _sid);
+                command.CommandText = "SELECT COUNT(*) FROM sys.server_principals WHERE name=@name AND sid=@sid AND type='S';";
+                if ((int)await command.ExecuteScalarAsync(timeout.Token) != 1)
+                    throw new IOException("Cutover login identity could not be confirmed.");
+            });
+
+            async Task Create()
+            {
+                command.CommandText = "CREATE LOGIN [" + Name + "] WITH PASSWORD=N'" + _password + "', SID=0x" + sid + ", CHECK_POLICY=OFF;";
+                _attempted = true;
+                await command.ExecuteNonQueryAsync(timeout.Token);
+            }
         }
         public async Task CleanupAsync()
         {
