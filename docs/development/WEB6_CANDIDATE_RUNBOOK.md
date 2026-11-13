@@ -1,6 +1,6 @@
 # WEB6 — Pinned Windows/IIS Express/SQL candidate runbook
 
-**Status (2026-11-13): attempt17 reached PairPassed, then FailedRetained during cutover baseline snapshot.** Task 6 remains open. The controlled nonproduction runbook applies to Codex Local and protected Windows CI using IIS Express and SQL Server. [B05a operations](../evidence/web6/20261110-b05a-operations.md) Â· [B05b paired candidate](../evidence/web6/20261110-b05b-paired-candidate.md) Â· [Backend roadmap](../plans/20261103-001-web6-recovery-quality-backend.md) Â· [Acceptance](WEB6_BACKEND_ACCEPTANCE.md) Â· [WEB5 owned-host evidence](../evidence/web5/20261103-b05-owned-host-admission.md) Â· [React companion](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261103-001-web6-recovery-quality-web.md).
+**Status (2026-11-13): attempt18 reached PairPassed, then FailedRetained at cutover deployment path validation.** Task 6 remains open. The controlled nonproduction runbook applies to Codex Local and protected Windows CI using IIS Express and SQL Server. [B05a operations](../evidence/web6/20261110-b05a-operations.md) Â· [B05b paired candidate](../evidence/web6/20261110-b05b-paired-candidate.md) Â· [Backend roadmap](../plans/20261103-001-web6-recovery-quality-backend.md) Â· [Acceptance](WEB6_BACKEND_ACCEPTANCE.md) Â· [WEB5 owned-host evidence](../evidence/web5/20261103-b05-owned-host-admission.md) Â· [React companion](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261103-001-web6-recovery-quality-web.md).
 
 ## 1. Candidate manifest required before any live test
 
@@ -242,3 +242,11 @@ Candidate `web6-20261113-0fa528e7` used backend `485570368afd64d814d024f0fb43554
 Chromium and Edge each passed one selector with native `ACCEPTED` and verified cleanup. `PairPassed` SHA-256 `d5ef840228c4c93a354556e6beafcaad4bb680fbc218b34b17e81263f9181b16`. Cutover admitted the pinned artifacts and all three seed calls returned. The current baseline snapshot passed a null SQL JSON scalar to `JArray.Parse` and failed before IIS/browser launch. Terminal `FailedRetained` SHA-256 `5042f06f3e890d92b6c0ebab249e80d8a02fd3a814973ed92aa78f4f07d9a7e3`. Three cutover databases, three runtime logins and three SQL control roots are retained with linked ownership records.
 
 Workload/recovery did not run and `CandidateVerified` is absent. Task 6 remains open. A fresh chain needs new explicit Owner authorization after review of the snapshot failure. [Attempt17 evidence](../evidence/web6/20261110-b05b-paired-candidate.md#task-6-attempt17-browser-pair-pass-and-cutover-snapshot-failure).
+
+### Attempt18 terminal boundary
+
+Candidate `web6-20261113-0f79b843` used backend `c1afa4fbb81b17bee08b5e880b16ffca21d448df` and frontend `5f355e4ed3d0ca0778e195b940ecbed67b410dc0`. Approved Edge, Node/npm and SQL master checks preceded a new protected SQL approval and one authorize/prepare/run chain. Prepare `PIN_MATCHED`, ordinary resend OFF, ten dist/wwwroot files equal and zero live allocations.
+
+Chromium and Edge each passed one selector with native `ACCEPTED` and accepted cleanup. `PairPassed` SHA-256 `d13016f10c080941cb0f17ccd8497ead0f8e2930fcf27740ae7c5261d1b46211`. Cutover passed seed and initial snapshot reads and stopped at the current deployment contract path check before IIS/browser launch. Terminal `FailedRetained` SHA-256 `fbb8cfad196013c926268edb288e86c6ffe5204f5c27d6bf6dcb68cc1915713c`. Three databases, three runtime logins, three SQL control roots and current cutover control/runtime/browser staging directories remain retained.
+
+Workload/recovery did not run and `CandidateVerified` is absent. Task 6 remains open. A new chain needs fresh explicit Owner authorization after review of the path refusal. [Attempt18 evidence](../evidence/web6/20261110-b05b-paired-candidate.md#task-6-attempt18-browser-pair-pass-and-cutover-path-refusal).
