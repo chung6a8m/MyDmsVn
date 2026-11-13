@@ -618,6 +618,7 @@ public sealed partial class WebHostIisExpressTests
         using var bootstrap = Web6SelectorOutput.Open("cutover")
             ?? throw new IOException("Cutover requires the protected prepared candidate binding.");
         var currentBackend = AdmitCurrentBackend(bootstrap);
+        var provisioningScript = ReadCutoverProvisioningScript(currentBackend);
         string Required(string name) => values[name] ?? throw new InvalidOperationException("Cutover prerequisite disappeared.");
         var frontendRoot = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY"));
         var backendRoot = Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_BACKEND_ARCHIVE_DIRECTORY"));
@@ -704,7 +705,7 @@ public sealed partial class WebHostIisExpressTests
                 13, 12, currentReceipt, oldReceipt, restoredReceipt, currentEpoch, restoredEpoch);
             plan.VerifyArchives(frontend, backend);
             operations = new LiveCutoverOperations(plan, currentDatabase, oldDatabase, restoredDatabase, currentControl, oldControl, restoredControl,
-                currentBackend, bootstrap, selector, receipts);
+                currentBackend, provisioningScript, bootstrap, selector, receipts);
             await new Web6CandidateCutoverOrchestrator(operations).Execute(CancellationToken.None).ConfigureAwait(false);
             complete = true;
             }, async () =>
@@ -1064,6 +1065,17 @@ public sealed partial class WebHostIisExpressTests
         string? expectedRoot = null, string? expectedSha = null, string? expectedTree = null) =>
         Web6CandidateBackendSource.Admit(startDirectory, StrictGitIdentity, expectedRoot, expectedSha, expectedTree);
 
+    internal static string ReadCutoverProvisioningScript(Web6CandidateBackendSource source)
+    {
+        using var directory = new BootstrapPathPolicy.PinnedDirectory(source.Root);
+        // Read the committed blob without checkout filters or a later worktree-path read.
+        var script = Git(source.Root, "cat-file blob " + source.Commit + ":deployment/sql/Provision-MyDmsVnWebPrincipals.sql",
+            strict: true, preserveOutput: true);
+        directory.Verify();
+        if (string.IsNullOrWhiteSpace(script)) throw new IOException("The admitted cutover provisioning script is empty.");
+        return script;
+    }
+
     private static string GitHead(string root)
     {
         if (Git(root, "status --porcelain").Length != 0) throw new InvalidOperationException("Candidate source tree must be clean.");
@@ -1073,25 +1085,88 @@ public sealed partial class WebHostIisExpressTests
     private static (string Sha, string Tree) GitIdentity(string root) =>
         (GitHead(root), Web6CandidateInputs.RequireHash(Git(root, "rev-parse HEAD^{tree}"), 40));
 
-    private static (string Root, string Sha, string Tree) StrictGitIdentity(string root)
+    private static (string Root, string Sha, string Tree) StrictGitIdentity(string root) =>
+        StrictGitIdentity(root, expectedCommit: null);
+
+    private static (string Root, string Sha, string Tree) StrictGitIdentity(string root, string? expectedCommit)
     {
         using var directory = new BootstrapPathPolicy.PinnedDirectory(root);
         string Read(string arguments) => Git(root, arguments, strict: true);
         var gitRoot = Read("rev-parse --show-toplevel").Replace('/', '\\');
         if (!BootstrapJson.SamePath(root, gitRoot))
             throw new IOException("Candidate source path is not the exact Git checkout root.");
-        var settings = Read("config --no-includes --list --name-only");
-        if (settings.Split('\n').Any(line => line.Trim().StartsWith("filter.", StringComparison.OrdinalIgnoreCase) ||
-            line.Trim().StartsWith("include", StringComparison.OrdinalIgnoreCase)))
-            throw new IOException("Candidate checkout has external Git configuration.");
-        if (Read("status --porcelain --untracked-files=all --ignore-submodules=none").Length != 0)
+        RequireStrictGitConfig(Read("config --no-includes --null --list"), submodule: expectedCommit != null);
+        foreach (var (path, commit) in ReadGitlinks(Read("ls-files --stage -v --sparse -z")))
+        {
+            var child = BootstrapJson.AbsolutePath(Path.Combine(root, path.Replace('/', '\\')));
+            if (!BootstrapJson.IsChild(child, root))
+                throw new IOException("Candidate submodule path escaped the exact checkout.");
+            if (!Directory.Exists(child) && !File.Exists(child)) continue;
+            using var childDirectory = new BootstrapPathPolicy.PinnedDirectory(child);
+            var marker = Path.Combine(child, ".git");
+            if (File.Exists(marker) || Directory.Exists(marker))
+            {
+                _ = Web6CandidateFileSystem.Attributes(marker);
+                StrictGitIdentity(child, commit);
+            }
+            else if (Directory.EnumerateFileSystemEntries(child).Any())
+                throw new IOException("Candidate submodule path is populated without an initialized checkout.");
+            childDirectory.Verify();
+        }
+        // Every initialized gitlink was verified independently before this command.
+        // Do not let status recurse into nested configuration or re-evaluate gitlinks.
+        if (Read("status --porcelain --untracked-files=all --ignore-submodules=all").Length != 0)
             throw new IOException("Candidate source checkout is dirty.");
         var sha = Web6CandidateInputs.RequireHash(Read("rev-parse --verify HEAD"), 40);
         var tree = Web6CandidateInputs.RequireHash(Read("rev-parse --verify HEAD^{tree}"), 40);
+        if (expectedCommit != null && sha != expectedCommit)
+            throw new IOException("Candidate submodule HEAD differs from its indexed gitlink.");
+        if (Read("diff-index --cached --name-only --ignore-submodules=none " + sha + " --").Length != 0)
+            throw new IOException("Candidate source index differs from HEAD.");
         directory.Verify();
         return (gitRoot, sha, tree);
     }
-    private static string Git(string root, string arguments, bool strict = false)
+
+    private static void RequireStrictGitConfig(string config, bool submodule)
+    {
+        foreach (var entry in config.Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = entry.IndexOf('\n');
+            var key = separator < 0 ? entry : entry.Substring(0, separator);
+            var value = separator < 0 ? "" : entry.Substring(separator + 1);
+            if (key.StartsWith("filter.", StringComparison.OrdinalIgnoreCase) ||
+                key.StartsWith("include", StringComparison.OrdinalIgnoreCase))
+                throw new IOException("Candidate checkout has external Git configuration.");
+            if (key is "core.sparsecheckout" or "core.sparsecheckoutcone" or "index.sparse")
+            {
+                if (value is not ("false" or "no" or "off" or "0"))
+                    throw new IOException("Candidate checkout has sparse Git configuration.");
+            }
+            if (submodule && (key is "diff.ignoresubmodules" or "status.showuntrackedfiles" ||
+                (key.StartsWith("submodule.", StringComparison.OrdinalIgnoreCase) && key.EndsWith(".ignore", StringComparison.OrdinalIgnoreCase))))
+                throw new IOException("Candidate submodule has Git configuration that alters cleanliness reporting.");
+        }
+    }
+
+    private static IEnumerable<(string Path, string Commit)> ReadGitlinks(string index)
+    {
+        if (index.Length == 0 || index[index.Length - 1] != '\0')
+            throw new IOException("Candidate checkout index is empty or incomplete.");
+        foreach (var record in index.Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            // With -v, a lowercase tag denotes assume-unchanged. S denotes
+            // skip-worktree. Stage zero H is the only admitted cached entry.
+            if (record.Length <= 52 || !record.StartsWith("H ", StringComparison.Ordinal) ||
+                record[8] != ' ' || record[49] != ' ' || record[50] != '0' || record[51] != '\t')
+                throw new IOException("Candidate index has a non-normal tracked entry.");
+            var mode = record.Substring(2, 6);
+            if (mode is not ("100644" or "100755" or "160000"))
+                throw new IOException("Candidate index contains an unsupported tracked file mode.");
+            var objectId = Web6CandidateInputs.RequireHash(record.Substring(9, 40), 40);
+            if (mode == "160000") yield return (record.Substring(52), objectId);
+        }
+    }
+    private static string Git(string root, string arguments, bool strict = false, bool preserveOutput = false)
     {
         var bootstrap = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_BOOTSTRAP_RUN_ID") != null;
         using var bootstrapOutput = bootstrap ? Web6SelectorOutput.Open(Path.GetFileNameWithoutExtension(
@@ -1120,12 +1195,18 @@ public sealed partial class WebHostIisExpressTests
             start.EnvironmentVariables["GIT_CONFIG_GLOBAL"] = "NUL";
             start.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
         }
+        if (strict)
+        {
+            start.EnvironmentVariables["GIT_NO_LAZY_FETCH"] = "1";
+            start.EnvironmentVariables["GIT_NO_REPLACE_OBJECTS"] = "1";
+            start.StandardOutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+        }
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Git source proof could not start.");
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
         if (!process.WaitForExit(10000) || process.ExitCode != 0 || error.Length != 0)
             throw new IOException("Git source proof failed.");
-        return output.Trim();
+        return preserveOutput ? output : output.Trim();
     }
     private static string CertificateHash(string thumbprint)
     {

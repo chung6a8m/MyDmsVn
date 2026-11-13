@@ -35,6 +35,7 @@ public sealed partial class WebHostIisExpressTests
         private readonly Web6SelectorOutput _bootstrap;
         private readonly Web6CutoverSelector _selector;
         private readonly Web6CandidateBackendSource _currentBackend;
+        private readonly string _provisioningScript;
         internal JArray BootstrapResources { get; } = new JArray();
         internal string? BootstrapSqlReceipt { get; private set; }
         internal string? BootstrapManifestHash { get; private set; }
@@ -63,13 +64,14 @@ public sealed partial class WebHostIisExpressTests
 
         internal LiveCutoverOperations(Web6CandidateCutoverPlan plan, SqlTestDatabase current, SqlTestDatabase old, SqlTestDatabase restored,
             SqlTestOwnershipManifest currentControl, SqlTestOwnershipManifest oldControl, SqlTestOwnershipManifest restoredControl,
-            Web6CandidateBackendSource currentBackend, Web6SelectorOutput bootstrap, Web6CutoverSelector selector,
+            Web6CandidateBackendSource currentBackend, string provisioningScript, Web6SelectorOutput bootstrap, Web6CutoverSelector selector,
             IReadOnlyDictionary<Web6CutoverPair, (string Path, string Hash)> receipts)
         {
             _plan = plan; _current = current; _old = old; _currentControl = currentControl; _oldControl = oldControl; _restored = restored; _restoredControl = restoredControl;
             _bootstrap = bootstrap;
             _selector = selector;
             _currentBackend = currentBackend;
+            _provisioningScript = provisioningScript;
             _currentLogin = new OwnedLogin(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable));
             _oldLogin = new OwnedLogin(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable));
             _restoredLogin = new OwnedLogin(Required(SqlTestDatabase.ConnectionStringEnvironmentVariable));
@@ -137,7 +139,7 @@ public sealed partial class WebHostIisExpressTests
         {
             using var sql = new SqlConnection(database.ConnectionString); await sql.OpenAsync();
             await sql.ExecuteAsync("CREATE USER [" + login.Name + "] FOR LOGIN [" + login.Name + "]; CREATE USER WebSmokeMigration WITHOUT LOGIN;");
-            await sql.ExecuteAsync(File.ReadAllText(Path.Combine(_currentBackend.Root, "deployment", "sql", "Provision-MyDmsVnWebPrincipals.sql"))
+            await sql.ExecuteAsync(_provisioningScript
                 .Replace("$(WebRuntimeUser)", login.Name).Replace("$(MigrationUser)", "WebSmokeMigration"));
             await sql.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',@hash,N'',N'BCrypt'); " +
                 "INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';",

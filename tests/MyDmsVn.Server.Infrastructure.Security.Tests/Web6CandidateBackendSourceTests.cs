@@ -169,6 +169,147 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         finally { Environment.SetEnvironmentVariable("GIT_DIR", prior); }
     }
 
+    [Theory]
+    [InlineData("assume-unchanged", false)]
+    [InlineData("skip-worktree", false)]
+    [InlineData("assume-unchanged", true)]
+    [InlineData("skip-worktree", true)]
+    [InlineData("external-include", true)]
+    [InlineData("ignore-untracked", true)]
+    [InlineData("sparse-checkout", false)]
+    public async Task Strict_source_refuses_index_flags_or_nested_config_before_allocator(string change, bool nested)
+    {
+        var leaf = CreateNestedCheckout();
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        var checkout = nested ? leaf : _root;
+        var file = nested ? "tracked.txt" : "deployment/sql/Provision-MyDmsVnWebPrincipals.sql";
+        if (change is "assume-unchanged" or "skip-worktree")
+        {
+            Git(checkout, "update-index --" + change + " -- " + file);
+            File.AppendAllText(Path.Combine(checkout, file), "\nchanged");
+        }
+        else if (change == "external-include") Git(leaf, "config include.path absent-fixture-config");
+        else if (change == "ignore-untracked") Git(leaf, "config status.showUntrackedFiles no");
+        else Git(_root, "config core.sparseCheckout true");
+
+        Assert.Equal("", Git(_root, "status --porcelain --untracked-files=all --ignore-submodules=none"));
+        var indexBefore = Git(checkout, "ls-files -v");
+        var calls = 0;
+        await Assert.ThrowsAsync<IOException>(() => source.AllocateAsync(() => { calls++; return Task.FromResult(1); }));
+        Assert.Equal(0, calls);
+        Assert.Equal(indexBefore, Git(checkout, "ls-files -v"));
+    }
+
+    [Fact]
+    public async Task Strict_source_admits_clean_initialized_nested_checkouts()
+    {
+        CreateNestedCheckout();
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        Assert.Equal(42, await source.AllocateAsync(() => Task.FromResult(42)));
+    }
+
+    [Fact]
+    public void Cutover_provisioning_text_uses_admitted_commit_after_worktree_edits()
+    {
+        CreateNestedCheckout();
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        var script = WebHostIisExpressTests.ReadCutoverProvisioningScript(source);
+        File.WriteAllText(Path.Combine(_root, "deployment", "sql", "Provision-MyDmsVnWebPrincipals.sql"), "SELECT 2;\n");
+        Assert.Equal("SELECT 1;\n", script);
+        Assert.Equal(script, WebHostIisExpressTests.ReadCutoverProvisioningScript(source));
+    }
+
+    [Theory]
+    [InlineData("changed-commit")]
+    [InlineData("staged-gitlink")]
+    [InlineData("junction")]
+    public async Task Strict_source_refuses_nested_gitlink_identity_drift(string drift)
+    {
+        var leaf = CreateNestedCheckout();
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        var calls = 0;
+        Func<Task<int>> allocate = () => { calls++; return Task.FromResult(1); };
+        if (drift == "junction")
+        {
+            var moved = Path.Combine(_root, "leaf-outside");
+            Directory.Move(leaf, moved);
+            using var command = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+                "/d /c mklink /J \"" + leaf + "\" \"" + moved + "\"") { UseShellExecute = false, CreateNoWindow = true });
+            Assert.NotNull(command);
+            Assert.True(command!.WaitForExit(5000));
+            Assert.Equal(0, command.ExitCode);
+            try { await Assert.ThrowsAsync<IOException>(() => source.AllocateAsync(allocate)); }
+            finally { Directory.Delete(leaf); }
+        }
+        else
+        {
+            Git(leaf, "commit --allow-empty --quiet -m changed-head");
+            if (drift == "staged-gitlink")
+                Git(Path.Combine(_root, "vendor", "first"), "update-index --cacheinfo 160000," + Git(leaf, "rev-parse HEAD") + ",vendor/second");
+            await Assert.ThrowsAsync<IOException>(() => source.AllocateAsync(allocate));
+        }
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task Strict_source_leaves_uninitialized_gitlinks_alone()
+    {
+        var leaf = CreateNestedCheckout();
+        var parent = Path.Combine(_root, "vendor", "first");
+        var marker = Path.Combine(leaf, ".git");
+        Directory.Move(marker, Path.Combine(_root, ".git", "fixture-detached-leaf"));
+        File.Move(Path.Combine(leaf, "tracked.txt"), Path.Combine(_root, ".git", "fixture-detached-file"));
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        Assert.Equal(42, await source.AllocateAsync(() => Task.FromResult(42)));
+        Assert.Empty(Directory.GetFileSystemEntries(leaf));
+        Assert.Equal("160000", Git(parent, "ls-files --stage -- vendor/second").Substring(0, 6));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Cutover_refuses_hidden_current_source_change_before_the_next_live_callback(int ordinal)
+    {
+        CreateNestedCheckout();
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        using var artifacts = new Web6CutoverSelectorTests();
+        var selector = artifacts.Selector();
+        var calls = new List<Web6CutoverPair>();
+        var refusal = (Web6CutoverPair)ordinal;
+        await Assert.ThrowsAsync<IOException>(() => selector.AllocateAsync(() => source.Verify(),
+            pair => { calls.Add(pair); return Task.FromResult(pair); }, (_, _) => Task.CompletedTask,
+            prepare: pair =>
+            {
+                if (pair != refusal) return;
+                const string script = "deployment/sql/Provision-MyDmsVnWebPrincipals.sql";
+                Git(_root, "update-index --assume-unchanged -- " + script);
+                File.AppendAllText(Path.Combine(_root, script), "\nchanged between cutover allocations");
+            }));
+        Assert.Equal(Web6CutoverSelector.Pairs.Take(ordinal), calls);
+    }
+
+    private string CreateNestedCheckout()
+    {
+        Git(_root, "init --quiet");
+        File.WriteAllText(Path.Combine(_root, "MyDmsVn.sln"), "synthetic solution");
+        var scripts = Directory.CreateDirectory(Path.Combine(_root, "deployment", "sql")).FullName;
+        File.WriteAllText(Path.Combine(scripts, "Provision-MyDmsVnWebPrincipals.sql"), "SELECT 1;\n");
+        var child = Directory.CreateDirectory(Path.Combine(_root, "vendor", "first")).FullName;
+        var leaf = Directory.CreateDirectory(Path.Combine(child, "vendor", "second")).FullName;
+        Git(leaf, "init --quiet");
+        File.WriteAllText(Path.Combine(leaf, "tracked.txt"), "original");
+        Git(leaf, "add tracked.txt");
+        Git(leaf, "commit --quiet -m synthetic-leaf");
+        Git(child, "init --quiet");
+        Git(child, "update-index --add --cacheinfo 160000," + Git(leaf, "rev-parse HEAD") + ",vendor/second");
+        Git(child, "commit --quiet -m synthetic-child");
+        Git(_root, "update-index --add --cacheinfo 160000," + Git(child, "rev-parse HEAD") + ",vendor/first");
+        Git(_root, "add MyDmsVn.sln deployment");
+        Git(_root, "commit --quiet -m synthetic-root");
+        return leaf;
+    }
+
     private static string Git(string root, string arguments)
     {
         var start = new ProcessStartInfo("git",

@@ -16,6 +16,7 @@ internal sealed class Web6CandidateBackendSource
     { Root = root; _identity = identity; _readIdentity = readIdentity; }
 
     internal string Root { get; }
+    internal string Commit => _identity.Sha;
 
     internal static string ResolveRoot(string startDirectory)
     {

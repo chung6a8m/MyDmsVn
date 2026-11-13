@@ -312,7 +312,7 @@ public sealed class Web6CutoverSelectorTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(refused.Path, "host")));
     }
 
-    private Web6CutoverSelector Selector(Func<string, (string Root, string Sha, string Tree)>? git = null, string? pairHash = null) =>
+    internal Web6CutoverSelector Selector(Func<string, (string Root, string Sha, string Tree)>? git = null, string? pairHash = null) =>
         new Web6CutoverSelector(_authority, FrontendRoot, BackendRoot, ArchivedDist, OldPublish, CurrentPublish,
             _publishHash, pairHash ?? _pairHash, git ?? (root => (root.Replace('\\', '/'), Sha(root), Tree)));
     private string Sha(string root) => root == FrontendRoot ? Web6CandidateCutoverPlan.FrontendArchiveSha : Web6CandidateCutoverPlan.BackendArchiveSha;
