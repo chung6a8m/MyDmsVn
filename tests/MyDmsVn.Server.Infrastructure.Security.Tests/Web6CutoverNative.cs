@@ -5,6 +5,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
@@ -50,7 +51,7 @@ internal static class Web6CutoverNative
                 try
                 {
                     if (!child.HasExited && identityCaptured)
-                        TerminateVerified(child.VerifyIdentity, child.Terminate, deadline, token);
+                        TerminateVerified(child.VerifyRunningIdentity, child.Terminate, deadline, token);
                 }
                 catch (Exception failure) { failures.Add(failure); }
 
@@ -112,10 +113,11 @@ internal static class Web6CutoverNative
         deadline.Observe(kill, token);
     }
 
-    internal static void VerifyHandle(Process process, int id, DateTime start, string executable)
+    internal static void VerifyRunningHandle(Process process, SafeProcessHandle? handle, int id, DateTime start, string executable)
     {
         process.Refresh();
-        if (process.HasExited || process.Id != id || process.StartTime.ToUniversalTime() != start ||
+        if (handle == null || handle.IsInvalid || handle.IsClosed || !ReferenceEquals(process.SafeHandle, handle) ||
+            process.HasExited || process.Id != id || process.StartTime.ToUniversalTime() != start ||
             !string.Equals(Path.GetFullPath(process.MainModule!.FileName), Path.GetFullPath(executable), StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Owned process handle identity changed.");
     }
@@ -150,7 +152,7 @@ internal interface IWeb6CutoverChild : IDisposable
 {
     bool Start();
     void CaptureIdentity();
-    void VerifyIdentity();
+    void VerifyRunningIdentity();
     bool HasExited { get; }
     void Terminate();
     // Completes successfully only when this exact owned process has exited.
@@ -169,6 +171,7 @@ internal sealed class Web6CutoverProcessChild : IWeb6CutoverChild
     private readonly string _executable;
     private readonly int _maximumOutput;
     private readonly TaskCompletionSource<bool> _exited = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    private SafeProcessHandle? _handle;
     private int _id;
     private DateTime _started;
 
@@ -183,11 +186,15 @@ internal sealed class Web6CutoverProcessChild : IWeb6CutoverChild
     public bool Start() => _process.Start();
     public void CaptureIdentity()
     {
+        // The direct launch retains its process handle after natural exit. Module inspection
+        // requires a running process and belongs to the termination check.
+        var handle = _process.SafeHandle;
+        if (handle.IsInvalid || handle.IsClosed) throw new InvalidDataException("Owned process handle is unavailable.");
         _id = _process.Id;
         _started = _process.StartTime.ToUniversalTime();
-        VerifyIdentity();
+        _handle = handle;
     }
-    public void VerifyIdentity() => Web6CutoverNative.VerifyHandle(_process, _id, _started, _executable);
+    public void VerifyRunningIdentity() => Web6CutoverNative.VerifyRunningHandle(_process, _handle, _id, _started, _executable);
     public bool HasExited
     {
         get

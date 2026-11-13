@@ -66,6 +66,22 @@ Each project below passed `dotnet restore <project> --locked-mode` and `dotnet b
 
 Frontend `package-lock.json` SHA-256 is `283593a2d944b2031ce57c8c8a59f18755e51b25ab6767571ef3ffdd341f55e9`. The installed Playwright worker used by the unit source assertion has SHA-256 `b7ae55d578fb3a2a6bd4d9acc0abf93146ae1d9062330bbc0e3f82acbff751b8`. The candidate checks use existing locked dependencies. Both worktrees passed `git diff --check`.
 
+## Final-review correction for early natural child exit
+
+Backend parent `52b1ea4b0ed78dfc8d15c784a88eb9ae947d0739` called the running-process check during identity capture. A child could exit after a successful direct launch and be rejected before its output was read. This correction captures the retained launch handle, PID and start time. Before terminating a running child, the adapter verifies the same handle, PID, start time and executable path. The child lifecycle joins proven exit and both output readers before exposing the exit code to the existing service-state validator.
+
+The regression gates the real adapter on a disposable local `cmd.exe` exit before capture. Exit-code rows 0 and 7 reproduce the original failure and verify both streams and exit-code handling after the correction. A live disposable child checks that a different handle or image path prevents termination. Controlled stdout and stderr cases separately verify that the lifecycle retains ownership until each reader completes. These fixtures use no HTTP.sys, SQL, IIS, browser, or retained resources.
+
+The locked Security.Tests Release/net48 build passed with zero warnings or errors. The frontend remained at `96842a6329191713282b3212e5420872eb0f3a41`. The integrated selection above was rerun with that checkout configured, and its exact-source paired test passed.
+
+| Selection | Discovered / executed | Passed / failed / skipped | TRX SHA-256 |
+| --- | ---: | ---: | --- |
+| Early-exit RED | 2 / 2 | 0 / 2 / 0 | `213caf29c83fc1781701842d9d843fbc24cb36d8d9cbd83f1194f832b2a276cf` |
+| Focused final | 73 / 73 | 73 / 0 / 0 | `1d64ba8d74b78e863d67e250caa884b7261ef2e1d178fc569a67045db2dcc30e` |
+| Integrated final | 732 / 732 | 732 / 0 / 0 | `dea6cdd9f2b575efa01ea349f75e786b0585082f0dfaaeddfd56e5bb4b478a99` |
+
+The corrected Security.Tests assembly SHA-256 is `fb7c3d78b00e5e1a6be91f7b8044987a5e005dd86f913db0d62e161076d81520`. The 729-case result above records the prior backend source.
+
 ## Acceptance boundary
 
 Real SQL, IIS Express, full IIS, Chromium/Edge cutover, native process/provider deadline containment, workload, recovery and Narrator acceptance were **NOT RUN** in this checkpoint. The tests exercised disposable filesystem/Git, fake toolchain and synthetic deadline/controller fixtures. No live approval or candidate was created. Ordinary resend is **OFF**, staging is **NOT ACCEPTED** and production remains **NO-GO**.
