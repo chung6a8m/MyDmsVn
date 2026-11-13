@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -132,6 +132,72 @@ internal static class Web5IisExpressHostAdmission
         if (process == null) throw new ArgumentNullException(nameof(process));
         ValidateProcess(process, launch, expected: null);
         return new Web5IisExpressIdentity(process, launch, HashConfiguration(launch.ConfigurationPath));
+    }
+
+    internal static Web5IisExpressIdentity Capture(Process process, Web5IisExpressLaunch launch,
+        Web6CutoverDeadline deadline, CancellationToken token)
+    {
+        deadline.ThrowIfExpired(token);
+        process.Refresh();
+        if (process.HasExited) throw new InvalidDataException("Owned IIS Express process has exited.");
+        var id = process.Id;
+        var start = process.StartTime.ToUniversalTime();
+        var observation = ObserveOptional(id, deadline, token) ?? throw new InvalidDataException("Owned IIS Express process is absent.");
+        var identity = deadline.Observe(() => Capture(id, start, observation, launch), token);
+        VerifyOwnedProcess(identity, process, deadline, token);
+        return identity;
+    }
+
+    internal static void VerifyOwnedProcess(Web5IisExpressIdentity identity, Process process,
+        Web6CutoverDeadline deadline, CancellationToken token)
+    {
+        var observed = ObserveOptional(identity.Process.ProcessId, deadline, token) ?? throw new InvalidDataException("Owned IIS Express process is absent.");
+        deadline.Observe(() =>
+        {
+            process.Refresh();
+            if (process.HasExited) throw new InvalidDataException("Owned IIS Express process exited.");
+            ValidateOwnedHandleIdentity(process.Id, process.StartTime.ToUniversalTime(), observed);
+            ValidateProcess(observed, identity.Launch, identity.Process);
+        }, token);
+    }
+
+    internal static async Task<Web5HttpRequestQueue> VerifyAsync(Web5IisExpressIdentity identity,
+        Web6CutoverDeadline deadline, CancellationToken token)
+    {
+        var before = ObserveOptional(identity.Process.ProcessId, deadline, token) ?? throw new InvalidDataException("Owned IIS Express process is absent.");
+        deadline.Observe(() => { ValidateProcess(before, identity.Launch, identity.Process); ValidateConfiguration(identity); }, token);
+        var snapshot = await Web5HttpServiceState.ReadAsync(deadline, token);
+        var queue = deadline.Observe(() => ValidateEvidence(identity, before, snapshot), token);
+        var after = ObserveOptional(identity.Process.ProcessId, deadline, token) ?? throw new InvalidDataException("Owned IIS Express process is absent.");
+        deadline.Observe(() => ValidateProcess(after, identity.Launch, identity.Process), token);
+        return queue;
+    }
+
+    internal static Task WaitForAdmissionAsync(Web5IisExpressIdentity identity, Process process,
+        Web6CutoverDeadline deadline, CancellationToken token) => Poll(async () =>
+        {
+            if (process.HasExited) throw new IOException("Owned IIS Express process exited before admission.");
+            await VerifyAsync(identity, deadline, token);
+        }, deadline, token);
+
+    internal static Task WaitForAbsenceAsync(Web5IisExpressIdentity identity, Web6CutoverDeadline deadline,
+        CancellationToken token) => Poll(async () =>
+        {
+            var observation = ObserveOptional(identity.Process.ProcessId, deadline, token);
+            var snapshot = await Web5HttpServiceState.ReadAsync(deadline, token);
+            deadline.Observe(() => ValidateAbsent(identity, observation, snapshot), token);
+        }, deadline, token);
+
+    internal static async Task Poll(Func<Task> observe, Web6CutoverDeadline deadline, CancellationToken token,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
+    {
+        while (true)
+        {
+            deadline.ThrowIfExpired(token);
+            try { await observe(); deadline.ThrowIfExpired(token); return; }
+            catch (InvalidDataException) { }
+            await deadline.Delay(TimeSpan.FromMilliseconds(200), token, delay);
+        }
     }
 
     internal static async Task<Web5HttpRequestQueue> VerifyAsync(Web5IisExpressIdentity identity, CancellationToken token)
@@ -277,14 +343,18 @@ internal static class Web5IisExpressHostAdmission
             throw new InvalidDataException("Owned IIS Express process identity is unavailable.");
     }
 
-    private static Web5IisExpressProcessObservation? ObserveOptional(int processId)
+    private static Web5IisExpressProcessObservation? ObserveOptional(int processId, Web6CutoverDeadline? deadline = null, CancellationToken token = default)
     {
         try
         {
             using var searcher = new ManagementObjectSearcher("SELECT ProcessId,CreationDate,ExecutablePath,CommandLine FROM Win32_Process WHERE ProcessId=" +
                 processId.ToString(CultureInfo.InvariantCulture));
+            deadline?.ThrowIfExpired(token);
+            if (deadline != null) searcher.Options = new EnumerationOptions { Timeout = deadline.Remaining, ReturnImmediately = false };
             using var results = searcher.Get();
+            deadline?.ThrowIfExpired(token);
             var rows = results.Cast<ManagementObject>().ToArray();
+            deadline?.ThrowIfExpired(token);
             if (rows.Length == 0) return null;
             if (rows.Length != 1) throw new InvalidDataException("Owned IIS Express process identity is ambiguous.");
             using var row = rows[0];
@@ -296,6 +366,7 @@ internal static class Web5IisExpressHostAdmission
             var start = ManagementDateTimeConverter.ToDateTime(creation).ToUniversalTime();
             if (row["ProcessId"] is not uint observedProcessId || observedProcessId != (uint)processId)
                 throw new InvalidDataException("Owned IIS Express WMI process identifier changed.");
+            deadline?.ThrowIfExpired(token);
             return new Web5IisExpressProcessObservation((int)observedProcessId, start, executable!, command!);
         }
         catch (ManagementException exception)

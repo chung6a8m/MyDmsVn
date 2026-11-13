@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -196,6 +196,49 @@ internal static class Web5HttpServiceState
         await drained;
         return ValidateCommandResult(process.ExitCode, await output, await error);
     }
+
+#if !WEB6_BOOTSTRAP
+    internal static async Task<string> ReadAsync(Web6CutoverDeadline deadline, CancellationToken token)
+    {
+        deadline = deadline.Clamp(TimeSpan.FromSeconds(10));
+        using var phase = deadline.Link(token); token = phase.Token;
+        var executable = Path.Combine(Environment.SystemDirectory, "netsh.exe");
+        var start = new ProcessStartInfo(executable, "http show servicestate view=requestq verbose=yes")
+        {
+            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardOutput = true, RedirectStandardError = true,
+        };
+        using var process = new Process { StartInfo = start };
+        if (!deadline.Observe(process.Start, token)) throw new InvalidDataException("HTTP service-state reader did not start.");
+        var id = process.Id;
+        var created = process.StartTime.ToUniversalTime();
+        deadline.Observe(() => Web6CutoverNative.VerifyHandle(process, id, created, executable), token);
+        var output = Web6CutoverNative.ReadOutput(process.StandardOutput.BaseStream, process.StandardOutput.CurrentEncoding, MaximumSnapshotLength, token);
+        var error = Web6CutoverNative.ReadOutput(process.StandardError.BaseStream, process.StandardError.CurrentEncoding, 4096, token);
+        Exception? primary = null;
+        try
+        {
+            // Reserve part of the same phase for a verified termination and both output drains.
+            var work = deadline.Clamp(TimeSpan.FromTicks(deadline.Remaining.Ticks / 2));
+            try { await Web6CutoverNative.WaitForExit(() => process.HasExited, work, token); }
+            catch (TimeoutException)
+            {
+                Web6CutoverNative.TerminateVerified(() => Web6CutoverNative.VerifyHandle(process, id, created, executable), process.Kill, deadline, token);
+                await Web6CutoverNative.WaitForExit(() => process.HasExited, deadline, token);
+                throw;
+            }
+        }
+        catch (Exception failure) { primary = failure; }
+        try { await Web6CutoverNative.JoinOutput(output, error, deadline, token); }
+        catch (Exception drain)
+        {
+            if (primary != null) throw new AggregateException("Owned service-state read and drain failed.", primary, drain);
+            throw;
+        }
+        if (primary != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
+        return ValidateCommandResult(process.ExitCode, await output, await error);
+    }
+#endif
 
     internal static async Task<string> ReadBoundedAsync(TextReader reader, int maximumLength)
     {

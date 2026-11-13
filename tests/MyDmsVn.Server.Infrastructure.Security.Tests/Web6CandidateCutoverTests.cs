@@ -11,6 +11,64 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web6CandidateCutoverTests
 {
+    [Theory]
+    [InlineData((int)Web6CutoverPair.Current, false)]
+    [InlineData((int)Web6CutoverPair.Current, true)]
+    [InlineData((int)Web6CutoverPair.Old, false)]
+    [InlineData((int)Web6CutoverPair.Restored, false)]
+    public async Task Stable_readmission_observes_exact_pair_queue_and_health_then_rechecks_identity(int pairValue, bool cached)
+    {
+        var pair = (Web6CutoverPair)pairValue;
+        var plan = Plan();
+        var admission = Admission(plan, pair);
+        var calls = new List<string>();
+        await WebHostIisExpressTests.VerifyCutoverStableEvidence(plan, pair, cached, admission.Epoch, pair, cached, admission,
+            () => { calls.Add("identity-queue"); return Task.CompletedTask; },
+            () => { calls.Add("pinned-health"); return Task.CompletedTask; },
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(1)), default);
+        Assert.Equal(new[] { "identity-queue", "pinned-health", "identity-queue" }, calls);
+    }
+
+    [Theory]
+    [InlineData("pair")]
+    [InlineData("cached")]
+    [InlineData("epoch")]
+    [InlineData("schema")]
+    [InlineData("receipt")]
+    [InlineData("artifact")]
+    [InlineData("queue")]
+    [InlineData("health")]
+    public async Task Stable_readmission_refuses_mismatch_or_failed_observation(string fault)
+    {
+        var plan = Plan();
+        var admission = Admission(plan, Web6CutoverPair.Current);
+        if (fault == "schema") admission = admission.WithSchema(12);
+        if (fault == "receipt") admission = admission.WithReceipt(new string('0', 64));
+        if (fault == "artifact") admission = admission.WithArtifact(new string('0', 64));
+        var calls = new List<string>();
+        await Assert.ThrowsAsync<IOException>(() => WebHostIisExpressTests.VerifyCutoverStableEvidence(plan,
+            Web6CutoverPair.Current, false, fault == "epoch" ? Guid.Empty : plan.CurrentEpoch,
+            fault == "pair" ? Web6CutoverPair.Old : Web6CutoverPair.Current, fault == "cached", admission,
+            () => { calls.Add("queue"); if (fault == "queue") throw new IOException(); return Task.CompletedTask; },
+            () => { calls.Add("health"); if (fault == "health") throw new IOException(); return Task.CompletedTask; },
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(1)), default));
+        if (fault != "health") Assert.DoesNotContain("health", calls);
+    }
+
+    [Fact]
+    public async Task Stable_health_returning_after_deadline_does_not_acknowledge_success()
+    {
+        var plan = Plan();
+        var now = TimeSpan.Zero;
+        var calls = 0;
+        await Assert.ThrowsAsync<TimeoutException>(() => WebHostIisExpressTests.VerifyCutoverStableEvidence(plan,
+            Web6CutoverPair.Current, false, plan.CurrentEpoch, Web6CutoverPair.Current, false, Admission(plan, Web6CutoverPair.Current),
+            () => { calls++; return Task.CompletedTask; },
+            () => { now = TimeSpan.FromSeconds(2); return Task.CompletedTask; },
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(1), () => now), default));
+        Assert.Equal(1, calls);
+    }
+
     private const string FrontendArchive = "ea104582a5aa4bcdf0d04999296a30a3c43e450e";
     private const string BackendArchive = "a3f3db16381a38bdf0b76e8ab36cb55bec02bbd2";
     private static readonly string FrontendTree = new string('a', 40);
@@ -324,7 +382,7 @@ public sealed class Web6CandidateCutoverTests
     public async Task Restored_admission_failure_cannot_complete_lifecycle()
     {
         var runtime = new RecordingRuntime { FailRestored = true };
-        var session = new Web6CutoverSession(Plan(), runtime); await session.Begin(CancellationToken.None);
+        var session = new Web6CutoverSession(Plan(), runtime); await session.Begin(new Web6CutoverDeadline(TimeSpan.FromSeconds(210)), CancellationToken.None);
         var committed = Guid.NewGuid(); var unknown = Guid.NewGuid();
         await Handle(session, "committedUnavailable", committed, Proof(committed));
         await Handle(session, "sameEpochRestart", unknown);
@@ -341,7 +399,7 @@ public sealed class Web6CandidateCutoverTests
     };
 
     private static Task<JObject> Handle(Web6CutoverSession session, string action, Guid? operation, JObject? proof = null) =>
-        session.Handle(new Web6CutoverRequest(action, operation, proof, TimeSpan.FromSeconds(10)), CancellationToken.None);
+        session.Handle(new Web6CutoverRequest(action, operation, proof, TimeSpan.FromSeconds(10)), new Web6CutoverDeadline(TimeSpan.FromSeconds(210)), CancellationToken.None);
 
     [Fact]
     public void Cutover_acceptance_gate_cannot_turn_missing_prerequisites_into_a_pass()
@@ -619,7 +677,7 @@ public sealed class Web6CandidateCutoverTests
     {
         var runtime = new RecordingRuntime();
         var session = new Web6CutoverSession(Plan(), runtime);
-        await session.Begin(CancellationToken.None);
+        await session.Begin(new Web6CutoverDeadline(TimeSpan.FromSeconds(210)), CancellationToken.None);
         var id = Guid.NewGuid();
         await Handle(session, "oldClientNewHostOn", null);
         await Handle(session, "verifyNoCutoverMutation", Guid.NewGuid());
@@ -641,7 +699,7 @@ public sealed class Web6CandidateCutoverTests
             "Current:current", "committed", "unavailable", "zero", "identity", "Current:current", "identity", "grant:False", "grant:True",
             "Restored:current", "zero" }, runtime.Calls);
         var incomplete = new Web6CutoverSession(Plan(), new RecordingRuntime());
-        await incomplete.Begin(CancellationToken.None);
+        await incomplete.Begin(new Web6CutoverDeadline(TimeSpan.FromSeconds(210)), CancellationToken.None);
         Assert.Throws<InvalidDataException>(incomplete.VerifyComplete);
     }
 
@@ -650,7 +708,7 @@ public sealed class Web6CandidateCutoverTests
     {
         var runtime = new RecordingRuntime { RejectCommitted = true };
         var session = new Web6CutoverSession(Plan(), runtime);
-        await session.Begin(CancellationToken.None);
+        await session.Begin(new Web6CutoverDeadline(TimeSpan.FromSeconds(210)), CancellationToken.None);
         var id = Guid.NewGuid();
         await Assert.ThrowsAsync<InvalidDataException>(() => Handle(session, "committedUnavailable", id, Proof(id)));
         Assert.DoesNotContain("unavailable", runtime.Calls);
@@ -702,14 +760,14 @@ public sealed class Web6CandidateCutoverTests
         internal List<string> Calls { get; } = new List<string>();
         internal bool RejectCommitted;
         internal bool FailRestored;
-        public Task Switch(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token) { Calls.Add(pair + (cached ? ":cached" : ":current")); if (FailRestored && pair == Web6CutoverPair.Restored) throw new IOException("restored admission failed"); return Task.CompletedTask; }
-        public Task VerifyStableAdmission(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token) => Task.CompletedTask;
-        public Task VerifyOperation(Guid id, bool committed, CancellationToken token) { Calls.Add(committed ? "committed" : "identity"); if (committed && RejectCommitted) throw new InvalidDataException(); return Task.CompletedTask; }
-        public Task VerifyCommittedSetup(Web6CommittedSetup proof, CancellationToken token) => VerifyOperation(proof.Operation, true, token);
-        public Task VerifyLifecycle(CancellationToken token) => Task.CompletedTask;
-        public Task SetGrant(bool granted, CancellationToken token) { Calls.Add("grant:" + granted); return Task.CompletedTask; }
-        public Task MakeCommittedUnavailable(Guid id, CancellationToken token) { Calls.Add("unavailable"); return Task.CompletedTask; }
-        public Task VerifyZeroMutation(Guid id, CancellationToken token) { Calls.Add("zero"); return Task.CompletedTask; }
+        public Task Switch(Web6CutoverPair pair, bool cached, Guid epoch, Web6CutoverDeadline deadline, CancellationToken token) { Calls.Add(pair + (cached ? ":cached" : ":current")); if (FailRestored && pair == Web6CutoverPair.Restored) throw new IOException("restored admission failed"); return Task.CompletedTask; }
+        public Task VerifyStableAdmission(Web6CutoverPair pair, bool cached, Guid epoch, Web6CutoverDeadline deadline, CancellationToken token) => Task.CompletedTask;
+        public Task VerifyOperation(Guid id, bool committed, Web6CutoverDeadline deadline, CancellationToken token) { Calls.Add(committed ? "committed" : "identity"); if (committed && RejectCommitted) throw new InvalidDataException(); return Task.CompletedTask; }
+        public Task VerifyCommittedSetup(Web6CommittedSetup proof, Web6CutoverDeadline deadline, CancellationToken token) => VerifyOperation(proof.Operation, true, deadline, token);
+        public Task VerifyLifecycle(Web6CutoverDeadline deadline, CancellationToken token) => Task.CompletedTask;
+        public Task SetGrant(bool granted, Web6CutoverDeadline deadline, CancellationToken token) { Calls.Add("grant:" + granted); return Task.CompletedTask; }
+        public Task MakeCommittedUnavailable(Guid id, Web6CutoverDeadline deadline, CancellationToken token) { Calls.Add("unavailable"); return Task.CompletedTask; }
+        public Task VerifyZeroMutation(Guid id, Web6CutoverDeadline deadline, CancellationToken token) { Calls.Add("zero"); return Task.CompletedTask; }
     }
 
     private static Web6CandidateExpected CurrentExpected() => new Web6CandidateExpected("web6-current",

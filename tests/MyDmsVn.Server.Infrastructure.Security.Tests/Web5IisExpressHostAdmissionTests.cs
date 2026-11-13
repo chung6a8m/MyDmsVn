@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -10,6 +10,65 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web5IisExpressHostAdmissionTests
 {
+    [Fact]
+    public async Task Queue_poll_final_iteration_never_restarts_an_expired_phase()
+    {
+        var now = TimeSpan.Zero;
+        var calls = 0;
+        var deadline = new Web6CutoverDeadline(TimeSpan.FromMilliseconds(10), () => now);
+        await Assert.ThrowsAsync<TimeoutException>(() => Web5IisExpressHostAdmission.Poll(
+            () => { calls++; throw new InvalidDataException(); }, deadline, default,
+            (duration, token) => { Assert.Equal(TimeSpan.FromMilliseconds(10), duration); now += duration; return Task.CompletedTask; }));
+        Assert.Equal(1, calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Process_termination_requires_successful_fresh_identity_verification(bool expired)
+    {
+        var now = TimeSpan.Zero;
+        var deadline = new Web6CutoverDeadline(TimeSpan.FromSeconds(1), () => now);
+        var killed = false;
+        Assert.ThrowsAny<Exception>(() => Web6CutoverNative.TerminateVerified(
+            () => { if (expired) now = TimeSpan.FromSeconds(2); else throw new InvalidDataException(); },
+            () => killed = true, deadline, default));
+        Assert.False(killed);
+    }
+
+    [Fact]
+    public async Task Owned_process_wait_is_clamped_to_final_phase_remainder()
+    {
+        var now = TimeSpan.Zero;
+        var polls = 0;
+        var deadline = new Web6CutoverDeadline(TimeSpan.FromMilliseconds(3), () => now);
+        await Assert.ThrowsAsync<TimeoutException>(() => Web6CutoverNative.WaitForExit(() => { polls++; return false; }, deadline, default,
+            (duration, token) => { Assert.Equal(TimeSpan.FromMilliseconds(3), duration); now += duration; return Task.CompletedTask; }));
+        Assert.Equal(1, polls);
+    }
+
+    [Fact]
+    public async Task Health_poll_clamps_its_request_and_final_delay_to_the_shared_phase()
+    {
+        var now = TimeSpan.Zero;
+        var probes = 0;
+        var deadline = new Web6CutoverDeadline(TimeSpan.FromMilliseconds(50), () => now);
+        await Assert.ThrowsAsync<TimeoutException>(() => WebHostIisExpressTests.PollCutoverHealth((request, token) =>
+        {
+            probes++;
+            Assert.True(token.CanBeCanceled);
+            Assert.Equal(TimeSpan.FromMilliseconds(50), request.Remaining);
+            now = TimeSpan.FromMilliseconds(40);
+            return Task.FromResult(false);
+        }, deadline, default, (delay, token) =>
+        {
+            Assert.Equal(TimeSpan.FromMilliseconds(10), delay);
+            now += delay;
+            return Task.CompletedTask;
+        }));
+        Assert.Equal(1, probes);
+    }
+
     private const string QueueSnapshot = @"
 Snapshot of HTTP service state (Request Queue View):
 -----------------------------------------------------

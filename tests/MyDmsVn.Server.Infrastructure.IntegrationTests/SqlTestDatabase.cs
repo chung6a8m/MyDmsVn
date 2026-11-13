@@ -316,8 +316,13 @@ internal sealed class SqlTestDatabase : IDisposable
     }
 
     // Validate the actual reset connection, not just a name or connection-string target.
-    internal async Task VerifyOwnershipAsync(SqlConnection connection, CancellationToken cancellationToken)
+    internal Task VerifyOwnershipAsync(SqlConnection connection, CancellationToken cancellationToken) =>
+        VerifyOwnershipAsync(connection, 30, cancellationToken);
+
+    internal async Task VerifyOwnershipAsync(SqlConnection connection, int commandTimeout, CancellationToken cancellationToken)
     {
+        if (commandTimeout <= 0 || commandTimeout > 30) throw new ArgumentOutOfRangeException(nameof(commandTimeout));
+        cancellationToken.ThrowIfCancellationRequested();
         if (Volatile.Read(ref _disposeState) != 0)
         {
             throw new InvalidOperationException("The SQL test allocation is disposing or disposed.");
@@ -335,6 +340,7 @@ internal sealed class SqlTestDatabase : IDisposable
             "(SELECT CONVERT(nvarchar(128),value) FROM sys.extended_properties " +
             "WHERE class=0 AND name=N'MyDmsVn.TestOwnership') " +
             "FROM sys.databases WHERE database_id=DB_ID();");
+        command.CommandTimeout = commandTimeout;
         using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ||
             reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(4) ||

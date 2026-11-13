@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
@@ -256,73 +256,92 @@ WHERE j.OperationId=@operation;", new { operation = operationId }, cancellationT
         }
     }
 
-    internal static async Task VerifyOneEffectAsync(SqlConnection sql, Guid operationId, CancellationToken cancellationToken, byte[]? retainedCanonicalResult = null)
+    internal static async Task VerifyOneEffectAsync(SqlConnection sql, Guid operationId, byte[]? retainedCanonicalResult,
+        Web6CutoverDeadline deadline, CancellationToken cancellationToken)
+    {
+        await VerifyOneEffectAsync(sql, operationId, cancellationToken, retainedCanonicalResult, () => deadline.SqlTimeout(cancellationToken));
+        deadline.ThrowIfExpired(cancellationToken);
+    }
+
+    internal static async Task VerifyOneEffectAsync(SqlConnection sql, Guid operationId, CancellationToken cancellationToken, byte[]? retainedCanonicalResult = null, Func<int>? commandTimeout = null)
     {
         var count = await sql.QuerySingleAsync<int>(new SqlTestCommand(
             "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE OperationId=@operation AND Disposition='COMMITTED';",
-            new { operation = operationId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            new { operation = operationId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         if (count != 1) throw Invalid();
         var row = await sql.QuerySingleAsync<JournalRow>(new SqlTestCommand(@"
 SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes
 FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation;",
-            new { operation = operationId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
-        await VerifyPhysicalEffect(sql, row, null, cancellationToken).ConfigureAwait(false);
+            new { operation = operationId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        await VerifyPhysicalEffect(sql, row, null, cancellationToken, commandTimeout).ConfigureAwait(false);
         var envelope = ValidateCanonicalResultBytes(row.OperationKind, retainedCanonicalResult ?? row.ResultBytes);
-        await VerifyResultProjection(sql, row, envelope, cancellationToken).ConfigureAwait(false);
+        await VerifyResultProjection(sql, row, envelope, cancellationToken, commandTimeout).ConfigureAwait(false);
     }
 
     internal static async Task VerifyRecoveryPostAsync(SqlConnection sql, Guid operationId,
-        Web6StockExpectation stock, CancellationToken cancellationToken)
+        Web6StockExpectation stock, CancellationToken cancellationToken, Func<int>? commandTimeout = null)
     {
         var row = await sql.QuerySingleAsync<JournalRow>(new SqlTestCommand(@"
 SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes
 FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId
 WHERE j.OperationId=@operation AND j.Disposition='COMMITTED';",
-            new { operation = operationId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            new { operation = operationId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         if (row.OperationKind is not (3 or 6)) throw Invalid();
-        await VerifyPhysicalEffect(sql, row, stock ?? throw Invalid(), cancellationToken).ConfigureAwait(false);
-        await VerifyResultProjection(sql, row, ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes), cancellationToken).ConfigureAwait(false);
+        await VerifyPhysicalEffect(sql, row, stock ?? throw Invalid(), cancellationToken, commandTimeout).ConfigureAwait(false);
+        await VerifyResultProjection(sql, row, ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes), cancellationToken, commandTimeout).ConfigureAwait(false);
     }
 
-    internal static async Task<long> VerifyCommittedSetupAsync(SqlConnection sql, Web6CommittedSetup proof, Guid epoch)
+    internal static Task<long> VerifyCommittedSetupAsync(SqlConnection sql, Web6CommittedSetup proof, Guid epoch) =>
+        VerifyCommittedSetupCore(sql, proof, epoch, default, null);
+
+    internal static async Task<long> VerifyCommittedSetupAsync(SqlConnection sql, Web6CommittedSetup proof, Guid epoch,
+        Web6CutoverDeadline deadline, CancellationToken cancellationToken)
     {
-        var rows = (await sql.QueryAsync<JournalRow>(@"
+        var result = await VerifyCommittedSetupCore(sql, proof, epoch, cancellationToken, () => deadline.SqlTimeout(cancellationToken));
+        deadline.ThrowIfExpired(cancellationToken);
+        return result;
+    }
+
+    private static async Task<long> VerifyCommittedSetupCore(SqlConnection sql, Web6CommittedSetup proof, Guid epoch,
+        CancellationToken cancellationToken, Func<int>? commandTimeout)
+    {
+        var rows = (await sql.QueryAsync<JournalRow>(new SqlTestCommand(@"
 SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes
 FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation;",
-            new { operation = proof.Operation })).ToArray();
+            new { operation = proof.Operation }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken))).ToArray();
         if (rows.Length != 1) throw Invalid();
         var row = rows[0];
         proof.VerifyJournal(row.OperationId, row.OperationKind, ToHex(row.RequestFingerprint), row.DeploymentEpoch, epoch,
             row.Disposition, row.Actor, row.RequestTargetId, row.ResultDocumentId);
         var envelope = ValidateCanonicalResultBytes(row.OperationKind, row.ResultBytes);
-        await VerifyPhysicalEffect(sql, row, null, CancellationToken.None);
-        await VerifyResultProjection(sql, row, envelope, CancellationToken.None);
+        await VerifyPhysicalEffect(sql, row, null, cancellationToken, commandTimeout);
+        await VerifyResultProjection(sql, row, envelope, cancellationToken, commandTimeout);
         return row.ResultDocumentId;
     }
 
     internal const string SalesHeaderProjectionSql =
         "SELECT SaleId,SaleNo AS SaleNumber,SaleDate,CustomerId,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.SalesReceipts WHERE SaleId=@id;";
 
-    private static async Task VerifyResultProjection(SqlConnection sql, JournalRow row, JObject envelope, CancellationToken cancellationToken)
+    private static async Task VerifyResultProjection(SqlConnection sql, JournalRow row, JObject envelope, CancellationToken cancellationToken, Func<int>? commandTimeout = null)
     {
         if (row.OperationKind is 1 or 2)
         {
             var header = await sql.QuerySingleAsync<SalesHeader>(new SqlTestCommand(
                 SalesHeaderProjectionSql,
-                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                new { id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
             var lines = (await sql.QueryAsync<SalesLine>(new SqlTestCommand(
                 "SELECT SaleLineId,[LineNo],ProductId,Qty,UnitPrice,IsGift,LineAmount FROM dbo.SalesReceiptLines WHERE SaleId=@id ORDER BY [LineNo];",
-                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
+                new { id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
             ValidateDraftProjection(row.OperationKind, envelope, header.Json(), new JArray(lines.Select(line => line.Json())));
         }
         else if (row.OperationKind is 4 or 5)
         {
             var header = await sql.QuerySingleAsync<ReceiptHeader>(new SqlTestCommand(
                 "SELECT ReceiptId,ReceiptNo ReceiptNumber,ReceiptDate,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
-                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                new { id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
             var lines = (await sql.QueryAsync<ReceiptLine>(new SqlTestCommand(
                 "SELECT ReceiptLineId,[LineNo] LineNumber,ProductId,Quantity,UnitCost FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id ORDER BY [LineNo];",
-                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
+                new { id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
             ValidateDraftProjection(row.OperationKind, envelope, header.Json(), new JArray(lines.Select(line => line.Json())));
         }
         else
@@ -332,7 +351,7 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE 
             var posted = await sql.QuerySingleAsync<PostHeader>(new SqlTestCommand(row.OperationKind == 3
                 ? "SELECT Status,PostedAtUtc,RowVersion FROM dbo.SalesReceipts WHERE SaleId=@id;"
                 : "SELECT Status,PostedAtUtc,CAST(NULL AS binary(8)) RowVersion FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
-                new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                new { id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
             if ((string?)data[idName] != row.ResultDocumentId.ToString(CultureInfo.InvariantCulture) || (string?)data["status"] != posted.Status ||
                 !DateTime.TryParse((string?)data["postedAtUtc"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var expectedPosted) ||
                 expectedPosted != DateTime.SpecifyKind(posted.PostedAtUtc, DateTimeKind.Utc) ||
@@ -340,24 +359,24 @@ FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE 
         }
     }
 
-    private static async Task VerifyPhysicalEffect(SqlConnection sql, JournalRow row, Web6StockExpectation? stock, CancellationToken cancellationToken)
+    private static async Task VerifyPhysicalEffect(SqlConnection sql, JournalRow row, Web6StockExpectation? stock, CancellationToken cancellationToken, Func<int>? commandTimeout = null)
     {
         var sales = row.OperationKind <= 3;
         var exists = await sql.QuerySingleAsync<int>(new SqlTestCommand(sales
             ? "SELECT COUNT(*) FROM dbo.SalesReceipts WHERE SaleId=@id;"
-            : "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE ReceiptId=@id;", new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            : "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE ReceiptId=@id;", new { id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         if (exists != 1) throw Invalid();
         if (row.OperationKind is not (3 or 6)) return;
         var posted = await sql.QuerySingleAsync<int>(new SqlTestCommand(sales
             ? "SELECT COUNT(*) FROM dbo.SalesReceipts WHERE SaleId=@id AND Status='Posted' AND PostedAtUtc IS NOT NULL;"
             : "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE ReceiptId=@id AND Status='Posted' AND PostedAtUtc IS NOT NULL;",
-            new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            new { id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         var sourceLines = await sql.QuerySingleAsync<int>(new SqlTestCommand(sales
             ? "SELECT COUNT(*) FROM dbo.SalesReceiptLines WHERE SaleId=@id;"
-            : "SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id;", new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            : "SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id;", new { id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         var ledger = await sql.QuerySingleAsync<int>(new SqlTestCommand(
             "SELECT COUNT(*) FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId WHERE l.DocumentType=@type AND l.DocumentId=@id;",
-            new { type = sales ? "SalesReceipt" : "GoodsReceipt", id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            new { type = sales ? "SalesReceipt" : "GoodsReceipt", id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         var invalid = await sql.QuerySingleAsync<int>(new SqlTestCommand(sales ? @"
 SELECT COUNT(*) FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId
 JOIN dbo.SalesReceiptLines s ON s.SaleId=l.DocumentId AND s.SaleLineId=l.DocumentLineId
@@ -367,13 +386,13 @@ SELECT COUNT(*) FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.Led
 JOIN dbo.GoodsReceiptLines r ON r.ReceiptId=l.DocumentId AND r.ReceiptLineId=l.DocumentLineId
 WHERE l.DocumentType='GoodsReceipt' AND l.DocumentId=@id AND
 (l.QuantityChange<>r.Quantity OR v.ValueChange<>ROUND(r.Quantity*r.UnitCost,4));",
-            new { id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            new { id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         if (posted != 1 || sourceLines <= 0 || ledger != sourceLines || invalid != 0) throw Invalid();
         if (stock != null)
         {
             var keys = (await sql.QueryAsync<StockKey>(new SqlTestCommand(
                 "SELECT DISTINCT WarehouseId,ProductId FROM dbo.StockLedger WHERE DocumentType=@type AND DocumentId=@id;",
-                new { type = sales ? "SalesReceipt" : "GoodsReceipt", id = row.ResultDocumentId }, cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
+                new { type = sales ? "SalesReceipt" : "GoodsReceipt", id = row.ResultDocumentId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false)).ToArray();
             if (keys.Length == 0) throw Invalid();
             foreach (var key in keys)
             {
@@ -381,10 +400,10 @@ WHERE l.DocumentType='GoodsReceipt' AND l.DocumentId=@id AND
                 var movement = await sql.QuerySingleAsync<StockMovement>(new SqlTestCommand(@"
 SELECT COALESCE(SUM(l.QuantityChange),0) QuantityChange,COALESCE(SUM(v.ValueChange),0) ValueChange
 FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId
-WHERE l.WarehouseId=@warehouse AND l.ProductId=@product;", new { warehouse = key.WarehouseId, product = key.ProductId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+WHERE l.WarehouseId=@warehouse AND l.ProductId=@product;", new { warehouse = key.WarehouseId, product = key.ProductId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
                 var balance = await sql.QuerySingleAsync<StockBalance>(new SqlTestCommand(
                     "SELECT Quantity,InventoryValue FROM dbo.StockBalances WHERE WarehouseId=@warehouse AND ProductId=@product;",
-                    new { warehouse = key.WarehouseId, product = key.ProductId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                    new { warehouse = key.WarehouseId, product = key.ProductId }, commandTimeout: commandTimeout?.Invoke(), cancellationToken: cancellationToken)).ConfigureAwait(false);
                 ValidateStockBalance(Decimal(initial.Quantity), Decimal(initial.Value), Decimal(movement.QuantityChange), Decimal(movement.ValueChange), Decimal(balance.Quantity), Decimal(balance.InventoryValue));
             }
         }

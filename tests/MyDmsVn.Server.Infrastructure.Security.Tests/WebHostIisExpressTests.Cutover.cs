@@ -23,11 +23,57 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed partial class WebHostIisExpressTests
 {
+    internal static async Task VerifyCutoverStableEvidence(Web6CandidateCutoverPlan plan,
+        Web6CutoverPair pair, bool cached, Guid epoch, Web6CutoverPair observedPair, bool observedCached,
+        Web6CutoverAdmission admission, Func<Task> observeProcessAndQueue, Func<Task> observeHealth,
+        Web6CutoverDeadline deadline, CancellationToken token)
+    {
+        deadline.ThrowIfExpired(token);
+        if (pair != observedPair || cached != observedCached || (cached && pair != Web6CutoverPair.Current) || admission.Epoch != epoch)
+            throw new IOException("Cutover stable pair, client or epoch changed.");
+        new Web6CandidateCutoverCoordinator(plan).Admit(pair, admission);
+        await observeProcessAndQueue();
+        deadline.ThrowIfExpired(token);
+        await observeHealth();
+        deadline.ThrowIfExpired(token);
+        await observeProcessAndQueue();
+        deadline.ThrowIfExpired(token);
+    }
+
+    internal static async Task PollCutoverHealth(Func<Web6CutoverDeadline, CancellationToken, Task<bool>> probe,
+        Web6CutoverDeadline deadline, CancellationToken token, Func<TimeSpan, CancellationToken, Task>? delay = null)
+    {
+        while (true)
+        {
+            deadline.ThrowIfExpired(token);
+            var requestDeadline = deadline.Clamp(TimeSpan.FromSeconds(10));
+            using var requestCancellation = requestDeadline.Link(token);
+            try
+            {
+                if (await probe(requestDeadline, requestCancellation.Token))
+                {
+                    requestDeadline.ThrowIfExpired(requestCancellation.Token);
+                    return;
+                }
+            }
+            catch (WebException) { deadline.ThrowIfExpired(token); }
+            await deadline.Delay(TimeSpan.FromMilliseconds(250), token, delay);
+        }
+    }
+
     internal static Web5IisExpressLaunch CreateCutoverIisLaunch(string configuration, Uri origin) =>
         new Web5IisExpressLaunch(configuration, "Web2Smoke", origin);
 
-    internal static async Task<JObject> ReadCutoverLifecycleSnapshot(SqlConnection sql, bool current,
-        Func<SqlCommand, Task<object?>>? executeScalar = null)
+    internal static Task<JObject> ReadCutoverLifecycleSnapshot(SqlConnection sql, bool current,
+        Func<SqlCommand, Task<object?>>? executeScalar = null) =>
+        ReadCutoverLifecycleSnapshotCore(sql, current, null, default, executeScalar);
+
+    internal static Task<JObject> ReadCutoverLifecycleSnapshot(SqlConnection sql, bool current,
+        Web6CutoverDeadline deadline, CancellationToken token, Func<SqlCommand, Task<object?>>? executeScalar = null) =>
+        ReadCutoverLifecycleSnapshotCore(sql, current, deadline, token, executeScalar);
+
+    private static async Task<JObject> ReadCutoverLifecycleSnapshotCore(SqlConnection sql, bool current,
+        Web6CutoverDeadline? deadline, CancellationToken token, Func<SqlCommand, Task<object?>>? executeScalar)
     {
         var snapshot = new JObject();
         foreach (var (key, table, order) in new[]
@@ -55,9 +101,9 @@ public sealed partial class WebHostIisExpressTests
         {
             // The nested FOR JSON produces one nvarchar(max) value rather than wire chunks.
             var query = "SELECT ISNULL((" + select + " FOR JSON PATH,INCLUDE_NULL_VALUES), CONVERT(nvarchar(max), N'[]'));";
-            using var command = SqlOracleExtensions.Build(sql, new SqlTestCommand(query));
+            using var command = SqlOracleExtensions.Build(sql, deadline == null ? new SqlTestCommand(query) : deadline.Command(query, token));
             object? result;
-            try { result = await (executeScalar == null ? command.ExecuteScalarAsync() : executeScalar(command)).ConfigureAwait(false); }
+            try { result = await (executeScalar == null ? command.ExecuteScalarAsync(token) : executeScalar(command)).ConfigureAwait(false); deadline?.ThrowIfExpired(token); }
             catch (SqlException) { throw new IOException("Cutover snapshot " + source + " query failed."); }
             var rows = result is string json ? ParseRows(json) : null;
             return rows ?? throw new IOException("Cutover snapshot " + source + " returned an invalid JSON row array.");
@@ -118,6 +164,10 @@ public sealed partial class WebHostIisExpressTests
         private Web5IisExpressIdentity? _identity;
         private Web6CutoverAdmission? _admission;
         private Web6CutoverPair _active;
+        private bool _activeCached;
+        private Task<string>? _stdout, _stderr;
+        private CancellationTokenSource? _outputCancellation;
+        private Exception? _outputCancellationFailure;
         private bool _browserDrained = true, _hostDrained = true, _complete;
         private int _browsers;
         private JObject? _currentSnapshot, _oldSnapshot, _restoredSnapshot;
@@ -179,9 +229,9 @@ public sealed partial class WebHostIisExpressTests
             await Web6CutoverSelector.CreateLoginsAsync(pair => CreateLogin(pair, logins[pair])).ConfigureAwait(false);
             await Seed(_current, _currentLogin, Web6CutoverPair.Current); await Seed(_old, _oldLogin, Web6CutoverPair.Old);
             await Seed(_restored, _restoredLogin, Web6CutoverPair.Restored);
-            _currentSnapshot = await LifecycleSnapshot(_current.ConnectionString, true);
-            _oldSnapshot = await LifecycleSnapshot(_old.ConnectionString, false);
-            _restoredSnapshot = await LifecycleSnapshot(_restored.ConnectionString, true);
+            _currentSnapshot = await LifecycleSnapshot(_current.ConnectionString, true, new Web6CutoverDeadline(Web6CutoverBudgets.LifecyclePhase), token);
+            _oldSnapshot = await LifecycleSnapshot(_old.ConnectionString, false, new Web6CutoverDeadline(Web6CutoverBudgets.LifecyclePhase), token);
+            _restoredSnapshot = await LifecycleSnapshot(_restored.ConnectionString, true, new Web6CutoverDeadline(Web6CutoverBudgets.LifecyclePhase), token);
             return _plan;
         }
 
@@ -195,14 +245,21 @@ public sealed partial class WebHostIisExpressTests
             }).ConfigureAwait(false);
         }
 
-        private async Task VerifyDatabase(SqlTestDatabase database, SqlTestOwnershipManifest control, Web6CutoverPair pair, CancellationToken token)
+        private Task VerifyDatabase(SqlTestDatabase database, SqlTestOwnershipManifest control, Web6CutoverPair pair, CancellationToken token) =>
+            VerifyDatabase(database, control, pair, new Web6CutoverDeadline(Web6CutoverBudgets.SqlMutationOrOraclePhase), token);
+
+        private async Task VerifyDatabase(SqlTestDatabase database, SqlTestOwnershipManifest control, Web6CutoverPair pair, Web6CutoverDeadline deadline, CancellationToken token)
         {
+            deadline = deadline.Clamp(Web6CutoverBudgets.SqlMutationOrOraclePhase);
+            using var phase = deadline.Link(token); token = phase.Token;
             var current = pair != Web6CutoverPair.Old;
-            using var sql = new SqlConnection(database.ConnectionString); await sql.OpenAsync(token);
-            await database.VerifyOwnershipAsync(sql, token);
-            var fingerprint = await SqlSchemaDefinitionFingerprint.ReadAsync(sql, token);
+            using var sql = new SqlConnection(database.ConnectionString); await deadline.Open(sql, token);
+            await database.VerifyOwnershipAsync(sql, deadline.SqlTimeout(token), token);
+            deadline.ThrowIfExpired(token);
+            var fingerprint = await SqlSchemaDefinitionFingerprint.ReadAsync(sql, deadline.SqlTimeout(token), token);
+            deadline.ThrowIfExpired(token);
             Web6CutoverSqlApproval.RequireSchema(fingerprint, current ? SqlSchemaDefinitionFingerprint.Schema13 : SqlSchemaDefinitionFingerprint.Schema12);
-            var receipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(control, control.VerifiedDigest(), fingerprint,
+            var receipt = Web6CutoverSqlOwnershipReceipt.FromProtectedRecord(control, deadline.Observe(control.VerifiedDigest, token), fingerprint,
                 pair == Web6CutoverPair.Restored ? "restored-allocation" : current ? "current-allocation" : "old-allocation").Digest;
             if (receipt != (pair == Web6CutoverPair.Restored ? _plan.RestoredDatabaseReceipt : current ? _plan.CurrentDatabaseReceipt : _plan.OldDatabaseReceipt)) throw new IOException("Cutover ownership receipt changed.");
         }
@@ -296,17 +353,19 @@ public sealed partial class WebHostIisExpressTests
         public async Task<Web6CutoverAdmission> StartAndObserve(string browser, Web6CutoverPair pair, CancellationToken token)
         {
             _cleanupGate.ThrowIfRetained();
-            await VerifyLifecycle(token);
+            await VerifyLifecycle(new Web6CutoverDeadline(Web6CutoverBudgets.LifecyclePhase), token);
             _committedSetup = null; _committedCanonical = null; _committedCanonicalHash = null;
             _session = new Web6CutoverSession(_plan, this);
-            await _session.Begin(token);
+            await _session.Begin(new Web6CutoverDeadline(Web6CutoverBudgets.HostSwitchPhase), token);
             if (browser == "edge") _currentReadmissions++;
             return _admission ?? throw new IOException("Cutover host admission is absent.");
         }
 
-        public async Task Switch(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token)
+        public async Task Switch(Web6CutoverPair pair, bool cached, Guid epoch, Web6CutoverDeadline deadline, CancellationToken token)
         {
-            await DrainHost();
+            deadline = deadline.Clamp(Web6CutoverBudgets.HostSwitchPhase);
+            using var phase = deadline.Link(token); token = phase.Token;
+            await DrainHost(deadline, token);
             var current = pair != Web6CutoverPair.Old;
             if ((pair == Web6CutoverPair.Current && epoch != _plan.CurrentEpoch) || (pair == Web6CutoverPair.Restored && epoch != _plan.RestoredEpoch))
                 throw new IOException("Cutover allocation epoch cannot be relabeled or rewound.");
@@ -314,14 +373,20 @@ public sealed partial class WebHostIisExpressTests
             var database = pair == Web6CutoverPair.Restored ? _restored : current ? _current : _old;
             var login = pair == Web6CutoverPair.Restored ? _restoredLogin : current ? _currentLogin : _oldLogin;
             var receipt = pair == Web6CutoverPair.Restored ? _plan.RestoredDatabaseReceipt : current ? _plan.CurrentDatabaseReceipt : _plan.OldDatabaseReceipt;
-            await VerifyDatabase(database, pair == Web6CutoverPair.Restored ? _restoredControl : current ? _currentControl : _oldControl, pair, token);
-            if (pair == Web6CutoverPair.Restored) await CopyRestoredSession(token);
+            await VerifyDatabase(database, pair == Web6CutoverPair.Restored ? _restoredControl : current ? _currentControl : _oldControl, pair, deadline, token);
+            if (pair == Web6CutoverPair.Restored) await CopyRestoredSession(deadline, token);
             var expectedSource = current ? _plan.CurrentArtifactHash : _plan.OldArtifactHash;
-            if (Web6CandidateFileSet.MeasureTree(deployment.Source) != expectedSource || Web6CandidateFileSet.MeasureTree(deployment.Host) != deployment.Hash ||
-                HashText(File.ReadAllText(deployment.Configuration)) != deployment.ConfigHash) throw new IOException("Cutover deployment/configuration drift.");
-            using (var sql = new SqlConnection(database.ConnectionString))
-                if (current && await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;") != epoch)
+            VerifyDeployment(deployment, expectedSource, deadline, token);
+            if (current)
+            {
+                var epochDeadline = deadline.Clamp(Web6CutoverBudgets.SqlMutationOrOraclePhase);
+                using var epochCancellation = epochDeadline.Link(token);
+                using var sql = new SqlConnection(database.ConnectionString);
+                await epochDeadline.Open(sql, epochCancellation.Token);
+                if (await sql.QuerySingleAsync<Guid>(epochDeadline.Command("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;", epochCancellation.Token)) != epoch)
                     throw new IOException("Cutover current epoch changed; refusing rewind.");
+                epochDeadline.ThrowIfExpired(epochCancellation.Token);
+            }
             var origin = (current ? _plan.CurrentOrigin : _plan.OldOrigin).GetLeftPart(UriPartial.Authority);
             var launch = CreateCutoverIisLaunch(deployment.Configuration, new Uri(origin + "/"));
             var start = launch.CreateStartInfo();
@@ -342,76 +407,166 @@ public sealed partial class WebHostIisExpressTests
                 start.EnvironmentVariables["MYDMSVN_WEB_SECURITY_AUDIT_PATH"] = deployment.Manifest!.AuditPath;
             }
             _cleanupGate.ThrowIfRetained();
-            _process = new Process { StartInfo = start }; _active = pair;
-            _process.OutputDataReceived += (_, _) => { }; _process.ErrorDataReceived += (_, _) => { };
+            deadline.ThrowIfExpired(token);
+            _process = new Process { StartInfo = start }; _active = pair; _activeCached = cached;
             _hostDrained = false;
             if (!_process.Start()) throw new IOException("Cutover IIS process did not start.");
-            _process.BeginOutputReadLine(); _process.BeginErrorReadLine();
-            _identity = Web5IisExpressHostAdmission.Capture(_process, launch);
-            await Web5IisExpressHostAdmission.WaitForAdmissionAsync(_identity, _process, TimeSpan.FromSeconds(45), token);
-            var queue = await Web5IisExpressHostAdmission.VerifyAsync(_identity, token);
-            Web6BootstrapSelectorEvidence.Host(BootstrapResources, _identity, queue.Name);
-            if (current)
+            _outputCancellation = new CancellationTokenSource();
+            _stdout = Web6CutoverNative.ReadOutput(_process.StandardOutput.BaseStream, _process.StandardOutput.CurrentEncoding, 1024 * 1024, _outputCancellation.Token);
+            _stderr = Web6CutoverNative.ReadOutput(_process.StandardError.BaseStream, _process.StandardError.CurrentEncoding, 1024 * 1024, _outputCancellation.Token);
+            using var cancelOutput = token.Register(CancelOwnedOutput);
+            try
             {
-                var inputs = deployment.Inputs;
-                deployment.Manifest!.VerifyBeforeAdmission(_process.Id, _process.StartTime.ToUniversalTime(), queue.Name, () =>
-                    new Web6CandidateObservation((inputs.Backend.Sha, inputs.Backend.Tree, true), (inputs.Frontend.Sha, inputs.Frontend.Tree, true),
-                        inputs.Schema13Fingerprint, CertificateHash(Required("MYDMSVN_WEB_TEST_TLS_THUMBPRINT")), receipt, new[] { queue },
-                        new Web6CandidateAuditLaunch(_process.Id, _process.StartTime.ToUniversalTime(), deployment.Root, deployment.Manifest.AuditPath, _plan.CurrentCandidateId)));
+                deadline.ThrowIfExpired(token);
+                _identity = Web5IisExpressHostAdmission.Capture(_process, launch, deadline, token);
+                await Web5IisExpressHostAdmission.WaitForAdmissionAsync(_identity, _process, deadline.Clamp(TimeSpan.FromSeconds(45)), token);
+                var queue = await Web5IisExpressHostAdmission.VerifyAsync(_identity, deadline, token);
+                Web6BootstrapSelectorEvidence.Host(BootstrapResources, _identity, queue.Name);
+                if (current)
+                {
+                    var inputs = deployment.Inputs;
+                    deployment.Manifest!.VerifyBeforeAdmission(_process.Id, _process.StartTime.ToUniversalTime(), queue.Name, () =>
+                        new Web6CandidateObservation((inputs.Backend.Sha, inputs.Backend.Tree, true), (inputs.Frontend.Sha, inputs.Frontend.Tree, true),
+                            inputs.Schema13Fingerprint, CertificateHash(Required("MYDMSVN_WEB_TEST_TLS_THUMBPRINT")), receipt, new[] { queue },
+                            new Web6CandidateAuditLaunch(_process.Id, _process.StartTime.ToUniversalTime(), deployment.Root, deployment.Manifest.AuditPath, _plan.CurrentCandidateId)));
+                }
+                deadline.ThrowIfExpired(token);
+                _admission = new Web6CutoverAdmission(new Uri(origin + "/"), current ? 13 : 12, receipt,
+                    expectedSource, current ? epoch : Guid.Empty, 1, 1, true);
+                await VerifyStableAdmission(pair, cached, epoch, deadline, token);
+                deadline.ThrowIfExpired(token);
+                _coordinator.Admit(pair, _admission);
+                if (pair == Web6CutoverPair.Restored) _restoredAdmissions++;
             }
-            _admission = new Web6CutoverAdmission(new Uri(origin + "/"), current ? 13 : 12, receipt,
-                expectedSource, current ? epoch : Guid.Empty, 1, 1, true);
-            _coordinator.Admit(pair, _admission);
-            if (pair == Web6CutoverPair.Restored) _restoredAdmissions++;
-            var deadline = DateTime.UtcNow.AddSeconds(45);
-            while (DateTime.UtcNow < deadline && !_process.HasExited)
+            catch (Exception primary)
             {
-                try { if ((await Request(origin + "/api/v1/health", Required("MYDMSVN_WEB_TEST_TLS_THUMBPRINT"))).Status == 200) return; }
-                catch (WebException) { }
-                await Task.Delay(250);
+                try { await Web6CutoverNative.JoinOutput(_stdout, _stderr, deadline, token, CancelOwnedOutput, cancelImmediately: true); }
+                catch (Exception drain) { throw OutputFailure(primary, drain); }
+                if (_outputCancellationFailure != null) throw OutputFailure(primary, _outputCancellationFailure);
+                throw;
             }
-            throw new IOException("Admitted cutover host did not become healthy.");
         }
 
-        public Task VerifyStableAdmission(Web6CutoverPair pair, bool cached, Guid epoch, CancellationToken token) =>
-            throw new IOException("Cutover stable admission verification is unavailable.");
-
-        private async Task CopyRestoredSession(CancellationToken token)
+        public async Task VerifyStableAdmission(Web6CutoverPair pair, bool cached, Guid epoch, Web6CutoverDeadline deadline, CancellationToken token)
         {
+            deadline = deadline.Clamp(Web6CutoverBudgets.HostSwitchPhase);
+            using var phase = deadline.Link(token); token = phase.Token;
+            _cleanupGate.ThrowIfRetained();
+            if (_process == null || _identity == null || _admission == null) throw new IOException("Cutover stable admission is absent.");
+            var current = pair != Web6CutoverPair.Old;
+            var deployment = _deployments[pair == Web6CutoverPair.Restored ? "restored" : current ? cached ? "cached" : "current" : "old"];
+            var origin = current ? _plan.CurrentOrigin : _plan.OldOrigin;
+            var launch = CreateCutoverIisLaunch(deployment.Configuration, origin);
+            await VerifyCutoverStableEvidence(_plan, pair, cached, epoch, _active, _activeCached, _admission,
+                async () =>
+                {
+                    if (_identity.Launch.CommandLine != launch.CommandLine || _identity.Origin != origin)
+                        throw new IOException("Cutover launch differs from the requested deployment.");
+                    VerifyDeployment(deployment, current ? _plan.CurrentArtifactHash : _plan.OldArtifactHash, deadline, token);
+                    Web5IisExpressHostAdmission.VerifyOwnedProcess(_identity, _process, deadline, token);
+                    await Web5IisExpressHostAdmission.VerifyAsync(_identity, deadline, token);
+                },
+                () => VerifyHealth(origin, deadline.Clamp(TimeSpan.FromSeconds(45)), token), deadline, token);
+        }
+
+        private static void VerifyDeployment(Deployment deployment, string expectedSource, Web6CutoverDeadline deadline, CancellationToken token)
+        {
+            if (deadline.Observe(() => Web6CandidateFileSet.MeasureTree(deployment.Source), token) != expectedSource ||
+                deadline.Observe(() => Web6CandidateFileSet.MeasureTree(deployment.Host), token) != deployment.Hash ||
+                deadline.Observe(() => HashText(File.ReadAllText(deployment.Configuration)), token) != deployment.ConfigHash)
+                throw new IOException("Cutover deployment/configuration drift.");
+        }
+
+        private static Task VerifyHealth(Uri origin, Web6CutoverDeadline deadline, CancellationToken token) =>
+            PollCutoverHealth(async (requestDeadline, requestToken) =>
+            {
+                var request = Web5IisExpressHostAdmission.CreateDirectRequest(new Uri(origin, "api/v1/health"));
+                request.Timeout = requestDeadline.Milliseconds(requestToken);
+                request.ReadWriteTimeout = request.Timeout;
+                var thumbprint = Required("MYDMSVN_WEB_TEST_TLS_THUMBPRINT").Replace(" ", "").ToUpperInvariant();
+                request.ServerCertificateValidationCallback = (_, certificate, _, _) => certificate != null &&
+                    certificate.GetCertHashString().Replace(" ", "").ToUpperInvariant() == thumbprint;
+                using var abort = requestToken.Register(request.Abort);
+                using var response = (HttpWebResponse)await request.GetResponseAsync();
+                return response.StatusCode == HttpStatusCode.OK;
+            }, deadline, token);
+
+        private async Task CopyRestoredSession(Web6CutoverDeadline deadline, CancellationToken token)
+        {
+            deadline = deadline.Clamp(Web6CutoverBudgets.SqlMutationOrOraclePhase);
+            using var phase = deadline.Link(token); token = phase.Token;
             // Fixture metadata only: keep the browser's valid bearer session across the separate allocation.
             // No JWT, password or refresh-token/hash is copied, and the source allocation is read-only.
             if (!_hostDrained || _process != null) throw new IOException("Session copy requires verified host drain.");
-            await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, token);
-            await VerifyDatabase(_restored, _restoredControl, Web6CutoverPair.Restored, token);
-            using var source = new SqlConnection(_current.ConnectionString); await source.OpenAsync();
-            using var target = new SqlConnection(_restored.ConnectionString); await target.OpenAsync();
-            var actor = await source.QuerySingleAsync<int>("SELECT UserId FROM dbo.Users WHERE Username=N'integratedEditor' AND IsActive=1;");
-            var targetActor = await target.QuerySingleAsync<int>("SELECT UserId FROM dbo.Users WHERE Username=N'integratedEditor' AND IsActive=1;");
+            await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, deadline, token);
+            await VerifyDatabase(_restored, _restoredControl, Web6CutoverPair.Restored, deadline, token);
+            using var source = new SqlConnection(_current.ConnectionString); await deadline.Open(source, token);
+            using var target = new SqlConnection(_restored.ConnectionString); await deadline.Open(target, token);
+            var actor = await source.QuerySingleAsync<int>(deadline.Command("SELECT UserId FROM dbo.Users WHERE Username=N'integratedEditor' AND IsActive=1;", token));
+            var targetActor = await target.QuerySingleAsync<int>(deadline.Command("SELECT UserId FROM dbo.Users WHERE Username=N'integratedEditor' AND IsActive=1;", token));
             const string fields = "SessionId,UserId,CreatedAtUtc,AbsoluteExpiresAtUtc,IdleExpiresAtUtc,RevokedAtUtc";
-            var rows = JArray.Parse(await source.QuerySingleAsync<string>("SELECT (SELECT TOP(1) " + fields + " FROM dbo.WebAuthSessions WHERE UserId=@actor AND RevokedAtUtc IS NULL AND IdleExpiresAtUtc>SYSUTCDATETIME() AND AbsoluteExpiresAtUtc>SYSUTCDATETIME() ORDER BY CreatedAtUtc DESC,SessionId FOR JSON PATH,INCLUDE_NULL_VALUES);", new { actor }));
+            var rows = JArray.Parse(await source.QuerySingleAsync<string>(deadline.Command("SELECT (SELECT TOP(1) " + fields + " FROM dbo.WebAuthSessions WHERE UserId=@actor AND RevokedAtUtc IS NULL AND IdleExpiresAtUtc>SYSUTCDATETIME() AND AbsoluteExpiresAtUtc>SYSUTCDATETIME() ORDER BY CreatedAtUtc DESC,SessionId FOR JSON PATH,INCLUDE_NULL_VALUES);", token, new { actor })));
             if (rows.Count != 1) throw new IOException("Restored fixture requires the current active actor session.");
             var row = (JObject)rows[0]; var session = Guid.Parse((string)row["SessionId"]!);
-            async Task<JArray> ReadTarget() => JArray.Parse(await target.QuerySingleAsync<string>("SELECT (SELECT " + fields + " FROM dbo.WebAuthSessions WHERE SessionId=@session FOR JSON PATH,INCLUDE_NULL_VALUES);", new { session }));
+            async Task<JArray> ReadTarget() => JArray.Parse(await target.QuerySingleAsync<string>(deadline.Command("SELECT (SELECT " + fields + " FROM dbo.WebAuthSessions WHERE SessionId=@session FOR JSON PATH,INCLUDE_NULL_VALUES);", token, new { session })));
             var existing = await ReadTarget();
             Web6CutoverSessionCopy.Verify(row, existing.Count == 0 ? null : (JObject)existing.Single(), targetActor, DateTime.UtcNow);
             if (existing.Count == 0)
             {
-                if (await target.ExecuteAsync("INSERT dbo.WebAuthSessions(" + fields + ") VALUES(@session,@actor,@created,@absolute,@idle,NULL);",
-                    new { session, actor, created = (DateTime)row["CreatedAtUtc"]!, absolute = (DateTime)row["AbsoluteExpiresAtUtc"]!, idle = (DateTime)row["IdleExpiresAtUtc"]! }) != 1)
+                if (await target.ExecuteAsync(deadline.Command("INSERT dbo.WebAuthSessions(" + fields + ") VALUES(@session,@actor,@created,@absolute,@idle,NULL);", token,
+                    new { session, actor, created = (DateTime)row["CreatedAtUtc"]!, absolute = (DateTime)row["AbsoluteExpiresAtUtc"]!, idle = (DateTime)row["IdleExpiresAtUtc"]! })) != 1)
                     throw new IOException("Restored fixture session copy failed.");
             }
             Web6CutoverSessionCopy.Verify(row, (JObject)(await ReadTarget()).Single(), targetActor, DateTime.UtcNow);
-            await VerifyLifecycle(token);
+            await VerifyLifecycle(deadline, token);
         }
 
-        private Task DrainHost() => _cleanupGate.DrainHost(DrainOwnedHost);
-
-        private async Task DrainOwnedHost()
+        private void CancelOwnedOutput()
         {
+            try { _outputCancellation?.Cancel(); }
+            catch (Exception failure) { Interlocked.CompareExchange(ref _outputCancellationFailure, failure, null); }
+        }
+
+        private Exception OutputFailure(Exception primary, Exception drain) => _outputCancellationFailure == null
+            ? new AggregateException("Cutover process and output drain failed.", primary, drain)
+            : new AggregateException("Cutover process, output cancellation and drain failed.", primary, drain, _outputCancellationFailure);
+
+        private Task DrainHost(Web6CutoverDeadline deadline, CancellationToken token) =>
+            _cleanupGate.DrainHost(() => DrainOwnedHost(deadline, token));
+
+        private async Task DrainOwnedHost(Web6CutoverDeadline deadline, CancellationToken token)
+        {
+            deadline = deadline.Clamp(Web6CutoverBudgets.HostSwitchPhase);
+            using var phase = deadline.Link(token); token = phase.Token;
+            deadline.ThrowIfExpired(token);
             if (_process == null) return;
-            if (!_process.HasExited) { try { _process.StandardInput.WriteLine("q"); } catch (IOException) { } if (!_process.WaitForExit(10000)) _process.Kill(); }
-            if (!_process.WaitForExit(10000) || _identity == null) throw new IOException("Cutover process identity/drain uncertain; quarantine allocations.");
-            await Web5IisExpressHostAdmission.WaitForAbsenceAsync(_identity, TimeSpan.FromSeconds(20), CancellationToken.None);
+            if (_identity == null || _stdout == null || _stderr == null || _outputCancellation == null)
+                throw new IOException("Cutover process identity/drain uncertain; quarantine allocations.");
+            using var cancelOutput = token.Register(CancelOwnedOutput);
+            Exception? primary = null;
+            try
+            {
+                if (!_process.HasExited)
+                {
+                    // Kill only the exact freshly re-observed owned process; no unverified PID fallback.
+                    Web6CutoverNative.TerminateVerified(
+                        () => Web5IisExpressHostAdmission.VerifyOwnedProcess(_identity, _process, deadline, token),
+                        _process.Kill, deadline, token);
+                    await Web6CutoverNative.WaitForExit(() => _process.HasExited, deadline.Clamp(TimeSpan.FromSeconds(10)), token);
+                }
+                await Web5IisExpressHostAdmission.WaitForAbsenceAsync(_identity, deadline.Clamp(TimeSpan.FromSeconds(20)), token);
+            }
+            catch (Exception failure) { primary = failure; }
+            try { await Web6CutoverNative.JoinOutput(_stdout, _stderr, deadline.Clamp(TimeSpan.FromSeconds(10)), token, CancelOwnedOutput, cancelImmediately: primary != null); }
+            catch (Exception drain)
+            {
+                if (primary != null) throw OutputFailure(primary, drain);
+                throw;
+            }
+            if (_outputCancellationFailure != null) throw OutputFailure(primary ?? _outputCancellationFailure, _outputCancellationFailure);
+            if (primary != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
+            deadline.ThrowIfExpired(token);
+            _outputCancellation.Dispose(); _outputCancellation = null; _stdout = null; _stderr = null;
             _process.Dispose(); _process = null; _identity = null; _admission = null; _hostDrained = true;
             if (_coordinator.HasActivePair) _coordinator.Drain(_active, true, true);
         }
@@ -431,7 +586,7 @@ public sealed partial class WebHostIisExpressTests
                     _currentBackend, _bootstrap.Plan.Text("candidateDistSha256"));
                 _browserDrained = true;
                 _session.VerifyComplete();
-                await VerifyLifecycle(token);
+                await VerifyLifecycle(new Web6CutoverDeadline(Web6CutoverBudgets.LifecyclePhase), token);
                 Web6CutoverOracle.ValidateSetupEvidence(_session.CommittedSetup, _committedSetup, _restoredAdmissions == _browsers + 1);
                 _verifiedSetups.Add(_committedSetup!);
                 _deployments["current"].Manifest!.RecordDisposition(browser == "chromium" ? Web6CandidateStage.Chromium : Web6CandidateStage.Edge, Web6CandidateOutcome.Passed);
@@ -449,75 +604,88 @@ public sealed partial class WebHostIisExpressTests
                 () => control.CutoverJoined && !control.CutoverJoinUncertain);
         }
 
-        public async Task VerifyOperation(Guid operation, bool committed, CancellationToken token)
+        public async Task VerifyOperation(Guid operation, bool committed, Web6CutoverDeadline deadline, CancellationToken token)
         {
+            deadline = deadline.Clamp(Web6CutoverBudgets.SqlMutationOrOraclePhase);
+            using var phase = deadline.Link(token); token = phase.Token;
             _cleanupGate.ThrowIfRetained();
-            using var sql = new SqlConnection(_current.ConnectionString); await sql.OpenAsync();
-            var identity = await sql.QuerySingleAsync<string>("SELECT (SELECT ActorUserId,OperationId,DeploymentEpoch,ContractVersion,CodecVersion,OperationKind,RequestTargetId,RequestFingerprint,ResultDocumentId,Disposition FROM dbo.WebOperationJournal WHERE OperationId=@operation ORDER BY ActorUserId FOR JSON PATH,INCLUDE_NULL_VALUES);", new { operation });
+            using var sql = new SqlConnection(_current.ConnectionString); await deadline.Open(sql, token);
+            var identity = await sql.QuerySingleAsync<string>(deadline.Command("SELECT (SELECT ActorUserId,OperationId,DeploymentEpoch,ContractVersion,CodecVersion,OperationKind,RequestTargetId,RequestFingerprint,ResultDocumentId,Disposition FROM dbo.WebOperationJournal WHERE OperationId=@operation ORDER BY ActorUserId FOR JSON PATH,INCLUDE_NULL_VALUES);", token, new { operation }));
             if (_operationIdentities.TryGetValue(operation, out var prior) && prior != identity) throw new IOException("Cutover operation identity changed across lifecycle.");
             if (committed)
             {
-                if (await sql.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation AND j.DeploymentEpoch=@epoch AND j.Disposition='COMMITTED' AND u.Username=N'integratedEditor';", new { operation, epoch = _plan.CurrentEpoch }) != 1)
+                if (await sql.QuerySingleAsync<int>(deadline.Command("SELECT COUNT(*) FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation AND j.DeploymentEpoch=@epoch AND j.Disposition='COMMITTED' AND u.Username=N'integratedEditor';", token, new { operation, epoch = _plan.CurrentEpoch })) != 1)
                     throw new InvalidDataException("Cutover committed-unavailable requires an authentic committed operation; pre-dispatch absence is not COMMITTED.");
                 if (_committedSetup?.Operation == operation && _committedCanonical != null && HashBytes(_committedCanonical) != _committedCanonicalHash)
                     throw new IOException("Retained canonical cutover result changed.");
-                await Web6CandidateOracle.VerifyOneEffectAsync(sql, operation, token, _committedSetup?.Operation == operation ? _committedCanonical : null);
+                await Web6CandidateOracle.VerifyOneEffectAsync(sql, operation, _committedSetup?.Operation == operation ? _committedCanonical : null, deadline, token);
             }
+            deadline.ThrowIfExpired(token);
             _operationIdentities[operation] = identity;
         }
 
-        public async Task SetGrant(bool granted, CancellationToken token)
+        public async Task SetGrant(bool granted, Web6CutoverDeadline deadline, CancellationToken token)
         {
+            deadline = deadline.Clamp(Web6CutoverBudgets.SqlMutationOrOraclePhase);
+            using var phase = deadline.Link(token); token = phase.Token;
             _cleanupGate.ThrowIfRetained();
             using var sql = new SqlConnection(_current.ConnectionString);
-            if (await sql.ExecuteAsync("UPDATE p SET Granted=@granted FROM dbo.UserPermissions p JOIN dbo.Users u ON u.UserId=p.UserId WHERE u.Username=N'integratedEditor' AND p.PermissionKey=N'Sales.Receipts.Write';", new { granted }) != 1)
+            await deadline.Open(sql, token);
+            if (await sql.ExecuteAsync(deadline.Command("UPDATE p SET Granted=@granted FROM dbo.UserPermissions p JOIN dbo.Users u ON u.UserId=p.UserId WHERE u.Username=N'integratedEditor' AND p.PermissionKey=N'Sales.Receipts.Write';", token, new { granted })) != 1)
                 throw new IOException("Cutover original write grant was not found.");
+            deadline.ThrowIfExpired(token);
         }
 
-        public async Task VerifyCommittedSetup(Web6CommittedSetup proof, CancellationToken token)
+        public async Task VerifyCommittedSetup(Web6CommittedSetup proof, Web6CutoverDeadline deadline, CancellationToken token)
         {
+            deadline = deadline.Clamp(Web6CutoverBudgets.SqlMutationOrOraclePhase);
+            using var phase = deadline.Link(token); token = phase.Token;
             _cleanupGate.ThrowIfRetained();
             if (_committedSetup != null || _active != Web6CutoverPair.Current) throw new InvalidDataException("Unexpected cutover setup.");
-            using var sql = new SqlConnection(_current.ConnectionString); await sql.OpenAsync();
-            var document = await Web6CandidateOracle.VerifyCommittedSetupAsync(sql, proof, _plan.CurrentEpoch);
-            var observed = await LifecycleSnapshot(_current.ConnectionString, true);
+            using var sql = new SqlConnection(_current.ConnectionString); await deadline.Open(sql, token);
+            var document = await Web6CandidateOracle.VerifyCommittedSetupAsync(sql, proof, _plan.CurrentEpoch, deadline, token);
+            var observed = await LifecycleSnapshot(_current.ConnectionString, true, deadline, token);
             Web6CutoverDelta.VerifySetup(_currentSnapshot!, observed, proof.Operation, document);
-            Web6CutoverDelta.VerifyZero(_oldSnapshot!, await LifecycleSnapshot(_old.ConnectionString, false));
-            Web6CutoverDelta.VerifyZero(_restoredSnapshot!, await LifecycleSnapshot(_restored.ConnectionString, true));
+            Web6CutoverDelta.VerifyZero(_oldSnapshot!, await LifecycleSnapshot(_old.ConnectionString, false, deadline, token));
+            Web6CutoverDelta.VerifyZero(_restoredSnapshot!, await LifecycleSnapshot(_restored.ConnectionString, true, deadline, token));
             _currentSnapshot = observed; _committedSetup = proof;
             _committedCanonical = Convert.FromBase64String((string)((JArray)observed["journal"]!).Single(row => string.Equals((string?)row["OperationId"], proof.Operation.ToString("D"), StringComparison.OrdinalIgnoreCase))["ResultBytes"]!);
             _committedCanonicalHash = HashBytes(_committedCanonical);
-            await VerifyOperation(proof.Operation, true, token);
+            await VerifyOperation(proof.Operation, true, deadline, token);
         }
 
-        public async Task MakeCommittedUnavailable(Guid operation, CancellationToken token)
+        public async Task MakeCommittedUnavailable(Guid operation, Web6CutoverDeadline deadline, CancellationToken token)
         {
+            using var phase = deadline.Link(token); token = phase.Token;
             if (_committedSetup?.Operation != operation) throw new InvalidDataException("Committed setup proof is absent.");
-            await VerifyLifecycle(token);
-            await VerifyOperation(operation, true, token);
-            await DrainHost();
-            await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, token);
+            await VerifyLifecycle(deadline, token);
+            await VerifyOperation(operation, true, deadline, token);
+            await DrainHost(deadline, token);
+            await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, deadline, token);
             _corruptionHealthy = false;
             Exception? corruptionFailure = null;
+            var mutationDeadline = deadline.Clamp(Web6CutoverBudgets.SqlMutationOrOraclePhase);
+            using var mutationCancellation = mutationDeadline.Link(token);
+            var mutationToken = mutationCancellation.Token;
             try
             {
-                using var sql = new SqlConnection(_current.ConnectionString); await sql.OpenAsync();
-                using var transaction = sql.BeginTransaction();
+                using var sql = new SqlConnection(_current.ConnectionString); await mutationDeadline.Open(sql, mutationToken);
+                using var transaction = mutationDeadline.Observe(sql.BeginTransaction, mutationToken);
                 await Web6CutoverCorruption.Run(
-                    () => sql.ExecuteAsync(new SqlTestCommand("DISABLE TRIGGER dbo.TR_WebOperationJournal_Immutable ON dbo.WebOperationJournal;", transaction: transaction)),
+                    () => sql.ExecuteAsync(mutationDeadline.Command("DISABLE TRIGGER dbo.TR_WebOperationJournal_Immutable ON dbo.WebOperationJournal;", mutationToken, transaction: transaction)),
                     async () =>
                     {
-                        var changed = await sql.ExecuteAsync(new SqlTestCommand("UPDATE dbo.WebOperationJournal SET ResultBytes=0x7B7D WHERE OperationId=@operation AND Disposition='COMMITTED' AND ResultBytes=@original;",
+                        var changed = await sql.ExecuteAsync(mutationDeadline.Command("UPDATE dbo.WebOperationJournal SET ResultBytes=0x7B7D WHERE OperationId=@operation AND Disposition='COMMITTED' AND ResultBytes=@original;", mutationToken,
                             new { operation, original = _committedCanonical }, transaction: transaction));
                         if (changed != 1) throw new IOException("Authentic cutover result changed before fixture corruption.");
                     },
-                    () => sql.ExecuteAsync(new SqlTestCommand("ENABLE TRIGGER dbo.TR_WebOperationJournal_Immutable ON dbo.WebOperationJournal;", transaction: transaction)),
+                    () => sql.ExecuteAsync(mutationDeadline.Command("ENABLE TRIGGER dbo.TR_WebOperationJournal_Immutable ON dbo.WebOperationJournal;", mutationToken, transaction: transaction)),
                     async () =>
                     {
-                        if (await sql.QuerySingleAsync<int>(new SqlTestCommand("SELECT COUNT(*) FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_WebOperationJournal_Immutable') AND is_disabled=0;", transaction: transaction)) != 1)
+                        if (await sql.QuerySingleAsync<int>(mutationDeadline.Command("SELECT COUNT(*) FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_WebOperationJournal_Immutable') AND is_disabled=0;", mutationToken, transaction: transaction)) != 1)
                             throw new IOException("Cutover journal trigger restoration failed.");
                     });
-                transaction.Commit();
+                mutationDeadline.Observe(transaction.Commit, mutationToken);
             }
             catch (Exception failure) { corruptionFailure = failure; throw; }
             finally
@@ -525,10 +693,12 @@ public sealed partial class WebHostIisExpressTests
                 try
                 {
                     // Transaction disposal rolls back any failed corruption; independently observe the enabled trigger afterward.
-                    await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, CancellationToken.None);
+                    await VerifyDatabase(_current, _currentControl, Web6CutoverPair.Current, mutationDeadline, mutationToken);
                     using var observedSql = new SqlConnection(_current.ConnectionString);
-                    if (await observedSql.QuerySingleAsync<int>("SELECT COUNT(*) FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_WebOperationJournal_Immutable') AND is_disabled=0;") != 1)
+                    await mutationDeadline.Open(observedSql, mutationToken);
+                    if (await observedSql.QuerySingleAsync<int>(mutationDeadline.Command("SELECT COUNT(*) FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_WebOperationJournal_Immutable') AND is_disabled=0;", mutationToken)) != 1)
                         throw new IOException("Cutover trigger state uncertain; quarantine allocation.");
+                    mutationDeadline.ThrowIfExpired(mutationToken);
                     _corruptionHealthy = true;
                 }
                 catch (Exception verification)
@@ -537,57 +707,76 @@ public sealed partial class WebHostIisExpressTests
                     throw;
                 }
             }
-            var observed = await LifecycleSnapshot(_current.ConnectionString, true);
+            var observed = await LifecycleSnapshot(_current.ConnectionString, true, deadline, token);
             Web6CutoverDelta.VerifyUnavailable(_currentSnapshot!, observed, operation);
             _currentSnapshot = observed;
-            await VerifyOperation(operation, true, token);
+            await VerifyOperation(operation, true, deadline, token);
             Console.WriteLine("WEB6_CUTOVER_FIXTURE_CORRUPTION authenticated-committed-result-only");
-            await Switch(Web6CutoverPair.Current, false, _plan.CurrentEpoch, token);
+            await Switch(Web6CutoverPair.Current, false, _plan.CurrentEpoch, deadline, token);
         }
 
         private static string HashBytes(byte[] value)
         { using var hash = SHA256.Create(); return BitConverter.ToString(hash.ComputeHash(value)).Replace("-", "").ToLowerInvariant(); }
 
-        private static async Task<JObject> LifecycleSnapshot(string connectionString, bool current)
+        private static async Task<JObject> LifecycleSnapshot(string connectionString, bool current, Web6CutoverDeadline deadline, CancellationToken token)
         {
-            using var sql = new SqlConnection(connectionString); await sql.OpenAsync();
-            return await ReadCutoverLifecycleSnapshot(sql, current);
+            deadline = deadline.Clamp(Web6CutoverBudgets.LifecyclePhase);
+            using var phase = deadline.Link(token); token = phase.Token;
+            using var sql = new SqlConnection(connectionString); await deadline.Open(sql, token);
+            return await ReadCutoverLifecycleSnapshot(sql, current, deadline, token);
         }
 
-        public async Task VerifyLifecycle(CancellationToken token)
+        public async Task VerifyLifecycle(Web6CutoverDeadline deadline, CancellationToken token)
         {
+            deadline = deadline.Clamp(Web6CutoverBudgets.LifecyclePhase);
+            using var phase = deadline.Link(token); token = phase.Token;
             _cleanupGate.ThrowIfRetained();
-            _browserLease?.Verify();
-            foreach (var deployment in _deployments.Values) { deployment.ControlLease?.Verify(); deployment.RuntimeLease?.Verify(); }
-            Web6CutoverDelta.VerifyZero(_currentSnapshot!, await LifecycleSnapshot(_current.ConnectionString, true));
-            Web6CutoverDelta.VerifyZero(_oldSnapshot!, await LifecycleSnapshot(_old.ConnectionString, false));
-            Web6CutoverDelta.VerifyZero(_restoredSnapshot!, await LifecycleSnapshot(_restored.ConnectionString, true));
+            deadline.Observe(() => _browserLease?.Verify(), token);
+            foreach (var deployment in _deployments.Values)
+            {
+                deadline.Observe(() => deployment.ControlLease?.Verify(), token);
+                deadline.Observe(() => deployment.RuntimeLease?.Verify(), token);
+            }
+            Web6CutoverDelta.VerifyZero(_currentSnapshot!, await LifecycleSnapshot(_current.ConnectionString, true, deadline, token));
+            Web6CutoverDelta.VerifyZero(_oldSnapshot!, await LifecycleSnapshot(_old.ConnectionString, false, deadline, token));
+            Web6CutoverDelta.VerifyZero(_restoredSnapshot!, await LifecycleSnapshot(_restored.ConnectionString, true, deadline, token));
             using var current = new SqlConnection(_current.ConnectionString);
             using var restored = new SqlConnection(_restored.ConnectionString);
-            if (await current.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;") != _plan.CurrentEpoch ||
-                await restored.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;") != _plan.RestoredEpoch)
+            await deadline.Open(current, token); await deadline.Open(restored, token);
+            if (await current.QuerySingleAsync<Guid>(deadline.Command("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;", token)) != _plan.CurrentEpoch ||
+                await restored.QuerySingleAsync<Guid>(deadline.Command("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;", token)) != _plan.RestoredEpoch)
                 throw new IOException("Cutover allocation epoch changed.");
+            deadline.ThrowIfExpired(token);
         }
 
-        public async Task VerifyZeroMutation(Guid operation, CancellationToken token)
+        public async Task VerifyZeroMutation(Guid operation, Web6CutoverDeadline deadline, CancellationToken token)
         {
-            await VerifyLifecycle(token);
-            if (_committedSetup?.Operation == operation) { await VerifyOperation(operation, true, token); return; }
+            deadline = deadline.Clamp(Web6CutoverBudgets.SqlMutationOrOraclePhase);
+            using var phase = deadline.Link(token); token = phase.Token;
+            await VerifyLifecycle(deadline, token);
+            if (_committedSetup?.Operation == operation) { await VerifyOperation(operation, true, deadline, token); return; }
             foreach (var database in new[] { _current, _old, _restored })
             {
                 using var sql = new SqlConnection(database.ConnectionString);
-                if (await sql.QuerySingleAsync<int>("SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE OperationId=@operation;", new { operation }) != 0)
+                await deadline.Open(sql, token);
+                if (await sql.QuerySingleAsync<int>(deadline.Command("SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE OperationId=@operation;", token, new { operation })) != 0)
                     throw new IOException("Pre-dispatch cutover operation unexpectedly reached SQL.");
+                deadline.ThrowIfExpired(token);
             }
         }
 
         public async Task<Web6CutoverDrain> Drain(string browser, Web6CutoverPair pair, CancellationToken token)
-        { await DrainHost(); await VerifyLifecycle(token); return new Web6CutoverDrain(_hostDrained, _hostDrained); }
+        {
+            var deadline = new Web6CutoverDeadline(Web6CutoverBudgets.HostSwitchPhase);
+            await DrainHost(deadline, token); await VerifyLifecycle(deadline, token);
+            return new Web6CutoverDrain(_hostDrained, _hostDrained);
+        }
         public Task VerifyRestore(string browser, CancellationToken token)
         { _cleanupGate.ThrowIfRetained(); _session!.VerifyComplete(); return Task.CompletedTask; }
         public async Task Complete(CancellationToken token)
         {
-            await VerifyLifecycle(token);
+            var deadline = new Web6CutoverDeadline(Web6CutoverBudgets.LifecyclePhase);
+            await VerifyLifecycle(deadline, token);
             Web6CutoverOracle.ValidateAllocationDisposition(_plan, _verifiedSetups, _restoredAdmissions, _currentReadmissions);
             _complete = _browsers == 2; if (!_complete) throw new IOException("Both browsers are required.");
         }
@@ -597,7 +786,8 @@ public sealed partial class WebHostIisExpressTests
             _cleanupGate.ThrowIfRetained();
             var failures = new List<Exception>();
             try { await StopController(); } catch (Exception error) when (!RetainForContainment) { failures.Add(error); }
-            try { await DrainHost(); } catch (Exception error) { failures.Add(error); }
+            using var cleanupDeadline = new CancellationTokenSource(Web6CutoverBudgets.HostSwitchPhase);
+            try { await DrainHost(new Web6CutoverDeadline(Web6CutoverBudgets.HostSwitchPhase), cleanupDeadline.Token); } catch (Exception error) { failures.Add(error); }
             if (!_complete)
                 throw new IOException("Incomplete bootstrap cutover retains every allocation after bounded drain.");
             if (_corruptionHealthy && _browserDrained && _hostDrained && failures.Count == 0 && !GuiTestSafety.IsPoisoned)

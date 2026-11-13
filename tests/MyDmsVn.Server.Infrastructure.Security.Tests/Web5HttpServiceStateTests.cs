@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -9,6 +9,57 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web5HttpServiceStateTests
 {
+    [Fact]
+    public async Task Output_drain_cancels_at_deadline_but_joins_the_exact_noncooperative_read()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var stream = new PendingOutputStream();
+        var output = Web6CutoverNative.ReadOutput(stream, System.Text.Encoding.UTF8, 100, cancellation.Token);
+        var drain = Web6CutoverNative.JoinOutput(output, Task.CompletedTask,
+            new Web6CutoverDeadline(TimeSpan.FromMilliseconds(20)), default, cancellation.Cancel);
+        try
+        {
+            // Bounded fake wait observes cancellation; the read itself deliberately ignores it.
+            Assert.True(cancellation.Token.WaitHandle.WaitOne(2000));
+            Assert.False(drain.IsCompleted);
+            Assert.False(output.IsCompleted);
+        }
+        finally { stream.Finish.TrySetResult(0); }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => drain);
+        Assert.True(output.IsCompleted);
+    }
+
+    [Fact]
+    public async Task Output_reader_preserves_text_and_refuses_overflow_after_joined_EOF()
+    {
+        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("dấu"));
+        Assert.Equal("dấu", await Web6CutoverNative.ReadOutput(stream, System.Text.Encoding.UTF8, 3, default));
+        stream.Position = 0;
+        await Assert.ThrowsAsync<InvalidDataException>(() => Web6CutoverNative.ReadOutput(stream, System.Text.Encoding.UTF8, 2, default));
+        Assert.Equal(stream.Length, stream.Position);
+    }
+
+    private sealed class PendingOutputStream : MemoryStream
+    {
+        internal TaskCompletionSource<int> Finish { get; } = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken token) => Finish.Task;
+    }
+
+    [Fact]
+    public async Task Output_cancellation_callback_failure_cannot_abandon_owned_readers()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var output = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failure = new IOException("fake cancellation callback");
+        var drain = Web6CutoverNative.JoinOutput(output.Task, Task.CompletedTask,
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(1)), cancellation.Token, () => throw failure);
+        try { Assert.False(drain.IsCompleted); }
+        finally { output.TrySetResult(true); }
+        var observed = await Assert.ThrowsAsync<IOException>(() => drain);
+        Assert.Same(failure, observed);
+    }
+
     private const string Empty = @"
 Snapshot of HTTP service state (Request Queue View):
 -----------------------------------------------------

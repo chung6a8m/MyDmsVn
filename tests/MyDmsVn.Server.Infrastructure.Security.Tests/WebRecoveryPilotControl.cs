@@ -41,7 +41,7 @@ internal sealed class WebRecoveryPilotControl
     private readonly string? _runtimeUser;
     private readonly Dictionary<Guid, WebOperationHttpSqlTests.Intent> _web6Operations = new Dictionary<Guid, WebOperationHttpSqlTests.Intent>();
     private readonly Web6CandidateHostMismatch? _candidateMismatch;
-    private readonly Func<Web6CutoverRequest, CancellationToken, Task<JObject>>? _cutover;
+    private readonly Func<Web6CutoverRequest, Web6CutoverDeadline, CancellationToken, Task<JObject>>? _cutover;
     private readonly Action<NamedPipeServerStream>? _closeCutoverResponse;
     private readonly Stopwatch? _cutoverLifetime;
     private readonly TimeSpan _cutoverControllerLifetime;
@@ -55,7 +55,7 @@ internal sealed class WebRecoveryPilotControl
     private bool _eligibilityJournalDenied;
     private WebRecoveryPilotControl(string connectionString, bool web5, bool web6 = false, string? runtimeUser = null,
         Web6CandidateHostMismatch? candidateMismatch = null, bool candidatePair = false,
-        Func<Web6CutoverRequest, CancellationToken, Task<JObject>>? cutover = null,
+        Func<Web6CutoverRequest, Web6CutoverDeadline, CancellationToken, Task<JObject>>? cutover = null,
         Action<NamedPipeServerStream>? closeCutoverResponse = null, TimeSpan? cutoverControllerLifetime = null)
     {
         _cutover = cutover;
@@ -103,10 +103,10 @@ internal sealed class WebRecoveryPilotControl
         return control;
     }
 
-    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<Web6CutoverRequest, CancellationToken, Task<JObject>> handler) =>
+    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<Web6CutoverRequest, Web6CutoverDeadline, CancellationToken, Task<JObject>> handler) =>
         StartCutover(epoch, handler, closeResponse: null);
 
-    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<Web6CutoverRequest, CancellationToken, Task<JObject>> handler,
+    internal static WebRecoveryPilotControl StartCutover(Guid epoch, Func<Web6CutoverRequest, Web6CutoverDeadline, CancellationToken, Task<JObject>> handler,
         Action<NamedPipeServerStream>? closeResponse, TimeSpan? controllerLifetime = null)
     {
         var control = new WebRecoveryPilotControl("", web5: true, web6: true,
@@ -226,8 +226,9 @@ internal sealed class WebRecoveryPilotControl
             throw CutoverDeadline("controller-cancelled");
         if (workRemaining <= TimeSpan.Zero) throw CutoverDeadline("action-deadline");
 
+        var workDeadline = new Web6CutoverDeadline(workRemaining);
         var reply = await RunCutoverPhase(workRemaining, pipe.Dispose, "action-deadline",
-            token => _cutover!(request, token)).ConfigureAwait(false);
+            token => _cutover!(request, workDeadline, token)).ConfigureAwait(false);
         if (_stop.IsCancellationRequested || CutoverControllerRemaining <= TimeSpan.Zero) throw CutoverDeadline("controller-cancelled");
         if (elapsed.Elapsed >= workAllowance) throw CutoverDeadline("action-deadline");
 

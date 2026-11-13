@@ -17,7 +17,7 @@ public sealed class WebRecoveryPilotControlTests
         var started = Signal();
         var release = Signal();
         var calls = 0;
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, deadline, token) =>
         {
             Assert.Equal("oldClientNewHostOn", request.Action);
             Assert.True(token.CanBeCanceled);
@@ -54,7 +54,7 @@ public sealed class WebRecoveryPilotControlTests
         var started = Signal();
         var cancelled = Signal();
         var actions = new List<string>();
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, deadline, token) =>
         {
             actions.Add(request.Action);
             started.SetResult(true);
@@ -88,7 +88,7 @@ public sealed class WebRecoveryPilotControlTests
     {
         var primary = new IOException("Injected handler failure.");
         var calls = 0;
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), (request, deadline, token) =>
         {
             Interlocked.Increment(ref calls);
             throw primary;
@@ -117,7 +117,7 @@ public sealed class WebRecoveryPilotControlTests
     {
         var returned = Signal();
         var calls = 0;
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), (request, deadline, token) =>
         {
             Interlocked.Increment(ref calls);
             returned.SetResult(true);
@@ -150,7 +150,7 @@ public sealed class WebRecoveryPilotControlTests
         var release = Signal();
         var primary = new IOException("Injected late handler failure.");
         var calls = 0;
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, deadline, token) =>
         {
             Interlocked.Increment(ref calls);
             started.SetResult(true);
@@ -192,7 +192,7 @@ public sealed class WebRecoveryPilotControlTests
         var handlerReturning = Signal();
         var releaseCallback = Signal();
         var primary = new IOException("Injected handler failure.");
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, deadline, token) =>
         {
             token.Register(() =>
             {
@@ -236,7 +236,7 @@ public sealed class WebRecoveryPilotControlTests
         var primary = new IOException("Injected handler failure.");
         var callback = new InvalidOperationException("Injected cancellation callback failure.");
         var callbackCount = 0;
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, deadline, token) =>
         {
             token.Register(() =>
             {
@@ -276,7 +276,7 @@ public sealed class WebRecoveryPilotControlTests
         var cancelled = Signal();
         var primary = new IOException("Injected handler failure.");
         var callback = new InvalidOperationException("Injected work timer callback failure.");
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), async (request, deadline, token) =>
         {
             token.Register(() =>
             {
@@ -310,7 +310,7 @@ public sealed class WebRecoveryPilotControlTests
         var closeFailure = new IOException("Injected response close failure.");
         var workCallbacks = 0;
         var responseCloses = 0;
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), (request, deadline, token) =>
         {
             token.Register(() => Interlocked.Increment(ref workCallbacks));
             return Task.FromResult(new JObject { ["marker"] = new string('a', 900000) });
@@ -343,7 +343,7 @@ public sealed class WebRecoveryPilotControlTests
     public async Task Idle_controller_deadline_closes_the_pipe_without_starting_a_handler()
     {
         var calls = 0;
-        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), (request, token) =>
+        var control = WebRecoveryPilotControl.StartCutover(Guid.NewGuid(), (request, deadline, token) =>
         {
             Interlocked.Increment(ref calls);
             return Task.FromResult(new JObject());
