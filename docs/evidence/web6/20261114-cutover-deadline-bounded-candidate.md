@@ -10,11 +10,11 @@
 | Initial Task 6 backend | `c99f426d98853dbd3f9a48ff6a769bba615ef8e9` | `460a3f51439ed7c3f5fbdb7a1d3fcae775b615d8` |
 | Backend paired provenance correction | `6dddc17eca0bfc7970a81fa21bd3c14dc15a6682` | `c8e6a81578811bfb05573c60d626be6e08a47783` |
 | Backend verified source and tests, before this documentation delta | Paired Git process cleanup correction | `dcdc8edda5a630fec191b5766ba78cd76d3490ba` |
-| Frontend exact reviewed pin | `96842a6329191713282b3212e5420872eb0f3a41` | `a8095060d0c578d8556a58c5301e11df4b4aff97` |
+| Frontend exact reviewed pin | `726b10351bdbe0028696f9fcfa0bbb52e8a84d28` | `2a6173d788d78f9f9c3e30818aced6cb95095684` |
 
 The only change to bootstrap execution in Task 6 is the `ReviewedFrontendSha` pin. The review correction changes the paired source test and evidence. The vendor gitlink remains `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`.
 
-The real `BootstrapPreflight.PrepareAsync` path ran with synthetic Git/build/SQL-master toolchain inputs and disposable protected files. It accepted `96842a6329191713282b3212e5420872eb0f3a41` as `PIN_MATCHED`. It blocked the prior pin `66b935488d00ee78ec3ffbd183f474da06aa3404` and immediate frontend base `447e39f03b2b22398d30324c8cec992fc93ce83c` as `BLOCKED_REVIEWED_FRONTEND_PIN`. Only the admitted receipt opened a selector plan in the pin matrix.
+The real `BootstrapPreflight.PrepareAsync` path ran with synthetic Git/build/SQL-master toolchain inputs and disposable protected files. It accepted `726b10351bdbe0028696f9fcfa0bbb52e8a84d28` as `PIN_MATCHED`. It blocked the superseded reviewed pin `96842a6329191713282b3212e5420872eb0f3a41`, the prior pin `66b935488d00ee78ec3ffbd183f474da06aa3404` and immediate frontend base `447e39f03b2b22398d30324c8cec992fc93ce83c` as `BLOCKED_REVIEWED_FRONTEND_PIN`. Only the admitted receipt opened a selector plan in the pin matrix.
 
 The paired test verifies the configured frontend checkout's commit/tree with replacement lookup disabled and Git config isolated. It independently hashes each blob's original bytes as a Git object before copying the three tracked TypeScript sources into the temporary prepared root. The test inspects those sources as text and validates synthetic frames against the real backend parser. It checks 11 action caps, both `revokeGrantOff` forms, the strict allowance field, the 5,000-ms response reserve, the three scenario/reset budgets, one reset hook and the pack/controller/aggregate/selector hierarchy. The paired test executes no frontend code or compiler. The separate full frontend unit run provides behavior coverage for cumulative accounting, framing, transport timing and the cleanup hook. This fixture uses no real host, database or browser.
 
@@ -81,6 +81,23 @@ The locked Security.Tests Release/net48 build passed with zero warnings or error
 | Integrated final | 732 / 732 | 732 / 0 / 0 | `dea6cdd9f2b575efa01ea349f75e786b0585082f0dfaaeddfd56e5bb4b478a99` |
 
 The corrected Security.Tests assembly SHA-256 is `fb7c3d78b00e5e1a6be91f7b8044987a5e005dd86f913db0d62e161076d81520`. The 729-case result above records the prior backend source.
+
+## PR review correction for connector cancellation and CI timeout
+
+Frontend PR #38 review identified two P2 findings at `96842a6329191713282b3212e5420872eb0f3a41`: the 58.1-second virtual sequential observer case retained Vitest's five-second real timeout, and the cutover absolute timer settled the request without cancelling an in-progress named-pipe connector. The corrected frontend is `726b10351bdbe0028696f9fcfa0bbb52e8a84d28`, tree `2a6173d788d78f9f9c3e30818aced6cb95095684`.
+
+The transport now passes an owned `AbortSignal` to the connector and aborts it when the request settles. The default connector destroys an in-progress socket, cancels its retry pause and checks cancellation before every further `ENOENT` attempt. It still never retries after connection or for a non-`ENOENT` failure. Regression tests prove that an absent pipe cannot produce a later connection after the absolute deadline and that a pending socket is destroyed. The long virtual observer keeps the same sequential 29-second context plus 29-second eligibility delays and exact selector deadline clamp, but uses a one-second controlled polling step and a 15-second test timeout so CI cost is bounded without shortening the simulated HTTP path.
+
+Frontend verification on the corrected commit passed typecheck, production build, 90 unit files / 1,794 tests, 286 Chromium stub/browser tests and 2 production-artifact isolation tests. These are local non-live checks; they do not establish native WEB6 acceptance.
+
+Backend pin tests first reproduced the expected inverse failure: the new SHA was blocked, the superseded SHA was admitted and the paired source test failed admission. After changing only `PreparedCandidateReceipt.ReviewedFrontendSha`, the exact pin matrix and paired source selection passed 25/25. The locked Release/net48 build passed with zero warnings/errors. The bounded integrated pure selection passed 733/733 with zero failed/skipped and included the paired exact-source row.
+
+| PR review selection | Passed / failed / skipped | TRX SHA-256 |
+| --- | ---: | --- |
+| Exact pin matrix plus paired source | 25 / 0 / 0 | `bbcd1324cab556cd6e703e9aad4432f53a1531a8d58a801ec31106022e5e1432` |
+| Integrated pure backend | 733 / 0 / 0 | `b96a1ffec58aa06a7224e4c0c64a60f2c9fe863f1e70a9b423ead0db919741d8` |
+
+No fresh live candidate, allocation, SQL approval, IIS process or browser cutover was created. Attempt21 and all other retained resources were not accessed.
 
 ## Acceptance boundary
 
