@@ -1,6 +1,6 @@
 # WEB6 — Pinned Windows/IIS Express/SQL candidate runbook
 
-**Status (2026-11-13): attempt19 reached PairPassed, then FailedRetained at cutover IIS Express process identity.** Task 6 remains open. The controlled nonproduction runbook applies to Codex Local and protected Windows CI using IIS Express and SQL Server. [B05a operations](../evidence/web6/20261110-b05a-operations.md) Â· [B05b paired candidate](../evidence/web6/20261110-b05b-paired-candidate.md) Â· [Backend roadmap](../plans/20261103-001-web6-recovery-quality-backend.md) Â· [Acceptance](WEB6_BACKEND_ACCEPTANCE.md) Â· [WEB5 owned-host evidence](../evidence/web5/20261103-b05-owned-host-admission.md) Â· [React companion](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261103-001-web6-recovery-quality-web.md).
+**Status (2026-11-13): attempt20 reached PairPassed, then FailedRetained at Chromium cutover control.** Task 6 remains open. The controlled nonproduction runbook applies to Codex Local and protected Windows CI using IIS Express and SQL Server. [B05a operations](../evidence/web6/20261110-b05a-operations.md) Â· [B05b paired candidate](../evidence/web6/20261110-b05b-paired-candidate.md) Â· [Backend roadmap](../plans/20261103-001-web6-recovery-quality-backend.md) Â· [Acceptance](WEB6_BACKEND_ACCEPTANCE.md) Â· [WEB5 owned-host evidence](../evidence/web5/20261103-b05-owned-host-admission.md) Â· [React companion](https://github.com/chung6a8m/MyDmsVn.ReactWebUI/blob/main/docs/plans/20261103-001-web6-recovery-quality-web.md).
 
 ## 1. Candidate manifest required before any live test
 
@@ -258,3 +258,11 @@ Candidate `web6-20261113-b93cedcb` used backend `be8c61b43e2311ee0bb59d8ea1c152d
 Chromium and Edge each passed one selector with native `ACCEPTED` and accepted cleanup. `PairPassed` SHA-256 `f1a919bcab6d53627d22ee91474ca7152696084320decbe67a0f911eadee9bda`. Cutover completed artifact sealing and started IIS Express. The process command-line check refused admission before any cutover browser case. Terminal `FailedRetained` SHA-256 `a7af67ac022d439c3d0d95ad1521e57cb317606f43faea20f5187d016b38e24c`. Three databases, three runtime logins, three SQL control roots and all nine cutover control/runtime/browser staging directories remain retained.
 
 Workload/recovery did not run and `CandidateVerified` is absent. Task 6 remains open. A new chain needs fresh explicit Owner authorization after review of the host identity refusal. [Attempt19 evidence](../evidence/web6/20261110-b05b-paired-candidate.md#task-6-attempt19-browser-pair-pass-and-cutover-iis-identity-refusal).
+
+### Attempt20 terminal boundary
+
+Candidate `web6-20261113-11ddfd6c` used backend `512035c8e1f610bf5f9a6ddbe47e57d30ae0d46a` and frontend `5f355e4ed3d0ca0778e195b940ecbed67b410dc0`. Approved Edge, Node/npm and SQL master checks preceded a new protected SQL approval and one authorize/prepare/run chain. Prepare `PIN_MATCHED`, ordinary resend OFF, ten dist/wwwroot files equal and zero live allocation.
+
+Chromium and Edge pair each passed one selector with native `ACCEPTED` and accepted cleanup. `PairPassed` SHA-256 `e1f5428bcfcae2bcb0c573b17178b5e8974722b31c01e1305b69fd140d0470af`. The shared IIS launch-plan capture admitted the first cutover host. Chromium cutover then failed the cached WEB4 case with `Owned WEB6 cutover control failed.`. Two remaining Chromium cutover cases and the Edge cutover pack did not run. Terminal `FailedRetained` SHA-256 `a814d811123fbb057e5c32b6d4ebcd5d96641624cc4a1f20f72ce8746d8874d1`. Three databases, three runtime logins, three SQL control roots and all nine cutover control/runtime/browser staging directories remain retained.
+
+Workload/recovery did not run and `CandidateVerified` is absent. Task 6 remains open. A new chain needs fresh explicit Owner authorization after review of the cutover control failure. [Attempt20 evidence](../evidence/web6/20261110-b05b-paired-candidate.md#task-6-attempt20-browser-pair-pass-and-cutover-control-failure).
