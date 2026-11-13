@@ -8,6 +8,7 @@ using System.Net;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -15,12 +16,65 @@ using MyDmsVn.Desktop.Tests;
 using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Operations;
 using MyDmsVn.Testing.Sql;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed partial class WebHostIisExpressTests
 {
+    internal static async Task<JObject> ReadCutoverLifecycleSnapshot(SqlConnection sql, bool current,
+        Func<SqlCommand, Task<object?>>? executeScalar = null)
+    {
+        var snapshot = new JObject();
+        foreach (var (key, table, order) in new[]
+        {
+            ("sales", "SalesReceipts", "SaleId"),
+            ("saleLines", "SalesReceiptLines", "SaleLineId"),
+            ("receipts", "GoodsReceipts", "ReceiptId"),
+            ("receiptLines", "GoodsReceiptLines", "ReceiptLineId"),
+            ("balances", "StockBalances", "WarehouseId,ProductId"),
+            ("ledger", "StockLedger", "LedgerId"),
+            ("valuation", "StockValuationEntries", "LedgerId"),
+            ("journal", "WebOperationJournal", "ActorUserId,OperationId"),
+        })
+            snapshot[key] = await ReadArray(table, "SELECT * FROM dbo." + table + " ORDER BY " + order).ConfigureAwait(false);
+        snapshot["sequences"] = await ReadArray("sys.sequences",
+            "SELECT name,CONVERT(decimal(38,0),current_value) AS value,CONVERT(decimal(38,0),last_used_value) AS lastUsed," +
+            "CONVERT(decimal(38,0),start_value) AS start FROM sys.sequences WHERE object_id IN " +
+            "(OBJECT_ID(N'dbo.SalesReceiptNumberSequence'),OBJECT_ID(N'dbo.GoodsReceiptNumberSequence')) ORDER BY name").ConfigureAwait(false);
+        snapshot["terminal"] = current
+            ? await ReadArray("WebOperationTerminalAudit", "SELECT * FROM dbo.WebOperationTerminalAudit ORDER BY ActorUserId,OperationId").ConfigureAwait(false)
+            : new JArray();
+        return snapshot;
+
+        async Task<JArray> ReadArray(string source, string select)
+        {
+            // The nested FOR JSON produces one nvarchar(max) value rather than wire chunks.
+            var query = "SELECT ISNULL((" + select + " FOR JSON PATH,INCLUDE_NULL_VALUES), CONVERT(nvarchar(max), N'[]'));";
+            using var command = SqlOracleExtensions.Build(sql, new SqlTestCommand(query));
+            object? result;
+            try { result = await (executeScalar == null ? command.ExecuteScalarAsync() : executeScalar(command)).ConfigureAwait(false); }
+            catch (SqlException) { throw new IOException("Cutover snapshot " + source + " query failed."); }
+            var rows = result is string json ? ParseRows(json) : null;
+            return rows ?? throw new IOException("Cutover snapshot " + source + " returned an invalid JSON row array.");
+        }
+
+        static JArray? ParseRows(string json)
+        {
+            try
+            {
+                // Validate strict JSON syntax before preserving existing Newtonsoft token types.
+                using var document = JsonDocument.Parse(json);
+                if (document.RootElement.ValueKind != JsonValueKind.Array) return null;
+                var rows = JArray.Parse(json, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+                return rows.All(row => row is JObject) ? rows : null;
+            }
+            catch (System.Text.Json.JsonException) { return null; }
+            catch (Newtonsoft.Json.JsonException) { return null; }
+        }
+    }
+
     internal static async Task InitializeCutoverEpoch(SqlConnection sql, Guid epoch,
         Func<SqlCommand, Task<object?>>? executeScalar = null)
     {
@@ -475,18 +529,7 @@ public sealed partial class WebHostIisExpressTests
         private static async Task<JObject> LifecycleSnapshot(string connectionString, bool current)
         {
             using var sql = new SqlConnection(connectionString); await sql.OpenAsync();
-            var snapshot = new JObject();
-            foreach (var source in new[]
-            {
-                ("sales", "SalesReceipts ORDER BY SaleId"), ("saleLines", "SalesReceiptLines ORDER BY SaleLineId"),
-                ("receipts", "GoodsReceipts ORDER BY ReceiptId"), ("receiptLines", "GoodsReceiptLines ORDER BY ReceiptLineId"),
-                ("balances", "StockBalances ORDER BY WarehouseId,ProductId"), ("ledger", "StockLedger ORDER BY LedgerId"),
-                ("valuation", "StockValuationEntries ORDER BY LedgerId"), ("journal", "WebOperationJournal ORDER BY ActorUserId,OperationId"),
-            })
-                snapshot[source.Item1] = JArray.Parse(await sql.QuerySingleAsync<string>("SELECT (SELECT * FROM dbo." + source.Item2 + " FOR JSON PATH,INCLUDE_NULL_VALUES);"));
-            snapshot["sequences"] = JArray.Parse(await sql.QuerySingleAsync<string>("SELECT (SELECT name,CONVERT(decimal(38,0),current_value) AS value,CONVERT(decimal(38,0),last_used_value) AS lastUsed,CONVERT(decimal(38,0),start_value) AS start FROM sys.sequences WHERE object_id IN (OBJECT_ID(N'dbo.SalesReceiptNumberSequence'),OBJECT_ID(N'dbo.GoodsReceiptNumberSequence')) ORDER BY name FOR JSON PATH,INCLUDE_NULL_VALUES);"));
-            snapshot["terminal"] = current ? JArray.Parse(await sql.QuerySingleAsync<string>("SELECT (SELECT * FROM dbo.WebOperationTerminalAudit ORDER BY ActorUserId,OperationId FOR JSON PATH,INCLUDE_NULL_VALUES);")) : new JArray();
-            return snapshot;
+            return await ReadCutoverLifecycleSnapshot(sql, current);
         }
 
         public async Task VerifyLifecycle()
