@@ -21,6 +21,18 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed partial class WebHostIisExpressTests
 {
+    internal static async Task InitializeCutoverEpoch(SqlConnection sql, Guid epoch,
+        Func<SqlCommand, Task<object?>>? executeScalar = null)
+    {
+        // Provisioning leaves NOCOUNT ON on this session. Return the UPDATE count as data.
+        using var command = SqlOracleExtensions.Build(sql, new SqlTestCommand(
+            "UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@epoch WHERE Id=1; SELECT CONVERT(int, @@ROWCOUNT);",
+            new { epoch }));
+        var changed = await (executeScalar == null ? command.ExecuteScalarAsync() : executeScalar(command)).ConfigureAwait(false);
+        if (changed is not 1)
+            throw new IOException("Fresh current allocation epoch was not initialized.");
+    }
+
     // All three allocation owners outlive this adapter, every browser and the final disposition.
     // No runtime endpoint, global environment mutation or unowned IIS process is used.
     private sealed class LiveCutoverOperations : IWeb6CandidateCutoverOperations, IWeb6CutoverRuntime
@@ -155,8 +167,7 @@ public sealed partial class WebHostIisExpressTests
             if (pair != Web6CutoverPair.Old)
             {
                 // Fresh allocation only, before the first writer admission.
-                if (await sql.ExecuteAsync("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@epoch WHERE Id=1;", new { epoch = pair == Web6CutoverPair.Restored ? _plan.RestoredEpoch : _plan.CurrentEpoch }) != 1)
-                    throw new IOException("Fresh current allocation epoch was not initialized.");
+                await InitializeCutoverEpoch(sql, pair == Web6CutoverPair.Restored ? _plan.RestoredEpoch : _plan.CurrentEpoch);
                 if (pair == Web6CutoverPair.Current) { _customer = customer; _warehouse = warehouse; _employee = employee; _product = product; _receiptProduct = receipt; _integrated = integrated; }
             }
         }
