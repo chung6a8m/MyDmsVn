@@ -49,7 +49,7 @@ internal sealed class Web6SelectorOutput : IDisposable
                     .ToDictionary(n => n, n => Environment.GetEnvironmentVariable(n)!, StringComparer.OrdinalIgnoreCase));
                 _parent = new BootstrapPathPolicy.PinnedDirectory(Plan.EvidenceRoot);
                 _parentAcl = RequirePrivateParent(Plan.EvidenceRoot);
-                if (gate == "cutover") VerifyPairPassed(Plan, RunId);
+                if (gate == "cutover") VerifyPairPassed(Plan, RunId, Environment.GetEnvironmentVariable(Web6SelectorPlan.PairPassedDigestVariable)!);
                 if (gate is "workload" or "recovery")
                     VerifyTask4(Plan, RunId, Environment.GetEnvironmentVariable("MYDMSVN_WEB6_TASK4_ACCEPTANCE_PATH") ?? "",
                         Environment.GetEnvironmentVariable("MYDMSVN_WEB6_TASK4_ACCEPTANCE_SHA256") ?? "");
@@ -194,9 +194,9 @@ internal sealed class Web6SelectorOutput : IDisposable
         }
     }
 
-    internal static void VerifyPairPassed(Web6SelectorPlan plan, string runId)
+    internal static void VerifyPairPassed(Web6SelectorPlan plan, string runId, string acceptedDigest)
     {
-        using var transitionFile = ProtectedJsonFile.OpenSqlApproval(Path.Combine(plan.TaskRoot, "run-PairPassed.json"));
+        using var transitionFile = ProtectedJsonFile.Open(Path.Combine(plan.TaskRoot, "run-PairPassed.json"), acceptedDigest);
         var transition = PreparedCandidateReceipt.ReadCanonical(transitionFile.Bytes);
         if ((string?)transition["state"] != "PairPassed" || (string?)transition["runId"] != runId ||
             (string?)transition["candidateId"] != plan.Text("candidateId") ||
@@ -206,6 +206,11 @@ internal sealed class Web6SelectorOutput : IDisposable
             (string?)transition["backendPublishSha256"] != plan.Text("currentPublishSha256") ||
             (string?)transition["frontendDistSha256"] != plan.Text("candidateDistSha256"))
             throw new IOException("Cutover PairPassed transition differs from the protected prepared candidate.");
+        RequirePassedCounts(transition, "pair-edge", plan.Gates[1].Filter);
+        if ((int?)transition["exitCode"] != 0 || (bool?)transition["processTreeDrained"] != true ||
+            (bool?)transition["requiresDispositionProof"] != false || transition["pairChromiumResult"] is not JObject chromium)
+            throw new IOException("Cutover PairPassed selector completion is incomplete.");
+        RequirePassedCounts(chromium, "pair-chromium", plan.Gates[0].Filter);
         foreach (var (gate, pathKey, hashKey) in new[]
         {
             ("pair-chromium", "pairChromiumPrivatePath", "pairChromiumSha256"),
@@ -219,16 +224,36 @@ internal sealed class Web6SelectorOutput : IDisposable
             var envelope = PreparedCandidateReceipt.ReadCanonical(envelopeFile.Bytes);
             var nativePath = Path.Combine(plan.EvidenceRoot, gate + ".json");
             if ((string?)envelope["gate"] != gate || (string?)envelope["runId"] != runId ||
-                (string?)envelope["nativePath"] != nativePath)
+                (string?)envelope["nativePath"] != nativePath || (string?)envelope["candidateId"] != plan.Text("candidateId") ||
+                (string?)envelope["backendSha"] != plan.Text("backendSha") || (string?)envelope["frontendSha"] != plan.Text("frontendSha") ||
+                (string?)envelope["frontendDistSha256"] != plan.Text("candidateDistSha256"))
                 throw new IOException("Cutover pair envelope belongs to another run or gate.");
             using var file = ProtectedJsonFile.Open(nativePath, BootstrapJson.Text(envelope, "nativeSha256"));
             var native = PreparedCandidateReceipt.ReadCanonical(file.Bytes);
             var expected = CreatePayload(plan, gate, runId);
-            foreach (var key in new[] { "gate", "runId", "candidateId", "backendSha", "frontendSha", "frontendDistSha256",
-                "backendPublishSha256", "preparedSha256", "status", "browser" })
-                if ((string?)native[key] != (string?)expected[key])
-                    throw new IOException("Cutover pair native receipt differs from the admitted candidate.");
+            RequireAcceptedNativeIdentity(native, expected);
+            BootstrapDisposition.RequireOwnershipEvidence(plan, runId, native);
         }
+    }
+
+    private static void RequirePassedCounts(JObject result, string selector, string filter)
+    {
+        if ((string?)result["selector"] != selector || (string?)result["filter"] != filter ||
+            (int?)result["discovered"] != 1 || (int?)result["executed"] != 1 || (int?)result["passed"] != 1 ||
+            (int?)result["failed"] != 0 || (int?)result["skipped"] != 0)
+            throw new IOException("Cutover requires one exact passing result from each pair selector.");
+    }
+
+    internal static void RequireAcceptedNativeIdentity(JObject native, JObject expected)
+    {
+        foreach (var key in new[] { "gate", "runId", "candidateId", "backendSha", "frontendSha", "frontendDistSha256",
+            "backendPublishSha256", "preparedSha256", "status", "browser" })
+            if ((string?)native[key] != (string?)expected[key])
+                throw new IOException("Bootstrap native receipt candidate or gate differs.");
+        foreach (var key in new[] { "processDrained", "httpQueuesAbsent", "sqlQuiescent", "resourcesVerified" })
+            if ((bool?)native[key] != true) throw new IOException("Bootstrap selector disposition is incomplete.");
+        if (!BootstrapJson.IsLowerHex((string?)native["sqlOwnershipReceiptSha256"] ?? "", 64) || native["resources"] is not JArray { Count: > 0 })
+            throw new IOException("Bootstrap selector ownership proof is missing.");
     }
 
     internal static void RequireEnvironment(Web6SelectorPlan plan, string gate, string runId, IReadOnlyDictionary<string, string> actual)
@@ -236,7 +261,7 @@ internal sealed class Web6SelectorOutput : IDisposable
         string Value(string name) => actual.TryGetValue(name, out var value) ? value : "";
         var expected = plan.EnvironmentFor(gate, runId, Value("MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING"),
             gate is "workload" or "recovery" ? Path.Combine(plan.EvidenceRoot, "task4.json") : null,
-            Value("MYDMSVN_WEB6_TASK4_ACCEPTANCE_SHA256"));
+            Value("MYDMSVN_WEB6_TASK4_ACCEPTANCE_SHA256"), Value(Web6SelectorPlan.PairPassedDigestVariable));
         foreach (var item in expected)
         {
             // These are fresh per-run epochs, independently constrained by the
@@ -246,6 +271,8 @@ internal sealed class Web6SelectorOutput : IDisposable
         }
         foreach (var enable in new[] { "MYDMSVN_WEB6_CANDIDATE_ENABLE", "MYDMSVN_WEB6_CUTOVER_ENABLE", "MYDMSVN_WEB6_WORKLOAD_ENABLE", "MYDMSVN_WEB6_RECOVERY_ENABLE" })
             if (!expected.ContainsKey(enable) && Value(enable).Length != 0) throw new IOException("An unrelated bootstrap selector is enabled.");
+        if (gate != "cutover" && Value(Web6SelectorPlan.PairPassedDigestVariable).Length != 0)
+            throw new IOException("An unrelated bootstrap PairPassed digest is present.");
     }
 
     public void Dispose() { _parent?.Dispose(); _authority.Dispose(); _prepared.Dispose(); }

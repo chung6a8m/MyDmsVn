@@ -272,6 +272,22 @@ internal sealed class ProtectedJsonFile : IDisposable
         }
     }
 
+    // Use the existing owner handle directly. A second open of a directory held
+    // with DELETE access would need to share DELETE and is intentionally avoided.
+    internal static SafeFileHandle CreateChildDirectory(SafeFileHandle parent, string path, DirectorySecurity acl)
+    {
+        path = BootstrapJson.AbsolutePath(path);
+        Inspect(parent, System.IO.Path.GetDirectoryName(path)!, directory: true);
+        return OpenRelative(parent, path, directory: true, acl.GetSecurityDescriptorBinaryForm());
+    }
+
+    internal static SafeFileHandle CreateChildFile(SafeFileHandle parent, string path, FileSecurity acl)
+    {
+        path = BootstrapJson.AbsolutePath(path);
+        Inspect(parent, System.IO.Path.GetDirectoryName(path)!, directory: true);
+        return OpenRelative(parent, path, directory: false, acl.GetSecurityDescriptorBinaryForm());
+    }
+
     internal static (uint Volume, uint IndexHigh, uint IndexLow, long CreationTime) Inspect(SafeFileHandle handle,
         string expectedPath, bool directory, bool installedTool = false)
     {

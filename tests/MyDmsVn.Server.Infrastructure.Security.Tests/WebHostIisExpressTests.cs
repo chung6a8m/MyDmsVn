@@ -628,7 +628,7 @@ public sealed partial class WebHostIisExpressTests
             Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_PATH")),
             Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_SHA256"));
         var selector = new Web6CutoverSelector(buildAuthority, frontendRoot, backendRoot, frontendDist, oldPublish, currentPublish,
-            bootstrap.Plan.Text("currentPublishSha256"), bootstrap.Plan.Text("candidateDistSha256"), CutoverArchiveIdentity);
+            bootstrap.Plan.Text("currentPublishSha256"), bootstrap.Plan.Text("candidateDistSha256"), StrictGitIdentity);
         var buildObservation = selector.Verify();
         if (!Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_EPOCH"), "D", out var currentEpoch) ||
             !Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_RESTORED_EPOCH"), "D", out var restoredEpoch))
@@ -1057,11 +1057,12 @@ public sealed partial class WebHostIisExpressTests
         Regex.Replace(output.Replace(BrowserPassword, "<redacted>"), "(?i)(authorization: Bearer )[^\\s]+", "$1<redacted>"),
         "(?i)(__Host-mydmsvn-rt=)[^;\\s]+", "$1<redacted>");
     private static Web6CandidateBackendSource AdmitCurrentBackend(Web6SelectorOutput? bootstrap) =>
-        Web6CandidateBackendSource.Admit(AppContext.BaseDirectory, root =>
-        {
-            var identity = GitIdentity(root);
-            return (Git(root, "rev-parse --show-toplevel"), identity.Sha, identity.Tree);
-        }, bootstrap?.Plan.Text("backendWorktree"), bootstrap?.Plan.Text("backendSha"), bootstrap?.Plan.Text("backendTree"));
+        AdmitCurrentBackend(AppContext.BaseDirectory, bootstrap?.Plan.Text("backendWorktree"),
+            bootstrap?.Plan.Text("backendSha"), bootstrap?.Plan.Text("backendTree"));
+
+    internal static Web6CandidateBackendSource AdmitCurrentBackend(string startDirectory,
+        string? expectedRoot = null, string? expectedSha = null, string? expectedTree = null) =>
+        Web6CandidateBackendSource.Admit(startDirectory, StrictGitIdentity, expectedRoot, expectedSha, expectedTree);
 
     private static string GitHead(string root)
     {
@@ -1072,15 +1073,25 @@ public sealed partial class WebHostIisExpressTests
     private static (string Sha, string Tree) GitIdentity(string root) =>
         (GitHead(root), Web6CandidateInputs.RequireHash(Git(root, "rev-parse HEAD^{tree}"), 40));
 
-    private static (string Root, string Sha, string Tree) CutoverArchiveIdentity(string root)
+    private static (string Root, string Sha, string Tree) StrictGitIdentity(string root)
     {
-        var gitRoot = Git(root, "rev-parse --show-toplevel").Replace('/', '\\');
-        if (Git(root, "status --porcelain --untracked-files=all --ignore-submodules=none").Length != 0)
-            throw new IOException("Cutover archive checkout is dirty.");
-        return (gitRoot, Web6CandidateInputs.RequireHash(Git(root, "rev-parse --verify HEAD"), 40),
-            Web6CandidateInputs.RequireHash(Git(root, "rev-parse --verify HEAD^{tree}"), 40));
+        using var directory = new BootstrapPathPolicy.PinnedDirectory(root);
+        string Read(string arguments) => Git(root, arguments, strict: true);
+        var gitRoot = Read("rev-parse --show-toplevel").Replace('/', '\\');
+        if (!BootstrapJson.SamePath(root, gitRoot))
+            throw new IOException("Candidate source path is not the exact Git checkout root.");
+        var settings = Read("config --no-includes --list --name-only");
+        if (settings.Split('\n').Any(line => line.Trim().StartsWith("filter.", StringComparison.OrdinalIgnoreCase) ||
+            line.Trim().StartsWith("include", StringComparison.OrdinalIgnoreCase)))
+            throw new IOException("Candidate checkout has external Git configuration.");
+        if (Read("status --porcelain --untracked-files=all --ignore-submodules=none").Length != 0)
+            throw new IOException("Candidate source checkout is dirty.");
+        var sha = Web6CandidateInputs.RequireHash(Read("rev-parse --verify HEAD"), 40);
+        var tree = Web6CandidateInputs.RequireHash(Read("rev-parse --verify HEAD^{tree}"), 40);
+        directory.Verify();
+        return (gitRoot, sha, tree);
     }
-    private static string Git(string root, string arguments)
+    private static string Git(string root, string arguments, bool strict = false)
     {
         var bootstrap = Environment.GetEnvironmentVariable("MYDMSVN_WEB6_BOOTSTRAP_RUN_ID") != null;
         using var bootstrapOutput = bootstrap ? Web6SelectorOutput.Open(Path.GetFileNameWithoutExtension(
@@ -1093,12 +1104,17 @@ public sealed partial class WebHostIisExpressTests
         using var pinnedGit = gitParents?.OpenRead(installedTool: true);
         if (bootstrap && BootstrapPathPolicy.HashStream(pinnedGit!) != Environment.GetEnvironmentVariable("MYDMSVN_WEB6_BOOTSTRAP_GIT_SHA256"))
             throw new IOException("Bootstrap Git executable digest differs.");
-        var start = new ProcessStartInfo(executable, "--no-optional-locks -c core.hooksPath=NUL -c core.fsmonitor=false -c core.ignoreStat=false -c core.excludesFile=NUL -C \"" + root + "\" " + arguments)
+        var options = "--no-optional-locks -c core.hooksPath=NUL -c core.fsmonitor=false -c core.ignoreStat=false -c core.excludesFile=NUL";
+        if (strict) options += " -c core.trustctime=true -c core.checkStat=default -c submodule.recurse=false";
+        var start = new ProcessStartInfo(executable, options + " -C \"" + root + "\" " + arguments)
         {
             UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
             RedirectStandardOutput = true, RedirectStandardError = true,
         };
-        if (bootstrap)
+        if (strict)
+            foreach (var name in start.EnvironmentVariables.Keys.Cast<string>().Where(name => name.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase)).ToArray())
+                start.EnvironmentVariables.Remove(name);
+        if (bootstrap || strict)
         {
             start.EnvironmentVariables["GIT_CONFIG_NOSYSTEM"] = "1";
             start.EnvironmentVariables["GIT_CONFIG_GLOBAL"] = "NUL";
@@ -1108,7 +1124,7 @@ public sealed partial class WebHostIisExpressTests
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
         if (!process.WaitForExit(10000) || process.ExitCode != 0 || error.Length != 0)
-            throw new InvalidOperationException("Git source proof failed.");
+            throw new IOException("Git source proof failed.");
         return output.Trim();
     }
     private static string CertificateHash(string thumbprint)

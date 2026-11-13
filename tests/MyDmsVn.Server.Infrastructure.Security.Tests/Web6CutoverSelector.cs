@@ -119,19 +119,23 @@ internal sealed class Web6CutoverSelector
         return (identity.Sha, identity.Tree);
     }
 
-    internal (string FrontendSource, string Hash) Compose(string destination, bool cached, bool old)
+    internal (string FrontendSource, string Hash) Compose(Web6PrivateDirectoryLease runtime, bool cached, bool old)
     {
         using var artifacts = OpenVerifiedArtifacts();
         var backend = old ? artifacts.OldPublish : artifacts.CurrentPublish;
         var frontend = cached ? artifacts.ArchivedDist : artifacts.CurrentPublish;
         var frontendPrefix = cached ? "" : "wwwroot/";
-        using var target = new BootstrapPathPolicy.PinnedDirectory(destination, create: true);
-        backend.CopyFiles(destination, omitPrefix: "wwwroot/");
+        runtime.Verify();
+        var destination = Path.Combine(runtime.Path, "host");
+        var acl = SqlTestPrivateRecord.DirectoryAcl(ProtectedJsonFile.CurrentOwner());
+        using var target = ProtectedJsonFile.CreateChildDirectory(runtime.RetainedHandle, destination, acl);
+        backend.CopyFiles(destination, target, omitPrefix: "wwwroot/");
         var wwwroot = Path.Combine(destination, "wwwroot");
-        using var frontendTarget = new BootstrapPathPolicy.PinnedDirectory(wwwroot, create: true);
-        frontend.CopyFiles(wwwroot, frontendPrefix);
-        target.Verify();
-        frontendTarget.Verify();
+        using var frontendTarget = ProtectedJsonFile.CreateChildDirectory(target, wwwroot, acl);
+        frontend.CopyFiles(wwwroot, frontendTarget, frontendPrefix);
+        ProtectedJsonFile.Inspect(target, destination, directory: true);
+        ProtectedJsonFile.Inspect(frontendTarget, wwwroot, directory: true);
+        runtime.Verify();
         var digest = backend.DeploymentDigest(frontend, frontendPrefix);
         if (Web6CandidateFileSet.MeasureTree(destination) != digest)
             throw new IOException("Cutover deployment differs from its sealed inputs.");

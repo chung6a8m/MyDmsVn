@@ -10,6 +10,7 @@ internal sealed class Web6SelectorPlan
 {
     private const string Namespace = "FullyQualifiedName=MyDmsVn.Server.Infrastructure.IntegrationTests.";
     internal const string Owner = "MyDmsVn.Server.Infrastructure.Security.Tests";
+    internal const string PairPassedDigestVariable = "MYDMSVN_WEB6_CUTOVER_PAIR_PASSED_SHA256";
     internal static readonly string[] CriticalClasses = { "SalesCreate", "SalesUpdate", "SalesPost", "ReceiptCreate", "ReceiptUpdate", "ReceiptPost" };
     private readonly JObject _json;
     private readonly string _currentEpoch = Guid.NewGuid().ToString("D"), _restoredEpoch = Guid.NewGuid().ToString("D");
@@ -44,7 +45,8 @@ internal sealed class Web6SelectorPlan
     internal string GateRoot(string gate) => Text(gate switch
     { "pair-chromium" => "pairChromiumRoot", "pair-edge" => "pairEdgeRoot", _ => gate + "Root" });
 
-    internal Dictionary<string, string> EnvironmentFor(string gate, string runId, string sql, string? task4Path, string? task4Hash)
+    internal Dictionary<string, string> EnvironmentFor(string gate, string runId, string sql, string? task4Path, string? task4Hash,
+        string? pairPassedHash = null)
     {
         if (!Gates.Any(g => g.Name == gate)) throw new IOException("Unknown bootstrap selector.");
         var env = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -66,6 +68,9 @@ internal sealed class Web6SelectorPlan
         }
         if (gate == "cutover")
         {
+            if (!BootstrapJson.IsLowerHex(pairPassedHash ?? "", 64))
+                throw new IOException("Cutover requires the accepted PairPassed transition digest.");
+            env[PairPassedDigestVariable] = pairPassedHash!;
             env["MYDMSVN_WEB6_CUTOVER_ENABLE"] = "1";
             foreach (var item in new[] { ("FRONTEND_ARCHIVE_DIRECTORY", "oldFrontendWorktree"), ("BACKEND_ARCHIVE_DIRECTORY", "oldBackendWorktree"),
                 ("FRONTEND_DIST_DIRECTORY", "oldFrontendDist"), ("OLD_PUBLISH_DIRECTORY", "oldPublish"), ("CURRENT_PUBLISH_DIRECTORY", "currentPublish"),

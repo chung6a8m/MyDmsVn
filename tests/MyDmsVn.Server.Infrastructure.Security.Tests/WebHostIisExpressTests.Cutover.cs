@@ -89,7 +89,7 @@ public sealed partial class WebHostIisExpressTests
             // Task 3's browser runner must consume the same immutable publication as this owner.
             if (Path.GetFullPath(Required("MYDMSVN_WEB_TEST_PUBLISH_DIRECTORY")) != Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_PUBLISH_DIRECTORY")))
                 throw new IOException("Current publication authorities differ.");
-            var frontend = CutoverArchiveIdentity(Required("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY"));
+            var frontend = StrictGitIdentity(Required("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY"));
             if (!BootstrapJson.SamePath(frontend.Root, _bootstrap.Plan.Text("frontendWorktree")) ||
                 frontend.Sha != _bootstrap.Plan.Text("frontendSha") || frontend.Tree != _bootstrap.Plan.Text("frontendTree"))
                 throw new IOException("Cutover frontend differs from the reviewed prepared source.");
@@ -180,10 +180,12 @@ public sealed partial class WebHostIisExpressTests
         {
             var backendRoot = old ? Required("MYDMSVN_WEB6_CUTOVER_BACKEND_ARCHIVE_DIRECTORY") : _currentBackend.Root;
             var frontendRoot = cached ? Required("MYDMSVN_WEB6_CUTOVER_FRONTEND_ARCHIVE_DIRECTORY") : Required("MYDMSVN_WEB_TEST_BROWSER_DIRECTORY");
-            var backend = old ? GitIdentity(backendRoot) : _currentBackend.Verify(); var frontend = GitIdentity(frontendRoot);
+            var oldBackend = old ? StrictGitIdentity(backendRoot) : default;
+            var backend = old ? (oldBackend.Sha, oldBackend.Tree) : _currentBackend.Verify();
+            var frontend = StrictGitIdentity(frontendRoot);
             var root = key == "current" ? Root : Root + "-" + key;
             if (Directory.Exists(root) || File.Exists(root)) throw new IOException("Cutover deployment root must be create-new.");
-            var inputs = new Web6CandidateInputs(_plan.CurrentCandidateId, backend, frontend, SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(),
+            var inputs = new Web6CandidateInputs(_plan.CurrentCandidateId, backend, (frontend.Sha, frontend.Tree), SqlSchemaDefinitionFingerprint.Schema13.ToLowerInvariant(),
                 old ? _plan.OldOrigin : _plan.CurrentOrigin, CertificateHash(Required("MYDMSVN_WEB_TEST_TLS_THUMBPRINT")), "Web6CutoverPreflight", 600, 60, "web6-cutover-live.spec.ts");
             // Current-host variants use Task 2's protected file/audit admission. Exact12 uses PR95 plus its separately pinned schema/receipt.
             var deployment = new Deployment { Root = root, Inputs = inputs, Old = old, Source = published };
@@ -193,7 +195,7 @@ public sealed partial class WebHostIisExpressTests
             // The sealed control root has an exact child allowlist; payload/config/logs live outside it.
             var runtimeRoot = root + "-runtime"; deployment.RuntimeLease = Web6PrivateDirectoryLease.CreateNew(runtimeRoot);
             var host = Path.Combine(runtimeRoot, "host");
-            var (dist, hash) = _selector.Compose(host, cached, old);
+            var (dist, hash) = _selector.Compose(deployment.RuntimeLease, cached, old);
             deployment.Host = host; deployment.Hash = hash;
             deployment.Configuration = CreateConfiguration(runtimeRoot, host);
             if (old)

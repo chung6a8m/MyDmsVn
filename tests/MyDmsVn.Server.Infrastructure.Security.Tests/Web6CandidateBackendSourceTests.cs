@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -90,5 +92,106 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         Assert.True(File.Exists(Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Security.Tests", "MyDmsVn.Server.Infrastructure.Security.Tests.csproj")));
     }
 
-    public void Dispose() => Directory.Delete(_root, true);
+    [Theory]
+    [InlineData("dirty-submodule")]
+    [InlineData("untracked")]
+    [InlineData("external-config")]
+    [InlineData("wrong-git-root")]
+    [InlineData("junction-root")]
+    public async Task Live_backend_reader_refuses_hidden_or_redirected_source_before_allocator(string change)
+    {
+        Git(_root, "init --quiet");
+        File.WriteAllText(Path.Combine(_root, "MyDmsVn.sln"), "synthetic solution");
+        var submodule = Directory.CreateDirectory(Path.Combine(_root, "vendor", "sample")).FullName;
+        Git(submodule, "init --quiet");
+        File.WriteAllText(Path.Combine(submodule, "tracked.txt"), "tracked");
+        Git(submodule, "add tracked.txt");
+        Git(submodule, "commit --quiet -m synthetic-submodule");
+        Git(_root, "config diff.ignoreSubmodules all");
+        Git(_root, "config status.showUntrackedFiles no");
+        Git(_root, "update-index --add --cacheinfo 160000," + Git(submodule, "rev-parse HEAD") + ",vendor/sample");
+        Git(_root, "add MyDmsVn.sln");
+        Git(_root, "commit --quiet -m synthetic-root");
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        var calls = 0;
+        Func<Task<int>> allocate = () => { calls++; return Task.FromResult(1); };
+        switch (change)
+        {
+            case "dirty-submodule":
+                File.WriteAllText(Path.Combine(submodule, "tracked.txt"), "uncommitted change");
+                Assert.Equal("", Git(_root, "status --porcelain"));
+                await Assert.ThrowsAnyAsync<IOException>(() => source.AllocateAsync(allocate));
+                break;
+            case "untracked":
+                File.WriteAllText(Path.Combine(_root, "new.txt"), "untracked change");
+                Assert.Equal("", Git(_root, "status --porcelain"));
+                await Assert.ThrowsAnyAsync<IOException>(() => source.AllocateAsync(allocate));
+                break;
+            case "external-config":
+                Git(_root, "config include.path missing-fixture-config");
+                await Assert.ThrowsAnyAsync<IOException>(() => source.AllocateAsync(allocate));
+                break;
+            case "wrong-git-root":
+                var nested = Directory.CreateDirectory(Path.Combine(_root, "wrong")).FullName;
+                File.WriteAllText(Path.Combine(nested, "MyDmsVn.sln"), "fake solution marker");
+                await Assert.ThrowsAnyAsync<IOException>(() => WebHostIisExpressTests.AdmitCurrentBackend(nested).AllocateAsync(allocate));
+                break;
+            case "junction-root":
+                var alias = _root + "-alias";
+                using (var command = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+                    "/d /c mklink /J \"" + alias + "\" \"" + _root + "\"") { UseShellExecute = false, CreateNoWindow = true }))
+                {
+                    Assert.NotNull(command);
+                    Assert.True(command!.WaitForExit(5000));
+                    Assert.Equal(0, command.ExitCode);
+                }
+                try { await Assert.ThrowsAnyAsync<IOException>(() => WebHostIisExpressTests.AdmitCurrentBackend(alias).AllocateAsync(allocate)); }
+                finally { Directory.Delete(alias); }
+                break;
+        }
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task Live_backend_reader_ignores_ambient_git_directory()
+    {
+        Git(_root, "init --quiet");
+        File.WriteAllText(Path.Combine(_root, "MyDmsVn.sln"), "synthetic solution");
+        Git(_root, "add MyDmsVn.sln");
+        Git(_root, "commit --quiet -m synthetic-root");
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        var prior = Environment.GetEnvironmentVariable("GIT_DIR");
+        try
+        {
+            Environment.SetEnvironmentVariable("GIT_DIR", Path.Combine(_root, "absent-git-directory"));
+            Assert.Equal(1, await source.AllocateAsync(() => Task.FromResult(1)));
+        }
+        finally { Environment.SetEnvironmentVariable("GIT_DIR", prior); }
+    }
+
+    private static string Git(string root, string arguments)
+    {
+        var start = new ProcessStartInfo("git",
+            "-c user.name=Fixture -c user.email=fixture@example.invalid -c core.hooksPath=NUL " + arguments)
+        {
+            WorkingDirectory = root, UseShellExecute = false, RedirectStandardOutput = true,
+            RedirectStandardError = true, CreateNoWindow = true,
+        };
+        foreach (var key in new List<string>(start.EnvironmentVariables.Keys.Cast<string>()))
+            if (key.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase)) start.EnvironmentVariables.Remove(key);
+        start.EnvironmentVariables["GIT_CONFIG_NOSYSTEM"] = "1";
+        start.EnvironmentVariables["GIT_CONFIG_GLOBAL"] = "NUL";
+        using var process = Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEnd();
+        Assert.True(process.WaitForExit(5000));
+        Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd());
+        return output.Trim();
+    }
+
+    public void Dispose()
+    {
+        foreach (var path in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+            File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
+        Directory.Delete(_root, true);
+    }
 }

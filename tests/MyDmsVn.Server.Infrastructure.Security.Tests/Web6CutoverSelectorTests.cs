@@ -263,8 +263,28 @@ public sealed class Web6CutoverSelectorTests : IDisposable
         await Assert.ThrowsAsync<IOException>(() => selector.AllocateAsync(() => { },
             pair => { calls++; return Task.FromResult(pair); }, (_, _) => Task.CompletedTask));
         Assert.Equal(0, calls);
-        Assert.Throws<IOException>(() => selector.Compose(Path.Combine(_root, "deployment"), cached: false, old: false));
-        Assert.False(Directory.Exists(Path.Combine(_root, "deployment")));
+        using var runtime = Web6PrivateDirectoryLease.CreateNew(Path.Combine(_root, "deployment"));
+        Assert.Throws<IOException>(() => selector.Compose(runtime, cached: false, old: false));
+        Assert.False(Directory.Exists(Path.Combine(runtime.Path, "host")));
+    }
+
+    [Fact]
+    public void Deployment_composes_below_the_live_retained_delete_owner()
+    {
+        var runtime = Path.Combine(_root, "owned-runtime");
+        using var owner = Web6PrivateDirectoryLease.CreateNew(runtime);
+        var destination = Path.Combine(runtime, "host");
+
+        var deployment = Selector().Compose(owner, cached: false, old: false);
+
+        owner.Verify();
+        Assert.Equal(deployment.Hash, Web6CandidateFileSet.MeasureTree(destination));
+        Assert.Equal("paired frontend", File.ReadAllText(Path.Combine(destination, "wwwroot", "index.html")));
+        Assert.True(Directory.GetAccessControl(destination).AreAccessRulesProtected);
+        Assert.True(File.GetAccessControl(Path.Combine(destination, "wwwroot", "index.html")).AreAccessRulesProtected);
+        Assert.Throws<IOException>(() => Selector().Compose(owner, cached: false, old: false));
+        owner.DeleteTreeVerified();
+        Assert.False(Directory.Exists(runtime));
     }
 
     [Fact]
@@ -280,15 +300,16 @@ public sealed class Web6CutoverSelectorTests : IDisposable
             ("cached", true, false, "archived frontend", "current host")
         })
         {
-            var destination = Path.Combine(_root, name);
-            selector.Compose(destination, cached, old);
+            using var runtime = Web6PrivateDirectoryLease.CreateNew(Path.Combine(_root, name));
+            var destination = Path.Combine(runtime.Path, "host");
+            selector.Compose(runtime, cached, old);
             Assert.Equal(frontend, File.ReadAllText(Path.Combine(destination, "wwwroot", "index.html")));
             Assert.Equal(host, File.ReadAllText(Path.Combine(destination, "bin", "host.dll")));
         }
         File.WriteAllText(Asset, "sealed publish drift");
-        var refused = Path.Combine(_root, "refused");
+        using var refused = Web6PrivateDirectoryLease.CreateNew(Path.Combine(_root, "refused"));
         Assert.Throws<IOException>(() => selector.Compose(refused, cached: false, old: false));
-        Assert.False(Directory.Exists(refused));
+        Assert.False(Directory.Exists(Path.Combine(refused.Path, "host")));
     }
 
     private Web6CutoverSelector Selector(Func<string, (string Root, string Sha, string Tree)>? git = null, string? pairHash = null) =>

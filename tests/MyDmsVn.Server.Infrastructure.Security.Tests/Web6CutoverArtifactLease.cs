@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 using MyDmsVn.Web6.CandidateBootstrap;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -79,15 +80,37 @@ internal sealed class Web6CutoverArtifactLease : IDisposable
             ProtectedJsonFile.Inspect(entry.Value.Stream.SafeFileHandle, ToPath(entry.Key), directory: false);
     }
 
-    internal void CopyFiles(string destination, string prefix = "", string? omitPrefix = null)
+    internal void CopyFiles(string destination, SafeFileHandle target, string prefix = "", string? omitPrefix = null)
     {
-        foreach (var file in FilesUnder(prefix))
+        var owner = ProtectedJsonFile.CurrentOwner();
+        var directoryAcl = SqlTestPrivateRecord.DirectoryAcl(owner);
+        var fileAcl = SqlTestPrivateRecord.FileAcl(owner);
+        var directories = new Dictionary<string, SafeFileHandle>(StringComparer.Ordinal) { [destination] = target };
+        try
         {
-            if (omitPrefix != null && file.Name.StartsWith(omitPrefix, StringComparison.OrdinalIgnoreCase)) continue;
-            var outputPath = Path.Combine(destination, file.Name.Replace('/', Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-            file.Stream.Position = 0;
-            BootstrapPathPolicy.WriteNewFile(outputPath, file.Stream.CopyTo);
+            foreach (var file in FilesUnder(prefix))
+            {
+                if (omitPrefix != null && file.Name.StartsWith(omitPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+                var outputPath = Path.Combine(destination, file.Name.Replace('/', Path.DirectorySeparatorChar));
+                using var handle = ProtectedJsonFile.CreateChildFile(GetDirectory(Path.GetDirectoryName(outputPath)!), outputPath, fileAcl);
+                using var output = new FileStream(handle, FileAccess.Write);
+                file.Stream.Position = 0;
+                file.Stream.CopyTo(output);
+                output.Flush(flushToDisk: true);
+            }
+        }
+        finally
+        {
+            foreach (var directory in directories.Values.Reverse())
+                if (!ReferenceEquals(directory, target)) directory.Dispose();
+        }
+
+        SafeFileHandle GetDirectory(string path)
+        {
+            if (directories.TryGetValue(path, out var existing)) return existing;
+            var directory = ProtectedJsonFile.CreateChildDirectory(GetDirectory(Path.GetDirectoryName(path)!), path, directoryAcl);
+            directories.Add(path, directory);
+            return directory;
         }
     }
 

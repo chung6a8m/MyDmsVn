@@ -51,11 +51,13 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
         Assert.Equal(new[] { "pair-chromium", "pair-edge", "cutover", "workload", "recovery" }, plan.Gates.Select(g => g.Name));
         foreach (var gate in plan.Gates)
         {
-            var env = plan.EnvironmentFor(gate.Name, "run-1", "private-sql", "task4-path", Hash);
+            var env = plan.EnvironmentFor(gate.Name, "run-1", "private-sql", "task4-path", Hash,
+                gate.Name == "cutover" ? Hash : null);
             Assert.Equal("private-sql", env["MYDMSVN_TEST_SQLSERVER_CONNECTION_STRING"]);
             Assert.Equal("run-1", env["MYDMSVN_WEB6_BOOTSTRAP_RUN_ID"]);
             Assert.DoesNotContain("MYDMSVN_WEB_JWT_KEYS", env.Keys);
             Assert.Equal(gate.Name == "cutover", env.ContainsKey("MYDMSVN_WEB6_CUTOVER_ENABLE"));
+            Assert.Equal(gate.Name == "cutover", env.ContainsKey(Web6SelectorPlan.PairPassedDigestVariable));
             Assert.Equal(gate.Name == "workload", env.ContainsKey("MYDMSVN_WEB6_WORKLOAD_ENABLE"));
             Assert.Equal(gate.Name == "recovery", env.ContainsKey("MYDMSVN_WEB6_RECOVERY_ENABLE"));
             Assert.Equal(Path.Combine(_root, "git.exe"), env["MYDMSVN_WEB6_BOOTSTRAP_GIT_PATH"]);
@@ -180,16 +182,48 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
     [InlineData("missing-transition")]
     [InlineData("changed-chromium")]
     [InlineData("changed-edge")]
+    [InlineData("replacement-root")]
+    [InlineData("replacement-chain")]
+    [InlineData("invalid-edge-counts")]
+    [InlineData("invalid-chromium-counts")]
+    [InlineData("invalid-native-flags")]
     public async Task Cutover_requires_the_same_prepared_pair_and_both_native_receipts(string drift)
     {
         Assert.Equal(BootstrapRunStage.CandidateVerified, (await Run()).Stage);
         var prepared = Path.Combine(_root, "prepared.json");
         var plan = Web6SelectorPlan.Create(PreparedCandidateReceipt.Read(prepared, BootstrapPathPolicy.HashFile(prepared)));
-        Web6SelectorOutput.VerifyPairPassed(plan, "run-1");
+        var transitionPath = Path.Combine(_root, "run-PairPassed.json");
+        var acceptedDigest = BootstrapPathPolicy.HashFile(transitionPath);
+        Web6SelectorOutput.VerifyPairPassed(plan, "run-1", acceptedDigest);
         if (drift == "missing-transition") File.Delete(Path.Combine(_root, "run-PairPassed.json"));
         if (drift is "changed-chromium" or "changed-edge")
             File.AppendAllText(Path.Combine(plan.EvidenceRoot, "pair-" + drift.Substring("changed-".Length) + ".json"), "drift");
-        Assert.ThrowsAny<IOException>(() => Web6SelectorOutput.VerifyPairPassed(plan, drift == "foreign-run" ? "other-run" : "run-1"));
+        if (drift is "replacement-root" or "replacement-chain" or "invalid-edge-counts" or "invalid-chromium-counts" or "invalid-native-flags")
+        {
+            var transition = PreparedCandidateReceipt.ReadCanonical(File.ReadAllBytes(transitionPath));
+            transition["recordedAtUtc"] = DateTimeOffset.UtcNow.AddMinutes(-1).ToString("O");
+            if (drift == "invalid-edge-counts") transition["passed"] = 2;
+            if (drift == "invalid-chromium-counts") transition["pairChromiumResult"]!["failed"] = 1;
+            if (drift is "replacement-chain" or "invalid-native-flags")
+            {
+                var nativePath = Path.Combine(plan.EvidenceRoot, "pair-edge.json");
+                var envelopePath = Path.Combine(plan.EvidenceRoot, "pair-edge-envelope.json");
+                var native = PreparedCandidateReceipt.ReadCanonical(File.ReadAllBytes(nativePath));
+                native["processDrained"] = false;
+                var nativeBytes = BootstrapJson.Serialize(native);
+                File.WriteAllBytes(nativePath, nativeBytes);
+                var envelope = PreparedCandidateReceipt.ReadCanonical(File.ReadAllBytes(envelopePath));
+                envelope["nativeSha256"] = ProtectedJsonFile.Digest(nativeBytes);
+                var envelopeBytes = BootstrapJson.Serialize(envelope);
+                File.WriteAllBytes(envelopePath, envelopeBytes);
+                transition["gateSha256"] = ProtectedJsonFile.Digest(envelopeBytes);
+            }
+            var transitionBytes = BootstrapJson.Serialize(transition);
+            File.WriteAllBytes(transitionPath, transitionBytes);
+            if (drift.StartsWith("invalid-", StringComparison.Ordinal)) acceptedDigest = ProtectedJsonFile.Digest(transitionBytes);
+        }
+        Assert.ThrowsAny<IOException>(() => Web6SelectorOutput.VerifyPairPassed(plan,
+            drift == "foreign-run" ? "other-run" : "run-1", acceptedDigest));
     }
 
     [Theory]
@@ -308,6 +342,9 @@ public sealed class Web6CandidateBootstrapOrchestratorTests : IDisposable
     private Task<SelectorResult> Invoke(Web6SelectorPlan plan, SelectorInvocation invocation, CancellationToken token)
     {
         _calls.Add(invocation.Name);
+        if (invocation.Name == "cutover")
+            Assert.Equal(BootstrapPathPolicy.HashFile(Path.Combine(_root, "run-PairPassed.json")),
+                invocation.Environment[Web6SelectorPlan.PairPassedDigestVariable]);
         Assert.Equal(TimeSpan.FromMinutes(invocation.Name is "pair-chromium" or "pair-edge" ? 44 : 25), invocation.Timeout);
         var task4Path = Path.Combine(_root, "evidence", "task4.json");
         Assert.Equal(invocation.Name is "workload" or "recovery", File.Exists(task4Path));

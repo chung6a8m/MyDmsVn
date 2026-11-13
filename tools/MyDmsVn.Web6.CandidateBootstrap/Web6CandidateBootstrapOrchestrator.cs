@@ -38,7 +38,10 @@ internal sealed class Web6CandidateBootstrapOrchestrator
             try
             {
                 token.ThrowIfCancellationRequested(); root.Verify(); evidence.Verify();
-                var env = plan.EnvironmentFor(gate.Name, runId, sql, task4Path, task4Hash);
+                if (gate.Name == "cutover" && transition?.Stage != BootstrapRunStage.PairPassed)
+                    throw new IOException("Cutover requires the accepted PairPassed transition.");
+                var env = plan.EnvironmentFor(gate.Name, runId, sql, task4Path, task4Hash,
+                    gate.Name == "cutover" ? transition!.Sha256 : null);
                 var invocation = new SelectorInvocation(gate.Name, gate.Filter, env, Web6CandidatePairBudgets.GateTimeout(gate.Name),
                     Path.Combine(plan.TaskRoot, "trx-" + gate.Name, "result.trx"), plan.SelectorDll);
                 result = await _invoke(plan, invocation, token).ConfigureAwait(false);
@@ -86,15 +89,10 @@ internal sealed class Web6CandidateBootstrapOrchestrator
         var expected = Web6SelectorOutput.CreatePayload(plan, invocation.Name, result.RunId ?? throw new IOException("Bootstrap run identity is missing."));
         if (!json.Properties().Select(p => p.Name).OrderBy(n => n).SequenceEqual(expected.Properties().Select(p => p.Name).OrderBy(n => n)))
             throw new IOException("Bootstrap native receipt schema differs.");
-        foreach (var key in new[] { "gate", "runId", "candidateId", "backendSha", "frontendSha", "frontendDistSha256", "backendPublishSha256", "preparedSha256", "status", "browser" })
-            if ((string?)json[key] != (string?)expected[key]) throw new IOException("Bootstrap native receipt candidate or gate differs.");
+        Web6SelectorOutput.RequireAcceptedNativeIdentity(json, expected);
         if (!DateTimeOffset.TryParseExact((string?)json["completedAtUtc"], "O", CultureInfo.InvariantCulture, DateTimeStyles.None, out var completed) ||
             completed.Offset != TimeSpan.Zero || completed < result.StartedAtUtc || completed > result.EndedAtUtc)
             throw new IOException("Bootstrap native receipt is stale or outside the selector execution.");
-        foreach (var key in new[] { "processDrained", "httpQueuesAbsent", "sqlQuiescent", "resourcesVerified" })
-            if ((bool?)json[key] != true) throw new IOException("Bootstrap selector disposition is incomplete.");
-        if (!BootstrapJson.IsLowerHex((string?)json["sqlOwnershipReceiptSha256"] ?? "", 64) || json["resources"] is not JArray { Count: > 0 })
-            throw new IOException("Bootstrap selector ownership proof is missing.");
         BootstrapDisposition.RequireOwnershipEvidence(plan, result.RunId!, json);
         if (invocation.Name == "cutover")
         {
