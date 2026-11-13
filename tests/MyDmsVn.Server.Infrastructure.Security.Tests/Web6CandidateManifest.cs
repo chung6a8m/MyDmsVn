@@ -612,6 +612,22 @@ internal sealed class Web6CandidateFileSet
     private readonly string _web4Contract, _web5Contract, _web6Contract, _dist, _published;
     private readonly string[] _backendLocks;
 
+    internal static Web6CandidateFileSet ForPublishedHost(string host, string iisConfig, string backendRoot,
+        IEnumerable<string> backendLocks, string frontendRoot, string dist) =>
+        new Web6CandidateFileSet(Path.Combine(host, "bin", "MyDmsVn.Server.HttpHost.dll"),
+            Path.Combine(host, "Web.config"), iisConfig, backendRoot, backendLocks.Select(RequireNativeLockPath), Path.Combine(frontendRoot, "package-lock.json"),
+            Path.Combine(backendRoot, "docs", "contracts", "web4-v1"), Path.Combine(backendRoot, "docs", "contracts", "web5-resolution-v1"),
+            Path.Combine(backendRoot, "docs", "contracts", "web6-resend-eligibility-v1"), dist, Path.Combine(host, "wwwroot"));
+
+    private static string RequireNativeLockPath(string path)
+    {
+        if (Path.IsPathRooted(path) || path.IndexOf(Path.AltDirectorySeparatorChar) >= 0 ||
+            path.Split(Path.DirectorySeparatorChar).Any(segment => segment is "" or "." or ".." ||
+                segment.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
+            throw new IOException("Published candidate requires canonical relative dependency lock paths.");
+        return path;
+    }
+
     internal Web6CandidateFileSet(string backendDll, string webConfig, string iisConfig, string backendRoot,
         IEnumerable<string> backendLocks, string frontendLock, string web4Contract, string web5Contract, string web6Contract,
         string dist, string published)

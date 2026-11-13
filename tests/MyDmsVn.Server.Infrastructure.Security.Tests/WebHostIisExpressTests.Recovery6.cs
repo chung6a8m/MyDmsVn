@@ -226,11 +226,8 @@ public sealed partial class WebHostIisExpressTests
             var locks = Directory.GetFiles(_backendRoot, "packages.lock.json", SearchOption.AllDirectories)
                 .Where(path => !path.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj" or ".git"))
                 .Select(path => path.Substring(_backendRoot.Length + 1)).ToArray();
-            manifest.SealArtifacts(new Web6CandidateFileSet(Path.Combine(_publish, "bin", "MyDmsVn.Server.HttpHost.dll"),
-                Path.Combine(_publish, "Web.config"), configuration, _backendRoot, locks,
-                Path.Combine(_frontendRoot, "package-lock.json"), Path.Combine(_backendRoot, "docs/contracts/web4-v1"),
-                Path.Combine(_backendRoot, "docs/contracts/web5-resolution-v1"), Path.Combine(_backendRoot, "docs/contracts/web6-resend-eligibility-v1"),
-                Path.Combine(_frontendRoot, "dist"), Path.Combine(_publish, "wwwroot")), sqlReceipt);
+            manifest.SealArtifacts(Web6CandidateFileSet.ForPublishedHost(_publish, configuration, _backendRoot, locks,
+                _frontendRoot, Path.Combine(_frontendRoot, "dist")), sqlReceipt);
             return manifest;
         }
 

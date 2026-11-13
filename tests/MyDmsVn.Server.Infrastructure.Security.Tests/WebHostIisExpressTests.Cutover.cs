@@ -281,10 +281,9 @@ public sealed partial class WebHostIisExpressTests
                 var locks = Directory.GetFiles(backendRoot, "packages.lock.json", SearchOption.AllDirectories)
                     .Where(path => !path.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj" or ".git"))
                     .Select(path => path.Substring(backendRoot.Length + 1)).ToArray();
-                deployment.Manifest.SealArtifacts(new Web6CandidateFileSet(Path.Combine(host, "bin", "MyDmsVn.Server.HttpHost.dll"),
-                    Path.Combine(host, "Web.config"), deployment.Configuration, backendRoot, locks, Path.Combine(frontendRoot, "package-lock.json"),
-                    Path.Combine(backendRoot, "docs/contracts/web4-v1"), Path.Combine(backendRoot, "docs/contracts/web5-resolution-v1"),
-                    Path.Combine(backendRoot, "docs/contracts/web6-resend-eligibility-v1"), dist, Path.Combine(host, "wwwroot")), key == "restored" ? _plan.RestoredDatabaseReceipt : _plan.CurrentDatabaseReceipt);
+                deployment.Manifest.SealArtifacts(Web6CandidateFileSet.ForPublishedHost(host, deployment.Configuration,
+                    backendRoot, locks, frontendRoot, dist),
+                    key == "restored" ? _plan.RestoredDatabaseReceipt : _plan.CurrentDatabaseReceipt);
             }
         }
 
