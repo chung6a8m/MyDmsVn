@@ -629,7 +629,7 @@ public sealed partial class WebHostIisExpressTests
             Path.GetFullPath(Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_PATH")),
             Required("MYDMSVN_WEB6_CUTOVER_BUILD_AUTHORITY_SHA256"));
         var selector = new Web6CutoverSelector(buildAuthority, frontendRoot, backendRoot, frontendDist, oldPublish, currentPublish,
-            bootstrap.Plan.Text("currentPublishSha256"), bootstrap.Plan.Text("candidateDistSha256"), StrictGitIdentity);
+            bootstrap.Plan.Text("currentPublishSha256"), bootstrap.Plan.Text("candidateDistSha256"), CreateStrictGitReader());
         var buildObservation = selector.Verify();
         if (!Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_CURRENT_EPOCH"), "D", out var currentEpoch) ||
             !Guid.TryParseExact(Required("MYDMSVN_WEB6_CUTOVER_RESTORED_EPOCH"), "D", out var restoredEpoch))
@@ -1063,7 +1063,7 @@ public sealed partial class WebHostIisExpressTests
 
     internal static Web6CandidateBackendSource AdmitCurrentBackend(string startDirectory,
         string? expectedRoot = null, string? expectedSha = null, string? expectedTree = null) =>
-        Web6CandidateBackendSource.Admit(startDirectory, StrictGitIdentity, expectedRoot, expectedSha, expectedTree);
+        Web6CandidateBackendSource.Admit(startDirectory, CreateStrictGitReader(), expectedRoot, expectedSha, expectedTree);
 
     internal static string ReadCutoverProvisioningScript(Web6CandidateBackendSource source)
     {
@@ -1085,10 +1085,62 @@ public sealed partial class WebHostIisExpressTests
     private static (string Sha, string Tree) GitIdentity(string root) =>
         (GitHead(root), Web6CandidateInputs.RequireHash(Git(root, "rev-parse HEAD^{tree}"), 40));
 
-    private static (string Root, string Sha, string Tree) StrictGitIdentity(string root) =>
-        StrictGitIdentity(root, expectedCommit: null);
+    private static (string Root, string Sha, string Tree) StrictGitIdentity(string root)
+    {
+        var observed = ReadStrictGitCheckout(root, expectedCommit: null);
+        return (observed.Root, observed.Sha, observed.Tree);
+    }
 
-    private static (string Root, string Sha, string Tree) StrictGitIdentity(string root, string? expectedCommit)
+    // One reader belongs to one admission lifetime. Later observations never replace
+    // the immutable inventory, including gitlinks that were initially uninitialized.
+    private static Func<string, (string Root, string Sha, string Tree)> CreateStrictGitReader()
+    {
+        var admitted = new Dictionary<string, StrictGitCheckout>(StringComparer.OrdinalIgnoreCase);
+        return root =>
+        {
+            var observed = ReadStrictGitCheckout(root, expectedCommit: null);
+            if (admitted.TryGetValue(root, out var initial)) initial.RequireSame(observed);
+            else admitted.Add(root, observed);
+            return (observed.Root, observed.Sha, observed.Tree);
+        };
+    }
+
+    private sealed class StrictGitCheckout
+    {
+        internal readonly string Root, Sha, Tree;
+        private readonly string _rootIdentity;
+        private readonly StrictGitlink[] _gitlinks;
+
+        internal StrictGitCheckout(string root, string rootIdentity, string sha, string tree, List<StrictGitlink> gitlinks)
+        { Root = root; _rootIdentity = rootIdentity; Sha = sha; Tree = tree; _gitlinks = gitlinks.ToArray(); }
+
+        internal void RequireSame(StrictGitCheckout observed)
+        {
+            if (!BootstrapJson.SamePath(Root, observed.Root) || _rootIdentity != observed._rootIdentity ||
+                Sha != observed.Sha || Tree != observed.Tree || _gitlinks.Length != observed._gitlinks.Length)
+                throw new IOException("Candidate checkout differs from its initial admitted inventory.");
+            for (var index = 0; index < _gitlinks.Length; index++) _gitlinks[index].RequireSame(observed._gitlinks[index]);
+        }
+    }
+
+    private sealed class StrictGitlink
+    {
+        private readonly string _path, _commit, _state;
+        private readonly StrictGitCheckout? _checkout;
+
+        internal StrictGitlink(string path, string commit, string state, StrictGitCheckout? checkout = null)
+        { _path = path; _commit = commit; _state = state; _checkout = checkout; }
+
+        internal void RequireSame(StrictGitlink observed)
+        {
+            if (_path != observed._path || _commit != observed._commit || _state != observed._state)
+                throw new IOException("Candidate gitlink differs from its initial admitted state.");
+            if (_checkout != null) _checkout.RequireSame(observed._checkout
+                ?? throw new IOException("An admitted initialized submodule disappeared."));
+        }
+    }
+
+    private static StrictGitCheckout ReadStrictGitCheckout(string root, string? expectedCommit)
     {
         using var directory = new BootstrapPathPolicy.PinnedDirectory(root);
         string Read(string arguments) => Git(root, arguments, strict: true);
@@ -1096,21 +1148,29 @@ public sealed partial class WebHostIisExpressTests
         if (!BootstrapJson.SamePath(root, gitRoot))
             throw new IOException("Candidate source path is not the exact Git checkout root.");
         RequireStrictGitConfig(Read("config --no-includes --null --list"), submodule: expectedCommit != null);
+        var gitlinks = new List<StrictGitlink>();
         foreach (var (path, commit) in ReadGitlinks(Read("ls-files --stage -v --sparse -z")))
         {
             var child = BootstrapJson.AbsolutePath(Path.Combine(root, path.Replace('/', '\\')));
             if (!BootstrapJson.IsChild(child, root))
                 throw new IOException("Candidate submodule path escaped the exact checkout.");
-            if (!Directory.Exists(child) && !File.Exists(child)) continue;
+            using var optional = new Web6CandidateFileSystem.OptionalDirectory(child);
+            if (!optional.Present)
+            {
+                gitlinks.Add(new StrictGitlink(path, commit, "absent"));
+                continue;
+            }
             using var childDirectory = new BootstrapPathPolicy.PinnedDirectory(child);
-            var marker = Path.Combine(child, ".git");
-            if (File.Exists(marker) || Directory.Exists(marker))
+            var entries = Directory.GetFileSystemEntries(child);
+            var marker = entries.SingleOrDefault(entry => string.Equals(Path.GetFileName(entry), ".git", StringComparison.OrdinalIgnoreCase));
+            if (marker != null)
             {
                 _ = Web6CandidateFileSystem.Attributes(marker);
-                StrictGitIdentity(child, commit);
+                gitlinks.Add(new StrictGitlink(path, commit, "initialized", ReadStrictGitCheckout(child, commit)));
             }
-            else if (Directory.EnumerateFileSystemEntries(child).Any())
+            else if (entries.Length != 0)
                 throw new IOException("Candidate submodule path is populated without an initialized checkout.");
+            else gitlinks.Add(new StrictGitlink(path, commit, "empty"));
             childDirectory.Verify();
         }
         // Every initialized gitlink was verified independently before this command.
@@ -1124,7 +1184,7 @@ public sealed partial class WebHostIisExpressTests
         if (Read("diff-index --cached --name-only --ignore-submodules=none " + sha + " --").Length != 0)
             throw new IOException("Candidate source index differs from HEAD.");
         directory.Verify();
-        return (gitRoot, sha, tree);
+        return new StrictGitCheckout(gitRoot, directory.Identity, sha, tree, gitlinks);
     }
 
     private static void RequireStrictGitConfig(string config, bool submodule)

@@ -772,10 +772,47 @@ internal static partial class Web6CandidateFileSystem
         }
     }
 
+    // Probe optional gitlink paths component by component. Only a native missing-name
+    // result is absence; access, sharing, non-directory and reparse failures propagate.
+    internal sealed class OptionalDirectory : IDisposable
+    {
+        private readonly List<SafeFileHandle> _leases = new List<SafeFileHandle>();
+        internal bool Present { get; }
+
+        internal OptionalDirectory(string path)
+        {
+            path = CanonicalPath(path);
+            var volume = Path.GetPathRoot(path)!;
+            try
+            {
+                _leases.Add(OpenDirectory(volume, pin: true));
+                Identity(_leases[0], directory: true);
+                foreach (var component in path.Substring(volume.Length).Split(Path.DirectorySeparatorChar))
+                {
+                    var handle = OpenRelativeDirectoryOrMissing(_leases[_leases.Count - 1], component,
+                        acl: null, allowMissing: true);
+                    if (handle == null) return;
+                    _leases.Add(handle);
+                    Identity(handle, directory: true);
+                }
+                Present = true;
+            }
+            catch { Dispose(); throw; }
+        }
+
+        public void Dispose()
+        {
+            for (var index = _leases.Count - 1; index >= 0; index--) _leases[index].Dispose();
+        }
+    }
+
     // Open each child relative to the already pinned parent. Create-new returns the original root handle
     // with the private descriptor already applied, without another lookup through the absolute path.
     private static SafeFileHandle OpenRelativeDirectory(SafeFileHandle parent, string name, DirectorySecurity? acl,
-        bool deleteAuthority = false)
+        bool deleteAuthority = false) => OpenRelativeDirectoryOrMissing(parent, name, acl, deleteAuthority)!;
+
+    private static SafeFileHandle? OpenRelativeDirectoryOrMissing(SafeFileHandle parent, string name, DirectorySecurity? acl,
+        bool deleteAuthority = false, bool allowMissing = false)
     {
         const uint caseInsensitive = 0x40, dontReparse = 0x1000, readAndListAttributes = 0x81, delete = 0x10000, shareRead = 1;
         const uint openExisting = 1, createNew = 2, directoryWithoutFollowing = 0x00200001;
@@ -807,6 +844,7 @@ internal static partial class Web6CandidateFileSystem
                 FileAttributes.Normal, shareRead, acl == null ? openExisting : createNew, directoryWithoutFollowing, IntPtr.Zero, 0);
             if (status >= 0 && handle != null && !handle.IsInvalid) return handle;
             handle?.Dispose();
+            if (allowMissing && acl == null && status == unchecked((int)0xc0000034)) return null; // STATUS_OBJECT_NAME_NOT_FOUND
             throw new IOException("Candidate directory could not be pinned or created through its owned parent.");
         }
         finally

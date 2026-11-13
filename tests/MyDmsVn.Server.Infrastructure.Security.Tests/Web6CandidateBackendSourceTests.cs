@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -287,6 +289,134 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
                 File.AppendAllText(Path.Combine(_root, script), "\nchanged between cutover allocations");
             }));
         Assert.Equal(Web6CutoverSelector.Pairs.Take(ordinal), calls);
+    }
+
+    [Theory]
+    [InlineData("absent", false, 1)]
+    [InlineData("absent", false, 2)]
+    [InlineData("empty", false, 1)]
+    [InlineData("empty", false, 2)]
+    [InlineData("absent", true, 1)]
+    [InlineData("absent", true, 2)]
+    [InlineData("empty", true, 1)]
+    [InlineData("empty", true, 2)]
+    [InlineData("initialized", false, 1)]
+    [InlineData("initialized", false, 2)]
+    [InlineData("initialized-empty", true, 1)]
+    [InlineData("initialized-empty", true, 2)]
+    [InlineData("replacement", false, 1)]
+    [InlineData("replacement", false, 2)]
+    [InlineData("replacement", true, 1)]
+    [InlineData("replacement", true, 2)]
+    [InlineData("denied", true, 1)]
+    [InlineData("denied", true, 2)]
+    [InlineData("junction", true, 1)]
+    [InlineData("junction", true, 2)]
+    [InlineData("file-parent", true, 1)]
+    [InlineData("file-parent", true, 2)]
+    [InlineData("sharing", true, 1)]
+    [InlineData("sharing", true, 2)]
+    public async Task Cutover_pins_initial_gitlink_inventory_before_each_callback(string change, bool nested, int ordinal)
+    {
+        var leaf = CreateNestedCheckout();
+        var child = nested ? leaf : Path.Combine(_root, "vendor", "first");
+        var detached = Path.Combine(_root, ".git", "detached-inventory");
+        if (change.StartsWith("initialized", StringComparison.Ordinal))
+        {
+            Directory.Move(child, detached);
+            if (change == "initialized-empty") Directory.CreateDirectory(child);
+        }
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        using var artifacts = new Web6CutoverSelectorTests();
+        var calls = new List<Web6CutoverPair>();
+        string? priorAcl = null;
+        IDisposable? conflictingHandle = null;
+        string? junction = null;
+        try
+        {
+            await Assert.ThrowsAnyAsync<IOException>(() => artifacts.Selector().AllocateAsync(() => source.Verify(),
+                pair => { calls.Add(pair); return Task.FromResult(pair); }, (_, _) => Task.CompletedTask,
+                prepare: pair =>
+                {
+                    if ((int)pair != ordinal) return;
+                    if (change.StartsWith("initialized", StringComparison.Ordinal))
+                    {
+                        if (change == "initialized-empty") Directory.Delete(child);
+                        Directory.Move(detached, child);
+                        return;
+                    }
+                    if (change == "sharing")
+                    {
+                        using var parent = Web6CandidateFileSystem.OpenDirectory(Path.GetDirectoryName(child)!);
+                        conflictingHandle = Web6CandidateFileSystem.OpenRelativeForDelete(parent, Path.GetFileName(child));
+                        return;
+                    }
+                    if (change == "denied")
+                    {
+                        priorAcl = Directory.GetAccessControl(child).GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+                        var denied = Directory.GetAccessControl(child);
+                        denied.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User!,
+                            FileSystemRights.ListDirectory | FileSystemRights.ReadAttributes, AccessControlType.Deny));
+                        Directory.SetAccessControl(child, denied);
+                        return;
+                    }
+                    if (change == "file-parent")
+                    {
+                        var parent = Path.GetDirectoryName(child)!;
+                        Directory.Move(parent, detached);
+                        File.WriteAllText(parent, "not a directory");
+                        return;
+                    }
+                    Directory.Move(child, detached);
+                    if (change is "empty" or "replacement") Directory.CreateDirectory(child);
+                    if (change == "replacement")
+                        foreach (var entry in Directory.GetFileSystemEntries(detached))
+                        {
+                            var destination = Path.Combine(child, Path.GetFileName(entry));
+                            if (Directory.Exists(entry)) Directory.Move(entry, destination);
+                            else File.Move(entry, destination);
+                        }
+                    if (change == "junction")
+                    {
+                        using var command = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+                            "/d /c mklink /J \"" + child + "\" \"" + detached + "\"") { UseShellExecute = false, CreateNoWindow = true });
+                        Assert.NotNull(command); Assert.True(command!.WaitForExit(5000)); Assert.Equal(0, command.ExitCode);
+                        junction = child;
+                    }
+                }));
+            Assert.Equal(new[] { Web6CutoverPair.Current, Web6CutoverPair.Old }.Take(ordinal), calls);
+        }
+        finally
+        {
+            conflictingHandle?.Dispose();
+            if (priorAcl != null)
+            {
+                var restored = new DirectorySecurity();
+                restored.SetSecurityDescriptorSddlForm(priorAcl, AccessControlSections.Access);
+                Directory.SetAccessControl(child, restored);
+            }
+            if (junction != null) Directory.Delete(junction);
+        }
+    }
+
+    [Theory]
+    [InlineData("initialized")]
+    [InlineData("absent")]
+    [InlineData("empty")]
+    public async Task Cutover_preserves_stable_gitlink_inventory_for_all_three_callbacks(string state)
+    {
+        var leaf = CreateNestedCheckout();
+        if (state != "initialized")
+        {
+            Directory.Move(leaf, Path.Combine(_root, ".git", "detached-inventory"));
+            if (state == "empty") Directory.CreateDirectory(leaf);
+        }
+        var source = WebHostIisExpressTests.AdmitCurrentBackend(_root);
+        using var artifacts = new Web6CutoverSelectorTests();
+        var calls = new List<Web6CutoverPair>();
+        await artifacts.Selector().AllocateAsync(() => source.Verify(),
+            pair => { calls.Add(pair); return Task.FromResult(pair); }, (_, _) => Task.CompletedTask);
+        Assert.Equal(new[] { Web6CutoverPair.Current, Web6CutoverPair.Old, Web6CutoverPair.Restored }, calls);
     }
 
     private string CreateNestedCheckout()
