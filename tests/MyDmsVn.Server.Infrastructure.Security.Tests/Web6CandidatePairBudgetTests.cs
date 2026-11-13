@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading.Tasks;
 using MyDmsVn.Desktop.Tests;
 using System.Collections.Generic;
@@ -10,6 +11,84 @@ namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web6CandidatePairBudgetTests
 {
+    [Fact]
+    public void Cutover_phase_and_response_budgets_match_the_deadline_contract()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(15), Web6CutoverBudgets.LifecyclePhase);
+        Assert.Equal(TimeSpan.FromSeconds(45), Web6CutoverBudgets.SqlMutationOrOraclePhase);
+        Assert.Equal(TimeSpan.FromSeconds(150), Web6CutoverBudgets.HostSwitchPhase);
+        Assert.Equal(TimeSpan.FromSeconds(5), Web6CutoverBudgets.ResponseReserve);
+    }
+
+    [Fact]
+    public void Cutover_scenarios_and_resets_fit_inside_the_browser_pack_and_controller()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(420), Web6CutoverBudgets.FirstScenario);
+        Assert.Equal(TimeSpan.FromSeconds(420), Web6CutoverBudgets.SecondScenario);
+        Assert.Equal(TimeSpan.FromSeconds(690), Web6CutoverBudgets.ThirdScenario);
+        Assert.Equal(TimeSpan.FromSeconds(180), Web6CutoverBudgets.FirstResetReserve);
+        Assert.Equal(TimeSpan.FromSeconds(180), Web6CutoverBudgets.SecondResetReserve);
+        Assert.Equal(TimeSpan.FromSeconds(60), Web6CutoverBudgets.ThirdResetReserve);
+        Assert.Equal(TimeSpan.FromSeconds(1560), Web6CutoverBudgets.BrowserPack);
+        Assert.Equal(TimeSpan.FromSeconds(1620), Web6CutoverBudgets.Controller);
+
+        var scenarios = Web6CutoverBudgets.FirstScenario + Web6CutoverBudgets.SecondScenario + Web6CutoverBudgets.ThirdScenario;
+        Assert.Equal(TimeSpan.FromSeconds(1530), scenarios);
+        Assert.True(scenarios < Web6CutoverBudgets.BrowserPack);
+        Assert.True(Web6CutoverBudgets.BrowserPack < Web6CutoverBudgets.Controller);
+    }
+
+    [Fact]
+    public void Cutover_controllers_fit_inside_the_aggregate_selector_and_process_ceiling()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(3300), Web6CutoverBudgets.AggregateParent);
+        Assert.Equal(TimeSpan.FromSeconds(3600), Web6CutoverBudgets.SelectorGate);
+        Assert.Equal(TimeSpan.FromSeconds(3660), Web6CutoverBudgets.SelectorProcessMaximum);
+
+        var controllers = Web6CutoverBudgets.Controller + Web6CutoverBudgets.Controller;
+        Assert.Equal(TimeSpan.FromSeconds(3240), controllers);
+        Assert.True(controllers < Web6CutoverBudgets.AggregateParent);
+        Assert.True(Web6CutoverBudgets.AggregateParent < Web6CutoverBudgets.SelectorGate);
+        Assert.True(Web6CutoverBudgets.SelectorGate < Web6CutoverBudgets.SelectorProcessMaximum);
+    }
+
+    [Theory]
+    [InlineData("oldClientNewHostOn", 180)]
+    [InlineData("oldClientNewHostOff", 180)]
+    [InlineData("newClientOldHostOn", 180)]
+    [InlineData("newClientOldHostOff", 180)]
+    [InlineData("restoreEpoch", 180)]
+    [InlineData("resetCutover", 180)]
+    [InlineData("sameEpochRestart", 210)]
+    [InlineData("committedUnavailable", 60)]
+    [InlineData("revokeGrantOn", 45)]
+    [InlineData("revokeGrantOff", 45)]
+    [InlineData("verifyNoCutoverMutation", 45)]
+    public void Cutover_actions_have_an_exact_cap_inside_the_shortest_scenario(string action, int seconds)
+    {
+        var cap = Web6CutoverBudgets.ActionCap(action);
+        Assert.Equal(TimeSpan.FromSeconds(seconds), cap);
+        Assert.True(cap - Web6CutoverBudgets.ResponseReserve < Web6CutoverBudgets.FirstScenario);
+    }
+
+    [Fact]
+    public void Unknown_cutover_actions_have_no_cap()
+    {
+        Assert.Throws<InvalidDataException>(() => Web6CutoverBudgets.ActionCap("unknown"));
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(40000, 40000)]
+    [InlineData(205000, 150000)]
+    public void Cutover_phase_allowance_respects_both_work_and_phase_caps(int remainingMs, int expectedMs)
+    {
+        var workAllowance = TimeSpan.FromMilliseconds(remainingMs);
+        var effective = Web6CutoverBudgets.PhaseAllowance(Web6CutoverBudgets.HostSwitchPhase, workAllowance);
+        Assert.Equal(TimeSpan.FromMilliseconds(expectedMs), effective);
+        Assert.True(effective <= workAllowance);
+    }
+
     [Theory]
     [InlineData(false, 41)]
     [InlineData(true, 44)]

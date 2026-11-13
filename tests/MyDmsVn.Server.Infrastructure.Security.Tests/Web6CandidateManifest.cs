@@ -460,39 +460,76 @@ internal sealed class Web6CutoverDrain
     internal bool QueueAbsent { get; }
 }
 
+internal sealed class Web6CutoverRequest
+{
+    private readonly JObject? _committedSetup;
+
+    internal Web6CutoverRequest(string action, Guid? operation, JObject? committedSetup, TimeSpan requestAllowance)
+    {
+        Action = action;
+        Operation = operation;
+        _committedSetup = (JObject?)committedSetup?.DeepClone();
+        RequestAllowance = requestAllowance;
+    }
+
+    internal string Action { get; }
+    internal Guid? Operation { get; }
+    internal JObject? CommittedSetup => (JObject?)_committedSetup?.DeepClone();
+    internal TimeSpan RequestAllowance { get; }
+    internal TimeSpan WorkAllowance => RequestAllowance - Web6CutoverBudgets.ResponseReserve;
+}
+
 internal static class Web6CutoverControl
 {
-    private static readonly HashSet<string> PairActions = new HashSet<string>(new[]
-    {
-        "oldClientNewHostOn", "oldClientNewHostOff", "newClientOldHostOn", "newClientOldHostOff",
-    }, StringComparer.Ordinal);
     private static readonly HashSet<string> OperationActions = new HashSet<string>(new[]
     {
         "sameEpochRestart", "revokeGrantOn", "revokeGrantOff", "restoreEpoch",
         "committedUnavailable", "verifyNoCutoverMutation",
     }, StringComparer.Ordinal);
 
-    internal static string Validate(JObject frame, string token)
+    internal static Web6CutoverRequest Validate(JObject frame, string token)
     {
         if (frame == null || string.IsNullOrEmpty(token) || frame["id"]?.Type != JTokenType.Integer ||
             frame["token"]?.Type != JTokenType.String || (string)frame["token"]! != token ||
             frame["action"]?.Type != JTokenType.String)
-            throw new InvalidDataException("Invalid WEB6 cutover control frame.");
+            throw InvalidFrame();
+
         var action = (string)frame["action"]!;
-        var cleanupGrant = action == "revokeGrantOff" && frame["operationId"] == null;
-        var expected = PairActions.Contains(action) || cleanupGrant
-            ? new[] { "id", "token", "action" }
-            : action == "committedUnavailable" ? new[] { "id", "token", "action", "operationId", "committedSetup" }
-            : OperationActions.Contains(action) ? new[] { "id", "token", "action", "operationId" } : Array.Empty<string>();
-        if (expected.Length == 0 || !frame.Properties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
+        var actionCap = Web6CutoverBudgets.ActionCap(action);
+        if (frame["requestAllowanceMs"] is not JValue { Type: JTokenType.Integer } allowance ||
+            !int.TryParse(allowance.ToString(CultureInfo.InvariantCulture), NumberStyles.Integer,
+                CultureInfo.InvariantCulture, out var allowanceMs))
+            throw InvalidFrame();
+
+        var requestAllowance = TimeSpan.FromMilliseconds(allowanceMs);
+        if (requestAllowance <= Web6CutoverBudgets.ResponseReserve || requestAllowance > actionCap)
+            throw InvalidFrame();
+
+        var requiresProof = action == "committedUnavailable";
+        var requiresOperation = OperationActions.Contains(action) && (action != "revokeGrantOff" || frame["operationId"] != null);
+        var expected = requiresProof ? new[] { "id", "token", "action", "requestAllowanceMs", "operationId", "committedSetup" }
+            : requiresOperation ? new[] { "id", "token", "action", "requestAllowanceMs", "operationId" }
+            : new[] { "id", "token", "action", "requestAllowanceMs" };
+        if (!frame.Properties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
             .SequenceEqual(expected.OrderBy(name => name, StringComparer.Ordinal)))
-            throw new InvalidDataException("Invalid WEB6 cutover control frame.");
-        if (OperationActions.Contains(action) && !cleanupGrant && (frame["operationId"]?.Type != JTokenType.String ||
-            !Guid.TryParseExact((string)frame["operationId"]!, "D", out var operation) || operation == Guid.Empty))
-            throw new InvalidDataException("Invalid WEB6 cutover control frame.");
-        if (action == "committedUnavailable") Web6CommittedSetup.Parse(frame["committedSetup"] as JObject, Guid.ParseExact((string)frame["operationId"]!, "D"));
-        return action;
+            throw InvalidFrame();
+
+        var operation = Guid.Empty;
+        if (requiresOperation && (frame["operationId"]?.Type != JTokenType.String ||
+            !Guid.TryParseExact((string)frame["operationId"]!, "D", out operation) || operation == Guid.Empty))
+            throw InvalidFrame();
+
+        var proof = frame["committedSetup"] as JObject;
+        if (requiresProof)
+        {
+            try { Web6CommittedSetup.Parse(proof, operation); }
+            catch (OverflowException) { throw InvalidFrame(); }
+        }
+
+        return new Web6CutoverRequest(action, requiresOperation ? operation : (Guid?)null, proof, requestAllowance);
     }
+
+    private static InvalidDataException InvalidFrame() => new InvalidDataException("Invalid WEB6 cutover control frame.");
 }
 
 internal interface IWeb6CandidateCutoverOperations

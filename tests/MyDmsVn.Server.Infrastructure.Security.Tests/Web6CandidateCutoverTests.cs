@@ -26,10 +26,15 @@ public sealed class Web6CandidateCutoverTests
     public void Committed_control_requires_exact_frontend_proof_and_matching_identity()
     {
         var id = Guid.NewGuid();
-        var frame = new JObject { ["id"] = 1, ["token"] = "secret", ["action"] = "committedUnavailable", ["operationId"] = id.ToString("D") };
+        var frame = ControlFrame("committedUnavailable");
+        frame["operationId"] = id.ToString("D");
+        frame.Remove("committedSetup");
         Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "secret"));
         frame["committedSetup"] = Proof(id);
-        Assert.Equal("committedUnavailable", Web6CutoverControl.Validate(frame, "secret"));
+        var request = Web6CutoverControl.Validate(frame, "secret");
+        Assert.Equal("committedUnavailable", request.Action);
+        Assert.Equal(id, request.Operation);
+        Assert.True(JToken.DeepEquals(Proof(id), request.CommittedSetup));
         foreach (var field in new[] { "operationId", "operationKind", "requestFingerprint", "authorizedBusinessEffects", "checkId", "extra" })
         {
             var bad = (JObject)frame.DeepClone();
@@ -41,8 +46,110 @@ public sealed class Web6CandidateCutoverTests
             var bad = (JObject)frame.DeepClone(); ((JObject)bad["committedSetup"]!).Remove(field.Name);
             Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(bad, "secret"));
         }
+        var oversized = (JObject)frame.DeepClone();
+        oversized["committedSetup"]!["authorizedBusinessEffects"] = long.MaxValue;
+        Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(oversized, "secret"));
         frame["action"] = "sameEpochRestart";
         Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "secret"));
+    }
+
+    [Fact]
+    public void Validated_committed_proof_is_immutable_after_validation()
+    {
+        var id = Guid.NewGuid();
+        var frame = ControlFrame("committedUnavailable");
+        frame["operationId"] = id.ToString("D");
+        frame["committedSetup"] = Proof(id);
+
+        var request = Web6CutoverControl.Validate(frame, "secret");
+        frame["committedSetup"]!["requestFingerprint"] = "changed";
+        request.CommittedSetup!["authorizedBusinessEffects"] = 2;
+
+        Assert.True(JToken.DeepEquals(Proof(id), request.CommittedSetup));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("null")]
+    [InlineData("true")]
+    [InlineData("\"5001\"")]
+    [InlineData("5001.0")]
+    [InlineData("5e3")]
+    [InlineData("-5001")]
+    [InlineData("5000")]
+    [InlineData("180001")]
+    [InlineData("9223372036854775808")]
+    public void Cutover_control_refuses_missing_non_integer_or_out_of_range_allowance(string? allowanceJson)
+    {
+        var frame = ControlFrame("oldClientNewHostOn");
+        if (allowanceJson == null) frame.Remove("requestAllowanceMs");
+        else frame["requestAllowanceMs"] = JToken.Parse(allowanceJson);
+
+        var failure = Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "secret"));
+        Assert.Equal("Invalid WEB6 cutover control frame.", failure.Message);
+    }
+
+    [Theory]
+    [InlineData("resetCutover", 5001)]
+    [InlineData("resetCutover", 180000)]
+    [InlineData("sameEpochRestart", 210000)]
+    [InlineData("revokeGrantOn", 45000)]
+    [InlineData("committedUnavailable", 60000)]
+    public void Cutover_control_reserves_exactly_five_seconds_of_each_admitted_allowance(string action, int allowanceMs)
+    {
+        var request = Web6CutoverControl.Validate(ControlFrame(action, allowanceMs), "secret");
+
+        Assert.Equal(TimeSpan.FromMilliseconds(allowanceMs), request.RequestAllowance);
+        Assert.Equal(TimeSpan.FromMilliseconds(allowanceMs - 5000), request.WorkAllowance);
+    }
+
+    [Theory]
+    [InlineData("revokeGrantOn", 45001)]
+    [InlineData("revokeGrantOff", 45001)]
+    [InlineData("verifyNoCutoverMutation", 45001)]
+    [InlineData("committedUnavailable", 60001)]
+    [InlineData("restoreEpoch", 180001)]
+    [InlineData("sameEpochRestart", 210001)]
+    public void Cutover_control_refuses_an_allowance_above_the_action_cap(string action, int allowanceMs)
+    {
+        Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(ControlFrame(action, allowanceMs), "secret"));
+    }
+
+    [Theory]
+    [InlineData("operationId")]
+    [InlineData("committedSetup")]
+    public void Reset_cutover_refuses_operation_and_proof_fields(string field)
+    {
+        var frame = ControlFrame("resetCutover");
+        frame[field] = JValue.CreateNull();
+
+        Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "secret"));
+    }
+
+    [Theory]
+    [InlineData("sameEpochRestart")]
+    [InlineData("revokeGrantOn")]
+    [InlineData("restoreEpoch")]
+    [InlineData("committedUnavailable")]
+    [InlineData("verifyNoCutoverMutation")]
+    public void Cutover_operation_actions_require_the_operation_field(string action)
+    {
+        var frame = ControlFrame(action);
+        frame.Remove("operationId");
+        Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "secret"));
+
+        frame["operationId"] = Guid.Empty.ToString("D");
+        Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "secret"));
+    }
+
+    [Fact]
+    public void Cutover_control_refuses_wrong_token_correlation_type_and_unknown_action()
+    {
+        var frame = ControlFrame("resetCutover");
+        Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "wrong"));
+        frame["id"] = "7";
+        Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "secret"));
+        Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(ControlFrame("unknown"), "secret"));
     }
 
     [Fact]
@@ -303,15 +410,25 @@ public sealed class Web6CandidateCutoverTests
     [InlineData("restoreEpoch")]
     [InlineData("committedUnavailable")]
     [InlineData("verifyNoCutoverMutation")]
+    [InlineData("resetCutover")]
     public void Cutover_control_maps_only_the_frontend_lifecycle_actions(string action)
     {
-        var frame = new JObject { ["id"] = 7, ["token"] = "secret", ["action"] = action };
-        if (action is "sameEpochRestart" or "revokeGrantOn" or "revokeGrantOff" or "restoreEpoch" or "committedUnavailable" or "verifyNoCutoverMutation")
-            frame["operationId"] = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-        if (action == "committedUnavailable") frame["committedSetup"] = Proof(Guid.Parse((string)frame["operationId"]!));
-        Assert.Equal(action, Web6CutoverControl.Validate(frame, "secret"));
+        var frame = ControlFrame(action);
+        var request = Web6CutoverControl.Validate(frame, "secret");
+        Assert.Equal(action, request.Action);
+        Assert.Equal((string?)frame["operationId"], request.Operation?.ToString("D"));
+        Assert.True(JToken.DeepEquals(frame["committedSetup"], request.CommittedSetup));
         frame["extra"] = true;
         Assert.Throws<InvalidDataException>(() => Web6CutoverControl.Validate(frame, "secret"));
+    }
+
+    private static JObject ControlFrame(string action, int allowanceMs = 5001)
+    {
+        var frame = new JObject { ["id"] = 7, ["token"] = "secret", ["action"] = action, ["requestAllowanceMs"] = allowanceMs };
+        if (action is "sameEpochRestart" or "revokeGrantOn" or "revokeGrantOff" or "restoreEpoch" or "committedUnavailable" or "verifyNoCutoverMutation")
+            frame["operationId"] = RestoredEpoch.ToString("D");
+        if (action == "committedUnavailable") frame["committedSetup"] = Proof(RestoredEpoch);
+        return frame;
     }
 
     [Fact]
@@ -621,10 +738,14 @@ public sealed class Web6CandidateCutoverTests
     }
 
     [Fact]
-    public void Frontend_after_each_can_restore_grant_without_operation_id()
+    public void Legacy_grant_cleanup_frame_can_omit_the_operation_id()
     {
-        var frame = JObject.Parse("{\"id\":2,\"token\":\"secret\",\"action\":\"revokeGrantOff\"}");
-        Assert.Equal("revokeGrantOff", Web6CutoverControl.Validate(frame, "secret"));
+        var frame = ControlFrame("revokeGrantOff");
+        frame.Remove("operationId");
+        var request = Web6CutoverControl.Validate(frame, "secret");
+        Assert.Equal("revokeGrantOff", request.Action);
+        Assert.Null(request.Operation);
+        Assert.Null(request.CommittedSetup);
     }
 
     // Literal shape emitted by frontend createWeb6PilotResult at reviewed 0e0330d5.

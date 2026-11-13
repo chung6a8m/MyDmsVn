@@ -150,9 +150,10 @@ internal sealed class WebRecoveryPilotControl
                 var frame = await WebFrontendPortBridge.ReadFrame(pipe, _stop.Token).ConfigureAwait(false);
                 if (_cutover != null)
                 {
-                    var cutoverAction = Web6CutoverControl.Validate(frame, _token);
-                    var cutoverReply = await _cutover(cutoverAction, frame["operationId"] == null ? (Guid?)null : Guid.ParseExact((string)frame["operationId"]!, "D"), frame["committedSetup"] as JObject).ConfigureAwait(false);
-                    cutoverReply["id"] = frame["id"]!.DeepClone(); cutoverReply["ok"] = true;
+                    var correlationId = frame["id"];
+                    var request = Web6CutoverControl.Validate(frame, _token);
+                    var cutoverReply = await _cutover(request.Action, request.Operation, request.CommittedSetup).ConfigureAwait(false);
+                    cutoverReply["id"] = correlationId!.DeepClone(); cutoverReply["ok"] = true;
                     await WebFrontendPortBridge.WriteFrame(pipe, cutoverReply, _stop.Token).ConfigureAwait(false);
                     continue;
                 }
