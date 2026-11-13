@@ -60,6 +60,146 @@ public sealed class Web5HttpServiceStateTests
         Assert.Same(failure, observed);
     }
 
+    [Theory]
+    [InlineData("start-expired")]
+    [InlineData("start-cancelled")]
+    [InlineData("start-threw")]
+    [InlineData("identity-failed")]
+    [InlineData("wait-cancelled")]
+    [InlineData("wait-cancelled-readers")]
+    public async Task Strict_child_failures_retain_ownership_even_with_completed_readers_until_proven_exit(string fault)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var now = TimeSpan.Zero;
+        var child = new FakeCutoverChild();
+        child.AfterStart = () =>
+        {
+            if (fault == "start-expired") now = TimeSpan.FromSeconds(61);
+            if (fault == "start-cancelled") cancellation.Cancel();
+            if (fault == "start-threw") throw new IOException("fake post-launch Start failure");
+        };
+        child.IdentityFailure = fault == "identity-failed";
+        if (fault == "wait-cancelled-readers")
+        {
+            child.Output = Task.FromCanceled<string>(new CancellationToken(true));
+            child.Error = Task.FromCanceled<string>(new CancellationToken(true));
+        }
+        var run = Web6CutoverNative.RunChild(child,
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(60), () => now), cancellation.Token,
+            (_, token) => { cancellation.Cancel(); return Task.CompletedTask; });
+        try
+        {
+            Assert.Equal(1, child.Starts);
+            Assert.True(child.Output.IsCompleted && child.Error.IsCompleted);
+            Assert.False(run.IsCompleted);
+            Assert.False(child.Disposed);
+            Assert.Equal(0, child.Terminations);
+            Assert.True(child.ExitAwaited);
+        }
+        finally { child.ProveExit(); }
+        await Assert.ThrowsAnyAsync<Exception>(() => run);
+        Assert.True(child.Disposed);
+        Assert.True(child.HasExited);
+    }
+
+    [Fact]
+    public async Task Strict_child_verified_termination_still_owns_process_until_exit_and_both_readers_join()
+    {
+        var now = TimeSpan.Zero;
+        var child = new FakeCutoverChild { ExitOnTerminate = false };
+        var output = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        child.Output = output.Task;
+        var run = Web6CutoverNative.RunChild(child,
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(60), () => now), default,
+            (_, token) => { now += TimeSpan.FromSeconds(31); return Task.CompletedTask; });
+        try
+        {
+            Assert.Equal(1, child.Terminations);
+            Assert.Equal(1, child.Verifications);
+            Assert.False(run.IsCompleted);
+            Assert.False(child.Disposed);
+            child.ProveExit();
+            Assert.False(run.IsCompleted);
+            Assert.False(child.Disposed);
+        }
+        finally { child.ProveExit(); output.TrySetResult("done"); }
+        await Assert.ThrowsAnyAsync<Exception>(() => run);
+        Assert.True(child.Disposed);
+    }
+
+    [Fact]
+    public async Task Strict_child_changed_identity_prevents_kill_and_keeps_the_child_for_containment()
+    {
+        var now = TimeSpan.Zero;
+        var child = new FakeCutoverChild { VerifyFailure = true };
+        var run = Web6CutoverNative.RunChild(child,
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(60), () => now), default,
+            (_, token) => { now += TimeSpan.FromSeconds(31); return Task.CompletedTask; });
+        try
+        {
+            Assert.Equal(1, child.Verifications);
+            Assert.Equal(0, child.Terminations);
+            Assert.False(child.Disposed);
+            Assert.False(run.IsCompleted);
+            Assert.True(child.ExitAwaited);
+        }
+        finally { child.ProveExit(); }
+        await Assert.ThrowsAnyAsync<Exception>(() => run);
+        Assert.True(child.Disposed);
+    }
+
+    [Fact]
+    public async Task Strict_child_partial_output_start_failure_joins_the_started_reader_after_exit()
+    {
+        var child = new FakeCutoverChild { OutputStartFailure = true, ExitOnTerminate = true };
+        var output = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        child.Output = output.Task;
+        var run = Web6CutoverNative.RunChild(child, new Web6CutoverDeadline(TimeSpan.FromSeconds(60)), default);
+        try
+        {
+            Assert.True(child.HasExited);
+            Assert.Equal(1, child.Terminations);
+            Assert.False(child.Disposed);
+            Assert.False(run.IsCompleted);
+        }
+        finally { child.ProveExit(); output.TrySetResult("partial"); }
+        await Assert.ThrowsAsync<IOException>(() => run);
+        Assert.True(child.Disposed);
+    }
+
+    [Fact]
+    public async Task Strict_child_success_releases_only_after_natural_exit_and_output()
+    {
+        var child = new FakeCutoverChild { Output = Task.FromResult("stdout"), Error = Task.FromResult("stderr") };
+        child.AfterStart = child.ProveExit;
+        var result = await Web6CutoverNative.RunChild(child, new Web6CutoverDeadline(TimeSpan.FromSeconds(60)), default);
+        Assert.Equal((0, "stdout", "stderr"), result);
+        Assert.True(child.Disposed);
+        Assert.True(child.ExitAwaited);
+        Assert.Equal(0, child.Terminations);
+    }
+
+    private sealed class FakeCutoverChild : IWeb6CutoverChild
+    {
+        private readonly TaskCompletionSource<bool> _exit = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal Action? AfterStart;
+        internal bool IdentityFailure, VerifyFailure, ExitOnTerminate, OutputStartFailure;
+        internal int Starts, Verifications, Terminations;
+        internal bool Disposed, ExitAwaited;
+        public bool Start() { Starts++; AfterStart?.Invoke(); return true; }
+        public void CaptureIdentity() { if (IdentityFailure) throw new IOException("fake identity capture"); }
+        public void VerifyIdentity() { Verifications++; if (VerifyFailure) throw new IOException("fake identity mismatch"); }
+        public bool HasExited { get; private set; }
+        public void Terminate() { Terminations++; if (ExitOnTerminate) ProveExit(); }
+        public Task ProvenExit { get { ExitAwaited = true; return _exit.Task; } }
+        public void StartOutput(CancellationToken token) { if (OutputStartFailure) throw new IOException("fake partial reader start"); }
+        public Task<string> Output { get; set; } = Task.FromResult("");
+        public Task<string> Error { get; set; } = Task.FromResult("");
+        public int ExitCode => 0;
+        public void Dispose() => Disposed = true;
+        internal void ProveExit() { HasExited = true; _exit.TrySetResult(true); }
+    }
+
     private const string Empty = @"
 Snapshot of HTTP service state (Request Queue View):
 -----------------------------------------------------
