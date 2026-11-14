@@ -278,8 +278,8 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
     [Web6PairedSourceFact]
     public async Task Prepared_frontend_cutover_matches_backend_wire_and_deadline_hierarchy()
     {
-        const string reviewedSha = "78e24ef00738f0b1d09ff466991802a736c67fec";
-        const string reviewedTree = "72a8e252f164c131fb72595cfda52c1432c2027c";
+        const string reviewedSha = "fa032ece3d47af029d5095ae39b21fb43d0f1afc";
+        const string reviewedTree = "e0cb0950f78d072e73850392b6bf496e574775ae";
         var root = Path.GetFullPath(Environment.GetEnvironmentVariable(Web6PairedSourceFactAttribute.RootVariable)!);
         using var sourceRoot = new BootstrapPathPolicy.PinnedDirectory(root);
         RequirePairedGitConfig(root);
@@ -289,10 +289,11 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         Assert.Empty(PairedGitText(root, "status --porcelain --untracked-files=all --ignore-submodules=all"));
 
         const string liveSpec = "tests/pilot/web6-cutover-live.spec.ts";
+        const string cutoverHelpers = "tests/pilot/web6-cutover-helpers.ts";
         const string deadlineSource = "tests/pilot/web6-cutover-deadline.ts";
         const string controlSource = "tests/pilot/web6-cutover-control.ts";
         var sources = new Dictionary<string, byte[]>(StringComparer.Ordinal);
-        foreach (var path in new[] { liveSpec, deadlineSource, controlSource })
+        foreach (var path in new[] { liveSpec, cutoverHelpers, deadlineSource, controlSource })
         {
             // Read the verified commit's blobs so index flags or a later edit cannot change the tested source.
             var blob = PairedGitText(root, "rev-parse --verify " + reviewedSha + ":" + path);
@@ -317,6 +318,12 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         VerifyPairedControlSource(ReadPrepared(deadlineSource), ReadPrepared(controlSource));
 
         var spec = ReadPrepared(liveSpec);
+        var helpers = ReadPrepared(cutoverHelpers);
+        Assert.Contains("operation.operationId === operationId", helpers);
+        Assert.Contains("operation.frozen.request.operationKind === \"Sales.Create\"", helpers);
+        Assert.Contains("operation.state === \"DISPATCHED\"", helpers);
+        Assert.Contains("matches.length !== 1", helpers);
+        Assert.Contains("selectDispatchedSalesCreateByWire(await readStore<DurableOperationRecord>(page, \"operations\"), wire!.operationId)", spec);
         var budgetRows = Regex.Matches(spec, @"\[\s*(\w+)\s*,\s*\[\s*([0-9_]+)\s*,\s*([0-9_]+)\s*\]\s*\]");
         var expected = new[]
         {

@@ -1,6 +1,6 @@
 # WEB6 cutover deadline bounded candidate — 2026-11-14
 
-**Source and non-live verification.** Attempt21 remains `FailedRetained` and was left untouched. The current candidate has no `CandidateVerified` result. Fresh live execution requires final cross-repository review and separate explicit Owner authorization. [Approved design](../../superpowers/specs/2026-11-13-web6-cutover-deadline-hierarchy-design.md) · [Implementation plan](../../superpowers/plans/2026-11-13-web6-cutover-deadline-hierarchy.md) · [Runbook](../../development/WEB6_CANDIDATE_RUNBOOK.md#cutover-deadline-and-reset-protocol).
+**Source and non-live verification.** Candidate `web6-20261114-9944f608` remains `FailedRetained` and was left untouched; `web6-20261114-f6402db1` remains pre-allocation `BLOCKED_PREFLIGHT`. The current source has no `CandidateVerified` result. Fresh live execution requires final cross-repository review, protected CI and separate explicit Owner authorization. [Approved design](../../superpowers/specs/2026-11-13-web6-cutover-deadline-hierarchy-design.md) · [Implementation plan](../../superpowers/plans/2026-11-13-web6-cutover-deadline-hierarchy.md) · [Runbook](../../development/WEB6_CANDIDATE_RUNBOOK.md#cutover-deadline-and-reset-protocol).
 
 ## Source identity
 
@@ -12,12 +12,13 @@
 | Backend verified source and tests, before this documentation delta | Paired Git process cleanup correction | `dcdc8edda5a630fec191b5766ba78cd76d3490ba` |
 | Frontend exact reviewed pin | `eafcc40a13c17dbfe3c546b76d6dbdd1bf360193` | `0ecffdc18a06685e4790c53e9494ae9f340abe19` |
 | Frontend reload-restore reviewed pin | `78e24ef00738f0b1d09ff466991802a736c67fec` | `72a8e252f164c131fb72595cfda52c1432c2027c` |
+| Frontend exact-wire reviewed pin | `fa032ece3d47af029d5095ae39b21fb43d0f1afc` | `e0cb0950f78d072e73850392b6bf496e574775ae` |
 
-The only change to bootstrap execution in Task 6 is the `ReviewedFrontendSha` pin. The review correction changes the paired source test and evidence. The vendor gitlink remains `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`.
+The only production bootstrap change in this correction is the `ReviewedFrontendSha` pin. The paired-source test additionally binds the exact-wire helper source and evidence. The vendor gitlink remains `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`.
 
-The real `BootstrapPreflight.PrepareAsync` path ran with synthetic Git/build/SQL-master toolchain inputs and disposable protected files. It accepted `eafcc40a13c17dbfe3c546b76d6dbdd1bf360193` as `PIN_MATCHED`. It blocked the superseded reviewed pin `726b10351bdbe0028696f9fcfa0bbb52e8a84d28`, earlier reviewed pin `96842a6329191713282b3212e5420872eb0f3a41`, prior pin `66b935488d00ee78ec3ffbd183f474da06aa3404` and immediate frontend base `447e39f03b2b22398d30324c8cec992fc93ce83c` as `BLOCKED_REVIEWED_FRONTEND_PIN`. Only the admitted receipt opened a selector plan in the pin matrix.
+The real `BootstrapPreflight.PrepareAsync` path ran with synthetic Git/build/SQL-master toolchain inputs and disposable protected files. It accepted `fa032ece3d47af029d5095ae39b21fb43d0f1afc` as `PIN_MATCHED`. It blocked the superseded reviewed pin `78e24ef00738f0b1d09ff466991802a736c67fec` and every earlier row as `BLOCKED_REVIEWED_FRONTEND_PIN`. Only the admitted receipt opened a selector plan in the pin matrix.
 
-The paired test verifies the configured frontend checkout's commit/tree with replacement lookup disabled and Git config isolated. It independently hashes each blob's original bytes as a Git object before copying the three tracked TypeScript sources into the temporary prepared root. The test inspects those sources as text and validates synthetic frames against the real backend parser. It checks 11 action caps, both `revokeGrantOff` forms, the strict allowance field, the 5,000-ms response reserve, the three scenario/reset budgets, one reset hook and the pack/controller/aggregate/selector hierarchy. The paired test executes no frontend code or compiler. The separate full frontend unit run provides behavior coverage for cumulative accounting, framing, transport timing and the cleanup hook. This fixture uses no real host, database or browser.
+The paired test verifies the configured frontend checkout's commit/tree with replacement lookup disabled and Git config isolated. It independently hashes each blob's original bytes as a Git object before copying four tracked TypeScript sources into the temporary prepared root. Besides deadline/control contracts, it verifies that UNKNOWN setup selects exactly one `Sales.Create` / `DISPATCHED` operation by the intercepted wire ID and fails closed otherwise. The paired test executes no frontend code or compiler. Separate frontend unit and browser runs provide behavior coverage. This fixture uses no real host, database or browser.
 
 Paired Git starts suspended and enters a Windows job before resuming. On timeout or cancellation, the runner requests termination of that exact job and waits for root exit, zero active job processes and both stdout/stderr reader tasks before it releases their resources. Disposable child tests cover timeout, cancellation, delayed output on both streams, successful exit and start failure. A separate controlled test holds each reader open to verify that completion waits for both. If Windows permanently cannot prove exit or EOF, the paired test remains pending and retains ownership.
 
@@ -34,10 +35,13 @@ Windows 10.0.26300, .NET SDK 8.0.428, VSTest 17.11.2, net48 Release, Node 22.14.
 | Process cleanup RED, TRX | 2 / 2 | 0 / 2 / 0 | `6673f3c0211833f368e20777538eb021bd592800d1a3a596613b8c2e224126c4` |
 | Process cleanup focused GREEN, TRX | 16 / 16 | 16 / 0 / 0 | `daae348ee7ca236583e2eba344141819d2e9aba7cfca8c3a1a528a237038b47e` |
 | Final integrated backend after review, TRX | 729 / 729 | 729 / 0 / 0 | `cdde1ef8eb99db7d6cb1d8e9f08c895794691a2e795d9faf7de49edafc96cd0c` |
-| Frontend typecheck log at the reviewed SHA | — | exit 0, zero diagnostics | `6a56be18103da1ff832d9eb9529790860e2aa12dbceef7417852378e41ef748d` |
-| Frontend full unit log at the reviewed SHA, 90 files | 1,791 / 1,791 | 1,791 / 0 / 0 | `c2dfc50dab3f105307de361e2658de8428f3bec1826dede1d75f644f0e6971ef` |
+| Exact-wire pin RED, TRX | 29 / 29 | 26 / 3 / 0 | `f8b37f7ef9056833a30e1549aeecb02668ef095ba1320ce94cbcaef825b32420` |
+| Exact-wire pin focused GREEN, TRX | 29 / 29 | 29 / 0 / 0 | `597e70b368e137eb36abb3ecf2c7146b8f8fc3bc53e65100103ee4d2f8267715` |
+| Exact-wire integrated backend, TRX | 739 / 739 | 739 / 0 / 0 | `b89f96398ebf41c03a912ffb0f08eb97b568adc78bc9cb28cd9057f9c24b3b6a` |
+| Frontend typecheck log at reload-restore SHA `78e24ef…` | — | exit 0, zero diagnostics | `6a56be18103da1ff832d9eb9529790860e2aa12dbceef7417852378e41ef748d` |
+| Frontend full unit log at reload-restore SHA `78e24ef…`, 90 files | 1,791 / 1,791 | 1,791 / 0 / 0 | `c2dfc50dab3f105307de361e2658de8428f3bec1826dede1d75f644f0e6971ef` |
 
-The pin RED failed only the inverse rows for the new and previously admitted SHA. The `447e39f…` row already blocked before the pin change. Review regression checks cover a replacement marker in a disposable repository, byte-hash mismatch, local/worktree configuration refusal and the absence of frontend toolchain execution. The final integrated backend run includes the exact-source paired test and the selector-plan assertions for all 23 fresh Prepare rows.
+The exact-wire pin RED failed only the inverse rows for the new and previously admitted SHA plus paired-source admission. The `447e39f…` row already blocked before the pin change. Review regression checks cover a replacement marker in a disposable repository, byte-hash mismatch, local/worktree configuration refusal and the absence of frontend toolchain execution. The exact-wire integrated backend run includes the four-source paired test and selector-plan assertions for all 28 fresh Prepare rows.
 
 ```powershell
 $project = 'tests/MyDmsVn.Server.Infrastructure.Security.Tests/MyDmsVn.Server.Infrastructure.Security.Tests.csproj'

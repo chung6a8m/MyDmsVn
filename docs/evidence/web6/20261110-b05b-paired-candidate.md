@@ -1,6 +1,44 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-13): attempt21 reached PairPassed, then FailedRetained at Chromium cutover response-header timeout.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN.
+**Latest disposition (2026-11-14): candidate `web6-20261114-9944f608` reached PairPassed, then FailedRetained because the third Chromium cutover case selected an older dispatched Sales Create instead of the intercepted wire operation.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. The frontend pilot correction is source-verified only and does not authorize another live attempt.
+
+## Task 6 fresh attempts and exact-wire pilot correction — 2026-11-14
+
+The Owner authorized the exact reviewed pair: backend `1a97d159a05cf1000140a795f45797d8f137806b` / tree `e550be0eacf9233e6e0aae9b3b01ec621ee16840` and frontend `78e24ef00738f0b1d09ff466991802a736c67fec` / tree `72a8e252f164c131fb72595cfda52c1432c2027c`. Each exact commit had two terminal protected-CI PASS runs before execution.
+
+Candidate `web6-20261114-f6402db1` authorized successfully, but Prepare returned `BLOCKED_PREFLIGHT`, exit 4, before task-root creation or SQL, IIS Express or browser allocation. Its request resolved installed Node 22.14.0 beside npm 10.9.2, not the required adjacent npm 11.6.0. Authority, request and SQL-approval records and three empty protected parent directories remain retained. It was not reused, retried or cleaned.
+
+The Owner separately authorized candidate `web6-20261114-9944f608` with a protected current-user-only Node 22.14.0 / npm 11.6.0 copy. Authorize and Prepare ran once. Prepare returned `PREPARED` / `PIN_MATCHED`; independent admission checks found ordinary resend OFF, the expected marker, 10/10 byte-equal candidate dist/published files and zero pre-Run allocation. The one serial Run returned exit 5 / `FailedRetained`.
+
+| Selector | Discovered / executed / passed / failed / skipped | Outcome |
+| --- | --- | --- |
+| Chromium pair | 1 / 1 / 1 / 0 / 0 | PASS / native ACCEPTED |
+| Edge pair | 1 / 1 / 1 / 0 / 0 | PASS / native ACCEPTED |
+| Cutover | 1 / 1 / 0 / 1 / 0 | FAIL / third Chromium cutover case |
+| Workload | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+| Recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+The first two Chromium cutover cases passed. The third, `restart preserves UNKNOWN while revoked and restored epochs fail closed`, failed during UNKNOWN setup. Its wire request contained the newly intercepted operation ID, while the pilot's broad `Sales.Create` / `DISPATCHED` search selected the older committed-response-loss operation left by the preceding case. The assertion therefore compared two different authentic operations; it did not establish a product runtime failure. Edge cutover did not start.
+
+| Receipt or artifact | SHA-256 |
+| --- | --- |
+| Prepared / PairPassed | `6bf65b4c1b626a47c772ec0c07fd64797acd4c062b1e0e38da9337d81658b6aa` / `8198e0d4bde6671e305619eece982442d75051d61937bf94c750766229e14ab8` |
+| FailedRetained | `2ae001520a141efe59eb2a0d0a195ac105024c4ebe1960fa912be1a07e5b1418` |
+| Cutover TRX | `ea0fb5f856a7e021d378fe7e467391ef0d0bd5cceede7a1d8d8e35f921852b3c` |
+
+Both pair cleanups were native ACCEPTED. Cutover retained three databases, three runtime logins, three SQL control roots and nine control/runtime/browser staging directories. Six intent and six confirmation records exist and each confirmation matches its intent digest; deletion authority is false. Process-tree drain completed with no remaining IIS Express or candidate-port listener. No post-failure SQL query, cleanup, retry or access to earlier retained candidates occurred.
+
+Frontend correction `fa032ece3d47af029d5095ae39b21fb43d0f1afc` / tree `e0cb0950f78d072e73850392b6bf496e574775ae` requires exactly one dispatched Sales Create matching the intercepted wire operation ID. Its focused test passed 42/42, full unit passed 1,797/1,797, typecheck/build passed, Chromium E2E passed 286/286 and production isolation passed 2/2. Independent review found no issue. Protected push run `43575722223` and pull-request run `43575726471` both terminal-PASS on the exact commit.
+
+Backend pin TDD produced the expected inverse RED: 26 passed / 3 failed because the new SHA was blocked, the old SHA remained admitted and paired-source Prepare was blocked. After changing only the reviewed pin and paired-source contract, the same selection passed 29/29. The paired test now copies and hashes the helper as a fourth frontend source and verifies exact-wire selection, `Sales.Create`, `DISPATCHED` and fail-closed cardinality. The integrated non-live selection passed 739/739; Release/net48 build passed with zero warnings and errors.
+
+| Backend verification | TRX SHA-256 |
+| --- | --- |
+| Pin and paired-source RED, 26 / 29 passed | `f8b37f7ef9056833a30e1549aeecb02668ef095ba1320ce94cbcaef825b32420` |
+| Pin and paired-source GREEN, 29 / 29 passed | `597e70b368e137eb36abb3ecf2c7146b8f8fc3bc53e65100103ee4d2f8267715` |
+| Integrated non-live, 739 / 739 passed | `b89f96398ebf41c03a912ffb0f08eb97b568adc78bc9cb28cd9057f9c24b3b6a` |
+
+This source correction does not alter the retained candidate and is not live acceptance. A new exact backend commit, protected CI and explicit Owner authorization are required before a fresh attempt. Ordinary resend remains OFF. Full IIS and unperformed Narrator remain NOT RUN. Staging remains NOT ACCEPTED and production NO-GO.
 
 ## Task 6 attempt21 browser pair PASS and cutover response-header timeout
 
