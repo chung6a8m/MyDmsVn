@@ -1,6 +1,31 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-14): candidate `web6-20261114-3046899d` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control returned EOF after the restored-session copy passed a null SQL JSON scalar to `JArray.Parse`.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. Source commit `be49fc7e...` contains the locally and protected-CI verified parser correction; a new explicit Owner authorization remains required before another fresh attempt.
+**Latest disposition (2026-11-14): candidate `web6-20261114-de43c0c7` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control failed the exact restored-session metadata verification after the zero-row parser correction.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. The field-level metadata difference is not recorded, so a reviewed diagnosis/source correction and new explicit Owner authorization are required before another fresh attempt.
+
+## Task 6 attempt24 restored-session exact-metadata failure — 2026-11-14
+
+The Owner authorized exactly one fresh nonproduction attempt for backend `6f77186dd39cac03ec0574520758ba1a6ce92228` / tree `c9780f2dbb51ca55deed19ba2b78d279f14833a5` and frontend `e5e083ffd1bf8f70ce49e2e9bad81661e9c6e669` / tree `928b9878a8b408244433e0eb3ee89130a46f4fd6`. Backend protected push/PR runs `43596561583` / `43596565398` and frontend protected push/PR runs `43590748324` / `43590752462` were terminal-PASS. Four read-only Edge observations matched version `157.0.4341.60`, SHA-256 `2497874639116d8edc3de34b3fd83f72fa099112a5d2a426e1f08fcf39a99612`. Effective SQL catalog was `master` on server hash `956ab0c9e40a3109023eed4fba416fc3d02df062cf9375deae2635d6bd773dff`, SQL 14.0.2150.2. IIS Express SHA-256 was `01fcaff363713cecd482d9ecf99814fc83870871b82a62bf11ab43d8844a8281`; TLS certificate SHA-256 was `47985af0a6345e7c8df22aacbea36cf7cb12d924eba42704cb6997745470f647`.
+
+Fresh protected authority, task, SQL-control and tool roots were created only for candidate `web6-20261114-de43c0c7`. The protected tool copy verified Node 22.14.0 / npm 11.6.0, zero reparse points, Node SHA-256 `33b1bc1a8aca11fd5a4f2699e51019c63c0af30cf437701d07af69be7706771b` and npm CLI SHA-256 `8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7`. Owner authority SHA-256 was `1c80e6b0642fdbbae0d860960f52f895dceaff083dc823bbc54c4864dad28959`, SQL approval SHA-256 `4c4f60d6aa3e7882a2ab439a78ea653e190ea288043700142f9ed9140f609e29`, and request SHA-256 `cbcd07a4216a7159fc3aaca93e9ff1c2c0e91c07372a1f4d593646f3f3abeeb2`.
+
+Authorize ran exactly once. Prepare ran exactly once, `2026-11-14T13:01:42.7999775Z`–`13:04:35.7889618Z`, and returned `PREPARED` / `PIN_MATCHED`; receipt SHA-256 `2a38ebae3bbc0dc6b86cb5c60752c2988c5d199a9e3551ecda65374be3c35f11`. Independent admission verified ordinary marker `candidateId:null`, the exact candidate marker, 10/10 byte-equal candidate dist/published files, five detached-clean source pins and zero run attempt, SQL-control entry, live selector root, IIS Express process or candidate listener.
+
+Run ran exactly once, `2026-11-14T13:06:18.5140865Z`–`13:12:09.8002401Z`, and returned exit 5 / `FailedRetained`; terminal SHA-256 `88c4c72607a1ab05574384835b116920492e6f8a68ba87f643f6ec86789c2db3`. PairPassed SHA-256 is `9fe32bfc78bb00c401b04f5350e166c92125b90beab7d9a3b3c2b69bd1162d81`.
+
+| Selector | Discovered / executed / passed / failed / skipped | Outcome / SHA-256 |
+| --- | --- | --- |
+| Chromium pair | 1 / 1 / 1 / 0 / 0 | native ACCEPTED / TRX `ddcd48b5fbd34f199bd187418c7b700316b8d66ef392c53cabcc1cb0994d24b4` |
+| Edge pair | 1 / 1 / 1 / 0 / 0 | native ACCEPTED / TRX `268c155f50d2dae3d89afe0062814933b293d7938f1f70e0d309f24bacd8bd6e` |
+| Cutover wrapper | 1 / 1 / 0 / 1 / 0 | FAIL / TRX `b3bc6beb115f71fcf993d633d8c4b7ed84712506f26fa9e3ddfba3be1fea9082` |
+| Chromium cutover pack | 3 / 3 / 2 / 1 / 0 | third case failed / log `967af8f2d3cd9a79bb3f1525da3f2cbea7074112f28114fb5665e7a281100b40` |
+| Edge cutover | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Workload / recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+The cached-WEB4 and exact12-old-host Chromium cases passed. The third case, `restart preserves UNKNOWN while revoked and restored epochs fail closed`, reached `restoreEpoch` and received EOF / `incomplete-response` in the response-header phase after 1,619 ms. The previous null-scalar failure did not recur: `CopyRestoredSession` passed its initial zero-row verification, created the target session, then `Web6CutoverSessionCopy.Verify` rejected the row read at `WebHostIisExpressTests.Cutover.cs:523` because its exact metadata was not `JToken.DeepEquals` to the source row. The retained evidence does not identify which field differed. A timestamp-parameter precision difference is a hypothesis from static source inspection, not an established cause; no post-failure SQL query or replay was permitted. This is a cutover fixture/control failure, not product-runtime failure or restored-epoch acceptance.
+
+Each pair cleanup was native ACCEPTED with process drain, HTTP queues absent, SQL quiescence and nine resources verified; its cleanup inventory carries `deletionAuthority=false`. Cutover retains three databases, three runtime logins, three SQL control roots and nine control/runtime/browser directories. All six confirmation records match their intent SHA-256 and carry `deletionAuthority=false`. The owned process tree drained; a read-only OS check found zero IIS Express processes and zero listeners on candidate ports 44321/44322. No post-failure SQL query, manual cleanup, retry, resource adoption or access to an earlier retained candidate occurred.
+
+CandidateVerified is absent. Ordinary resend remains OFF. Full IIS and unperformed Narrator remain NOT RUN, staging remains NOT ACCEPTED and production remains NO-GO.
 
 ## Task 6 attempt23 restored-session null-scalar failure — 2026-11-14
 
