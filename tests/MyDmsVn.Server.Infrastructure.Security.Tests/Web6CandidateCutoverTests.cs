@@ -1,9 +1,13 @@
 ﻿using System;
+using System.Data;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Infrastructure.Operations;
+using MyDmsVn.Testing.Sql;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -355,9 +359,39 @@ public sealed class Web6CandidateCutoverTests
         Web6CutoverSessionCopy.Verify(source, null, 7, now);
         Web6CutoverSessionCopy.Verify(source, (JObject)source.DeepClone(), 7, now);
         Assert.Throws<InvalidDataException>(() => Web6CutoverSessionCopy.Verify(source, null, 8, now));
-        var changed = (JObject)source.DeepClone(); changed["IdleExpiresAtUtc"] = now.AddMinutes(10);
-        Assert.Throws<InvalidDataException>(() => Web6CutoverSessionCopy.Verify(source, changed, 7, now));
+        var changed = (JObject)source.DeepClone(); changed["IdleExpiresAtUtc"] = now.AddMinutes(10).AddTicks(7);
+        var mismatch = Assert.Throws<InvalidDataException>(() => Web6CutoverSessionCopy.Verify(source, changed, 7, now));
+        Assert.Contains("IdleExpiresAtUtc", mismatch.Message);
+        Assert.DoesNotContain(now.AddMinutes(10).AddTicks(7).ToString("O"), mismatch.Message);
         Assert.Throws<InvalidDataException>(() => Web6CutoverSessionCopy.Verify(source, null, 7, now.AddDays(2)));
+    }
+
+    [Fact]
+    public void Restored_session_copy_parameters_use_datetime2_for_exact_ticks()
+    {
+        var stamp = new DateTime(2026, 11, 10, 1, 2, 3, DateTimeKind.Utc).AddTicks(1_234_567);
+        var parameters = Web6CutoverSessionCopy.Parameters(Guid.NewGuid(), 7, stamp, stamp.AddDays(1), stamp.AddHours(1));
+        var timestamps = parameters.Where(parameter => parameter.Value is DateTime).ToArray();
+
+        Assert.Equal(3, timestamps.Length);
+        Assert.All(timestamps, parameter =>
+        {
+            Assert.Equal(SqlDbType.DateTime2, parameter.SqlDbType);
+            Assert.Equal(7, parameter.Scale);
+        });
+    }
+
+    [SqlServerFact]
+    public async Task Restored_session_copy_datetime2_parameter_round_trips_seventh_fractional_digit()
+    {
+        var stamp = new DateTime(2026, 11, 10, 1, 2, 3, DateTimeKind.Utc).AddTicks(1_234_567);
+        using var connection = new SqlConnection(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable));
+
+        var parameters = Web6CutoverSessionCopy.Parameters(Guid.NewGuid(), 7, stamp, stamp.AddDays(1), stamp.AddHours(1));
+        var restored = await connection.QuerySingleAsync<DateTime>(new SqlTestCommand(
+            "SELECT CONVERT(datetime2(7),@created);", parameters));
+
+        Assert.Equal(stamp, restored);
     }
 
     [Fact]

@@ -517,7 +517,8 @@ public sealed partial class WebHostIisExpressTests
             if (existing.Count == 0)
             {
                 if (await target.ExecuteAsync(deadline.Command("INSERT dbo.WebAuthSessions(" + fields + ") VALUES(@session,@actor,@created,@absolute,@idle,NULL);", token,
-                    new { session, actor, created = (DateTime)row["CreatedAtUtc"]!, absolute = (DateTime)row["AbsoluteExpiresAtUtc"]!, idle = (DateTime)row["IdleExpiresAtUtc"]! })) != 1)
+                    Web6CutoverSessionCopy.Parameters(session, actor, (DateTime)row["CreatedAtUtc"]!,
+                        (DateTime)row["AbsoluteExpiresAtUtc"]!, (DateTime)row["IdleExpiresAtUtc"]!))) != 1)
                     throw new IOException("Restored fixture session copy failed.");
             }
             Web6CutoverSessionCopy.Verify(row, (JObject)(await ReadTarget()).Single(), targetActor, DateTime.UtcNow);
