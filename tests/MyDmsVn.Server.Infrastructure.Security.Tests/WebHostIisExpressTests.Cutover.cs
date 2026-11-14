@@ -511,13 +511,14 @@ public sealed partial class WebHostIisExpressTests
             var rows = JArray.Parse(await source.QuerySingleAsync<string>(deadline.Command("SELECT (SELECT TOP(1) " + fields + " FROM dbo.WebAuthSessions WHERE UserId=@actor AND RevokedAtUtc IS NULL AND IdleExpiresAtUtc>SYSUTCDATETIME() AND AbsoluteExpiresAtUtc>SYSUTCDATETIME() ORDER BY CreatedAtUtc DESC,SessionId FOR JSON PATH,INCLUDE_NULL_VALUES);", token, new { actor })));
             if (rows.Count != 1) throw new IOException("Restored fixture requires the current active actor session.");
             var row = (JObject)rows[0]; var session = Guid.Parse((string)row["SessionId"]!);
-            async Task<JArray> ReadTarget() => JArray.Parse(await target.QuerySingleAsync<string>(deadline.Command("SELECT (SELECT " + fields + " FROM dbo.WebAuthSessions WHERE SessionId=@session FOR JSON PATH,INCLUDE_NULL_VALUES);", token, new { session })));
+            async Task<JArray> ReadTarget() => Web6CutoverSessionCopy.ParseRows(await target.QuerySingleAsync<string>(deadline.Command("SELECT (SELECT " + fields + " FROM dbo.WebAuthSessions WHERE SessionId=@session FOR JSON PATH,INCLUDE_NULL_VALUES);", token, new { session })));
             var existing = await ReadTarget();
             Web6CutoverSessionCopy.Verify(row, existing.Count == 0 ? null : (JObject)existing.Single(), targetActor, DateTime.UtcNow);
             if (existing.Count == 0)
             {
                 if (await target.ExecuteAsync(deadline.Command("INSERT dbo.WebAuthSessions(" + fields + ") VALUES(@session,@actor,@created,@absolute,@idle,NULL);", token,
-                    new { session, actor, created = (DateTime)row["CreatedAtUtc"]!, absolute = (DateTime)row["AbsoluteExpiresAtUtc"]!, idle = (DateTime)row["IdleExpiresAtUtc"]! })) != 1)
+                    Web6CutoverSessionCopy.Parameters(session, actor, (DateTime)row["CreatedAtUtc"]!,
+                        (DateTime)row["AbsoluteExpiresAtUtc"]!, (DateTime)row["IdleExpiresAtUtc"]!))) != 1)
                     throw new IOException("Restored fixture session copy failed.");
             }
             Web6CutoverSessionCopy.Verify(row, (JObject)(await ReadTarget()).Single(), targetActor, DateTime.UtcNow);

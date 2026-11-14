@@ -1,9 +1,11 @@
 using System;
+using System.Data;
 using System.IO;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Microsoft.Data.SqlClient;
 using Newtonsoft.Json.Linq;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -94,6 +96,18 @@ internal static class Web6CutoverCorruption
 
 internal static class Web6CutoverSessionCopy
 {
+    internal static JArray ParseRows(string? json) => json == null ? new JArray() : JArray.Parse(json);
+
+    internal static SqlParameter[] Parameters(Guid session, int actor, DateTime created, DateTime absolute, DateTime idle) => new[]
+    {
+        new SqlParameter("@session", SqlDbType.UniqueIdentifier) { Value = session },
+        new SqlParameter("@actor", SqlDbType.Int) { Value = actor },
+        DateTime2("@created", created), DateTime2("@absolute", absolute), DateTime2("@idle", idle),
+    };
+
+    private static SqlParameter DateTime2(string name, DateTime value) =>
+        new SqlParameter(name, SqlDbType.DateTime2) { Scale = 7, Value = value };
+
     internal static void Verify(JObject source, JObject? existing, int targetActor, DateTime now)
     {
         var fields = new[] { "SessionId", "UserId", "CreatedAtUtc", "AbsoluteExpiresAtUtc", "IdleExpiresAtUtc", "RevokedAtUtc" };
@@ -101,8 +115,13 @@ internal static class Web6CutoverSessionCopy
             !Guid.TryParse((string?)source["SessionId"], out var session) || session == Guid.Empty ||
             source["UserId"]?.Type != JTokenType.Integer || (int)source["UserId"]! != targetActor || targetActor <= 0 ||
             source["RevokedAtUtc"]?.Type != JTokenType.Null || (DateTime?)source["CreatedAtUtc"] >= now ||
-            (DateTime?)source["IdleExpiresAtUtc"] <= now || (DateTime?)source["AbsoluteExpiresAtUtc"] <= now ||
-            (existing != null && !JToken.DeepEquals(source, existing)))
+            (DateTime?)source["IdleExpiresAtUtc"] <= now || (DateTime?)source["AbsoluteExpiresAtUtc"] <= now)
             throw new InvalidDataException("Restored fixture session identity is not exact and active.");
+        if (existing == null || JToken.DeepEquals(source, existing)) return;
+        var differing = fields.Where(field => !JToken.DeepEquals(source[field], existing[field])).ToArray();
+        var shapeMatches = existing.Properties().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal)
+            .SequenceEqual(fields.OrderBy(n => n, StringComparer.Ordinal));
+        throw new InvalidDataException("Restored fixture session identity is not exact and active. Differing fields: " +
+            string.Join(",", differing.Length == 0 && !shapeMatches ? new[] { "metadata-shape" } : differing) + ".");
     }
 }
