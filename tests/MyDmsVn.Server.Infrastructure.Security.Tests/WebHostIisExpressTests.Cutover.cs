@@ -511,7 +511,7 @@ public sealed partial class WebHostIisExpressTests
             var rows = JArray.Parse(await source.QuerySingleAsync<string>(deadline.Command("SELECT (SELECT TOP(1) " + fields + " FROM dbo.WebAuthSessions WHERE UserId=@actor AND RevokedAtUtc IS NULL AND IdleExpiresAtUtc>SYSUTCDATETIME() AND AbsoluteExpiresAtUtc>SYSUTCDATETIME() ORDER BY CreatedAtUtc DESC,SessionId FOR JSON PATH,INCLUDE_NULL_VALUES);", token, new { actor })));
             if (rows.Count != 1) throw new IOException("Restored fixture requires the current active actor session.");
             var row = (JObject)rows[0]; var session = Guid.Parse((string)row["SessionId"]!);
-            async Task<JArray> ReadTarget() => JArray.Parse(await target.QuerySingleAsync<string>(deadline.Command("SELECT (SELECT " + fields + " FROM dbo.WebAuthSessions WHERE SessionId=@session FOR JSON PATH,INCLUDE_NULL_VALUES);", token, new { session })));
+            async Task<JArray> ReadTarget() => Web6CutoverSessionCopy.ParseRows(await target.QuerySingleAsync<string>(deadline.Command("SELECT (SELECT " + fields + " FROM dbo.WebAuthSessions WHERE SessionId=@session FOR JSON PATH,INCLUDE_NULL_VALUES);", token, new { session })));
             var existing = await ReadTarget();
             Web6CutoverSessionCopy.Verify(row, existing.Count == 0 ? null : (JObject)existing.Single(), targetActor, DateTime.UtcNow);
             if (existing.Count == 0)

@@ -94,6 +94,8 @@ internal static class Web6CutoverCorruption
 
 internal static class Web6CutoverSessionCopy
 {
+    internal static JArray ParseRows(string? json) => json == null ? new JArray() : JArray.Parse(json);
+
     internal static void Verify(JObject source, JObject? existing, int targetActor, DateTime now)
     {
         var fields = new[] { "SessionId", "UserId", "CreatedAtUtc", "AbsoluteExpiresAtUtc", "IdleExpiresAtUtc", "RevokedAtUtc" };

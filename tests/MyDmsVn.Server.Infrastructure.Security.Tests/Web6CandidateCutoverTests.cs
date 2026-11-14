@@ -361,6 +361,16 @@ public sealed class Web6CandidateCutoverTests
     }
 
     [Fact]
+    public void Restored_session_rows_treat_null_sql_scalar_as_empty_without_hiding_json()
+    {
+        Assert.Empty(Web6CutoverSessionCopy.ParseRows(null));
+
+        var session = Guid.NewGuid();
+        var rows = Web6CutoverSessionCopy.ParseRows("[{\"SessionId\":\"" + session.ToString("D") + "\"}]");
+        Assert.Equal(session.ToString("D"), (string?)Assert.Single(rows)["SessionId"]);
+    }
+
+    [Fact]
     public async Task Edge_current_readmission_failure_drains_and_never_completes()
     {
         var operations = new RecordingCutoverOperations(Plan()) { FailEdgeStart = true };
