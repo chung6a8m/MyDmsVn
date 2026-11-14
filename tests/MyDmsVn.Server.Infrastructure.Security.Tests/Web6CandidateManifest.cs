@@ -425,6 +425,7 @@ internal static class Web6CutoverSqlApproval
         {
             using var reader = new JsonTextReader(new StringReader(text)) { DateParseHandling = DateParseHandling.None };
             json = JObject.Load(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+            if (reader.Read()) throw new IOException("Cutover SQL approval contains trailing content.");
         }
         catch (Exception error) { throw new IOException("Cutover SQL approval is invalid.", error); }
         var keys = new[] { "version", "purpose", "serverSha256", "expiresUtc" };

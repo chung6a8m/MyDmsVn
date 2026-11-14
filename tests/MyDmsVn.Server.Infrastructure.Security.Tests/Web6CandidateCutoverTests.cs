@@ -553,6 +553,18 @@ public sealed class Web6CandidateCutoverTests
     }
 
     [Fact]
+    public void SQL_approval_refuses_trailing_JSON_content()
+    {
+        const string serverHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string approval =
+            "{\"version\":1,\"purpose\":\"web6-cutover\",\"serverSha256\":\"" + serverHash +
+            "\",\"expiresUtc\":\"2026-11-14T08:55:19.1536282Z\"}{}";
+        var observedAtUtc = new DateTimeOffset(2026, 11, 14, 8, 55, 19, 100, TimeSpan.Zero);
+
+        Assert.Throws<IOException>(() => Web6CutoverSqlApproval.ParseAndVerify(approval, serverHash, observedAtUtc));
+    }
+
+    [Fact]
     public void Cutover_plan_pins_archives_artifacts_and_separate_database_ownership()
     {
         var plan = Plan();
