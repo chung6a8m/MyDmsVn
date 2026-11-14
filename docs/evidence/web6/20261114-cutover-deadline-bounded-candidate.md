@@ -11,6 +11,7 @@
 | Backend paired provenance correction | `6dddc17eca0bfc7970a81fa21bd3c14dc15a6682` | `c8e6a81578811bfb05573c60d626be6e08a47783` |
 | Backend verified source and tests, before this documentation delta | Paired Git process cleanup correction | `dcdc8edda5a630fec191b5766ba78cd76d3490ba` |
 | Frontend exact reviewed pin | `eafcc40a13c17dbfe3c546b76d6dbdd1bf360193` | `0ecffdc18a06685e4790c53e9494ae9f340abe19` |
+| Frontend reload-restore reviewed pin | `76b125d74769b96be1f007803954b5b2489b10c3` | `025e13fcda200973c705c8eabe827c4b926dc274` |
 
 The only change to bootstrap execution in Task 6 is the `ReviewedFrontendSha` pin. The review correction changes the paired source test and evidence. The vendor gitlink remains `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`.
 
@@ -113,6 +114,24 @@ Backend pin verification first reproduced the exact inverse RED: the new fronten
 The resulting local Release artifacts were `MyDmsVn.Web6.CandidateBootstrap.exe` SHA-256 `7fd7c373ceab633cb571e246c37d1abaf026a2aa3f1f0014c9810549484edb06` and `MyDmsVn.Server.Infrastructure.Security.Tests.dll` SHA-256 `70e7b413bda3e269467ca1df8609d09bc5aeb3e367577efc4cf0102e4c27c19b`. These are local source-verification artifacts, not candidate publish hashes.
 
 No Owner authority, fresh candidate root, SQL approval/allocation, IIS process or live browser selector was created by this correction checkpoint. Attempt21 and every other retained resource remain untouched. Fresh live preparation still requires this exact backend correction to be committed, reviewed and CI-verified, followed by a new exact-scope Owner authorization.
+
+## Fresh-attempt protected-draft reload correction
+
+Frontend PR #40 adds only the reviewed cutover harness correction on top of PR #39. Frontend `76b125d74769b96be1f007803954b5b2489b10c3`, tree `025e13fcda200973c705c8eabe827c4b926dc274`, restores the unique protected local draft after a workspace reload before opening `Đối soát thao tác`. The retained fresh attempt had reached the authenticated workspace with `Bản nháp trên thiết bị` visible, so waiting directly for the unresolved-operation action could not reopen recovery. The correction reuses the existing manual-resend restore path and closes the dialog before the next cutover control action.
+
+The frontend regression was observed RED at 1 failed / 40 passed, then GREEN at 41/41. Local HTTP unit tests passed 1,120/1,120, the full frontend unit/component suite passed 1,796/1,796, and typecheck plus production build succeeded. Both GitHub frontend workflows for PR #40 passed, including Chromium regression and production-artifact isolation.
+
+Backend pin verification reproduced the inverse RED before changing production code: the new frontend SHA was `BLOCKED_REVIEWED_FRONTEND_PIN`, the superseded `eafcc40...` SHA remained `PIN_MATCHED`, and the paired source test was blocked. After changing only `PreparedCandidateReceipt.ReviewedFrontendSha`, all 26 pin rows passed, with `76b125d...` admitted and `eafcc40...` rejected, and the paired source test independently verified the clean frontend commit/tree and tracked cutover sources.
+
+| Protected-draft reload selection | Passed / failed / skipped | TRX SHA-256 |
+| --- | ---: | --- |
+| Exact pin matrix | 26 / 0 / 0 | `771c6ce287caae7381c5a6d1b277c6a21a7a8c6e61afd6fa4937a2e777835ee8` |
+| Paired exact source | 1 / 0 / 0 | `f69757a807667b50d61b2ff8bab694ecb8826abfe5b09848f90216440e5dda36` |
+| Integrated pure backend | 737 / 0 / 0 | `8717bd4d5826c0145828aa326bf29cd57a45241cedce1cfaac58da5eb3425581` |
+
+The Release/net48 Security.Tests project graph built with zero warnings and errors. Resulting local verification artifacts were `MyDmsVn.Web6.CandidateBootstrap.exe` SHA-256 `8132dc4dbe1a3858e6db62e1fdd54ff8bb0494621823d1bb59a3e7515fbb9108` and `MyDmsVn.Server.Infrastructure.Security.Tests.dll` SHA-256 `47272120fd6d1ca115fe0b97f7beee76c345040fa888a22ed07b2f7d247859de`. These are local source-verification artifacts, not candidate publish hashes.
+
+No Owner authority, candidate root, protected SQL approval, allocation, IIS process or live browser selector was created in this checkpoint. The previous failed attempt and all retained resources remain untouched. A fresh live chain requires this backend correction to be committed, reviewed and CI-verified, followed by a new exact-scope Owner authorization for the resulting backend SHA paired with frontend `76b125d...`.
 
 ## Acceptance boundary
 

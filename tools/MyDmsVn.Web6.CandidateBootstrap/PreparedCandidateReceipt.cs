@@ -8,7 +8,7 @@ namespace MyDmsVn.Web6.CandidateBootstrap;
 
 internal sealed class PreparedCandidateReceipt
 {
-    internal const string ReviewedFrontendSha = "eafcc40a13c17dbfe3c546b76d6dbdd1bf360193";
+    internal const string ReviewedFrontendSha = "76b125d74769b96be1f007803954b5b2489b10c3";
     private const string SelectorOldFrontendSha = "ea104582a5aa4bcdf0d04999296a30a3c43e450e";
     private const string SelectorOldBackendSha = "a3f3db16381a38bdf0b76e8ab36cb55bec02bbd2";
 
