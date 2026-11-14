@@ -42,6 +42,45 @@ public sealed class WebOperationMaintenanceEvidenceTests : IDisposable
     private string BackupCase => Path.Combine(BackupRoot, CaseId);
 
     [Fact]
+    public void Ordinary_evidence_root_and_ancestry_deny_rename_and_delete_while_open()
+    {
+        var policy = new MaintenanceEvidencePolicy(PrimaryRoot, BackupRoot, Retention);
+        using var root = policy.OpenPrimary();
+        Assert.ThrowsAny<IOException>(() => Directory.Move(PrimaryRoot, PrimaryRoot + "-moved"));
+        Assert.ThrowsAny<IOException>(() => Directory.Delete(PrimaryRoot));
+        Assert.ThrowsAny<IOException>(() => Directory.Move(_workspace, _workspace + "-moved"));
+    }
+
+    [Fact]
+    public async Task Recovery_evidence_sharing_requires_live_exact_lease_and_keeps_root_pinned()
+    {
+        using var lease = Web6PrivateDirectoryLease.CreateNew(Path.Combine(_workspace, "recovery"));
+        var primary = Path.Combine(lease.Path, "primary");
+        var backup = Path.Combine(lease.Path, "backup");
+        CreatePrivateDirectory(primary); CreatePrivateDirectory(backup);
+        Assert.Throws<IOException>(() => new MaintenanceEvidencePolicy(primary, backup, Retention));
+        var policy = lease.CreateEvidencePolicy(primary, backup);
+        await new MaintenanceEvidenceStore(policy).WriteAttemptAsync(Attempt(), CancellationToken.None);
+        Assert.ThrowsAny<IOException>(() => Directory.Move(lease.Path, lease.Path + "-moved"));
+        using (var opened = policy.OpenPrimary())
+            Assert.ThrowsAny<IOException>(() => Directory.Move(primary, primary + "-moved"));
+        lease.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => policy.OpenPrimary());
+    }
+
+    [Fact]
+    public void Recovery_evidence_refuses_a_different_native_root_identity()
+    {
+        using var first = Web6PrivateDirectoryLease.CreateNew(Path.Combine(_workspace, "first"));
+        using var second = Web6PrivateDirectoryLease.CreateNew(Path.Combine(_workspace, "second"));
+        var primary = Path.Combine(first.Path, "primary");
+        var backup = Path.Combine(first.Path, "backup");
+        CreatePrivateDirectory(primary); CreatePrivateDirectory(backup);
+        var wrong = new MaintenanceRecoveryRoot(first.Path, second.RetainedHandle, second.Verify);
+        Assert.Throws<IOException>(() => new MaintenanceEvidencePolicy(primary, backup, Retention, wrong));
+    }
+
+    [Fact]
     public void Policy_refuses_relative_same_nested_and_noncanonical_roots_and_wrong_retention()
     {
         var nested = Path.Combine(PrimaryRoot, "nested");

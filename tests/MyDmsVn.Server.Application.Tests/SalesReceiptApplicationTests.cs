@@ -56,23 +56,81 @@ public sealed class SalesReceiptApplicationTests
         Assert.True(result.IsError); Assert.Equal(grant == "inactive" ? ErrorType.Unauthorized : ErrorType.Forbidden, result.FirstError.Type); Assert.Equal(0, factory.Opened);
     }
 
+    [Fact]
+    public async Task authorized_audited_request_does_not_enter_handler_when_admission_audit_fails()
+    {
+        var factory = new RejectingFactory();
+        var audit = new FailingAdmissionSink();
+        using var provider = Provider(factory, "post", audit);
+
+        var result = await provider.GetRequiredService<ISender>()
+            .Send(new PostSalesReceiptCommand(new PostSalesReceiptRequest(1, "AAAAAAAAAAA=")));
+
+        Assert.True(result.IsError);
+        Assert.Equal("InternalError", result.FirstError.Code);
+        Assert.Equal(0, factory.Opened);
+        Assert.Equal(SecurityAuditOutcome.Admitted, Assert.Single(audit.Attempts).Outcome);
+    }
+
+    [Fact]
+    public async Task denied_authorization_remains_denied_when_audit_sink_fails()
+    {
+        var factory = new RejectingFactory();
+        var audit = new FailingAdmissionSink();
+        var readiness = new TestSecurityAuditReadiness();
+        using var provider = Provider(factory, "deny", audit, readiness);
+
+        var result = await provider.GetRequiredService<ISender>()
+            .Send(new PostSalesReceiptCommand(new PostSalesReceiptRequest(1, "AAAAAAAAAAA=")));
+
+        Assert.Equal(ErrorType.Forbidden, result.FirstError.Type);
+        Assert.Equal(0, factory.Opened);
+        Assert.Equal(SecurityAuditOutcome.Denied, Assert.Single(audit.Attempts).Outcome);
+        Assert.Equal(SecurityAuditReadinessStatus.Degraded, readiness.Snapshot.Status);
+    }
+
+    private sealed class FailingAdmissionSink : ISecurityAuditSink
+    {
+        public List<SecurityAuditEntry> Attempts { get; } = new();
+
+        public Task WriteAsync(SecurityAuditEntry entry, CancellationToken cancellationToken)
+        {
+            Attempts.Add(entry);
+            throw new System.IO.IOException("audit destination unavailable");
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Post_materializes_authoritative_response_before_commit_and_audits_only_committed_result(bool invalidResponse)
+    public async Task Post_materializes_authoritative_response_and_preserves_committed_result_after_audit_failure(bool invalidResponse)
     {
         var fixture = new PostFixture { InvalidResponse = invalidResponse };
+        var readiness = new TestSecurityAuditReadiness();
         var services = new ServiceCollection(); services.AddServerApplication();
         services.AddSingleton<IUnitOfWorkFactory>(fixture); services.AddSingleton<ICurrentUserAccessor>(new Actor(true));
         services.AddSingleton<IPermissionStore>(new Permissions("post")); services.AddSingleton<ISecurityAuditSink>(fixture);
+        services.AddSingleton<ISecurityAuditReadiness>(readiness);
         using var provider = services.BuildServiceProvider();
         var result = await provider.GetRequiredService<ISender>().Send(new PostSalesReceiptCommand(new PostSalesReceiptRequest(1, "AAAAAAAAAAA=")));
-        if (invalidResponse) { Assert.True(result.IsError); Assert.DoesNotContain("commit", fixture.Events); Assert.DoesNotContain("audit", fixture.Events); }
+        if (invalidResponse)
+        {
+            Assert.True(result.IsError);
+            Assert.DoesNotContain("commit", fixture.Events);
+            Assert.DoesNotContain("audit", fixture.Events);
+            Assert.Equal(SecurityAuditReadinessStatus.Healthy, readiness.Snapshot.Status);
+        }
         else
         {
-            Assert.False(result.IsError); Assert.Equal("AQEBAQEBAQE=", result.Value.Version);
-            Assert.Equal(new[] { "begin", "gate", "header", "snapshot", "balances", "mark", "apply", "commit", "audit", "dispose" }, fixture.Events);
-            Assert.Equal(42, fixture.PostedActor); Assert.Equal(42, fixture.AuditActor);
+            Assert.False(result.IsError);
+            Assert.Equal("AQEBAQEBAQE=", result.Value.Version);
+            Assert.Equal(new[] { "admitted", "begin", "gate", "header", "snapshot", "balances", "mark", "apply", "commit", "audit", "dispose" }, fixture.Events);
+            Assert.Equal(42, fixture.PostedActor);
+            Assert.Equal(42, fixture.AuditActor);
+            Assert.Equal(SecurityAuditAction.SalesReceiptPost, fixture.CompletionAction);
+            Assert.Equal(SecurityAuditOutcome.Succeeded, fixture.CompletionOutcome);
+            Assert.False(fixture.CompletionAuditCanBeCanceled);
+            Assert.Equal(SecurityAuditReadinessStatus.Degraded, readiness.Snapshot.Status);
         }
     }
 
@@ -82,6 +140,9 @@ public sealed class SalesReceiptApplicationTests
         public string? Failure { get; set; }
         public int PostedActor { get; private set; }
         public int? AuditActor { get; private set; }
+        public SecurityAuditAction? CompletionAction { get; private set; }
+        public SecurityAuditOutcome? CompletionOutcome { get; private set; }
+        public bool CompletionAuditCanBeCanceled { get; private set; }
         public List<string> Events { get; } = new();
         public UnitOfWorkState State { get; private set; }
         public IUnitOfWork Create() => this;
@@ -109,7 +170,20 @@ public sealed class SalesReceiptApplicationTests
         public Task ApplyPostedInventoryAsync(SalesReceipt h, IReadOnlyList<SalesReceiptLine> lines, IReadOnlyDictionary<int, InventoryIssueCost> costs, DateTime stamp, int actor, CancellationToken token)
         { Events.Add("apply"); Assert.Equal(42, actor); Assert.Equal(1m, costs[1].CostAmount); return Task.CompletedTask; }
         public Task WriteAsync(SecurityAuditEntry entry, CancellationToken token)
-        { Assert.Equal(UnitOfWorkState.Committed, State); Assert.False(token.CanBeCanceled); Assert.Equal(SecurityAuditAction.SalesReceiptPost, entry.Action); Assert.Equal(SecurityAuditOutcome.Succeeded, entry.Outcome); AuditActor = entry.UserId; Events.Add("audit"); throw new InvalidOperationException("Expected sink failure after committed business result"); }
+        {
+            if (entry.Outcome == SecurityAuditOutcome.Admitted)
+            {
+                Events.Add("admitted");
+                return Task.CompletedTask;
+            }
+
+            AuditActor = entry.UserId;
+            CompletionAction = entry.Action;
+            CompletionOutcome = entry.Outcome;
+            CompletionAuditCanBeCanceled = token.CanBeCanceled;
+            Events.Add("audit");
+            throw new System.IO.IOException("Expected sink failure after committed business result");
+        }
         public Task<SalesReceiptReferenceSnapshot> GetReferenceSnapshotAsync(int c, int w, int e, IReadOnlyCollection<int> p, CancellationToken t) => throw new NotSupportedException();
         public Task<SalesReceipt> InsertDraftAsync(SalesReceipt h, IReadOnlyList<SalesReceiptLine> l, CancellationToken t) => throw new NotSupportedException();
         public Task<IReadOnlyList<SalesReceiptLine>> LoadLinesAsync(long id, CancellationToken t) => throw new NotSupportedException();
@@ -282,13 +356,16 @@ public sealed class SalesReceiptApplicationTests
             boundary == "note-length" ? new string('x', 1001) : boundary == "note-nul" ? "a\0b" : null, lines);
     }
 
-    private static ServiceProvider Provider(RejectingFactory factory, string grant = "write")
+    private static ServiceProvider Provider(RejectingFactory factory, string grant = "write",
+        ISecurityAuditSink? audit = null, ISecurityAuditReadiness? readiness = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IUnitOfWorkFactory>(factory);
         services.AddSingleton<ICurrentUserAccessor>(new Actor(grant != "inactive"));
         services.AddSingleton<IPermissionStore>(new Permissions(grant));
         services.AddSingleton<ISalesReceiptQueryService, MissingQuery>();
+        if (audit != null) services.AddSingleton(audit);
+        if (readiness != null) services.AddSingleton(readiness);
         services.AddServerApplication();
         return services.BuildServiceProvider();
     }

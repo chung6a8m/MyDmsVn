@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -32,35 +32,68 @@ internal sealed class Web5IisExpressProcessObservation
 
 internal sealed class Web5IisExpressIdentity
 {
-    internal Web5IisExpressIdentity(Web5IisExpressProcessObservation process, string configurationPath,
-        byte[] configurationHash, string siteName, Uri origin)
+    internal Web5IisExpressIdentity(Web5IisExpressProcessObservation process, Web5IisExpressLaunch launch, byte[] configurationHash)
     {
         Process = process;
-        ConfigurationPath = configurationPath;
+        Launch = launch;
         ConfigurationHash = configurationHash;
-        SiteName = siteName;
-        Origin = origin;
     }
     internal Web5IisExpressProcessObservation Process { get; }
-    internal string ConfigurationPath { get; }
+    internal string ConfigurationPath => Launch.ConfigurationPath;
     internal byte[] ConfigurationHash { get; }
+    internal string SiteName => Launch.SiteName;
+    internal Uri Origin => Launch.Origin;
+    internal Web5IisExpressLaunch Launch { get; }
+}
+
+internal sealed class Web5IisExpressLaunch
+{
+    private static readonly Regex SiteNamePattern = new Regex("\\A[A-Za-z0-9_.-]{1,64}\\z", RegexOptions.CultureInvariant);
+
+    internal Web5IisExpressLaunch(string configurationPath, string siteName, Uri origin)
+    {
+        if (string.IsNullOrWhiteSpace(configurationPath) || !Path.IsPathRooted(configurationPath) ||
+            configurationPath.Any(char.IsControl) || configurationPath.IndexOf('"') >= 0)
+            throw new ArgumentException("IIS Express configuration path must be absolute and safe.", nameof(configurationPath));
+        if (siteName == null || !SiteNamePattern.IsMatch(siteName))
+            throw new ArgumentException("IIS Express site name is invalid.", nameof(siteName));
+        if (origin == null || !origin.IsAbsoluteUri || origin.Scheme != Uri.UriSchemeHttps ||
+            origin.AbsolutePath != "/" || !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment))
+            throw new ArgumentException("IIS Express origin must be an HTTPS root origin.", nameof(origin));
+
+        ExecutablePath = Web5IisExpressHostAdmission.ExpectedExecutablePath;
+        ConfigurationPath = Path.GetFullPath(configurationPath);
+        SiteName = siteName;
+        Origin = origin;
+        Arguments = "/config:\"" + ConfigurationPath + "\" /site:" + SiteName + " /systray:false";
+        CommandLine = "\"" + ExecutablePath + "\" " + Arguments;
+    }
+
+    internal string ExecutablePath { get; }
+    internal string ConfigurationPath { get; }
     internal string SiteName { get; }
     internal Uri Origin { get; }
+    private string Arguments { get; }
+    internal string CommandLine { get; }
+
+    internal ProcessStartInfo CreateStartInfo() => new(ExecutablePath, Arguments)
+    {
+        UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+        RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
+    };
 }
 
 internal static class Web5IisExpressHostAdmission
 {
     private const int MaximumConfigurationLength = 1024 * 1024;
-    private static readonly Regex SiteNamePattern = new Regex("\\A[A-Za-z0-9_.-]{1,64}\\z", RegexOptions.CultureInvariant);
 
     internal static string ExpectedExecutablePath => Path.GetFullPath(Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "IIS Express", "iisexpress.exe"));
 
-    internal static string ExpectedCommandLine(string executablePath, string configurationPath, string siteName) =>
-        "\"" + Path.GetFullPath(executablePath) + "\" /config:\"" + Path.GetFullPath(configurationPath) +
-        "\" /site:" + siteName + " /systray:false";
-
     internal static Web5IisExpressIdentity Capture(Process process, string configurationPath, string siteName, Uri origin)
+        => Capture(process, new Web5IisExpressLaunch(configurationPath, siteName, origin));
+
+    internal static Web5IisExpressIdentity Capture(Process process, Web5IisExpressLaunch launch)
     {
         if (process == null) throw new ArgumentNullException(nameof(process));
         process.Refresh();
@@ -71,8 +104,7 @@ internal static class Web5IisExpressHostAdmission
         process.Refresh();
         if (process.HasExited || process.Id != ownedProcessId || process.StartTime.ToUniversalTime() != ownedStartTimeUtc)
             throw new InvalidDataException("Owned IIS Express process handle changed during capture.");
-        ValidateOwnedHandleIdentity(ownedProcessId, ownedStartTimeUtc, observation);
-        return Capture(observation, configurationPath, siteName, origin);
+        return Capture(ownedProcessId, ownedStartTimeUtc, observation, launch);
     }
 
     internal static void ValidateOwnedHandleIdentity(int ownedProcessId, DateTime ownedStartTimeUtc,
@@ -84,21 +116,88 @@ internal static class Web5IisExpressHostAdmission
             throw new InvalidDataException("Fixture process handle and WMI identity do not match.");
     }
 
+    internal static Web5IisExpressIdentity Capture(int ownedProcessId, DateTime ownedStartTimeUtc,
+        Web5IisExpressProcessObservation observation, Web5IisExpressLaunch launch)
+    {
+        ValidateOwnedHandleIdentity(ownedProcessId, ownedStartTimeUtc, observation);
+        return Capture(observation, launch);
+    }
+
     internal static Web5IisExpressIdentity Capture(Web5IisExpressProcessObservation process,
         string configurationPath, string siteName, Uri origin)
+        => Capture(process, new Web5IisExpressLaunch(configurationPath, siteName, origin));
+
+    private static Web5IisExpressIdentity Capture(Web5IisExpressProcessObservation process, Web5IisExpressLaunch launch)
     {
         if (process == null) throw new ArgumentNullException(nameof(process));
-        if (string.IsNullOrWhiteSpace(configurationPath) || !Path.IsPathRooted(configurationPath))
-            throw new ArgumentException("IIS Express configuration path must be absolute.", nameof(configurationPath));
-        if (!SiteNamePattern.IsMatch(siteName ?? string.Empty))
-            throw new ArgumentException("IIS Express site name is invalid.", nameof(siteName));
-        if (origin == null || !origin.IsAbsoluteUri || origin.Scheme != Uri.UriSchemeHttps ||
-            origin.AbsolutePath != "/" || !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment))
-            throw new ArgumentException("IIS Express origin must be an HTTPS root origin.", nameof(origin));
-        var fullConfigurationPath = Path.GetFullPath(configurationPath);
-        var exactSiteName = siteName!;
-        ValidateProcess(process, fullConfigurationPath, exactSiteName, expected: null);
-        return new Web5IisExpressIdentity(process, fullConfigurationPath, HashConfiguration(fullConfigurationPath), exactSiteName, origin);
+        ValidateProcess(process, launch, expected: null);
+        return new Web5IisExpressIdentity(process, launch, HashConfiguration(launch.ConfigurationPath));
+    }
+
+    internal static Web5IisExpressIdentity Capture(Process process, Web5IisExpressLaunch launch,
+        Web6CutoverDeadline deadline, CancellationToken token)
+    {
+        deadline.ThrowIfExpired(token);
+        process.Refresh();
+        if (process.HasExited) throw new InvalidDataException("Owned IIS Express process has exited.");
+        var id = process.Id;
+        var start = process.StartTime.ToUniversalTime();
+        var observation = ObserveOptional(id, deadline, token) ?? throw new InvalidDataException("Owned IIS Express process is absent.");
+        var identity = deadline.Observe(() => Capture(id, start, observation, launch), token);
+        VerifyOwnedProcess(identity, process, deadline, token);
+        return identity;
+    }
+
+    internal static void VerifyOwnedProcess(Web5IisExpressIdentity identity, Process process,
+        Web6CutoverDeadline deadline, CancellationToken token)
+    {
+        var observed = ObserveOptional(identity.Process.ProcessId, deadline, token) ?? throw new InvalidDataException("Owned IIS Express process is absent.");
+        deadline.Observe(() =>
+        {
+            process.Refresh();
+            if (process.HasExited) throw new InvalidDataException("Owned IIS Express process exited.");
+            ValidateOwnedHandleIdentity(process.Id, process.StartTime.ToUniversalTime(), observed);
+            ValidateProcess(observed, identity.Launch, identity.Process);
+        }, token);
+    }
+
+    internal static async Task<Web5HttpRequestQueue> VerifyAsync(Web5IisExpressIdentity identity,
+        Web6CutoverDeadline deadline, CancellationToken token)
+    {
+        var before = ObserveOptional(identity.Process.ProcessId, deadline, token) ?? throw new InvalidDataException("Owned IIS Express process is absent.");
+        deadline.Observe(() => { ValidateProcess(before, identity.Launch, identity.Process); ValidateConfiguration(identity); }, token);
+        var snapshot = await Web5HttpServiceState.ReadAsync(deadline, token);
+        var queue = deadline.Observe(() => ValidateEvidence(identity, before, snapshot), token);
+        var after = ObserveOptional(identity.Process.ProcessId, deadline, token) ?? throw new InvalidDataException("Owned IIS Express process is absent.");
+        deadline.Observe(() => ValidateProcess(after, identity.Launch, identity.Process), token);
+        return queue;
+    }
+
+    internal static Task WaitForAdmissionAsync(Web5IisExpressIdentity identity, Process process,
+        Web6CutoverDeadline deadline, CancellationToken token) => Poll(async () =>
+        {
+            if (process.HasExited) throw new IOException("Owned IIS Express process exited before admission.");
+            await VerifyAsync(identity, deadline, token);
+        }, deadline, token);
+
+    internal static Task WaitForAbsenceAsync(Web5IisExpressIdentity identity, Web6CutoverDeadline deadline,
+        CancellationToken token) => Poll(async () =>
+        {
+            var observation = ObserveOptional(identity.Process.ProcessId, deadline, token);
+            var snapshot = await Web5HttpServiceState.ReadAsync(deadline, token);
+            deadline.Observe(() => ValidateAbsent(identity, observation, snapshot), token);
+        }, deadline, token);
+
+    internal static async Task Poll(Func<Task> observe, Web6CutoverDeadline deadline, CancellationToken token,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
+    {
+        while (true)
+        {
+            deadline.ThrowIfExpired(token);
+            try { await observe(); deadline.ThrowIfExpired(token); return; }
+            catch (InvalidDataException) { }
+            await deadline.Delay(TimeSpan.FromMilliseconds(200), token, delay);
+        }
     }
 
     internal static async Task<Web5HttpRequestQueue> VerifyAsync(Web5IisExpressIdentity identity, CancellationToken token)
@@ -106,13 +205,13 @@ internal static class Web5IisExpressHostAdmission
         if (identity == null) throw new ArgumentNullException(nameof(identity));
         token.ThrowIfCancellationRequested();
         var before = Observe(identity.Process.ProcessId);
-        ValidateProcess(before, identity.ConfigurationPath, identity.SiteName, identity.Process);
+        ValidateProcess(before, identity.Launch, identity.Process);
         ValidateConfiguration(identity);
         var snapshot = await Web5HttpServiceState.ReadAsync(TimeSpan.FromSeconds(10), token);
         var queue = ValidateEvidence(identity, before, snapshot);
         token.ThrowIfCancellationRequested();
         var after = Observe(identity.Process.ProcessId);
-        ValidateProcess(after, identity.ConfigurationPath, identity.SiteName, identity.Process);
+        ValidateProcess(after, identity.Launch, identity.Process);
         return queue;
     }
 
@@ -163,7 +262,7 @@ internal static class Web5IisExpressHostAdmission
         Web5IisExpressProcessObservation observation, string serviceState)
     {
         if (identity == null) throw new ArgumentNullException(nameof(identity));
-        ValidateProcess(observation, identity.ConfigurationPath, identity.SiteName, identity.Process);
+        ValidateProcess(observation, identity.Launch, identity.Process);
         ValidateConfiguration(identity);
         return Web5HttpServiceState.RequireOwnedQueue(
             Web5HttpServiceState.Parse(serviceState), identity.Origin, identity.Process.ProcessId);
@@ -206,15 +305,14 @@ internal static class Web5IisExpressHostAdmission
         return request;
     }
 
-    private static void ValidateProcess(Web5IisExpressProcessObservation process, string configurationPath,
-        string siteName, Web5IisExpressProcessObservation? expected)
+    private static void ValidateProcess(Web5IisExpressProcessObservation process, Web5IisExpressLaunch launch,
+        Web5IisExpressProcessObservation? expected)
     {
         if (process.ProcessId <= 0 || process.StartTimeUtc.Kind != DateTimeKind.Utc)
             throw new InvalidDataException("IIS Express process identity is invalid.");
-        if (!PathEquals(process.ExecutablePath, ExpectedExecutablePath))
+        if (!PathEquals(process.ExecutablePath, launch.ExecutablePath))
             throw new InvalidDataException("Owned process is not the installed IIS Express executable.");
-        if (!string.Equals(process.CommandLine,
-            ExpectedCommandLine(ExpectedExecutablePath, configurationPath, siteName), StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(process.CommandLine, launch.CommandLine, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("IIS Express command line does not match the owned configuration and site.");
         if (expected != null && (process.ProcessId != expected.ProcessId || process.StartTimeUtc != expected.StartTimeUtc ||
             !PathEquals(process.ExecutablePath, expected.ExecutablePath) ||
@@ -245,14 +343,18 @@ internal static class Web5IisExpressHostAdmission
             throw new InvalidDataException("Owned IIS Express process identity is unavailable.");
     }
 
-    private static Web5IisExpressProcessObservation? ObserveOptional(int processId)
+    private static Web5IisExpressProcessObservation? ObserveOptional(int processId, Web6CutoverDeadline? deadline = null, CancellationToken token = default)
     {
         try
         {
             using var searcher = new ManagementObjectSearcher("SELECT ProcessId,CreationDate,ExecutablePath,CommandLine FROM Win32_Process WHERE ProcessId=" +
                 processId.ToString(CultureInfo.InvariantCulture));
+            deadline?.ThrowIfExpired(token);
+            if (deadline != null) searcher.Options = new EnumerationOptions { Timeout = deadline.Remaining, ReturnImmediately = false };
             using var results = searcher.Get();
+            deadline?.ThrowIfExpired(token);
             var rows = results.Cast<ManagementObject>().ToArray();
+            deadline?.ThrowIfExpired(token);
             if (rows.Length == 0) return null;
             if (rows.Length != 1) throw new InvalidDataException("Owned IIS Express process identity is ambiguous.");
             using var row = rows[0];
@@ -262,7 +364,10 @@ internal static class Web5IisExpressHostAdmission
             if (string.IsNullOrWhiteSpace(creation) || string.IsNullOrWhiteSpace(executable) || string.IsNullOrWhiteSpace(command))
                 throw new InvalidDataException("Owned IIS Express process metadata is incomplete.");
             var start = ManagementDateTimeConverter.ToDateTime(creation).ToUniversalTime();
-            return new Web5IisExpressProcessObservation(processId, start, executable!, command!);
+            if (row["ProcessId"] is not uint observedProcessId || observedProcessId != (uint)processId)
+                throw new InvalidDataException("Owned IIS Express WMI process identifier changed.");
+            deadline?.ThrowIfExpired(token);
+            return new Web5IisExpressProcessObservation((int)observedProcessId, start, executable!, command!);
         }
         catch (ManagementException exception)
         {

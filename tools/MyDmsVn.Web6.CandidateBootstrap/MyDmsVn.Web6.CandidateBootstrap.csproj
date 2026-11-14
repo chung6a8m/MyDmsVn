@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <DefineConstants>$(DefineConstants);WEB6_BOOTSTRAP</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <Compile Include="..\..\tests\MyDmsVn.Desktop.Tests\GuiOwnedProcess.cs" Link="Infrastructure\OwnedProcess.cs" />
+    <Compile Include="..\..\tests\MyDmsVn.Server.Infrastructure.Security.Tests\Web6CutoverBudgets.cs" Link="Infrastructure\CutoverBudgets.cs" />
+    <Compile Include="..\..\tests\MyDmsVn.Server.Infrastructure.Security.Tests\Web5HttpServiceState.cs" Link="Infrastructure\HttpServiceState.cs" />
+  </ItemGroup>
+</Project>

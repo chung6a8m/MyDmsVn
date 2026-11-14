@@ -57,12 +57,13 @@ public sealed class AccessLifetimeTests
     [InlineData("receipt-v1", "candidate-1", true)]
     public void Resend_environment_is_explicit_and_fail_closed(string? feature, string? candidate, bool enabled)
     {
+        using var destination = new AuditTests.PrivateAuditDestination();
         WithEnvironment(null, () =>
         {
             var options = WebHostOptions.FromEnvironment();
             Assert.Equal(enabled, options.Web6ResendEligibilityEnabled);
             Assert.Equal(candidate, options.Web6CandidateId);
-        }, "web5", feature, candidate);
+        }, "web5", feature, candidate, enabled ? destination.Root : null, enabled ? destination.Path : null);
     }
 
     [Theory]
@@ -76,8 +77,8 @@ public sealed class AccessLifetimeTests
             mode, feature, candidate);
     }
 
-    private static void WithEnvironment(string? lifetime, Action check, string? mode = "legacy-web11",
-        string? resend = null, string? candidate = null)
+    internal static void WithEnvironment(string? lifetime, Action check, string? mode = "legacy-web11",
+        string? resend = null, string? candidate = null, string? candidateRoot = null, string? auditPath = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -90,6 +91,8 @@ public sealed class AccessLifetimeTests
             ["MYDMSVN_WEB_OPERATION_MODE"] = mode,
             ["MYDMSVN_WEB6_RESEND_ELIGIBILITY"] = resend,
             ["MYDMSVN_WEB6_CANDIDATE_ID"] = candidate,
+            ["MYDMSVN_WEB6_CANDIDATE_ROOT"] = candidateRoot,
+            ["MYDMSVN_WEB_SECURITY_AUDIT_PATH"] = auditPath,
         };
         var previous = new Dictionary<string, string?>();
         foreach (var name in settings.Keys) previous[name] = Environment.GetEnvironmentVariable(name);

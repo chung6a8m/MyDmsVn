@@ -21,6 +21,7 @@ namespace MyDmsVn.Server.Application.Identity
         Disabled = 2,
         RehashFailed = 3,
         Denied = 4,
+        Admitted = 5,
     }
 
     public sealed class SecurityAuditEntry
@@ -32,7 +33,8 @@ namespace MyDmsVn.Server.Application.Identity
             DateTime occurredAtUtc,
             string? documentType = null,
             string? documentId = null,
-            string? correlationId = null)
+            string? correlationId = null,
+            bool requiresAdmission = true)
         {
             if (occurredAtUtc.Kind != DateTimeKind.Utc)
             {
@@ -46,6 +48,7 @@ namespace MyDmsVn.Server.Application.Identity
             DocumentType = documentType;
             DocumentId = documentId;
             CorrelationId = correlationId;
+            RequiresAdmission = requiresAdmission;
         }
 
         public SecurityAuditAction Action { get; }
@@ -55,6 +58,43 @@ namespace MyDmsVn.Server.Application.Identity
         public string? DocumentType { get; }
         public string? DocumentId { get; }
         public string? CorrelationId { get; }
+        internal bool RequiresAdmission { get; }
+    }
+
+    public sealed class SecurityAuditUnavailableException : Exception
+    {
+        public SecurityAuditUnavailableException()
+            : base("Required security audit persistence is unavailable.")
+        {
+        }
+    }
+
+    public enum SecurityAuditReadinessStatus
+    {
+        Healthy,
+        Degraded,
+    }
+
+    public sealed class SecurityAuditReadinessSnapshot
+    {
+        public const string PersistenceFailureReason = "SecurityAudit.Unavailable";
+
+        public SecurityAuditReadinessSnapshot(DateTime? lastFailureAtUtc = null)
+        {
+            LastFailureAtUtc = lastFailureAtUtc;
+        }
+
+        public SecurityAuditReadinessStatus Status => LastFailureAtUtc.HasValue
+            ? SecurityAuditReadinessStatus.Degraded
+            : SecurityAuditReadinessStatus.Healthy;
+        public string? ReasonCode => LastFailureAtUtc.HasValue ? PersistenceFailureReason : null;
+        public DateTime? LastFailureAtUtc { get; }
+    }
+
+    public interface ISecurityAuditReadiness
+    {
+        SecurityAuditReadinessSnapshot Snapshot { get; }
+        void MarkDegraded(DateTime failedAtUtc);
     }
 
     public interface ISecurityAuditSink
@@ -124,15 +164,21 @@ namespace MyDmsVn.Server.Application.Identity
         private readonly ISecurityAuditSink _sink;
         private readonly ISecurityAuditFailureReporter _failureReporter;
         private readonly IRequestCorrelationAccessor _correlationAccessor;
+        private readonly IUtcClock _clock;
+        private readonly ISecurityAuditReadiness? _readiness;
 
         public SecurityAuditWriter(
             ISecurityAuditSink sink,
             ISecurityAuditFailureReporter failureReporter,
-            IRequestCorrelationAccessor correlationAccessor)
+            IRequestCorrelationAccessor correlationAccessor,
+            IUtcClock clock,
+            ISecurityAuditReadiness? readiness = null)
         {
             _sink = sink;
             _failureReporter = failureReporter;
             _correlationAccessor = correlationAccessor;
+            _clock = clock;
+            _readiness = readiness;
         }
 
         public async Task WriteAsync(
@@ -149,18 +195,20 @@ namespace MyDmsVn.Server.Application.Identity
                     entry.OccurredAtUtc,
                     entry.DocumentType,
                     entry.DocumentId,
-                    _correlationAccessor.CorrelationId)
+                    _correlationAccessor.CorrelationId,
+                    entry.RequiresAdmission)
                 : entry;
             try
             {
                 await _sink.WriteAsync(enrichedEntry, cancellationToken).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (!businessOperationCommitted && cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
             catch (Exception exception)
             {
+                _readiness?.MarkDegraded(_clock.UtcNow);
                 try
                 {
                     _failureReporter.Report(
@@ -168,13 +216,16 @@ namespace MyDmsVn.Server.Application.Identity
                         exception,
                         businessOperationCommitted);
                 }
-                catch (Exception reporterException)
+                catch (Exception)
                 {
-                    System.Diagnostics.Trace.TraceError(
-                        "Security audit failure reporter failed for {0}; committed={1}; exception={2}",
-                        enrichedEntry.Action,
-                        businessOperationCommitted,
-                        reporterException.GetType().FullName);
+                    // A failed diagnostic reporter must not replace the request's outcome.
+                }
+
+                if (!businessOperationCommitted && enrichedEntry.RequiresAdmission &&
+                    (enrichedEntry.Outcome == SecurityAuditOutcome.Succeeded ||
+                     enrichedEntry.Outcome == SecurityAuditOutcome.Admitted))
+                {
+                    throw new SecurityAuditUnavailableException();
                 }
             }
         }

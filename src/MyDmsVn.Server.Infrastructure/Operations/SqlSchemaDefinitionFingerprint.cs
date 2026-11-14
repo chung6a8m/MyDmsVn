@@ -12,10 +12,13 @@ public static class SqlSchemaDefinitionFingerprint
     public const string Schema11 = "1B1CF2B760E4651A06D10F162E44418BB2A0DEF2E425EC9A901F55B71B03EC4F";
     public const string Schema12 = "50552E3ADC1AF4C68591D9C582B5340ED4744BB6883F085E8A7EC7053308BC87";
     public const string Schema13 = "D0A86EA0CACAB3D68F1188A1166227DFA5DE452572D1719CD55A3FA3C16F02C9";
-    public static async Task<string> ReadAsync(SqlConnection connection, CancellationToken cancellationToken)
+    public static Task<string> ReadAsync(SqlConnection connection, CancellationToken cancellationToken) => ReadAsync(connection, 30, cancellationToken);
+    public static async Task<string> ReadAsync(SqlConnection connection, int commandTimeout, CancellationToken cancellationToken)
     {
+        if (commandTimeout <= 0 || commandTimeout > 30) throw new ArgumentOutOfRangeException(nameof(commandTimeout));
+        cancellationToken.ThrowIfCancellationRequested();
         using var command = connection.CreateCommand();
-        command.CommandTimeout = 30;
+        command.CommandTimeout = commandTimeout;
         command.CommandText = @"
 DECLARE @s nvarchar(max);
 WITH signatures AS (

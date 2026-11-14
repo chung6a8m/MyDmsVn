@@ -1,19 +1,293 @@
-using System;
+﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 using Xunit;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
 
 public sealed class Web5HttpServiceStateTests
 {
+    [Fact]
+    public async Task Output_drain_cancels_at_deadline_but_joins_the_exact_noncooperative_read()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var stream = new PendingOutputStream();
+        var output = Web6CutoverNative.ReadOutput(stream, System.Text.Encoding.UTF8, 100, cancellation.Token);
+        var drain = Web6CutoverNative.JoinOutput(output, Task.CompletedTask,
+            new Web6CutoverDeadline(TimeSpan.FromMilliseconds(20)), default, cancellation.Cancel);
+        try
+        {
+            // Bounded fake wait observes cancellation; the read itself deliberately ignores it.
+            Assert.True(cancellation.Token.WaitHandle.WaitOne(2000));
+            Assert.False(drain.IsCompleted);
+            Assert.False(output.IsCompleted);
+        }
+        finally { stream.Finish.TrySetResult(0); }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => drain);
+        Assert.True(output.IsCompleted);
+    }
+
+    [Fact]
+    public async Task Output_reader_preserves_text_and_refuses_overflow_after_joined_EOF()
+    {
+        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("dấu"));
+        Assert.Equal("dấu", await Web6CutoverNative.ReadOutput(stream, System.Text.Encoding.UTF8, 3, default));
+        stream.Position = 0;
+        await Assert.ThrowsAsync<InvalidDataException>(() => Web6CutoverNative.ReadOutput(stream, System.Text.Encoding.UTF8, 2, default));
+        Assert.Equal(stream.Length, stream.Position);
+    }
+
+    private sealed class PendingOutputStream : MemoryStream
+    {
+        internal TaskCompletionSource<int> Finish { get; } = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken token) => Finish.Task;
+    }
+
+    [Fact]
+    public async Task Output_cancellation_callback_failure_cannot_abandon_owned_readers()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var output = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failure = new IOException("fake cancellation callback");
+        var drain = Web6CutoverNative.JoinOutput(output.Task, Task.CompletedTask,
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(1)), cancellation.Token, () => throw failure);
+        try { Assert.False(drain.IsCompleted); }
+        finally { output.TrySetResult(true); }
+        var observed = await Assert.ThrowsAsync<IOException>(() => drain);
+        Assert.Same(failure, observed);
+    }
+
+    [Theory]
+    [InlineData("start-expired")]
+    [InlineData("start-cancelled")]
+    [InlineData("start-threw")]
+    [InlineData("identity-failed")]
+    [InlineData("wait-cancelled")]
+    [InlineData("wait-cancelled-readers")]
+    public async Task Strict_child_failures_retain_ownership_even_with_completed_readers_until_proven_exit(string fault)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var now = TimeSpan.Zero;
+        var child = new FakeCutoverChild();
+        child.AfterStart = () =>
+        {
+            if (fault == "start-expired") now = TimeSpan.FromSeconds(61);
+            if (fault == "start-cancelled") cancellation.Cancel();
+            if (fault == "start-threw") throw new IOException("fake post-launch Start failure");
+        };
+        child.IdentityFailure = fault == "identity-failed";
+        if (fault == "wait-cancelled-readers")
+        {
+            child.Output = Task.FromCanceled<string>(new CancellationToken(true));
+            child.Error = Task.FromCanceled<string>(new CancellationToken(true));
+        }
+        var run = Web6CutoverNative.RunChild(child,
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(60), () => now), cancellation.Token,
+            (_, token) => { cancellation.Cancel(); return Task.CompletedTask; });
+        try
+        {
+            Assert.Equal(1, child.Starts);
+            Assert.True(child.Output.IsCompleted && child.Error.IsCompleted);
+            Assert.False(run.IsCompleted);
+            Assert.False(child.Disposed);
+            Assert.Equal(0, child.Terminations);
+            Assert.True(child.ExitAwaited);
+        }
+        finally { child.ProveExit(); }
+        await Assert.ThrowsAnyAsync<Exception>(() => run);
+        Assert.True(child.Disposed);
+        Assert.True(child.HasExited);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Strict_child_verified_termination_still_owns_process_until_each_reader_joins(bool holdStdout)
+    {
+        var now = TimeSpan.Zero;
+        var child = new FakeCutoverChild { ExitOnTerminate = true };
+        var pending = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (holdStdout) child.Output = pending.Task;
+        else child.Error = pending.Task;
+        var run = Web6CutoverNative.RunChild(child,
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(60), () => now), default,
+            (_, token) => { now += TimeSpan.FromSeconds(31); return Task.CompletedTask; });
+        try
+        {
+            Assert.Equal(1, child.Terminations);
+            Assert.Equal(1, child.Verifications);
+            Assert.True(child.HasExited);
+            Assert.True(child.ExitAwaited);
+            Assert.False(run.IsCompleted);
+            Assert.False(child.Disposed);
+        }
+        finally { child.ProveExit(); pending.TrySetResult("done"); }
+        await Assert.ThrowsAsync<TimeoutException>(() => run);
+        Assert.True(child.Disposed);
+    }
+
+    [Fact]
+    public async Task Strict_child_changed_identity_prevents_kill_and_keeps_the_child_for_containment()
+    {
+        var now = TimeSpan.Zero;
+        var child = new FakeCutoverChild { VerifyFailure = true };
+        var run = Web6CutoverNative.RunChild(child,
+            new Web6CutoverDeadline(TimeSpan.FromSeconds(60), () => now), default,
+            (_, token) => { now += TimeSpan.FromSeconds(31); return Task.CompletedTask; });
+        try
+        {
+            Assert.Equal(1, child.Verifications);
+            Assert.Equal(0, child.Terminations);
+            Assert.False(child.Disposed);
+            Assert.False(run.IsCompleted);
+            Assert.True(child.ExitAwaited);
+        }
+        finally { child.ProveExit(); }
+        await Assert.ThrowsAnyAsync<Exception>(() => run);
+        Assert.True(child.Disposed);
+    }
+
+    [Fact]
+    public async Task Strict_child_partial_output_start_failure_joins_the_started_reader_after_exit()
+    {
+        var child = new FakeCutoverChild { OutputStartFailure = true, ExitOnTerminate = true };
+        var output = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        child.Output = output.Task;
+        var run = Web6CutoverNative.RunChild(child, new Web6CutoverDeadline(TimeSpan.FromSeconds(60)), default);
+        try
+        {
+            Assert.True(child.HasExited);
+            Assert.Equal(1, child.Terminations);
+            Assert.False(child.Disposed);
+            Assert.False(run.IsCompleted);
+        }
+        finally { child.ProveExit(); output.TrySetResult("partial"); }
+        await Assert.ThrowsAsync<IOException>(() => run);
+        Assert.True(child.Disposed);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    public async Task Strict_child_natural_exit_before_capture_preserves_both_outputs_and_exit_code(int exitCode)
+    {
+        var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+            $"/d /c \"echo stdout&echo stderr>&2&exit /b {exitCode}\"")
+        {
+            UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true,
+        };
+        var child = new ExitedBeforeCaptureChild(new Web6CutoverProcessChild(start, 100));
+        var result = await Web6CutoverNative.RunChild(child, new Web6CutoverDeadline(TimeSpan.FromSeconds(30)), default);
+        Assert.Equal((exitCode, "stdout\r\n", "stderr\r\n"), result);
+        if (exitCode == 0)
+            Assert.Equal(result.Output, Web5HttpServiceState.ValidateCommandResult(result.ExitCode, result.Output, result.Error));
+        else
+            Assert.Throws<InvalidDataException>(() => Web5HttpServiceState.ValidateCommandResult(result.ExitCode, result.Output, result.Error));
+    }
+
+    [Fact]
+    public void Strict_live_child_requires_the_exact_launch_handle_and_executable_before_termination()
+    {
+        var executable = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        var start = new ProcessStartInfo(executable, "/d /c \"set /p owned=&exit /b 0\"")
+        {
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true,
+        };
+        using var child = new Process { StartInfo = start };
+        Assert.True(child.Start());
+        try
+        {
+            var handle = child.SafeHandle;
+            var pid = child.Id;
+            var started = child.StartTime.ToUniversalTime();
+            using var other = Process.GetCurrentProcess();
+            var deadline = new Web6CutoverDeadline(TimeSpan.FromSeconds(15));
+            void TerminateWith(SafeProcessHandle expected, string path) =>
+                Web6CutoverNative.TerminateVerified(
+                    () => Web6CutoverNative.VerifyRunningHandle(child, expected, pid, started, path),
+                    child.Kill, deadline, default);
+
+            Assert.Throws<InvalidDataException>(() => TerminateWith(other.SafeHandle, executable));
+            Assert.Throws<InvalidDataException>(() => TerminateWith(handle, Path.Combine(Environment.SystemDirectory, "different.exe")));
+            Assert.False(child.HasExited);
+            TerminateWith(handle, executable);
+            Assert.True(child.WaitForExit(5000));
+            Assert.NotEqual(0, child.ExitCode);
+        }
+        finally
+        {
+            child.StandardInput.Close();
+            Assert.True(child.WaitForExit(5000));
+        }
+    }
+
+    private sealed class ExitedBeforeCaptureChild : IWeb6CutoverChild
+    {
+        private readonly Web6CutoverProcessChild _child;
+
+        internal ExitedBeforeCaptureChild(Web6CutoverProcessChild child) => _child = child;
+
+        public bool Start() => _child.Start();
+        public void CaptureIdentity()
+        {
+            // Gate on this exact process's exit signal, not on how quickly cmd.exe usually exits.
+            if (!_child.ProvenExit.Wait(TimeSpan.FromSeconds(5)))
+            {
+                if (!_child.HasExited)
+                {
+                    _child.CaptureIdentity();
+                    _child.VerifyRunningIdentity();
+                    _child.Terminate();
+                }
+                throw new TimeoutException("Disposable command did not signal its expected natural exit.");
+            }
+            _child.CaptureIdentity();
+        }
+        public void VerifyRunningIdentity() => _child.VerifyRunningIdentity();
+        public bool HasExited => _child.HasExited;
+        public void Terminate() => throw new InvalidOperationException("The disposable command already exited naturally.");
+        public Task ProvenExit => _child.ProvenExit;
+        public void StartOutput(CancellationToken token) => _child.StartOutput(token);
+        public Task<string> Output => _child.Output;
+        public Task<string> Error => _child.Error;
+        public int ExitCode => _child.ExitCode;
+        public void Dispose() => _child.Dispose();
+    }
+
+    private sealed class FakeCutoverChild : IWeb6CutoverChild
+    {
+        private readonly TaskCompletionSource<bool> _exit = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal Action? AfterStart;
+        internal bool IdentityFailure, VerifyFailure, ExitOnTerminate, OutputStartFailure;
+        internal int Starts, Verifications, Terminations;
+        internal bool Disposed, ExitAwaited;
+        public bool Start() { Starts++; AfterStart?.Invoke(); return true; }
+        public void CaptureIdentity() { if (IdentityFailure) throw new IOException("fake identity capture"); }
+        public void VerifyRunningIdentity() { Verifications++; if (VerifyFailure) throw new IOException("fake identity mismatch"); }
+        public bool HasExited { get; private set; }
+        public void Terminate() { Terminations++; if (ExitOnTerminate) ProveExit(); }
+        public Task ProvenExit { get { ExitAwaited = true; return _exit.Task; } }
+        public void StartOutput(CancellationToken token) { if (OutputStartFailure) throw new IOException("fake partial reader start"); }
+        public Task<string> Output { get; set; } = Task.FromResult("");
+        public Task<string> Error { get; set; } = Task.FromResult("");
+        public int ExitCode => 0;
+        public void Dispose() => Disposed = true;
+        internal void ProveExit() { HasExited = true; _exit.TrySetResult(true); }
+    }
+
     private const string Empty = @"
 Snapshot of HTTP service state (Request Queue View):
 -----------------------------------------------------
 ";
-    private const string Owned = @"
+    // Mutation vectors use LF regardless of the checkout's required CRLF encoding.
+    private static string Owned => OwnedRaw.Replace("\r\n", "\n");
+    private const string OwnedRaw = @"
 Snapshot of HTTP service state (Request Queue View):
 -----------------------------------------------------
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -9,7 +9,11 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+#if WEB6_BOOTSTRAP
+namespace MyDmsVn.Web6.CandidateBootstrap;
+#else
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
+#endif
 
 internal sealed class Web5HttpUrlGroup
 {
@@ -192,6 +196,22 @@ internal static class Web5HttpServiceState
         await drained;
         return ValidateCommandResult(process.ExitCode, await output, await error);
     }
+
+#if !WEB6_BOOTSTRAP
+    internal static async Task<string> ReadAsync(Web6CutoverDeadline deadline, CancellationToken token)
+    {
+        deadline = deadline.Clamp(TimeSpan.FromSeconds(10));
+        using var phase = deadline.Link(token); token = phase.Token;
+        var executable = Path.Combine(Environment.SystemDirectory, "netsh.exe");
+        var start = new ProcessStartInfo(executable, "http show servicestate view=requestq verbose=yes")
+        {
+            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardOutput = true, RedirectStandardError = true,
+        };
+        var result = await Web6CutoverNative.RunChild(new Web6CutoverProcessChild(start, MaximumSnapshotLength), deadline, token);
+        return ValidateCommandResult(result.ExitCode, result.Output, result.Error);
+    }
+#endif
 
     internal static async Task<string> ReadBoundedAsync(TextReader reader, int maximumLength)
     {

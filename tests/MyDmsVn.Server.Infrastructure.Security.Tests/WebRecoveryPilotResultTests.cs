@@ -2,6 +2,10 @@
 using System.IO;
 using System.Data;
 using System.Linq;
+using System.Collections.Generic;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -23,6 +27,335 @@ public sealed class WebRecoveryPilotResultTests
     };
     private static void Verify(JObject result, JArray? physical = null) => WebHostIisExpressTests.VerifyRecoveryResult(result,
         physical ?? new JArray(Operation()), Array.Empty<long>(), Array.Empty<long>(), new[] { Epoch });
+
+    private static readonly Web6CandidateExpected Web6Expected = new Web6CandidateExpected(
+        "web6-candidate-plan", new string('a', 40), new string('b', 40), new string('c', 64));
+
+    private static JObject Web6Result()
+    {
+        var kinds = new[] { "Sales.Create", "Sales.Update", "Sales.Post", "Receipt.Create", "Receipt.Update", "Receipt.Post" };
+        return new JObject
+        {
+            ["version"] = 2, ["mode"] = "web6-candidate", ["candidateId"] = Web6Expected.CandidateId,
+            ["frontendSourceSha"] = Web6Expected.FrontendSourceSha, ["backendSourceSha"] = Web6Expected.BackendSourceSha,
+            ["frontendDistManifestSha256"] = Web6Expected.FrontendDistManifestSha256,
+            ["operations"] = new JArray(kinds.Select((kind, index) => new JObject
+            {
+                ["operationKind"] = kind, ["operationId"] = $"0000000{index + 1}-0000-4000-8000-00000000000{index + 1}",
+                ["requestFingerprint"] = new string((char)('a' + index), 64), ["consentDispatches"] = 1,
+                ["candidateId"] = Web6Expected.CandidateId, ["checkId"] = "web6-" + kind.Replace('.', '-').ToLowerInvariant(),
+            })),
+            ["checks"] = new JArray("web6-six-kinds-one-consent", "web6-committed-loss-no-resend",
+                "web6-two-tab-one-claim", "web6-fail-closed-boundaries", "web6-ime-double-click"),
+        };
+    }
+
+    [Fact]
+    public void Web6_live_acceptance_gate_fails_enabled_runs_with_missing_prerequisites_without_affecting_ordinary_discovery()
+    {
+        var disabled = new Dictionary<string, string?> { ["MYDMSVN_WEB6_CANDIDATE_ENABLE"] = null };
+        Assert.NotNull(Web6CandidateAcceptanceGate.OrdinarySkipReason(disabled));
+
+        var enabled = new Dictionary<string, string?> { ["MYDMSVN_WEB6_CANDIDATE_ENABLE"] = "1" };
+        Assert.Null(Web6CandidateAcceptanceGate.OrdinarySkipReason(enabled));
+        var failure = Assert.Throws<InvalidOperationException>(() => Web6CandidateAcceptanceGate.RequireLive(enabled));
+        Assert.Contains("MYDMSVN_WEB6_CANDIDATE_ROOT", failure.Message);
+    }
+
+    [Fact]
+    public async Task Candidate_mismatch_lifecycle_switches_the_owned_host_candidate_and_restores_the_exact_pair()
+    {
+        var switched = new List<string>();
+        var lifecycle = new Web6CandidateHostMismatch("candidate-a", id => { switched.Add(id); return Task.CompletedTask; });
+        await lifecycle.ArmAsync();
+        Assert.Equal(new[] { lifecycle.MismatchCandidateId, "candidate-a" }, new[] { switched[0], lifecycle.ExpectedCandidateId });
+        await Assert.ThrowsAsync<InvalidOperationException>(() => lifecycle.ArmAsync());
+        await lifecycle.RestoreAsync();
+        Assert.Equal(new[] { lifecycle.MismatchCandidateId, "candidate-a" }, switched);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => lifecycle.RestoreAsync());
+
+        await lifecycle.ArmAsync();
+        await lifecycle.RestoreIfNeededAsync();
+        Assert.Equal(new[] { lifecycle.MismatchCandidateId, "candidate-a", lifecycle.MismatchCandidateId, "candidate-a" }, switched);
+    }
+
+    [Fact]
+    public async Task Candidate_mismatch_lifecycle_restores_after_an_ambiguous_switch_failure()
+    {
+        var switched = new List<string>();
+        var lifecycle = new Web6CandidateHostMismatch("candidate-a", id =>
+        {
+            switched.Add(id);
+            if (id.EndsWith("-mismatch", StringComparison.Ordinal)) throw new IOException("ambiguous restart");
+            return Task.CompletedTask;
+        });
+        await Assert.ThrowsAsync<IOException>(() => lifecycle.ArmAsync());
+        Assert.True(lifecycle.IsArmed);
+        await lifecycle.RestoreIfNeededAsync();
+        Assert.Equal(new[] { lifecycle.MismatchCandidateId, "candidate-a" }, switched);
+    }
+
+    [Fact]
+    public void Candidate_mismatch_identity_remains_a_distinct_valid_bounded_candidate()
+    {
+        var expected = "a" + new string('b', 63);
+        var lifecycle = new Web6CandidateHostMismatch(expected, _ => Task.CompletedTask);
+        Assert.NotEqual(expected, lifecycle.MismatchCandidateId);
+        Assert.Matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", lifecycle.MismatchCandidateId);
+    }
+
+    [Fact]
+    public void Candidate_mismatch_identity_never_collides_with_a_maximum_length_suffix_candidate()
+    {
+        var expected = new string('a', 55) + "-mismatch";
+        Assert.Equal(64, expected.Length);
+        var lifecycle = new Web6CandidateHostMismatch(expected, _ => Task.CompletedTask);
+        Assert.NotEqual(expected, lifecycle.MismatchCandidateId);
+        Assert.Matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", lifecycle.MismatchCandidateId);
+    }
+
+    [Fact]
+    public void Candidate_sales_header_query_uses_physical_columns_and_preserves_reader_names()
+    {
+        var query = Regex.Match(Web6CandidateOracle.SalesHeaderProjectionSql,
+            @"\ASELECT (?<columns>.+) FROM dbo\.SalesReceipts WHERE SaleId=@id;\z", RegexOptions.CultureInvariant);
+        Assert.True(query.Success);
+        var columns = query.Groups["columns"].Value.Split(',')
+            .Select(column => column.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)).ToArray();
+        // Physical migration010 columns, independent of the result DTO property names.
+        Assert.Equal(new[] { "SaleId", "SaleNo", "SaleDate", "CustomerId", "WarehouseId", "EmployeeId",
+            "Status", "Note", "RowVersion", "PostedAtUtc", "PostedByUserId" }, columns.Select(column => column[0]));
+        // SqlTestOracle.Read binds SalesHeader properties by the result column name.
+        Assert.Equal(new[] { "SaleId", "SaleNumber", "SaleDate", "CustomerId", "WarehouseId", "EmployeeId",
+            "Status", "Note", "RowVersion", "PostedAtUtc", "PostedByUserId" }, columns.Select(column => column.Last()));
+    }
+
+    [Fact]
+    public void Candidate_oracle_SQL_matches_the_audited_physical_and_reader_identifiers()
+    {
+        var root = Web6CandidateBackendSource.ResolveRoot(AppContext.BaseDirectory);
+        var source = File.ReadAllText(Path.Combine(root, "tests", "MyDmsVn.Server.Infrastructure.Security.Tests", "Web6CandidateOracle.cs"));
+        // All 23 SELECT alternatives are C# string literals in this file, including the header constant.
+        var actual = Regex.Matches(source, @"@?""(?<sql>\s*SELECT\b[^""]*)""",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            .Cast<Match>().Select(match => match.Groups["sql"].Value).ToArray();
+
+        // Physical names from migrations 002, 005, 007, 010 and 012. SELECT order and aliases
+        // also record the SqlTestOracle reader contract. Keep brackets on the reserved LINENO.
+        const string journal = "SELECT u.Username AS Actor,j.OperationId,j.OperationKind,j.RequestTargetId,j.ResultDocumentId,j.RequestFingerprint,j.DeploymentEpoch,j.Disposition,j.ResultBytes " +
+            "FROM dbo.WebOperationJournal j JOIN dbo.Users u ON u.UserId=j.ActorUserId WHERE j.OperationId=@operation";
+        const string ledgerJoin = "FROM dbo.StockLedger l JOIN dbo.StockValuationEntries v ON v.LedgerId=l.LedgerId";
+        var expected = new[]
+        {
+            journal + ";",
+            "SELECT COUNT(*) FROM dbo.WebOperationJournal WHERE OperationId=@operation AND Disposition='COMMITTED';",
+            journal + ";",
+            journal + " AND j.Disposition='COMMITTED';",
+            journal + ";",
+            "SELECT SaleId,SaleNo AS SaleNumber,SaleDate,CustomerId,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.SalesReceipts WHERE SaleId=@id;",
+            "SELECT SaleLineId,[LineNo],ProductId,Qty,UnitPrice,IsGift,LineAmount FROM dbo.SalesReceiptLines WHERE SaleId=@id ORDER BY [LineNo];",
+            "SELECT ReceiptId,ReceiptNo ReceiptNumber,ReceiptDate,WarehouseId,EmployeeId,Status,Note,RowVersion,PostedAtUtc,PostedByUserId FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
+            "SELECT ReceiptLineId,[LineNo] LineNumber,ProductId,Quantity,UnitCost FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id ORDER BY [LineNo];",
+            "SELECT Status,PostedAtUtc,RowVersion FROM dbo.SalesReceipts WHERE SaleId=@id;",
+            "SELECT Status,PostedAtUtc,CAST(NULL AS binary(8)) RowVersion FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
+            "SELECT COUNT(*) FROM dbo.SalesReceipts WHERE SaleId=@id;",
+            "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE ReceiptId=@id;",
+            "SELECT COUNT(*) FROM dbo.SalesReceipts WHERE SaleId=@id AND Status='Posted' AND PostedAtUtc IS NOT NULL;",
+            "SELECT COUNT(*) FROM dbo.GoodsReceipts WHERE ReceiptId=@id AND Status='Posted' AND PostedAtUtc IS NOT NULL;",
+            "SELECT COUNT(*) FROM dbo.SalesReceiptLines WHERE SaleId=@id;",
+            "SELECT COUNT(*) FROM dbo.GoodsReceiptLines WHERE ReceiptId=@id;",
+            "SELECT COUNT(*) " + ledgerJoin + " WHERE l.DocumentType=@type AND l.DocumentId=@id;",
+            "SELECT COUNT(*) " + ledgerJoin + " JOIN dbo.SalesReceiptLines s ON s.SaleId=l.DocumentId AND s.SaleLineId=l.DocumentLineId " +
+                "WHERE l.DocumentType='SalesReceipt' AND l.DocumentId=@id AND " +
+                "(l.QuantityChange<>-s.Qty OR v.ValueChange<>-s.CostAmount OR s.PostedUnitCost IS NULL OR s.CostAmount IS NULL);",
+            "SELECT COUNT(*) " + ledgerJoin + " JOIN dbo.GoodsReceiptLines r ON r.ReceiptId=l.DocumentId AND r.ReceiptLineId=l.DocumentLineId " +
+                "WHERE l.DocumentType='GoodsReceipt' AND l.DocumentId=@id AND " +
+                "(l.QuantityChange<>r.Quantity OR v.ValueChange<>ROUND(r.Quantity*r.UnitCost,4));",
+            "SELECT DISTINCT WarehouseId,ProductId FROM dbo.StockLedger WHERE DocumentType=@type AND DocumentId=@id;",
+            "SELECT COALESCE(SUM(l.QuantityChange),0) QuantityChange,COALESCE(SUM(v.ValueChange),0) ValueChange " + ledgerJoin +
+                " WHERE l.WarehouseId=@warehouse AND l.ProductId=@product;",
+            "SELECT Quantity,InventoryValue FROM dbo.StockBalances WHERE WarehouseId=@warehouse AND ProductId=@product;",
+        };
+
+        static string[] Tokens(string sql) => Regex.Matches(sql, @"\[[^\]]+\]|'(?:[^']|'')*'|@?[A-Za-z_][A-Za-z_0-9]*|\d+|<>|\S",
+                RegexOptions.CultureInvariant)
+            .Cast<Match>().Select(match => match.Value).ToArray();
+
+        Assert.Equal(expected.Length, actual.Length);
+        Assert.All(expected.Zip(actual, (audited, sourceSql) => (audited, sourceSql)), pair =>
+            Assert.Equal(Tokens(pair.audited), Tokens(pair.sourceSql)));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Candidate_oracle_rejects_noncanonical_sales_result_bytes_and_changed_draft_projection(int operationKind)
+    {
+        var envelope = JObject.Parse("{\"data\":{\"saleId\":\"1\",\"saleNumber\":\"SA0000000001\",\"saleDate\":\"2026-11-10\",\"customerId\":1,\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"version\":\"AAAAAAAAAAA=\",\"lines\":[{\"saleLineId\":\"4\",\"lineNo\":1,\"productId\":5,\"qty\":\"2.0000\",\"unitPrice\":\"3.0000\",\"isGift\":false,\"lineAmount\":\"6.0000\",\"productIsActive\":true,\"unit\":\"EA\",\"productDisplayName\":\"P\"}],\"totalAmount\":\"6.0000\",\"customerIsActive\":true,\"warehouseIsActive\":true,\"employeeIsActive\":true,\"customerDisplayName\":\"C\",\"warehouseDisplayName\":\"W\",\"employeeDisplayName\":\"E\"}}" );
+        var bytes = Encoding.UTF8.GetBytes(envelope.ToString(Newtonsoft.Json.Formatting.None));
+        Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, bytes);
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, Encoding.UTF8.GetBytes(" " + Encoding.UTF8.GetString(bytes))));
+
+        var header = JObject.Parse("{\"saleId\":\"1\",\"saleNumber\":\"SA0000000001\",\"saleDate\":\"2026-11-10\",\"customerId\":1,\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"note\":null,\"version\":\"AAAAAAAAAAA=\",\"postedAtUtc\":null,\"postedByUserId\":null}");
+        var lines = JArray.Parse("[{\"saleLineId\":\"4\",\"lineNo\":1,\"productId\":5,\"qty\":\"2.0000\",\"unitPrice\":\"3.0000\",\"isGift\":false,\"lineAmount\":\"6.0000\"}]");
+        Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines);
+        header["warehouseId"] = 9;
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines));
+        header["warehouseId"] = 2; header["postedAtUtc"] = "2026-11-10T00:00:00Z"; header["postedByUserId"] = 7;
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines));
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(5)]
+    public void Candidate_oracle_compares_exact_receipt_header_lines_and_cardinality(int operationKind)
+    {
+        var envelope = JObject.Parse("{\"data\":{\"receiptId\":\"1\",\"receiptNumber\":\"GR0000000001\",\"receiptDate\":\"2026-11-10\",\"warehouseId\":2,\"warehouseDisplayName\":null,\"warehouseIsActive\":true,\"employeeId\":3,\"employeeDisplayName\":null,\"employeeIsActive\":true,\"status\":\"Draft\",\"note\":null,\"postedAtUtc\":null,\"version\":\"AAAAAAAAAAA=\",\"lines\":[{\"receiptLineId\":\"4\",\"lineNumber\":1,\"productId\":5,\"quantity\":\"2.0000\",\"unitCost\":\"3.0000\",\"productDisplayName\":null,\"productIsActive\":true}]}}" );
+        var bytes = Encoding.UTF8.GetBytes(envelope.ToString(Newtonsoft.Json.Formatting.None));
+        Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, bytes);
+        var header = JObject.Parse("{\"receiptId\":\"1\",\"receiptNumber\":\"GR0000000001\",\"receiptDate\":\"2026-11-10\",\"warehouseId\":2,\"employeeId\":3,\"status\":\"Draft\",\"note\":null,\"version\":\"AAAAAAAAAAA=\",\"postedAtUtc\":null,\"postedByUserId\":null}");
+        var lines = JArray.Parse("[{\"receiptLineId\":\"4\",\"lineNumber\":1,\"productId\":5,\"quantity\":\"2.0000\",\"unitCost\":\"3.0000\"}]");
+        Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines);
+        lines.Add(lines[0]!.DeepClone());
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDraftProjection(operationKind, envelope, header, lines));
+    }
+
+    [Theory]
+    [InlineData("1000.0000", "15000.0000", "-2.0000", "-30.0000", "998.0000", "14970.0000")]
+    [InlineData("0.0000", "0.0000", "2.0000", "6.0000", "2.0000", "6.0000")]
+    public void Candidate_oracle_requires_the_exact_stock_balance_after_one_post(string initialQuantity, string initialValue,
+        string quantityChange, string valueChange, string actualQuantity, string actualValue)
+    {
+        Web6CandidateOracle.ValidateStockBalance(initialQuantity, initialValue, quantityChange, valueChange, actualQuantity, actualValue);
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateStockBalance(initialQuantity, initialValue,
+            quantityChange, valueChange, (decimal.Parse(actualQuantity, System.Globalization.CultureInfo.InvariantCulture) + 1).ToString("F4", System.Globalization.CultureInfo.InvariantCulture), actualValue));
+    }
+
+    [Theory]
+    [InlineData(3, "{\"data\":{\"saleId\":\"1\",\"status\":\"Posted\",\"postedAtUtc\":\"2026-11-10T00:00:00Z\",\"version\":\"AAAAAAAAAAA=\"}}")]
+    [InlineData(6, "{\"data\":{\"receiptId\":\"1\",\"status\":\"Posted\",\"postedAtUtc\":\"2026-11-10T00:00:00Z\"}}")]
+    public void Candidate_oracle_decodes_canonical_post_result_bytes_for_both_modules(int operationKind, string json) =>
+        Web6CandidateOracle.ValidateCanonicalResultBytes(operationKind, Encoding.UTF8.GetBytes(json));
+
+    [Fact]
+    public void Web6_candidate_result_requires_exact_six_unique_kinds_and_one_consent()
+    {
+        Web6CandidateOracle.ValidateResult(Web6Result(), Web6Expected);
+        var missing = Web6Result(); ((JArray)missing["operations"]!).RemoveAt(0);
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(missing, Web6Expected));
+        var duplicate = Web6Result(); duplicate["operations"]![5]!["operationKind"] = "Sales.Create";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(duplicate, Web6Expected));
+        var dispatch = Web6Result(); dispatch["operations"]![0]!["consentDispatches"] = 2;
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(dispatch, Web6Expected));
+    }
+
+    [Theory]
+    [InlineData("candidateId", "other-candidate")]
+    [InlineData("frontendSourceSha", "dddddddddddddddddddddddddddddddddddddddd")]
+    [InlineData("backendSourceSha", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")]
+    [InlineData("frontendDistManifestSha256", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
+    public void Web6_candidate_result_refuses_wrong_pins(string property, string value)
+    {
+        var result = Web6Result(); result[property] = value;
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(result, Web6Expected));
+    }
+
+    [Theory]
+    [InlineData("token")]
+    [InlineData("cookie")]
+    [InlineData("connectionString")]
+    [InlineData("receipt")]
+    [InlineData("payload")]
+    public void Web6_candidate_result_refuses_extra_secret_or_raw_fields(string property)
+    {
+        var result = Web6Result(); result[property] = "secret";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateResult(result, Web6Expected));
+    }
+
+    [Fact]
+    public void Web6_browser_count_requires_three_real_passes_without_skip_retry_or_extra_fields()
+    {
+        var count = JObject.Parse("{\"version\":2,\"discovered\":3,\"passed\":3,\"failed\":0,\"skipped\":0,\"interrupted\":0,\"retries\":0}");
+        Web6CandidateOracle.ValidateBrowserCount(count);
+        foreach (var name in new[] { "failed", "skipped", "interrupted", "retries" })
+        {
+            var changed = (JObject)count.DeepClone(); changed[name] = 1;
+            Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateBrowserCount(changed));
+        }
+        var secret = (JObject)count.DeepClone(); secret["token"] = "secret";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateBrowserCount(secret));
+    }
+
+    [Fact]
+    public void Web6_network_summary_is_strict_and_contains_no_raw_request_material()
+    {
+        var summary = JArray.Parse("[{\"method\":\"GET\",\"routeClass\":\"resend-eligibility\",\"status\":200,\"count\":1},{\"method\":\"POST\",\"routeClass\":\"sales-write\",\"status\":0,\"count\":1}]");
+        Web6CandidateOracle.ValidateNetwork(summary);
+        var secret = (JArray)summary.DeepClone(); secret[0]!["headers"] = "Bearer secret";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateNetwork(secret));
+        var raw = (JArray)summary.DeepClone(); raw[0]!["routeClass"] = "/api/v3/operations/secret-id/resend-eligibility";
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateNetwork(raw));
+    }
+
+    [Fact]
+    public void Web6_candidate_disposition_requires_healthy_audit_and_unambiguous_cleanup()
+    {
+        Web6CandidateOracle.ValidateDisposition(auditHealthy: true, browserDrained: true, hostDrained: true, cleanupVerified: true);
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDisposition(false, true, true, true));
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDisposition(true, false, true, true));
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDisposition(true, true, false, true));
+        Assert.Throws<InvalidDataException>(() => Web6CandidateOracle.ValidateDisposition(true, true, true, false));
+    }
+
+    [Theory]
+    [InlineData("verifyNotObserved", true)]
+    [InlineData("verifyCommitted", true)]
+    [InlineData("verifyOneEffect", true)]
+    [InlineData("candidateMismatchOn", true)]
+    [InlineData("candidateMismatchOff", true)]
+    [InlineData("eligibility401", true)]
+    [InlineData("eligibility500", true)]
+    [InlineData("eligibilityNormal", true)]
+    public void Web6_control_contract_accepts_only_fixed_candidate_actions(string action, bool requiresOperation)
+    {
+        var frame = new JObject { ["id"] = 1, ["token"] = "token", ["action"] = action };
+        if (requiresOperation)
+        {
+            frame["operation"] = new JObject { ["schemaVersion"] = 1 };
+            frame["operationId"] = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+        }
+        Assert.Equal(action, WebRecoveryPilotControl.Validate(frame, "token", web6: true));
+        frame["extra"] = true;
+        Assert.Throws<InvalidDataException>(() => WebRecoveryPilotControl.Validate(frame, "token", web6: true));
+    }
+
+    [Theory]
+    [InlineData(true, null, "Receipt.Create", 1, "expected-operation-absent")]
+    [InlineData(true, null, "Receipt.Create", 0, "expected-operation-absent")]
+    [InlineData(true, "Sales.Create", "Receipt.Create", 1, "operation-kind-mismatch")]
+    [InlineData(false, "Sales.Create", "Receipt.Create", 1, "operation-kind-mismatch")]
+    [InlineData(true, "private operation SQL login", "Receipt.Create", 2, "operation-kind-mismatch")]
+    [InlineData(true, "Receipt.Create", "Receipt.Create", 0, "journal-not-single")]
+    [InlineData(true, "Receipt.Create", "Receipt.Create", 2, "journal-not-single")]
+    [InlineData(false, null, "Receipt.Create", 0, "journal-not-single")]
+    [InlineData(false, null, "Receipt.Create", 2, "journal-not-single")]
+    public void Web6_committed_guard_reports_only_allowlisted_failure_categories(bool requireObserved,
+        string? expectedKind, string candidateKind, int journal, string category)
+    {
+        var failure = Assert.Throws<InvalidDataException>(() =>
+            WebRecoveryPilotControl.ValidateCommittedCandidate(requireObserved, expectedKind, candidateKind, journal));
+        Assert.Equal("WEB6 candidate-commit " + category, failure.Message);
+        Assert.Null(failure.InnerException);
+    }
+
+    [Theory]
+    [InlineData(true, "Receipt.Create")]
+    [InlineData(false, "Receipt.Create")]
+    [InlineData(false, null)]
+    public void Web6_committed_guard_preserves_prior_observation_requirement_only_for_one_effect(bool requireObserved, string? expectedKind)
+    {
+        WebRecoveryPilotControl.ValidateCommittedCandidate(requireObserved, expectedKind, "Receipt.Create", 1);
+    }
 
     [Fact]
     public void Committed_draft_create_matches_original_null_target_and_physical_journal() => Verify(Result());

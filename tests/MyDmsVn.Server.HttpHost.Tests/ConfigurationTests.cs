@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using Xunit;
 namespace MyDmsVn.Server.HttpHost.Tests;
+[Collection("WEB2 environment")]
 public sealed class ConfigurationTests
 {
     [Theory]
@@ -57,6 +59,34 @@ public sealed class ConfigurationTests
     public void Resend_candidate_rejects_noncanonical_values(string candidate)
     {
         Assert.Throws<ArgumentException>(() => Options(web5: true, resend: true, candidate: candidate));
+    }
+
+    [Theory]
+    [InlineData("missing-root")]
+    [InlineData("missing-path")]
+    [InlineData("relative")]
+    [InlineData("outside")]
+    [InlineData("noncanonical")]
+    [InlineData("unexpected-outside-candidate")]
+    public void Deployed_candidate_requires_canonical_protected_audit_path(string defect)
+    {
+        using var destination = new AuditTests.PrivateAuditDestination();
+        var candidateRoot = defect == "missing-root" ? null : destination.Root;
+        var path = defect switch
+        {
+            "missing-path" => null,
+            "relative" => "audit.jsonl",
+            "outside" => Path.Combine(Path.GetDirectoryName(destination.Root)!, "audit.jsonl"),
+            "noncanonical" => Path.Combine(destination.Root, "..", Path.GetFileName(destination.Root), "audit.jsonl"),
+            _ => destination.Path,
+        };
+        var candidate = defect != "unexpected-outside-candidate";
+        AccessLifetimeTests.WithEnvironment(null, () =>
+        {
+            var error = Assert.Throws<InvalidOperationException>(() => WebHostOptions.FromEnvironment());
+            Assert.Null(error.InnerException);
+            Assert.DoesNotContain(destination.Root, error.Message);
+        }, "web5", candidate ? "receipt-v1" : null, candidate ? "candidate-1" : null, candidateRoot, path);
     }
 
     private static WebHostOptions Options(bool web5 = false, bool resend = false, string? candidate = null) =>

@@ -131,6 +131,24 @@ public sealed class Web6ResendEligibilityEndpointTests
     }
 
     [Fact]
+    public async Task Eligibility_repository_failure_maps_to_unavailable_503_without_private_details()
+    {
+        using var probe = new Probe { FailEligibilityRead = true };
+        var receipt = await probe.Receipt();
+        using var context = await probe.Get("resend-context");
+        Assert.Equal(HttpStatusCode.OK, context.StatusCode);
+        using var response = await probe.Eligibility(receipt);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        var envelope = JObject.Parse(body);
+        Assert.Equal("Operation.Unavailable", (string?)envelope["error"]!["code"]);
+        Assert.Empty((JArray)envelope["error"]!["details"]!);
+        Assert.Null(envelope["data"]);
+        Assert.DoesNotContain("private-journal-read-denied", body);
+        Assert.Equal(1, probe.EligibilityReads);
+    }
+
+    [Fact]
     public async Task Correctly_bound_expired_receipt_denies_without_treating_absence_as_rollback_proof()
     {
         using var probe = new Probe();
@@ -239,6 +257,7 @@ public sealed class Web6ResendEligibilityEndpointTests
         internal WebOperationResolution? Resolution;
         internal int EligibilityReads;
         internal bool ExpireDuringEligibilityRead;
+        internal bool FailEligibilityRead;
         internal AuthClock Clock => _host.Clock;
         internal void ResetAccess() => _token = null;
 
@@ -296,6 +315,7 @@ public sealed class Web6ResendEligibilityEndpointTests
         {
             EligibilityReads++;
             EligibilityKinds.Add(expectedKind);
+            if (FailEligibilityRead) throw new InvalidOperationException("private-journal-read-denied");
             if (ExpireDuringEligibilityRead) Clock.Now = Clock.Now.AddSeconds(Web6ResendReceiptCodec.LifetimeSeconds);
             return Task.FromResult(Resolution);
         }

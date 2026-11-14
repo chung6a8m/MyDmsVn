@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Globalization;
@@ -132,12 +133,32 @@ internal sealed class SqlTestDatabase : IDisposable
             using var connection = _connectionFactory(ConnectionString);
             await connection.OpenAsync(token).ConfigureAwait(false);
             await VerifyOwnershipAsync(connection, token).ConfigureAwait(false);
-            control.WriteVerifiedRecord(DatabaseName, _serverName, _identity.Id, _identity.CreateDate,
-                _ownershipToken, _guiAllocation, DateTimeOffset.UtcNow);
-            _ownershipManifest = control;
+            SealOriginalOwnership(control);
         }
         catch { throw new InvalidOperationException("Live allocation ownership/manifest seal was not confirmed; retain private control."); }
         finally { Volatile.Write(ref _manifestWriter, 0); }
+    }
+
+    private void SealOriginalOwnership(SqlTestOwnershipManifest control)
+    {
+        control.WriteVerifiedRecord(DatabaseName, _serverName, _identity.Id, _identity.CreateDate,
+            _ownershipToken, _guiAllocation, DateTimeOffset.UtcNow);
+        _ownershipManifest = control;
+    }
+
+    internal IReadOnlyDictionary<string, object> OriginalCutoverOwnership(SqlTestOwnershipManifest control)
+    {
+        if (!ReferenceEquals(control, _ownershipManifest))
+            throw new InvalidOperationException("Cutover ownership was not delivered to this control.");
+        control.Verify();
+        return new Dictionary<string, object>
+        {
+            ["databaseName"] = DatabaseName,
+            ["serverName"] = _serverName,
+            ["databaseId"] = _identity.Id,
+            ["createdAt"] = _identity.CreateDate.ToString("O", CultureInfo.InvariantCulture),
+            ["originalToken"] = _ownershipToken,
+        };
     }
 
     internal async Task CompleteOwnershipManifestAsync(SqlTestOwnershipManifest control, CancellationToken token)
@@ -184,12 +205,20 @@ internal sealed class SqlTestDatabase : IDisposable
         return CreateCoreAsync(adminConnectionString, cancellationToken, value => new SqlConnection(value), _ => { }, guiAllocation: false, beforeCreate: beforeCreate);
     }
 
+    // The caller supplied a create-new private intent writer and retains uncertainty.
+    // Deliver a database only after the original live tuple has been durably sealed.
+    internal static Task<SqlTestDatabase> CreateWithRetainedOwnershipAsync(string adminConnectionString,
+        SqlTestOwnershipManifest control, Action<string, string, string> sealIntent, CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(adminConnectionString, cancellationToken, value => new SqlConnection(value), _ => { },
+            guiAllocation: false, retainedControl: control, sealIntent: sealIntent);
+
     private static async Task<SqlTestDatabase> CreateCoreAsync(
         string adminConnectionString,
         CancellationToken cancellationToken,
         Func<string, SqlConnection> connectionFactory,
         Action<string> afterCreate,
-        bool guiAllocation, Action<string>? beforeCreate = null)
+        bool guiAllocation, Action<string>? beforeCreate = null,
+        SqlTestOwnershipManifest? retainedControl = null, Action<string, string, string>? sealIntent = null)
     {
         var normalizedConnectionString = NormalizeAdminConnectionString(adminConnectionString);
         if (connectionFactory is null)
@@ -218,6 +247,7 @@ internal sealed class SqlTestDatabase : IDisposable
             await connection.OpenAsync(token).ConfigureAwait(false);
             var serverName = await ReadInstanceAsync(connection, token).ConfigureAwait(false);
 
+            sealIntent?.Invoke(databaseName, serverName, ownershipToken);
             createAttempted = true;
             using (var create = CreateCommand(connection, $"CREATE DATABASE [{databaseName}];"))
             {
@@ -250,11 +280,15 @@ internal sealed class SqlTestDatabase : IDisposable
                 ownershipToken,
                 identity.Value,
                 guiAllocation);
+            if (retainedControl != null)
+                database.SealOriginalOwnership(retainedControl);
             afterCreate(databaseName);
             return database;
         }
         catch (Exception provisioningError)
         {
+            if (retainedControl != null)
+                throw new InvalidOperationException("Cutover allocation or ownership delivery failed. Retain its control and any sealed intent.", provisioningError);
             if (database is not null)
             {
                 try
@@ -282,8 +316,13 @@ internal sealed class SqlTestDatabase : IDisposable
     }
 
     // Validate the actual reset connection, not just a name or connection-string target.
-    internal async Task VerifyOwnershipAsync(SqlConnection connection, CancellationToken cancellationToken)
+    internal Task VerifyOwnershipAsync(SqlConnection connection, CancellationToken cancellationToken) =>
+        VerifyOwnershipAsync(connection, 30, cancellationToken);
+
+    internal async Task VerifyOwnershipAsync(SqlConnection connection, int commandTimeout, CancellationToken cancellationToken)
     {
+        if (commandTimeout <= 0 || commandTimeout > 30) throw new ArgumentOutOfRangeException(nameof(commandTimeout));
+        cancellationToken.ThrowIfCancellationRequested();
         if (Volatile.Read(ref _disposeState) != 0)
         {
             throw new InvalidOperationException("The SQL test allocation is disposing or disposed.");
@@ -301,6 +340,7 @@ internal sealed class SqlTestDatabase : IDisposable
             "(SELECT CONVERT(nvarchar(128),value) FROM sys.extended_properties " +
             "WHERE class=0 AND name=N'MyDmsVn.TestOwnership') " +
             "FROM sys.databases WHERE database_id=DB_ID();");
+        command.CommandTimeout = commandTimeout;
         using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ||
             reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(4) ||
@@ -727,6 +767,12 @@ internal sealed class SqlTestOwnershipManifest : IDisposable
     {
         try { VerifyCore(); }
         catch { throw new IOException("Private allocation manifest identity or content changed; retain control root."); }
+    }
+
+    internal string VerifiedDigest()
+    {
+        Verify();
+        return SqlTestPrivateRecord.Hash(_sealed!);
     }
 
     private void VerifyCore()

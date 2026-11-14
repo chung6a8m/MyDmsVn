@@ -4,27 +4,107 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+#if WEB6_SECURITY
+using System.Runtime.ExceptionServices;
+#endif
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 
+#if WEB6_BOOTSTRAP
+using CutoverBudgets = MyDmsVn.Web6.CandidateBootstrap.Web6CutoverBudgets;
+#elif WEB6_SECURITY
+using CutoverBudgets = MyDmsVn.Server.Infrastructure.IntegrationTests.Web6CutoverBudgets;
+#endif
+
+#if WEB6_BOOTSTRAP
+namespace MyDmsVn.Web6.CandidateBootstrap.Processes
+#else
 namespace MyDmsVn.Desktop.Tests
+#endif
 {
     internal static class GuiOwnedProcess
     {
         public const int OutputLimit = 32768;
         private static readonly TimeSpan CleanupBudget = TimeSpan.FromSeconds(5);
 
+#if WEB6_SECURITY
+        public static Task<GuiProcessResult> RunPairedGitAsync(ProcessStartInfo start, TimeSpan timeout,
+            CancellationToken cancellationToken, Encoding stdoutEncoding)
+            => RunCoreAsync(start, timeout, TimeSpan.FromSeconds(10), cancellationToken, stdoutEncoding: stdoutEncoding,
+                strictCompletion: true, pairedGit: true);
+
+        internal static async Task JoinPairedGitAsync(Func<Task> terminateAndJoin, Task output, Task error)
+        {
+            Exception? termination = null;
+            try { await terminateAndJoin().ConfigureAwait(false); }
+            catch (Exception failure) { termination = failure; }
+            try
+            {
+                await Task.WhenAll(output, error).ConfigureAwait(false);
+            }
+            catch (Exception drain) when (termination != null)
+            {
+                throw new AggregateException(termination, drain);
+            }
+            if (termination != null) ExceptionDispatchInfo.Capture(termination).Throw();
+        }
+#endif
+
         public static Task<GuiProcessResult> RunAsync(ProcessStartInfo start, TimeSpan timeout, CancellationToken cancellationToken = default, Action<int>? started = null)
             => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(5), cancellationToken, started);
 
         // Human walkthroughs use an explicit longer budget with the same job, fail-stop and drain policy.
-        public static Task<GuiProcessResult> RunAttendedAsync(ProcessStartInfo start, TimeSpan timeout, CancellationToken cancellationToken = default)
-            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(30), cancellationToken);
+        public static Task<GuiProcessResult> RunAttendedAsync(ProcessStartInfo start, TimeSpan timeout,
+            CancellationToken cancellationToken = default, Encoding? stdoutEncoding = null)
+            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(30), cancellationToken, stdoutEncoding: stdoutEncoding);
 
-        private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout, CancellationToken cancellationToken, Action<int>? started = null)
+        // Only the protected WEB6 pair callers use this exception. Ordinary 5m
+        // and attended 30m ceilings and all job/drain/poison behavior stay intact.
+        public static Task<GuiProcessResult> RunWeb6CandidatePairAsync(ProcessStartInfo start, TimeSpan timeout,
+            bool selectorProcess, CancellationToken cancellationToken = default)
+            => RunCoreAsync(start, timeout, TimeSpan.FromMinutes(selectorProcess ? 44 : 41), cancellationToken);
+
+#if WEB6_BOOTSTRAP || WEB6_SECURITY
+        // Extracted observation seam; the same decision path is used by the cutover runner.
+        internal static async Task<(string Reason, Exception Error)?> ObserveCutoverRoot(Func<bool> rootExited,
+            Func<TimeSpan> elapsed, TimeSpan timeout, CancellationToken token, Func<Task> poll)
+        {
+            while (true)
+            {
+                var exited = rootExited();
+                var failure = CheckCutoverCompletion(elapsed, timeout, token);
+                if (failure != null) return failure;
+                if (exited) return null;
+                await poll().ConfigureAwait(false);
+            }
+        }
+
+        internal static (string Reason, Exception Error)? CheckCutoverCompletion(Func<TimeSpan> elapsed, TimeSpan timeout, CancellationToken token)
+        {
+            if (token.IsCancellationRequested) return ("Canceled", new OperationCanceledException(token));
+            if (elapsed() >= timeout) return ("TimedOut", new TimeoutException("Owned child work deadline."));
+            return null;
+        }
+
+        // Exact protected cutover callers only. The selector's extra minute is
+        // termination/output join, never execution time; all other routes retain 5s cleanup.
+        public static Task<GuiProcessResult> RunWeb6CutoverAsync(ProcessStartInfo start, TimeSpan timeout,
+            bool selectorProcess, CancellationToken cancellationToken = default)
+            => RunCoreAsync(start, timeout, selectorProcess ? CutoverBudgets.SelectorGate : CutoverBudgets.BrowserPack, cancellationToken,
+                cleanupBudget: selectorProcess ? CutoverBudgets.SelectorProcessMaximum - CutoverBudgets.SelectorGate : CleanupBudget,
+                strictCompletion: true);
+#endif
+
+        private static async Task<GuiProcessResult> RunCoreAsync(ProcessStartInfo start, TimeSpan timeout, TimeSpan maximumTimeout,
+            CancellationToken cancellationToken, Action<int>? started = null, Encoding? stdoutEncoding = null, TimeSpan? cleanupBudget = null,
+            bool strictCompletion = false
+#if WEB6_SECURITY
+            , bool pairedGit = false
+#endif
+            )
         {
             GuiTestSafety.ThrowIfPoisoned();
             cancellationToken.ThrowIfCancellationRequested();
@@ -34,7 +114,11 @@ namespace MyDmsVn.Desktop.Tests
                 throw new ArgumentException("GUI child requires an existing absolute executable and UseShellExecute=false.", nameof(start));
 
             var clock = Stopwatch.StartNew();
-            using (var child = NativeChild.Start(start))
+            using (var child = NativeChild.Start(start, stdoutEncoding
+#if WEB6_SECURITY
+                , pairedGit
+#endif
+                ))
             {
                 var outputCapture = new GuiOutputCapture();
                 var errorCapture = new GuiOutputCapture();
@@ -46,6 +130,15 @@ namespace MyDmsVn.Desktop.Tests
                 try
                 {
                     started?.Invoke(child.ProcessId);
+#if WEB6_BOOTSTRAP || WEB6_SECURITY
+                    if (strictCompletion)
+                    {
+                        var observed = await ObserveCutoverRoot(() => child.RootExited, () => clock.Elapsed, timeout,
+                            cancellationToken, () => Task.Delay(20)).ConfigureAwait(false);
+                        if (observed is { } failure) { reason = failure.Reason; initial = failure.Error; }
+                    }
+                    else
+#endif
                     while (!child.RootExited)
                     {
                         if (cancellationToken.IsCancellationRequested)
@@ -85,21 +178,29 @@ namespace MyDmsVn.Desktop.Tests
                 }
 
                 Exception? cleanup = null;
+                var teardown = cleanupBudget ?? CleanupBudget;
                 var cleanupClock = Stopwatch.StartNew();
                 try
                 {
-                    child.Terminate();
-                    while (child.ActiveProcesses != 0 || !child.RootExited)
+#if WEB6_SECURITY
+                    if (pairedGit)
+                        await JoinPairedGitAsync(child.TerminateAndJoinPairedGitAsync, output, error).ConfigureAwait(false);
+                    else
+#endif
                     {
-                        if (cleanupClock.Elapsed >= CleanupBudget)
-                            throw new TimeoutException("Owned GUI process tree did not drain within the cleanup budget.");
-                        await Task.Delay(20).ConfigureAwait(false);
+                        child.Terminate();
+                        while (child.ActiveProcesses != 0 || !child.RootExited)
+                        {
+                            if (cleanupClock.Elapsed >= teardown)
+                                throw new TimeoutException("Owned GUI process tree did not drain within the cleanup budget.");
+                            await Task.Delay(20).ConfigureAwait(false);
+                        }
+                        var drains = Task.WhenAll(output, error);
+                        var remaining = teardown - cleanupClock.Elapsed;
+                        if (remaining <= TimeSpan.Zero || await Task.WhenAny(drains, Task.Delay(remaining)).ConfigureAwait(false) != drains)
+                            throw new TimeoutException("Owned stdout/stderr did not reach EOF after process-tree termination.");
+                        await drains.ConfigureAwait(false);
                     }
-                    var drains = Task.WhenAll(output, error);
-                    var remaining = CleanupBudget - cleanupClock.Elapsed;
-                    if (remaining <= TimeSpan.Zero || await Task.WhenAny(drains, Task.Delay(remaining)).ConfigureAwait(false) != drains)
-                        throw new TimeoutException("Owned stdout/stderr did not reach EOF after process-tree termination.");
-                    await drains.ConfigureAwait(false);
                 }
                 catch (Exception exception)
                 {
@@ -109,6 +210,14 @@ namespace MyDmsVn.Desktop.Tests
 
                 var stdout = outputCapture.Snapshot();
                 var stderr = errorCapture.Snapshot();
+#if WEB6_BOOTSTRAP || WEB6_SECURITY
+                // Teardown may use its reserve, but cannot turn late completion/cancellation into success.
+                if (strictCompletion && initial == null)
+                {
+                    var completion = CheckCutoverCompletion(() => clock.Elapsed, timeout, cancellationToken);
+                    if (completion is { } failure) { reason = failure.Reason; initial = failure.Error; }
+                }
+#endif
                 if (initial != null || cleanup != null)
                 {
                     var cause = initial == null ? cleanup! : cleanup == null ? initial : new AggregateException(initial, cleanup);
@@ -171,7 +280,30 @@ namespace MyDmsVn.Desktop.Tests
 
             public void Terminate() => Check(TerminateJobObject(_job, 0xe001));
 
-            public static NativeChild Start(ProcessStartInfo start)
+#if WEB6_SECURITY
+            public async Task TerminateAndJoinPairedGitAsync()
+            {
+                // Retain the exact job/process handles. A failed termination request is retried
+                // against that same job while the root or any descendant remains active.
+                while (true)
+                {
+                    if (PairedGitExited(_job, _process)) return;
+                    _ = TerminateJobObject(_job, 0xe001);
+                    await Task.Delay(20).ConfigureAwait(false);
+                }
+            }
+
+            private static bool PairedGitExited(KernelHandle job, KernelHandle process) =>
+                WaitForSingleObject(process, 0) == 0 &&
+                QueryInformationJobObject(job, 1, out var accounting, Marshal.SizeOf<JobAccounting>(), IntPtr.Zero) &&
+                accounting.ActiveProcesses == 0;
+#endif
+
+            public static NativeChild Start(ProcessStartInfo start, Encoding? stdoutEncoding
+#if WEB6_SECURITY
+                , bool pairedGit
+#endif
+                )
             {
                 var job = CreateJobObject(IntPtr.Zero, null);
                 KernelHandle? process = null;
@@ -188,7 +320,7 @@ namespace MyDmsVn.Desktop.Tests
                     Check(CreatePipe(out var outputRead, out var outputWrite, ref security, 0));
                     using (outputWrite)
                     {
-                        output = Reader(outputRead);
+                        output = Reader(outputRead, stdoutEncoding);
                         Check(CreatePipe(out var errorRead, out var errorWrite, ref security, 0));
                         using (errorWrite)
                         using (var input = CreateFile("NUL", 0x80000000, 3, ref security, 3, 0, IntPtr.Zero))
@@ -232,8 +364,22 @@ namespace MyDmsVn.Desktop.Tests
                     {
                         if (process != null)
                         {
-                            Check(assigned ? TerminateJobObject(job, 0xe001) : TerminateProcess(process, 0xe001));
-                            if (WaitForSingleObject(process, 5000) != 0) throw new TimeoutException("Failed launch did not drain.");
+#if WEB6_SECURITY
+                            if (pairedGit)
+                            {
+                                // Before assignment the exact root is still suspended and cannot spawn children.
+                                while (assigned ? !PairedGitExited(job, process) : WaitForSingleObject(process, 0) != 0)
+                                {
+                                    _ = assigned ? TerminateJobObject(job, 0xe001) : TerminateProcess(process, 0xe001);
+                                    Thread.Sleep(20);
+                                }
+                            }
+                            else
+#endif
+                            {
+                                Check(assigned ? TerminateJobObject(job, 0xe001) : TerminateProcess(process, 0xe001));
+                                if (WaitForSingleObject(process, 5000) != 0) throw new TimeoutException("Failed launch did not drain.");
+                            }
                         }
                     }
                     catch (Exception cleanup)
@@ -252,12 +398,13 @@ namespace MyDmsVn.Desktop.Tests
                 }
             }
 
-            private static StreamReader Reader(SafeFileHandle handle)
+            private static StreamReader Reader(SafeFileHandle handle, Encoding? encoding = null)
             {
                 try
                 {
                     Check(SetHandleInformation(handle, 1, 0));
-                    return new StreamReader(new FileStream(handle, FileAccess.Read, 4096, false), Encoding.UTF8);
+                    return new StreamReader(new FileStream(handle, FileAccess.Read, 4096, false), encoding ?? Encoding.UTF8,
+                        detectEncodingFromByteOrderMarks: encoding == null);
                 }
                 catch { handle.Dispose(); throw; }
             }

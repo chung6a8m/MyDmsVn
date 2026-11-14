@@ -7,12 +7,14 @@ using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Desktop.Tests;
 using MyDmsVn.Server.Application.Operations;
 using MyDmsVn.Server.Application.Security;
 using MyDmsVn.Server.DbMigrator;
+using MyDmsVn.Server.Infrastructure.Identity;
 using MyDmsVn.Server.Infrastructure.Operations;
 using MyDmsVn.Testing.Sql;
 using MyDmsVn.WebOperation.Operator;
@@ -144,6 +146,7 @@ internal sealed class Web6MaintenanceRecoveryFixture
         }
     }
     private readonly string _admin, _root, _clone = SqlTestDatabaseName.Create();
+    private readonly Web6PrivateDirectoryLease _rootLease;
     private readonly SecurityIdentifier _user, _service;
     private readonly DateTime _directoryCreated;
     private readonly string _marker = Guid.NewGuid().ToString("N");
@@ -151,6 +154,7 @@ internal sealed class Web6MaintenanceRecoveryFixture
     private readonly byte[] _fingerprint = Enumerable.Repeat((byte)7, 32).ToArray();
     private readonly List<string> _phases = new List<string>();
     private readonly List<Principal> _principals = new List<Principal>();
+    private readonly List<(string Name, string Type)> _backupFiles = new List<(string, string)>();
     private readonly Dictionary<string, (DateTime Created, string Hash)> _files = new Dictionary<string, (DateTime, string)>(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTime> _directories = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
     private readonly Admission _admission;
@@ -164,9 +168,9 @@ internal sealed class Web6MaintenanceRecoveryFixture
     private bool _cloneCreated, _done, _started, _failureReturned;
     private Failure _requestedFailure;
     private TestCleanupAuthorization? _testCleanup;
-    private int _actor;
+    private int _actor, _customer, _warehouse, _employee, _product, _receiptProduct;
     private Guid _oldEpoch, _newEpoch;
-    private Principal? _runtime, _maintenance;
+    private Principal? _sourceRuntime, _runtime, _maintenance;
     private readonly Result _result = new Result();
     private string Backup => Path.Combine(_root, "source.bak");
     private string Data => Path.Combine(_root, "clone.mdf");
@@ -174,11 +178,34 @@ internal sealed class Web6MaintenanceRecoveryFixture
     internal string ManifestPath => Path.Combine(_root, "ownership.json");
     internal bool TestCleanupResourcesAbsent { get; private set; }
     private string CloneConnection => new SqlConnectionStringBuilder(_admin) { InitialCatalog = _clone }.ConnectionString;
+    internal string LiveRuntimeConnectionString => _runtime?.Connection(CloneConnection) ?? throw new InvalidOperationException("Recovery runtime principal is not provisioned.");
+    internal string LiveSourceRuntimeConnectionString => _sourceRuntime?.Connection(_source?.ConnectionString ?? throw new InvalidOperationException("Recovery source is absent.")) ?? throw new InvalidOperationException("Recovery source runtime principal is not provisioned.");
+    internal string LiveObserverConnectionString => CloneConnection;
+    internal string SourceDatabaseIdentity => _sourceName;
+    internal IReadOnlyList<string> LivePrincipalNames => _principals.Select(principal => principal.Name).ToArray();
+    internal string DestinationDatabaseIdentity => _clone;
+    internal string SourceRuntimePrincipal => _sourceRuntime?.Name ?? throw new InvalidOperationException("Recovery source runtime principal is not provisioned.");
+    internal string RestoredRuntimePrincipal => _runtime?.Name ?? throw new InvalidOperationException("Recovery runtime principal is not provisioned.");
+    internal Guid SourceEpoch => _oldEpoch;
+    internal Guid RestoredEpoch => _newEpoch;
+    internal Guid OldSession => _oldSession;
+    internal Guid OldCommittedOperation => _draft;
+    internal byte[] OldFingerprint => (byte[])_fingerprint.Clone();
+    internal int CustomerId => _customer;
+    internal int WarehouseId => _warehouse;
+    internal int EmployeeId => _employee;
+    internal int ProductId => _product;
+    internal int ReceiptProductId => _receiptProduct;
+    internal string BackupPath => Backup;
+    internal string BackupSha256 { get { VerifySealed(Backup); return _files[Backup].Hash; } }
+    internal string LiveOwnershipReceiptSha256 { get { VerifyManifest(); return HashFile(ManifestPath); } }
+    internal Web6RecoveryOracleSnapshot? SourceRecoverySnapshot { get; private set; }
+    internal Web6RecoveryOracleSnapshot? RestoredRecoverySnapshot { get; private set; }
 
-    private Web6MaintenanceRecoveryFixture(string admin, string root, SecurityIdentifier user, SecurityIdentifier service)
+    private Web6MaintenanceRecoveryFixture(string admin, Web6PrivateDirectoryLease rootLease, SecurityIdentifier user, SecurityIdentifier service)
     {
-        _admin = admin; _root = root; _user = user; _service = service;
-        _directoryCreated = Directory.GetCreationTimeUtc(root);
+        _admin = admin; _rootLease = rootLease; _root = rootLease.Path; _user = user; _service = service;
+        _directoryCreated = Directory.GetCreationTimeUtc(_root);
         _admission = new Admission(ManifestPath);
     }
     internal static void EnsureDistinctNames(string source, string clone)
@@ -192,6 +219,9 @@ internal sealed class Web6MaintenanceRecoveryFixture
         Web5BackupFixture.EnsureNewDevice(path);
     }
     internal static async Task<Web6MaintenanceRecoveryFixture> CreateAsync()
+        => await CreateAsync(Path.Combine(Path.GetTempPath(), "web6-recovery-" + Guid.NewGuid().ToString("N")));
+
+    internal static async Task<Web6MaintenanceRecoveryFixture> CreateAsync(string root)
     {
         var options = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable(SqlTestDatabase.ConnectionStringEnvironmentVariable))
         { Pooling = false, ConnectRetryCount = 0, ConnectTimeout = 15 };
@@ -203,12 +233,107 @@ internal sealed class Web6MaintenanceRecoveryFixture
         var account = await sql.QuerySingleAsync<string>("SELECT service_account FROM sys.dm_server_services WHERE servicename=N'SQL Server ('+CONVERT(nvarchar(128),@@SERVICENAME)+N')';");
         var service = (SecurityIdentifier)new NTAccount(account).Translate(typeof(SecurityIdentifier));
         using var identity = WindowsIdentity.GetCurrent();
-        var root = Path.Combine(Path.GetTempPath(), "web6-recovery-" + Guid.NewGuid().ToString("N"));
+        root = Path.GetFullPath(root);
         Web5BackupFixture.EnsureNewDevice(root);
-        CreatePrivateDirectory(root, identity.User!, service);
-        var fixture = new Web6MaintenanceRecoveryFixture(options.ConnectionString, root, identity.User!, service);
+        var rootLease = Web6PrivateDirectoryLease.CreateNew(root, service);
+        var fixture = new Web6MaintenanceRecoveryFixture(options.ConnectionString, rootLease, identity.User!, service);
         fixture.Record("allocated-private-directory");
         return fixture;
+    }
+
+    internal async Task PrepareForLiveServiceAsync()
+    {
+        await PrepareSourceForLiveServiceAsync();
+        await BackupLiveSourceAsync();
+        await RestoreLiveDestinationAsync();
+        await VerifyLiveRestoreOracleAsync();
+        await RotateLiveEpochAsync();
+        await ProvisionLiveDestinationAsync();
+    }
+
+    internal async Task PrepareSourceForLiveServiceAsync()
+    {
+        if (_started) throw new InvalidOperationException("One recovery attempt only.");
+        _started = true;
+        _source = await SqlTestDatabase.CreateForSupervisorAsync(_admin, name => { _sourceName = name; EnsureDistinctNames(name, _clone); Record("source-create-intent"); });
+        using (var source = new SqlConnection(_source.ConnectionString))
+        {
+            await source.OpenAsync(); await _source.VerifyOwnershipAsync(source, default);
+            _server = await source.QuerySingleAsync<string>("SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName'));");
+            _adminLogin = await source.QuerySingleAsync<string>("SELECT ORIGINAL_LOGIN();");
+            _sourceIdentity = await ReadIdentity(source, _sourceName);
+            _sourcePaths = (await source.QueryAsync<string>("SELECT physical_name FROM sys.database_files ORDER BY file_id;")).ToArray();
+            _sourceToken = await source.QuerySingleAsync<string>("SELECT CONVERT(nvarchar(128),value) FROM sys.extended_properties WHERE class=0 AND name=N'MyDmsVn.TestOwnership';");
+        }
+        Record("source-owned");
+        if (!new DatabaseMigrationRunner().MigrateWeb5(_source.ConnectionString).Successful) throw new InvalidOperationException("Schema13 migration failed.");
+        using (var source = new SqlConnection(_source.ConnectionString))
+        {
+            await source.OpenAsync(); await Seed(source);
+            _sourceRuntime = new Principal(); _principals.Add(_sourceRuntime);
+            await _sourceRuntime.Create(source);
+            await source.ExecuteAsync("CREATE USER [Web6RecoverySourceMigration] WITHOUT LOGIN;");
+            await source.ExecuteAsync(ReadScript("Provision-MyDmsVnWebPrincipals.sql")
+                .Replace("$(WebRuntimeUser)", _sourceRuntime.Name).Replace("$(MigrationUser)", "Web6RecoverySourceMigration"));
+            _sourceOracle = await Snapshot(source);
+            SourceRecoverySnapshot = await RecoverySnapshot(source);
+        }
+        _newEpoch = Guid.NewGuid();
+        _runtime = new Principal();
+        Record("source-candidate-ready");
+    }
+
+    internal async Task BackupLiveSourceAsync()
+    {
+        await VerifyDrain(); Record("source-drained");
+        await BackupOnly(Failure.None);
+    }
+
+    internal Task RestoreLiveDestinationAsync() => RestoreOnly(Failure.None);
+
+    internal async Task VerifyLiveRestoreOracleAsync()
+    {
+        using (var clone = new SqlConnection(CloneConnection))
+        {
+            await clone.OpenAsync(); await VerifyClone(clone);
+            Assert.True((await SqlWeb5SchemaCompatibilityChecker.CheckConnectionAsync(clone, default)).IsCompatible);
+            Assert.Equal(_sourceOracle, await Snapshot(clone));
+            RestoredRecoverySnapshot = await RecoverySnapshot(clone);
+            _result.PhysicalOracleMatched = true; _admission.OracleVerified(); Record("clone-oracle-verified");
+        }
+    }
+
+    internal async Task RotateLiveEpochAsync()
+    {
+        using var clone = new SqlConnection(CloneConnection); await clone.OpenAsync(); await VerifyClone(clone);
+        var changed = await clone.ExecuteAsync("UPDATE dbo.WebDeploymentState SET DeploymentEpoch=@next,RotatedAtUtc=SYSUTCDATETIME() WHERE Id=1 AND DeploymentEpoch=@previous;",
+            new { next = _newEpoch, previous = _oldEpoch });
+        _admission.Rotated(changed); _result.EpochRotations++; Record("clone-epoch-rotated");
+        await clone.ExecuteAsync("UPDATE dbo.WebAuthSessions SET RevokedAtUtc=SYSUTCDATETIME() WHERE SessionId=@oldSession; DELETE dbo.RolePermissions WHERE RoleId IN(SELECT RoleId FROM dbo.UserRoles WHERE UserId=@actor); ALTER LOGIN [" + _sourceRuntime!.Name + "] DISABLE;",
+            new { oldSession = _oldSession, actor = _actor });
+    }
+
+    internal async Task ProvisionLiveDestinationAsync()
+    {
+        using (var clone = new SqlConnection(CloneConnection)) { await clone.OpenAsync(); await Provision(clone, Failure.None); }
+        _admission.PrincipalsVerified(); Record("fresh-principals-verified");
+        await InspectRecovered();
+    }
+
+    internal void AdmitLiveService() { _admission.Admit(); Record("service-host-admitted"); }
+
+    internal async Task<IWeb6RecoveryCleanup> PrepareLiveCleanupAsync()
+    {
+        await VerifyDrain();
+        _admission.Drained(); Record("all-workers-sessions-drained");
+        _admission.Cleanup(ManifestPath, () => _result.NormalCleanupCommands++);
+        return await PrepareOwnedCleanup();
+    }
+    internal void RetainLiveEvidence() => _rootLease.Dispose();
+    internal async Task<string> LiveEffectSnapshotAsync(CancellationToken token)
+    {
+        using var sql = new SqlConnection(CloneConnection); await sql.OpenAsync(token); await VerifyClone(sql);
+        return await Snapshot(sql);
     }
     internal async Task<Result> RunAsync(Failure failure)
     {
@@ -295,6 +420,11 @@ internal sealed class Web6MaintenanceRecoveryFixture
     }
     private async Task BackupAndRestore(Failure failure)
     {
+        await BackupOnly(failure);
+        await RestoreOnly(failure);
+    }
+    private async Task BackupOnly(Failure failure)
+    {
         VerifyDirectory(); EnsureNewPath("backup", Backup); EnsureNewPath("data", Data); EnsureNewPath("log", Log);
         using (new FileStream(Backup, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { }
         Seal(Backup); Record("backup-start");
@@ -326,14 +456,19 @@ internal sealed class Web6MaintenanceRecoveryFixture
             await ExpectInjectedSqlFault(Failure.Checksum,
                 () => master.ExecuteAsync(new SqlTestCommand("RESTORE VERIFYONLY FROM DISK=@backup WITH CHECKSUM;", new { backup = Backup }, commandTimeout: 120)),
                 new[] { 3189, 3013 }, new[] { 3183, 3013 });
-        var files = new List<(string Name, string Type)>();
+        _backupFiles.Clear();
         using (var list = master.CreateCommand())
         {
             list.CommandText = "RESTORE FILELISTONLY FROM DISK=@backup;"; list.CommandTimeout = 120; list.Parameters.AddWithValue("@backup", Backup);
             using var reader = await list.ExecuteReaderAsync();
-            while (await reader.ReadAsync()) files.Add((reader.GetString(reader.GetOrdinal("LogicalName")), reader.GetString(reader.GetOrdinal("Type"))));
+            while (await reader.ReadAsync()) _backupFiles.Add((reader.GetString(reader.GetOrdinal("LogicalName")), reader.GetString(reader.GetOrdinal("Type"))));
         }
-        if (files.Count != 2 || files.Count(x => x.Type == "D") != 1 || files.Count(x => x.Type == "L") != 1) throw new InvalidOperationException("Unsupported owned backup layout.");
+        if (_backupFiles.Count != 2 || _backupFiles.Count(x => x.Type == "D") != 1 || _backupFiles.Count(x => x.Type == "L") != 1) throw new InvalidOperationException("Unsupported owned backup layout.");
+    }
+    private async Task RestoreOnly(Failure failure)
+    {
+        if (_backupFiles.Count != 2) throw new InvalidOperationException("Verified backup file list is absent.");
+        using var master = new SqlConnection(_admin); await master.OpenAsync(); await VerifyMaster(master);
         if (await master.QuerySingleAsync<int>("SELECT COUNT(*) FROM sys.databases WHERE name=@name;", new { name = _clone }) != 0) throw new InvalidOperationException("Clone already exists.");
         VerifyDirectory(); VerifySealed(Backup); EnsureNewPath("data", Data); EnsureNewPath("log", Log); Record("restore-start");
         if (failure == Failure.Restore)
@@ -345,7 +480,7 @@ internal sealed class Web6MaintenanceRecoveryFixture
                     new { backup = Backup }, commandTimeout: 120)), new[] { 3287, 3013 });
         }
         await master.ExecuteAsync(new SqlTestCommand("RESTORE DATABASE [" + _clone + "] FROM DISK=@backup WITH CHECKSUM,MOVE @dataName TO @data,MOVE @logName TO @log;",
-            new { backup = Backup, dataName = files.Single(x => x.Type == "D").Name, data = Data, logName = files.Single(x => x.Type == "L").Name, log = Log }, commandTimeout: 120));
+            new { backup = Backup, dataName = _backupFiles.Single(x => x.Type == "D").Name, data = Data, logName = _backupFiles.Single(x => x.Type == "L").Name, log = Log }, commandTimeout: 120));
         _cloneIdentity = await ReadIdentity(master, _clone);
         _dataCreated = File.GetCreationTimeUtc(Data); _logCreated = File.GetCreationTimeUtc(Log);
         _cloneCreated = true;
@@ -356,11 +491,15 @@ internal sealed class Web6MaintenanceRecoveryFixture
         await sql.ExecuteAsync("EXEC sys.sp_addextendedproperty @name=N'Web6RecoveryOwner',@value=@marker;", new { marker = _marker });
         _oldEpoch = await sql.QuerySingleAsync<Guid>("SELECT DeploymentEpoch FROM dbo.WebDeploymentState WHERE Id=1;");
         _actor = await sql.QuerySingleAsync<int>("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) OUTPUT INSERTED.UserId VALUES(N'recovery',N'RECOVERY',N'Recovery',N'Local',N'hash',N'',N'BCrypt');");
+        await sql.ExecuteAsync("INSERT dbo.Users(Username,NormalizedUsername,DisplayName,Source,PasswordHash,PasswordSalt,PasswordAlgorithm) VALUES(N'web.smoke',N'WEB.SMOKE',N'Web smoke',N'Local',@hash,N'',N'BCrypt'); INSERT dbo.SystemSecuritySettings(Id,SuperuserUserId,BoundNormalizedUsername) SELECT 1,UserId,N'WEB.SMOKE' FROM dbo.Users WHERE NormalizedUsername=N'WEB.SMOKE';",
+            new { hash = new BcryptPasswordHasher().Hash("IisSmoke_test-only-password_2026!") });
         await sql.ExecuteAsync(@"
 INSERT dbo.Roles(RoleName,NormalizedRoleName) VALUES(N'recovery',N'RECOVERY'); DECLARE @r int=SCOPE_IDENTITY();
 INSERT dbo.UserRoles(UserId,RoleId) VALUES(@actor,@r); INSERT dbo.RolePermissions(RoleId,PermissionKey) VALUES(@r,N'Sales.Receipts.Write');
 DECLARE @now datetime2(7)=SYSUTCDATETIME(); INSERT dbo.WebAuthSessions VALUES(@session,@actor,@now,DATEADD(day,1,@now),DATEADD(day,1,@now),NULL);
 INSERT dbo.Products(Code,Name,Unit) VALUES(N'R5',N'Recovery',N'ea'); DECLARE @p int=SCOPE_IDENTITY();
+INSERT dbo.Products(Code,Name,Unit) VALUES(N'R5-SP',N'Recovery sales',N'ea'); DECLARE @sp int=SCOPE_IDENTITY();
+INSERT dbo.Products(Code,Name,Unit) VALUES(N'R5-RP',N'Recovery receipt',N'ea'); DECLARE @rp int=SCOPE_IDENTITY();
 INSERT dbo.Warehouses(Code,Name) VALUES(N'R5',N'Recovery'); DECLARE @w int=SCOPE_IDENTITY();
 INSERT dbo.Employees(Code,Name) VALUES(N'R5',N'Recovery'); DECLARE @e int=SCOPE_IDENTITY();
 INSERT dbo.Customers(Code,Name) VALUES(N'R5',N'Recovery'); DECLARE @c int=SCOPE_IDENTITY();
@@ -372,6 +511,7 @@ INSERT dbo.GoodsReceiptLines(ReceiptId,[LineNo],ProductId,Quantity,UnitCost,Crea
 INSERT dbo.StockLedger(WarehouseId,ProductId,DocumentType,DocumentId,DocumentLineId,QuantityChange,PostedAtUtc,PostedByUserId) VALUES(@w,@p,'GoodsReceipt',41,@line,10,@t,@actor);
 DECLARE @ledger bigint=SCOPE_IDENTITY(); INSERT dbo.StockValuationEntries VALUES(@ledger,20);
 INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@w,@p,10,20);
+INSERT dbo.StockBalances(WarehouseId,ProductId,Quantity,InventoryValue) VALUES(@w,@sp,1000,15000);
 SET IDENTITY_INSERT dbo.SalesReceipts ON;
 INSERT dbo.SalesReceipts(SaleId,SaleNo,SaleDate,WarehouseId,EmployeeId,CustomerId,Status,CreatedByUserId) VALUES(42,N'R5-D','20250101',@w,@e,@c,'Draft',@actor);
 SET IDENTITY_INSERT dbo.SalesReceipts OFF;
@@ -379,13 +519,19 @@ INSERT dbo.SalesReceiptLines(SaleId,[LineNo],ProductId,Qty,Unit,IsGift,LineAmoun
 INSERT dbo.WebOperationJournal VALUES(@actor,@post,@epoch,1,1,6,41,@hash,41,'EXPIRED',NULL,@t,@t,DATEADD(day,7,@t));
 INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'COMMITTED',0x7b7d,@t,@t,DATEADD(day,7,@t));",
             new { actor = _actor, session = _oldSession, epoch = _oldEpoch, post = _post, draft = _draft, hash = _fingerprint });
+        var catalog = await sql.QuerySingleAsync<(int Customer, int Warehouse, int Employee, int Product, int ReceiptProduct)>(
+            "SELECT (SELECT CustomerId FROM dbo.Customers WHERE Code=N'R5'),(SELECT WarehouseId FROM dbo.Warehouses WHERE Code=N'R5'),(SELECT EmployeeId FROM dbo.Employees WHERE Code=N'R5'),(SELECT ProductId FROM dbo.Products WHERE Code=N'R5-SP'),(SELECT ProductId FROM dbo.Products WHERE Code=N'R5-RP');");
+        _customer = catalog.Customer; _warehouse = catalog.Warehouse; _employee = catalog.Employee;
+        _product = catalog.Product; _receiptProduct = catalog.ReceiptProduct;
         Record("source-seeded");
     }
     private async Task Provision(SqlConnection sql, Failure failure)
     {
-        _runtime = new Principal(); var op = new Principal(); _maintenance = new Principal();
-        _principals.AddRange(new[] { _runtime, op, _maintenance }); Record("principals-create-intent");
-        foreach (var principal in _principals)
+        _runtime ??= new Principal(); var op = new Principal(); _maintenance = new Principal();
+        var fresh = new[] { _runtime, op, _maintenance };
+        foreach (var principal in fresh) if (!_principals.Contains(principal)) _principals.Add(principal);
+        Record("principals-create-intent");
+        foreach (var principal in fresh)
         {
             await principal.Create(sql); Record("principal-created");
             if (failure == Failure.PrincipalProvisioning)
@@ -399,7 +545,7 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
         await sql.ExecuteAsync(Script("Provision-MyDmsVnWebPrincipals.sql"));
         await sql.ExecuteAsync(Script("Provision-MyDmsVnWebOperationOperator.sql"));
         await sql.ExecuteAsync(Script("Provision-MyDmsVnWebOperationMaintenance.sql"));
-        foreach (var principal in _principals)
+        foreach (var principal in fresh)
         {
             using var probe = new SqlConnection(principal.Connection(CloneConnection)); await probe.OpenAsync();
             Assert.Equal(principal.Name, await probe.QuerySingleAsync<string>("SELECT ORIGINAL_LOGIN();"));
@@ -418,7 +564,7 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
             CreatePrivateDirectory(root, _user, new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
             _directories.Add(root, Directory.GetCreationTimeUtc(root));
         }
-        var evidence = new MaintenanceEvidenceStore(new MaintenanceEvidencePolicy(roots[0], roots[1], TimeSpan.FromDays(90)));
+        var evidence = new MaintenanceEvidenceStore(_rootLease.CreateEvidencePolicy(roots[0], roots[1]));
         Assert.True(CompactOptions.TryParse(Arguments("compact-preview", _draft), out var compact, out _));
         Assert.Equal(OperatorCompactionOutcome.NoChange, (await new SqlOperatorCompactionClient(factory).PreviewAsync(compact!, default)).Outcome);
         foreach (var operation in new[] { _post, _draft })
@@ -556,6 +702,13 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
     }
     private async Task CleanupOwned()
     {
+        using var cleanup = await PrepareOwnedCleanup();
+        await cleanup.DeleteSqlResources();
+        cleanup.DeleteEvidence();
+    }
+
+    private async Task<IWeb6RecoveryCleanup> PrepareOwnedCleanup()
+    {
         VerifyDirectory(); VerifyManifest(); await VerifyDrain();
         if (_source != null) await VerifySource();
         using var master = new SqlConnection(_admin); await master.OpenAsync();
@@ -571,38 +724,65 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
             await clone.OpenAsync(); await VerifyClone(clone);
             foreach (var principal in _principals) await principal.Verify(clone);
         }
-        foreach (var path in _files.Keys) VerifySealed(path);
-        foreach (var directory in _directories)
-            if (!Directory.Exists(directory.Key) || Directory.GetCreationTimeUtc(directory.Key) != directory.Value ||
-                (File.GetAttributes(directory.Key) & FileAttributes.ReparsePoint) != 0) throw new InvalidOperationException("Owned evidence directory changed.");
-        if (!Directory.GetDirectories(_root, "*", SearchOption.AllDirectories).OrderBy(x => x).SequenceEqual(_directories.Keys.OrderBy(x => x)))
-            throw new InvalidOperationException("Foreign directory retained.");
-        // Verify the intended deletion set first. Foreign children prevent cleanup.
-        var actualFiles = Directory.GetFiles(_root, "*", SearchOption.AllDirectories);
-        if (actualFiles.Any(path => path != ManifestPath && !_files.ContainsKey(path) && !(_cloneCreated && (path == Data || path == Log))))
-            throw new InvalidOperationException("Unowned child retained.");
-        if (_cloneCreated)
+        foreach (var principal in _principals) await principal.Verify(master);
+        // Verify destructive permissions now, before any resource is removed. Runtime
+        // credentials are never used for maintenance cleanup.
+        foreach (var name in new[] { _sourceName, _cloneCreated ? _clone : "" }.Where(name => name.Length > 0))
+            if (await master.QuerySingleAsync<int>("SELECT COALESCE(HAS_PERMS_BY_NAME(@name,'DATABASE','CONTROL'),0);", new { name }) != 1)
+                throw new InvalidOperationException("Database cleanup authority is unavailable.");
+        if (_principals.Count != 0 && await master.QuerySingleAsync<int>("SELECT COALESCE(HAS_PERMS_BY_NAME(NULL,NULL,'ALTER ANY LOGIN'),0);") != 1)
+            throw new InvalidOperationException("Principal cleanup authority is unavailable.");
+        var tree = _rootLease.PrepareCleanup(_cloneCreated ? new[] { Data, Log } : Array.Empty<string>());
+        try
         {
-            await master.ExecuteAsync("DROP DATABASE [" + _clone + "];");
-            _cloneCreated = false;
+            var seals = new Dictionary<string, (DateTime Created, string Hash)>(_files, StringComparer.OrdinalIgnoreCase);
+            if (_manifestHash != null) seals.Add(ManifestPath, (_manifestCreated, _manifestHash));
+            tree.VerifySeals(seals, _directories);
+            return new OwnedCleanup(this, tree);
         }
-        foreach (var principal in _principals) await principal.DropLogin(master);
-        if (_source != null) await _source.DisposeIfQuiescentAsync();
-        foreach (var name in new[] { _sourceName, _clone }.Where(x => x.Length > 0))
-            if (await master.QuerySingleAsync<int>("SELECT COUNT(*) FROM sys.databases WHERE name=@name;", new { name }) != 0) throw new InvalidOperationException("Database remains.");
-        if (File.Exists(Data) || File.Exists(Log)) throw new InvalidOperationException("Restored physical file remains.");
-        foreach (var path in _files.Keys) { VerifySealed(path); File.Delete(path); }
-        VerifyManifest(); File.Delete(ManifestPath);
-        foreach (var directory in _directories.Keys.OrderByDescending(x => x.Length))
+        catch { tree.Dispose(); throw; }
+    }
+
+    private sealed class OwnedCleanup : IWeb6RecoveryCleanup
+    {
+        private readonly Web6MaintenanceRecoveryFixture _owner;
+        private readonly Web6DirectoryCleanup _tree;
+        private bool _sqlRemoved;
+        internal OwnedCleanup(Web6MaintenanceRecoveryFixture owner, Web6DirectoryCleanup tree) { _owner = owner; _tree = tree; }
+        public void Verify() => _tree.Verify();
+        public async Task DeleteSqlResources()
         {
-            if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) throw new InvalidOperationException("Reparse child retained.");
-            Directory.Delete(directory, false);
+            Verify();
+            await _owner.VerifyDrain();
+            if (_owner._source != null) await _owner.VerifySource();
+            using var master = new SqlConnection(_owner._admin); await master.OpenAsync();
+            if (_owner._server.Length > 0) await _owner.VerifyMaster(master);
+            foreach (var principal in _owner._principals) await principal.Verify(master);
+            if (_owner._cloneCreated)
+            {
+                using (var clone = new SqlConnection(_owner.CloneConnection)) { await clone.OpenAsync(); await _owner.VerifyClone(clone); }
+                await master.ExecuteAsync("DROP DATABASE [" + _owner._clone + "];");
+                _owner._cloneCreated = false;
+            }
+            foreach (var principal in _owner._principals) await principal.DropLogin(master);
+            if (_owner._source != null) await _owner._source.DisposeIfQuiescentAsync();
+            foreach (var name in new[] { _owner._sourceName, _owner._clone }.Where(name => name.Length > 0))
+                if (await master.QuerySingleAsync<int>("SELECT COUNT(*) FROM sys.databases WHERE name=@name;", new { name }) != 0)
+                    throw new InvalidOperationException("Database remains.");
+            _tree.VerifySqlFilesRemoved();
+            _sqlRemoved = true;
         }
-        VerifyDirectory(); Directory.Delete(_root, false); _done = true;
-        Console.WriteLine("WEB6_RECOVERY exactResourcesAbsent=1");
+        public void DeleteEvidence()
+        {
+            if (!_sqlRemoved) throw new InvalidOperationException("Verified SQL cleanup is required before deleting evidence.");
+            _tree.Delete(); _owner._done = true;
+            Console.WriteLine("WEB6_RECOVERY exactResourcesAbsent=1");
+        }
+        public void Dispose() => _tree.Dispose();
     }
     private void VerifyDirectory()
     {
+        _rootLease.Verify();
         Web5BackupFixture.VerifyPrivateDirectory(_root, _user, _service);
         _admission.CheckOwnership(Directory.GetCreationTimeUtc(_root) == _directoryCreated, File.GetAttributes(_root));
     }
@@ -664,6 +844,27 @@ INSERT dbo.WebOperationJournal VALUES(@actor,@draft,@epoch,1,1,1,NULL,@hash,42,'
             if (includeJournal || !table.StartsWith("WebOperationJournal", StringComparison.Ordinal))
                 rows.Add(await sql.QuerySingleAsync<string>("SELECT (SELECT * FROM dbo." + table + " FOR JSON PATH,INCLUDE_NULL_VALUES);"));
         return string.Join("|", rows);
+    }
+    private static async Task<Web6RecoveryOracleSnapshot> RecoverySnapshot(SqlConnection sql)
+    {
+        var headers = await sql.QuerySingleAsync<long>("SELECT (SELECT COUNT_BIG(*) FROM dbo.SalesReceipts)+(SELECT COUNT_BIG(*) FROM dbo.GoodsReceipts);");
+        var lines = await sql.QuerySingleAsync<long>("SELECT (SELECT COUNT_BIG(*) FROM dbo.SalesReceiptLines)+(SELECT COUNT_BIG(*) FROM dbo.GoodsReceiptLines);");
+        var journal = await sql.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.WebOperationJournal;");
+        var ledger = await sql.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.StockLedger;");
+        var valuation = await sql.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.StockValuationEntries;");
+        var balances = await sql.QuerySingleAsync<long>("SELECT COUNT_BIG(*) FROM dbo.StockBalances;");
+        var canonical = await sql.QuerySingleAsync<string>(@"SELECT
+(SELECT * FROM dbo.SalesReceipts ORDER BY SaleId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.SalesReceiptLines ORDER BY SaleLineId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.GoodsReceipts ORDER BY ReceiptId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.GoodsReceiptLines ORDER BY ReceiptLineId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.StockBalances ORDER BY WarehouseId,ProductId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.StockLedger ORDER BY LedgerId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.StockValuationEntries ORDER BY LedgerId FOR JSON PATH,INCLUDE_NULL_VALUES) + N'|' +
+(SELECT * FROM dbo.WebOperationJournal ORDER BY ActorUserId,OperationId FOR JSON PATH,INCLUDE_NULL_VALUES);");
+        using var sha = SHA256.Create();
+        return new Web6RecoveryOracleSnapshot(headers, journal, lines, ledger, valuation, balances,
+            "sha256:" + Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(canonical))));
     }
     private static string HashFile(string path) { using var stream = File.OpenRead(path); using var sha = SHA256.Create(); return Hex(sha.ComputeHash(stream)); }
     private static string Hex(byte[] bytes) => string.Concat(bytes.Select(b => b.ToString("x2", CultureInfo.InvariantCulture)));
