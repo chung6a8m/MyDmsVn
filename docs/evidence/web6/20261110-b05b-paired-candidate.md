@@ -1,6 +1,31 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-14): candidate `web6-20261114-3408cf4b` reached PairPassed, then FailedRetained because the third Chromium cutover case used an ambiguous resend-button locator.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. The frontend pilot correction and backend pin are non-live source verification only and do not authorize another live attempt.
+**Latest disposition (2026-11-14): candidate `web6-20261114-3046899d` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control returned EOF after the restored-session copy passed a null SQL JSON scalar to `JArray.Parse`.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. A reviewed source correction and new explicit Owner authorization are required before another fresh attempt.
+
+## Task 6 attempt23 restored-session null-scalar failure — 2026-11-14
+
+The Owner authorized exactly one fresh nonproduction attempt for backend `39525cb6b4f11ffb3555decdbe19b9411fa97d15` / tree `b84eb83232c50276c7914c2919929e66c2ca213d` and frontend `e5e083ffd1bf8f70ce49e2e9bad81661e9c6e669` / tree `928b9878a8b408244433e0eb3ee89130a46f4fd6`. Backend protected push/PR runs `43593080118` / `43593084072` and frontend protected push/PR runs `43590748324` / `43590752462` were terminal-PASS. Four read-only Edge observations matched version `157.0.4341.60`, SHA-256 `2497874639116d8edc3de34b3fd83f72fa099112a5d2a426e1f08fcf39a99612`. Effective SQL catalog was `master` on server hash `956ab0c9e40a3109023eed4fba416fc3d02df062cf9375deae2635d6bd773dff`, SQL 14.0.2150.2.
+
+The installed Node directory copied alone resolved npm 10.9.2, so that first protected tool root remains retained and was never selected. A second protected root combined installed Node with the actual user-global npm package and verified Node 22.14.0 / npm 11.6.0, zero reparse points, Node SHA-256 `33b1bc1a8aca11fd5a4f2699e51019c63c0af30cf437701d07af69be7706771b` and npm CLI SHA-256 `8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7`. A time-format issuance attempt stopped after creating three empty protected roots, and a request issuance attempt stopped before file creation; the admitted inputs used `owner-input-02.json`, `sql-approval-02.json` and `request-02.json`. No failed input was adopted.
+
+Owner authority SHA-256 was `3d8c2934917649a60d949b6accfbad9673af7528579d10a00fbe85dbbfe910e7`, SQL approval SHA-256 `5c1b7cdbca74caff32d8c6789a3327affa22520222bc3f0cc2b5a8fd7202dbee`, and request SHA-256 `8ef6ff4a5559704604ca00f77af9b36e8415691bc298a6610130314a1f9288ab`. Authorize ran exactly once. Prepare ran exactly once, `2026-11-14T12:15:38.3750498Z`–`12:18:45.3833059Z`, and returned `PREPARED` / `PIN_MATCHED`; receipt SHA-256 `749d96d4d45f5443c344488d47f1469ec4d3d35326629e9433ddec4439be53e9`. Independent admission verified ordinary marker null/OFF, the exact candidate marker, 10/10 byte-equal candidate dist/published files, four detached-clean source pins and zero run root, SQL control entry, live root, IIS Express process or candidate listener.
+
+Run ran exactly once, `2026-11-14T12:19:52.7030661Z`–`12:25:42.5728186Z`, and returned exit 5 / `FailedRetained`; receipt SHA-256 `f6a63f83ebc6e29c57bf1d539578115891b0214f5f25e5fa5b9af21edbb77d36`. PairPassed SHA-256 is `adf6b17abcaa10018c4c3fe4c8738b758405bb400ac99b4adf2257b844e0af16`.
+
+| Selector | Discovered / executed / passed / failed / skipped | Outcome / SHA-256 |
+| --- | --- | --- |
+| Chromium pair | 1 / 1 / 1 / 0 / 0 | native ACCEPTED / TRX `3c6eb906669ba9e2a6ad5b7e6be5c636f9d392a5547bca904e4861c068b05058` |
+| Edge pair | 1 / 1 / 1 / 0 / 0 | native ACCEPTED / TRX `4b348c4b0df827a73abc29827debb5ab958729681d708a49f3fe0585606778f6` |
+| Cutover wrapper | 1 / 1 / 0 / 1 / 0 | FAIL / TRX `c99c8d4b10e1c4a914bbde6c370191e2b609834e340c284556aee36688330acb` |
+| Chromium cutover pack | 3 / 3 / 2 / 1 / 0 | third case failed / log `a6c732c4563f7644e1dc141d2ad62986f1d831e81482a50d0a7aae14838a766c` |
+| Edge cutover | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Workload / recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+The cached-WEB4 and exact12-old-host Chromium cases passed. The third case, `restart preserves UNKNOWN while revoked and restored epochs fail closed`, reached the `restoreEpoch` control action and received EOF / `incomplete-response` in the response-header phase after 1,285 ms. The retained stack records `ArgumentNullException` at `JArray.Parse` in `CopyRestoredSession.ReadTarget`: the target `FOR JSON PATH` scalar supplied null before the code could test `existing.Count == 0`. Cleanup then intentionally refused deletion because cutover was incomplete. This establishes a cutover harness/control failure, not a product-runtime failure or restored-epoch acceptance.
+
+Each pair cleanup was native ACCEPTED with process drain, HTTP queues absent, SQL quiescence and nine resources verified; its cleanup inventory carries `deletionAuthority=false`. Cutover retains three databases, three runtime logins, three SQL control roots and nine control/runtime/browser directories. All six confirmation records match their intent SHA-256 and carry `deletionAuthority=false`. The owned process tree drained; a read-only OS check found zero IIS Express processes and zero listeners on candidate ports 44321/44322. No post-failure SQL query, manual cleanup, retry, resource adoption or access to an earlier retained candidate occurred.
+
+CandidateVerified is absent. Ordinary resend remains OFF. Full IIS and unperformed Narrator remain NOT RUN, staging remains NOT ACCEPTED and production remains NO-GO.
 
 ## Task 6 attempt22 current-recovery-region locator correction — 2026-11-14
 
