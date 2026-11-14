@@ -278,8 +278,8 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
     [Web6PairedSourceFact]
     public async Task Prepared_frontend_cutover_matches_backend_wire_and_deadline_hierarchy()
     {
-        const string reviewedSha = "726b10351bdbe0028696f9fcfa0bbb52e8a84d28";
-        const string reviewedTree = "2a6173d788d78f9f9c3e30818aced6cb95095684";
+        const string reviewedSha = "e5e083ffd1bf8f70ce49e2e9bad81661e9c6e669";
+        const string reviewedTree = "928b9878a8b408244433e0eb3ee89130a46f4fd6";
         var root = Path.GetFullPath(Environment.GetEnvironmentVariable(Web6PairedSourceFactAttribute.RootVariable)!);
         using var sourceRoot = new BootstrapPathPolicy.PinnedDirectory(root);
         RequirePairedGitConfig(root);
@@ -289,10 +289,11 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         Assert.Empty(PairedGitText(root, "status --porcelain --untracked-files=all --ignore-submodules=all"));
 
         const string liveSpec = "tests/pilot/web6-cutover-live.spec.ts";
+        const string cutoverHelpers = "tests/pilot/web6-cutover-helpers.ts";
         const string deadlineSource = "tests/pilot/web6-cutover-deadline.ts";
         const string controlSource = "tests/pilot/web6-cutover-control.ts";
         var sources = new Dictionary<string, byte[]>(StringComparer.Ordinal);
-        foreach (var path in new[] { liveSpec, deadlineSource, controlSource })
+        foreach (var path in new[] { liveSpec, cutoverHelpers, deadlineSource, controlSource })
         {
             // Read the verified commit's blobs so index flags or a later edit cannot change the tested source.
             var blob = PairedGitText(root, "rev-parse --verify " + reviewedSha + ":" + path);
@@ -317,6 +318,33 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
         VerifyPairedControlSource(ReadPrepared(deadlineSource), ReadPrepared(controlSource));
 
         var spec = ReadPrepared(liveSpec);
+        var helpers = ReadPrepared(cutoverHelpers);
+        Assert.Contains("operation.operationId === operationId", helpers);
+        Assert.Contains("operation.frozen.request.operationKind === \"Sales.Create\"", helpers);
+        Assert.Contains("operation.state === \"DISPATCHED\"", helpers);
+        Assert.Contains("matches.length !== 1", helpers);
+        Assert.Contains("selectDispatchedSalesCreateByWire(await readStore<DurableOperationRecord>(page, \"operations\"), wire!.operationId)", spec);
+        var currentResend = Assert.Single(Regex.Matches(helpers,
+            @"\bexport\s+function\s+selectCurrentRecoveryResend\s*\(\s*dialog\s*:\s*Locator\s*\)\s*\{(?<body>[\s\S]*?)^\}",
+            RegexOptions.Multiline).Cast<Match>()).Groups["body"].Value;
+        Assert.Matches(@"\A\s*return\s+dialog\s*\.\s*getByRole\s*\(\s*""region""\s*,\s*\{\s*name\s*:\s*""Đối soát thao tác""\s*,\s*exact\s*:\s*true\s*\}\s*\)\s*" +
+            @"\.\s*getByRole\s*\(\s*""button""\s*,\s*\{\s*name\s*:\s*""Gửi lại đúng thao tác""\s*,\s*exact\s*:\s*true\s*\}\s*\)\s*;\s*\z", currentResend);
+
+        var restart = Assert.Single(Regex.Matches(spec,
+            @"\btest\s*\(\s*restartRevokeRestore\s*,\s*async\s*\(\s*\{\s*page\s*\}\s*,\s*testInfo\s*\)\s*=>\s*\{(?<body>[\s\S]*?)^\}\s*\)\s*;",
+            RegexOptions.Multiline).Cast<Match>()).Groups["body"].Value;
+        Assert.Equal(2, Regex.Matches(restart, @"\bselectCurrentRecoveryResend\s*\(\s*dialog\s*\)").Count);
+        Assert.Matches(@"\bconst\s+revoked\s*=\s*selectCurrentRecoveryResend\s*\(\s*dialog\s*\)\s*;\s*" +
+            @"if\s*\(\s*await\s+revoked\.count\s*\(\s*\)\s*\)\s*await\s+revoked\.click\s*\(\s*\)\s*;\s*" +
+            @"await\s+expect\s*\(\s*page\.getByRole\s*\(\s*""dialog""\s*,\s*\{\s*name\s*:\s*""Gửi lại đúng thao tác gốc\?""\s*,\s*exact\s*:\s*true\s*\}\s*\)\s*\)\.toHaveCount\s*\(\s*0\s*\)", restart);
+        Assert.Matches(@"\bconst\s+stale\s*=\s*selectCurrentRecoveryResend\s*\(\s*dialog\s*\)\s*;\s*" +
+            @"if\s*\(\s*await\s+stale\.count\s*\(\s*\)\s*\)\s*await\s+stale\.click\s*\(\s*\)\s*;\s*" +
+            @"await\s+expect\s*\(\s*page\.getByRole\s*\(\s*""dialog""\s*,\s*\{\s*name\s*:\s*""Gửi lại đúng thao tác gốc\?""\s*,\s*exact\s*:\s*true\s*\}\s*\)\s*\)\.toHaveCount\s*\(\s*0\s*\)", restart);
+        Assert.Equal(3, Regex.Matches(restart, @"\bexpect\s*\(\s*unknown\.writes\s*\(\s*\)\s*\)\.toBe\s*\(\s*1\s*\)").Count);
+        Assert.Equal(2, Regex.Matches(restart, @"\bverifyProtectedCutoverState\s*\(\s*unknown\.baseline!\s*,\s*await\s+protectedState\s*\(\s*page\s*,\s*unknown\.baseline!\s*\)\s*\)").Count);
+        Assert.Matches(@"\bstored\s*=\s*\(\s*await\s+readStore<DurableOperationRecord>\s*\(\s*page\s*,\s*""operations""\s*\)\s*\)\.find\s*\(\s*value\s*=>\s*value\.operationId\s*===\s*unknown\.operation\.operationId\s*\)\s*;[\s\S]*?" +
+            @"expect\s*\(\s*stored!\.state\s*\)\.toBe\s*\(\s*""DISPATCHED""\s*\)\s*;[\s\S]*?" +
+            @"cutoverControl\s*\(\s*testInfo\s*,\s*""verifyNoCutoverMutation""\s*,\s*unknown\.operation\.operationId\s*\)", restart);
         var budgetRows = Regex.Matches(spec, @"\[\s*(\w+)\s*,\s*\[\s*([0-9_]+)\s*,\s*([0-9_]+)\s*\]\s*\]");
         var expected = new[]
         {

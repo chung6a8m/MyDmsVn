@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using Microsoft.Data.SqlClient;
 using MyDmsVn.Server.Infrastructure.Operations;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MyDmsVn.Server.Infrastructure.IntegrationTests;
@@ -420,7 +421,12 @@ internal static class Web6CutoverSqlApproval
     internal static void ParseAndVerify(string text, string expectedServerHash, DateTimeOffset now)
     {
         JObject json;
-        try { json = JObject.Parse(text, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error }); }
+        try
+        {
+            using var reader = new JsonTextReader(new StringReader(text)) { DateParseHandling = DateParseHandling.None };
+            json = JObject.Load(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+            if (reader.Read()) throw new IOException("Cutover SQL approval contains trailing content.");
+        }
         catch (Exception error) { throw new IOException("Cutover SQL approval is invalid.", error); }
         var keys = new[] { "version", "purpose", "serverSha256", "expiresUtc" };
         if (!json.Properties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
