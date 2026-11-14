@@ -10,11 +10,11 @@
 | Initial Task 6 backend | `c99f426d98853dbd3f9a48ff6a769bba615ef8e9` | `460a3f51439ed7c3f5fbdb7a1d3fcae775b615d8` |
 | Backend paired provenance correction | `6dddc17eca0bfc7970a81fa21bd3c14dc15a6682` | `c8e6a81578811bfb05573c60d626be6e08a47783` |
 | Backend verified source and tests, before this documentation delta | Paired Git process cleanup correction | `dcdc8edda5a630fec191b5766ba78cd76d3490ba` |
-| Frontend exact reviewed pin | `726b10351bdbe0028696f9fcfa0bbb52e8a84d28` | `2a6173d788d78f9f9c3e30818aced6cb95095684` |
+| Frontend exact reviewed pin | `eafcc40a13c17dbfe3c546b76d6dbdd1bf360193` | `0ecffdc18a06685e4790c53e9494ae9f340abe19` |
 
 The only change to bootstrap execution in Task 6 is the `ReviewedFrontendSha` pin. The review correction changes the paired source test and evidence. The vendor gitlink remains `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`.
 
-The real `BootstrapPreflight.PrepareAsync` path ran with synthetic Git/build/SQL-master toolchain inputs and disposable protected files. It accepted `726b10351bdbe0028696f9fcfa0bbb52e8a84d28` as `PIN_MATCHED`. It blocked the superseded reviewed pin `96842a6329191713282b3212e5420872eb0f3a41`, the prior pin `66b935488d00ee78ec3ffbd183f474da06aa3404` and immediate frontend base `447e39f03b2b22398d30324c8cec992fc93ce83c` as `BLOCKED_REVIEWED_FRONTEND_PIN`. Only the admitted receipt opened a selector plan in the pin matrix.
+The real `BootstrapPreflight.PrepareAsync` path ran with synthetic Git/build/SQL-master toolchain inputs and disposable protected files. It accepted `eafcc40a13c17dbfe3c546b76d6dbdd1bf360193` as `PIN_MATCHED`. It blocked the superseded reviewed pin `726b10351bdbe0028696f9fcfa0bbb52e8a84d28`, earlier reviewed pin `96842a6329191713282b3212e5420872eb0f3a41`, prior pin `66b935488d00ee78ec3ffbd183f474da06aa3404` and immediate frontend base `447e39f03b2b22398d30324c8cec992fc93ce83c` as `BLOCKED_REVIEWED_FRONTEND_PIN`. Only the admitted receipt opened a selector plan in the pin matrix.
 
 The paired test verifies the configured frontend checkout's commit/tree with replacement lookup disabled and Git config isolated. It independently hashes each blob's original bytes as a Git object before copying the three tracked TypeScript sources into the temporary prepared root. The test inspects those sources as text and validates synthetic frames against the real backend parser. It checks 11 action caps, both `revokeGrantOff` forms, the strict allowance field, the 5,000-ms response reserve, the three scenario/reset budgets, one reset hook and the pack/controller/aggregate/selector hierarchy. The paired test executes no frontend code or compiler. The separate full frontend unit run provides behavior coverage for cumulative accounting, framing, transport timing and the cleanup hook. This fixture uses no real host, database or browser.
 
@@ -98,6 +98,21 @@ Backend pin tests first reproduced the expected inverse failure: the new SHA was
 | Integrated pure backend | 733 / 0 / 0 | `b96a1ffec58aa06a7224e4c0c64a60f2c9fe863f1e70a9b423ead0db919741d8` |
 
 No fresh live candidate, allocation, SQL approval, IIS process or browser cutover was created. Attempt21 and all other retained resources were not accessed.
+
+## Fresh-attempt product lookup commit correction
+
+The next fresh-attempt source pair adds only the reviewed frontend cutover harness correction from PR #39 on top of PR #38. Frontend `eafcc40a13c17dbfe3c546b76d6dbdd1bf360193`, tree `0ecffdc18a06685e4790c53e9494ae9f340abe19`, waits for exactly one `PILOT-P · ...` option, clicks that option and commits the grid editor with `Tab`. This replaces the unguarded immediate `ArrowDown`/`Enter` sequence that left the retained attempt's product cell unselected and blocked Save before any Sales mutation request. The frontend regression was observed RED against the old sequence, then GREEN 40/40; local HTTP unit 1,119/1,119, full unit/component 1,795/1,795, typecheck and production build passed. Both GitHub frontend workflows for PR #39 passed, including Chromium regression and production-artifact isolation.
+
+Backend pin verification first reproduced the exact inverse RED: the new frontend SHA was `BLOCKED_REVIEWED_FRONTEND_PIN` and the former `726b103...` SHA remained `PIN_MATCHED`; 23 other rows passed. Changing only `PreparedCandidateReceipt.ReviewedFrontendSha` made the 25-row pin matrix pass and made `726b103...` a negative case. The paired source test independently verified the clean frontend commit/tree and its tracked cutover sources. Release/net48 build completed with zero warnings and errors.
+
+| Fresh-attempt correction selection | Passed / failed / skipped | TRX SHA-256 |
+| --- | ---: | --- |
+| Exact pin matrix plus paired source | 26 / 0 / 0 | `0b5d7a7693e8d53c4ace43eea9dc533e6b59fd7eae2b8e582022a144f40a819e` |
+| Integrated pure backend | 736 / 0 / 0 | `7220a2926b3b5f2a7bca13f090bd66ec339f510ee77896e6576afe311c3cbc12` |
+
+The resulting local Release artifacts were `MyDmsVn.Web6.CandidateBootstrap.exe` SHA-256 `7fd7c373ceab633cb571e246c37d1abaf026a2aa3f1f0014c9810549484edb06` and `MyDmsVn.Server.Infrastructure.Security.Tests.dll` SHA-256 `70e7b413bda3e269467ca1df8609d09bc5aeb3e367577efc4cf0102e4c27c19b`. These are local source-verification artifacts, not candidate publish hashes.
+
+No Owner authority, fresh candidate root, SQL approval/allocation, IIS process or live browser selector was created by this correction checkpoint. Attempt21 and every other retained resource remain untouched. Fresh live preparation still requires this exact backend correction to be committed, reviewed and CI-verified, followed by a new exact-scope Owner authorization.
 
 ## Acceptance boundary
 

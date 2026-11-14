@@ -278,8 +278,8 @@ public sealed class Web6CandidateBackendSourceTests : IDisposable
     [Web6PairedSourceFact]
     public async Task Prepared_frontend_cutover_matches_backend_wire_and_deadline_hierarchy()
     {
-        const string reviewedSha = "726b10351bdbe0028696f9fcfa0bbb52e8a84d28";
-        const string reviewedTree = "2a6173d788d78f9f9c3e30818aced6cb95095684";
+        const string reviewedSha = "eafcc40a13c17dbfe3c546b76d6dbdd1bf360193";
+        const string reviewedTree = "0ecffdc18a06685e4790c53e9494ae9f340abe19";
         var root = Path.GetFullPath(Environment.GetEnvironmentVariable(Web6PairedSourceFactAttribute.RootVariable)!);
         using var sourceRoot = new BootstrapPathPolicy.PinnedDirectory(root);
         RequirePairedGitConfig(root);
