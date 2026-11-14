@@ -1,6 +1,6 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-14): candidate `web6-20261114-de43c0c7` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control copied `datetime2(7)` session values through SQL `datetime` parameters and failed exact restored-session metadata verification.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Source correction `221b4da6098871ae3219a61c43d2d569b5a59177` is locally verified; protected CI and new explicit Owner authorization remain required. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN.
+**Latest disposition (2026-11-14): candidate `web6-20261114-de43c0c7` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control copied `datetime2(7)` session values through SQL `datetime` parameters and failed exact restored-session metadata verification.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Source correction `221b4da6098871ae3219a61c43d2d569b5a59177` is locally verified and protected CI passed; new explicit Owner authorization remains required. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN.
 
 ## Task 6 attempt24 restored-session exact-metadata failure — 2026-11-14
 
@@ -39,7 +39,7 @@ Local GREEN verification:
 - complete `Web6CandidateCutoverTests`: **117 passed / 0 failed / 0 skipped**;
 - broader SQL-excluded Security selection: **1,459 passed / 1 failed / 20 skipped**. The sole failure was `Web6CandidateSafetyTests.Exact_net48_http_and_crash_graph_loads_without_SQL` at the pre-existing GUI crash-cleanup poison assertion. It reproduced unchanged in an exact rerun and again with the DateTime correction temporarily removed, so it is recorded as unrelated and not converted to PASS.
 
-No fresh bootstrap authorize/prepare/run, IIS/browser invocation, retained SQL query, cleanup, retry or historical-attempt access occurred. Protected CI and a new explicit Owner authorization remain prerequisites for any fresh live attempt. Attempt24 stays `FailedRetained`; Task 6 remains OPEN and `CandidateVerified` absent.
+No fresh bootstrap authorize/prepare/run, IIS/browser invocation, retained SQL query, cleanup, retry or historical-attempt access occurred. Protected push run `43601406386` and pull-request run `43601410769` passed on branch head `e84d08a40a714b513ce9b3c6471938050e98d171`. A new explicit Owner authorization remains prerequisite for any fresh live attempt. Attempt24 stays `FailedRetained`; Task 6 remains OPEN and `CandidateVerified` absent.
 
 ## Task 6 attempt23 restored-session null-scalar failure — 2026-11-14
 
