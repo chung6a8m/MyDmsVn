@@ -11,7 +11,7 @@
 | Backend paired provenance correction | `6dddc17eca0bfc7970a81fa21bd3c14dc15a6682` | `c8e6a81578811bfb05573c60d626be6e08a47783` |
 | Backend verified source and tests, before this documentation delta | Paired Git process cleanup correction | `dcdc8edda5a630fec191b5766ba78cd76d3490ba` |
 | Frontend exact reviewed pin | `eafcc40a13c17dbfe3c546b76d6dbdd1bf360193` | `0ecffdc18a06685e4790c53e9494ae9f340abe19` |
-| Frontend reload-restore reviewed pin | `76b125d74769b96be1f007803954b5b2489b10c3` | `025e13fcda200973c705c8eabe827c4b926dc274` |
+| Frontend reload-restore reviewed pin | `78e24ef00738f0b1d09ff466991802a736c67fec` | `72a8e252f164c131fb72595cfda52c1432c2027c` |
 
 The only change to bootstrap execution in Task 6 is the `ReviewedFrontendSha` pin. The review correction changes the paired source test and evidence. The vendor gitlink remains `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`.
 
@@ -132,6 +132,21 @@ Backend pin verification reproduced the inverse RED before changing production c
 The Release/net48 Security.Tests project graph built with zero warnings and errors. Resulting local verification artifacts were `MyDmsVn.Web6.CandidateBootstrap.exe` SHA-256 `8132dc4dbe1a3858e6db62e1fdd54ff8bb0494621823d1bb59a3e7515fbb9108` and `MyDmsVn.Server.Infrastructure.Security.Tests.dll` SHA-256 `47272120fd6d1ca115fe0b97f7beee76c345040fa888a22ed07b2f7d247859de`. These are local source-verification artifacts, not candidate publish hashes.
 
 No Owner authority, candidate root, protected SQL approval, allocation, IIS process or live browser selector was created in this checkpoint. The previous failed attempt and all retained resources remain untouched. A fresh live chain requires this backend correction to be committed, reviewed and CI-verified, followed by a new exact-scope Owner authorization for the resulting backend SHA paired with frontend `76b125d...`.
+
+## Boundary-observer CI determinism and final pin correction
+
+Frontend PR #40 commit `78e24ef00738f0b1d09ff466991802a736c67fec`, tree `72a8e252f164c131fb72595cfda52c1432c2027c`, retains the protected-draft reload correction and makes its fake-clock boundary-observer regression deterministic under the protected 90-worker unit runner. The test adapter polls presentation every five virtual seconds and advances nested async work one pending timer at a time; runtime request, selector and controller deadlines are unchanged. Protected frontend run `43570399192` passed typecheck, production build, unit/component tests, Chromium frontend regression and production-artifact isolation on the exact commit.
+
+Backend tests first reproduced the inverse RED: the new SHA was blocked, the superseded `76b125d...` SHA was admitted, and the paired-source test was blocked (3 failed, 25 passed). After changing only `PreparedCandidateReceipt.ReviewedFrontendSha`, the exact pin matrix plus paired source passed 28/28, including an explicit negative row for `76b125d...`. The bounded integrated pure selection passed 738/738 with zero failed/skipped, and the Release/net48 Security.Tests project graph built with zero warnings and errors.
+
+| Final pin selection | Passed / failed / skipped | TRX SHA-256 |
+| --- | ---: | --- |
+| Exact pin matrix plus paired source | 28 / 0 / 0 | `4c650ae89a236325e9874107094acd7f8d73bbde5127c97c5c7949ab46979282` |
+| Integrated pure backend | 738 / 0 / 0 | `ac4e699c6fd42e922f4838a0669f70e59b972d07217034b041cf55986b54d63a` |
+
+The resulting local Release artifacts were `MyDmsVn.Web6.CandidateBootstrap.exe` SHA-256 `3a5884a0737aa8af1bad16907749760d60553642edd1298fad0cb600b7f8778d` and `MyDmsVn.Server.Infrastructure.Security.Tests.dll` SHA-256 `4c7d54546afcf4735bdc760b4123c6027693fe0aa4d9b531da1ece8068e2d407`. These identify local verification outputs, not live candidate publish artifacts.
+
+No fresh candidate root, SQL approval/allocation, IIS process, browser cutover or retained-resource access occurred in this source correction. A new live attempt remains blocked until this backend change is independently reviewed, committed, pushed, protected-CI verified, and then explicitly authorized for its resulting exact backend SHA paired with frontend `78e24ef...`.
 
 ## Acceptance boundary
 
