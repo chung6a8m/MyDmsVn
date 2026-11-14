@@ -1,6 +1,6 @@
 # WEB6 cutover deadline bounded candidate — 2026-11-14
 
-**Source and non-live verification.** Candidate `web6-20261114-9944f608` remains `FailedRetained` and was left untouched; `web6-20261114-f6402db1` remains pre-allocation `BLOCKED_PREFLIGHT`. The current source has no `CandidateVerified` result. Fresh live execution requires final cross-repository review, protected CI and separate explicit Owner authorization. [Approved design](../../superpowers/specs/2026-11-13-web6-cutover-deadline-hierarchy-design.md) · [Implementation plan](../../superpowers/plans/2026-11-13-web6-cutover-deadline-hierarchy.md) · [Runbook](../../development/WEB6_CANDIDATE_RUNBOOK.md#cutover-deadline-and-reset-protocol).
+**Source and non-live verification.** Candidate `web6-20261114-3408cf4b` remains `FailedRetained` and was left untouched; earlier retained and pre-allocation candidates remain unchanged. The current source has no `CandidateVerified` result. Fresh live execution requires final cross-repository review, protected CI and separate explicit Owner authorization. [Approved design](../../superpowers/specs/2026-11-13-web6-cutover-deadline-hierarchy-design.md) · [Implementation plan](../../superpowers/plans/2026-11-13-web6-cutover-deadline-hierarchy.md) · [Runbook](../../development/WEB6_CANDIDATE_RUNBOOK.md#cutover-deadline-and-reset-protocol).
 
 ## Source identity
 
@@ -13,12 +13,13 @@
 | Frontend exact reviewed pin | `eafcc40a13c17dbfe3c546b76d6dbdd1bf360193` | `0ecffdc18a06685e4790c53e9494ae9f340abe19` |
 | Frontend reload-restore reviewed pin | `78e24ef00738f0b1d09ff466991802a736c67fec` | `72a8e252f164c131fb72595cfda52c1432c2027c` |
 | Frontend exact-wire reviewed pin | `fa032ece3d47af029d5095ae39b21fb43d0f1afc` | `e0cb0950f78d072e73850392b6bf496e574775ae` |
+| Frontend current-recovery-region reviewed pin | `e5e083ffd1bf8f70ce49e2e9bad81661e9c6e669` | `928b9878a8b408244433e0eb3ee89130a46f4fd6` |
 
 The only production bootstrap change in this correction is the `ReviewedFrontendSha` pin. The paired-source test additionally binds the exact-wire helper source and evidence. The vendor gitlink remains `433e5b53f979e37cc6b69bad6dfcde0975c7ecaf`.
 
-The real `BootstrapPreflight.PrepareAsync` path ran with synthetic Git/build/SQL-master toolchain inputs and disposable protected files. It accepted `fa032ece3d47af029d5095ae39b21fb43d0f1afc` as `PIN_MATCHED`. It blocked the superseded reviewed pin `78e24ef00738f0b1d09ff466991802a736c67fec` and every earlier row as `BLOCKED_REVIEWED_FRONTEND_PIN`. Only the admitted receipt opened a selector plan in the pin matrix.
+The real `BootstrapPreflight.PrepareAsync` path ran with synthetic Git/build/SQL-master toolchain inputs and disposable protected files. It accepted `e5e083ffd1bf8f70ce49e2e9bad81661e9c6e669` as `PIN_MATCHED`. It blocked the superseded reviewed pin `fa032ece3d47af029d5095ae39b21fb43d0f1afc` and every earlier row as `BLOCKED_REVIEWED_FRONTEND_PIN`. Only the admitted receipt opened a selector plan in the pin matrix.
 
-The paired test verifies the configured frontend checkout's commit/tree with replacement lookup disabled and Git config isolated. It independently hashes each blob's original bytes as a Git object before copying four tracked TypeScript sources into the temporary prepared root. Besides deadline/control contracts, it verifies that UNKNOWN setup selects exactly one `Sales.Create` / `DISPATCHED` operation by the intercepted wire ID and fails closed otherwise. The paired test executes no frontend code or compiler. Separate frontend unit and browser runs provide behavior coverage. This fixture uses no real host, database or browser.
+The paired test verifies the configured frontend checkout's commit/tree with replacement lookup disabled and Git config isolated. It independently hashes each blob's original bytes as a Git object before copying four tracked TypeScript sources into the temporary prepared root. Besides deadline/control and exact-wire contracts, it verifies that revoked and stale recovery select `Gửi lại đúng thao tác` only inside the exact current `Đối soát thao tác` region. The paired test executes no frontend code or compiler. Separate frontend unit and browser runs provide behavior coverage. This fixture uses no real host, database or browser.
 
 Paired Git starts suspended and enters a Windows job before resuming. On timeout or cancellation, the runner requests termination of that exact job and waits for root exit, zero active job processes and both stdout/stderr reader tasks before it releases their resources. Disposable child tests cover timeout, cancellation, delayed output on both streams, successful exit and start failure. A separate controlled test holds each reader open to verify that completion waits for both. If Windows permanently cannot prove exit or EOF, the paired test remains pending and retains ownership.
 
@@ -38,6 +39,9 @@ Windows 10.0.26300, .NET SDK 8.0.428, VSTest 17.11.2, net48 Release, Node 22.14.
 | Exact-wire pin RED, TRX | 29 / 29 | 26 / 3 / 0 | `f8b37f7ef9056833a30e1549aeecb02668ef095ba1320ce94cbcaef825b32420` |
 | Exact-wire pin focused GREEN, TRX | 29 / 29 | 29 / 0 / 0 | `597e70b368e137eb36abb3ecf2c7146b8f8fc3bc53e65100103ee4d2f8267715` |
 | Exact-wire integrated backend, TRX | 739 / 739 | 739 / 0 / 0 | `b89f96398ebf41c03a912ffb0f08eb97b568adc78bc9cb28cd9057f9c24b3b6a` |
+| Current-region pin RED, TRX | 30 / 30 | 27 / 3 / 0 | `e3670c9b0679205a1043778097d6a776debc3c2a88ca084b6c32e38daa7db646` |
+| Current-region pin post-review GREEN, TRX | 30 / 30 | 30 / 0 / 0 | `c53db459385e8036faec2e407ee4d18684f42ef824985fa4e42b9f98e6a9e5af` |
+| Current-region post-review integrated backend, TRX | 740 / 740 | 740 / 0 / 0 | `b56f255d23a0eac56e9eac5cd163dc146fbfb5ceacb4ecdaa0a162d7a0c71cd2` |
 | Frontend typecheck log at reload-restore SHA `78e24ef…` | — | exit 0, zero diagnostics | `6a56be18103da1ff832d9eb9529790860e2aa12dbceef7417852378e41ef748d` |
 | Frontend full unit log at reload-restore SHA `78e24ef…`, 90 files | 1,791 / 1,791 | 1,791 / 0 / 0 | `c2dfc50dab3f105307de361e2658de8428f3bec1826dede1d75f644f0e6971ef` |
 
@@ -151,6 +155,22 @@ Backend tests first reproduced the inverse RED: the new SHA was blocked, the sup
 The resulting local Release artifacts were `MyDmsVn.Web6.CandidateBootstrap.exe` SHA-256 `3a5884a0737aa8af1bad16907749760d60553642edd1298fad0cb600b7f8778d` and `MyDmsVn.Server.Infrastructure.Security.Tests.dll` SHA-256 `4c7d54546afcf4735bdc760b4123c6027693fe0aa4d9b531da1ece8068e2d407`. These identify local verification outputs, not live candidate publish artifacts.
 
 No fresh candidate root, SQL approval/allocation, IIS process, browser cutover or retained-resource access occurred in this source correction. A new live attempt remains blocked until this backend change is independently reviewed, committed, pushed, protected-CI verified, and then explicitly authorized for its resulting exact backend SHA paired with frontend `78e24ef...`.
+
+## Current-recovery-region locator and pin correction
+
+Fresh candidate `web6-20261114-3408cf4b` used backend `a7c8bac5e6d97fa40b8ee9dba5976b9a5ca3e672` / tree `9cb4d2b09b66ce101f188ce4b17a24ab001e7bb8` and frontend `fa032ece3d47af029d5095ae39b21fb43d0f1afc` / tree `e0cb0950f78d072e73850392b6bf496e574775ae`. Authorize, Prepare and Run each ran exactly once. The candidate reached `PairPassed`, with Chromium and Edge each passing 1/1 and native cleanup accepted, then became `FailedRetained` when the third Chromium cutover case found two same-named resend buttons and its unscoped strict locator refused the click. Workload/recovery and Edge cutover were NOT RUN. Cutover resources remain retained with deletion authority false. No post-failure SQL query, cleanup, retry or retained-candidate access occurred.
+
+Frontend `e5e083ffd1bf8f70ce49e2e9bad81661e9c6e669`, tree `928b9878a8b408244433e0eb3ee89130a46f4fd6`, changes only the pilot helper/spec, regression test and evidence. It locates the exact `Gửi lại đúng thao tác` button inside the current `Đối soát thao tác` region for both revoked and stale checks. Focused unit passed 43/43, full unit passed 1,798/1,798, typecheck/build passed, Chromium E2E passed 286/286 and production isolation passed 2/2. Protected push run `43590748324` and rerun pull-request run `43590752462` both terminal-PASS. An independent review found no issue.
+
+Backend pin tests first reproduced the inverse RED: the new frontend SHA was blocked, `fa032...` remained `PIN_MATCHED`, and paired-source Prepare was blocked (3 failed, 27 passed). Changing only `PreparedCandidateReceipt.ReviewedFrontendSha` made all 30 rows pass. Review strengthened the paired-source contract to extract the exact helper and `restartRevokeRestore` bodies and bind the chained region/button locator, both guarded clicks, zero confirmation, one write, `DISPATCHED`, protected state and no-cutover-mutation assertions. The bounded post-review integrated pure selection passed 740/740 with zero failed/skipped, and the Release/net48 Security.Tests project graph built with zero warnings and errors.
+
+| Current-region correction selection | Passed / failed / skipped | TRX SHA-256 |
+| --- | ---: | --- |
+| Exact pin matrix plus paired source RED | 27 / 3 / 0 | `e3670c9b0679205a1043778097d6a776debc3c2a88ca084b6c32e38daa7db646` |
+| Exact pin matrix plus paired source post-review GREEN | 30 / 0 / 0 | `c53db459385e8036faec2e407ee4d18684f42ef824985fa4e42b9f98e6a9e5af` |
+| Post-review integrated pure backend | 740 / 0 / 0 | `b56f255d23a0eac56e9eac5cd163dc146fbfb5ceacb4ecdaa0a162d7a0c71cd2` |
+
+The resulting local Release artifacts were `MyDmsVn.Web6.CandidateBootstrap.exe` SHA-256 `bc0b4277ad216257bb0568479da523ebb4c721644a42955e569230d4b7052fce` and `MyDmsVn.Server.Infrastructure.Security.Tests.dll` SHA-256 `af20a008810d9d9b2b3f38ca54f95d8d0a12e5b07de41c4c6c2aada19b267c8c`. These identify local source-verification outputs, not candidate publish artifacts. No Owner authority, new candidate root, SQL approval/allocation, IIS process or live browser selector was created by this correction. A fresh attempt still requires the resulting backend commit to pass independent review and protected CI, then a new explicit Owner authorization for its exact pairing with frontend `e5e083f...`.
 
 ## Acceptance boundary
 

@@ -1,6 +1,36 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-14): candidate `web6-20261114-9944f608` reached PairPassed, then FailedRetained because the third Chromium cutover case selected an older dispatched Sales Create instead of the intercepted wire operation.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. The frontend pilot correction is source-verified only and does not authorize another live attempt.
+**Latest disposition (2026-11-14): candidate `web6-20261114-3408cf4b` reached PairPassed, then FailedRetained because the third Chromium cutover case used an ambiguous resend-button locator.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. The frontend pilot correction and backend pin are non-live source verification only and do not authorize another live attempt.
+
+## Task 6 attempt22 current-recovery-region locator correction — 2026-11-14
+
+The Owner authorized the exact reviewed pair: backend `a7c8bac5e6d97fa40b8ee9dba5976b9a5ca3e672` / tree `9cb4d2b09b66ce101f188ce4b17a24ab001e7bb8` and frontend `fa032ece3d47af029d5095ae39b21fb43d0f1afc` / tree `e0cb0950f78d072e73850392b6bf496e574775ae`. Frontend protected push run `43575722223` and pull-request run `43575726471`, plus backend protected push run `43577495479` and pull-request run `43577503355`, were terminal-PASS before execution.
+
+Candidate `web6-20261114-3408cf4b` used the protected tool root `tools-web6-20261114-3408cf4b-02` with Node 22.14.0 and npm 11.6.0. Authorize ran exactly once. Prepare ran exactly once and returned `PREPARED` / `PIN_MATCHED`; the prepared receipt SHA-256 is `67f141185dd516a0d7d398173a1f41e01f9eb260cb676e5fa45e6302a4b2c29f`. Independent admission verified ordinary candidate ID null, the exact candidate marker, 10/10 byte-equal dist/published files and zero pre-Run SQL, listener or IIS allocation. Run ran exactly once and returned exit 5 / `FailedRetained`; its receipt SHA-256 is `fe7e4f3a602503a450dc7a743bbe9a80198bbc7d30e225daeb2c7970cb8a8fd7`.
+
+| Selector | Discovered / executed / passed / failed / skipped | Outcome / SHA-256 |
+| --- | --- | --- |
+| Chromium pair | 1 / 1 / 1 / 0 / 0 | native ACCEPTED / `dcef28f7f5ba12b5a5d5d27a1e3d3bf26a5a58eabe161b2a11cb54809394473a` |
+| Edge pair | 1 / 1 / 1 / 0 / 0 | native ACCEPTED / `acdf7813e1795928d64c855ebf4d363321981ec8361c4e130fe5f5bd7a0e9268` |
+| Cutover | 1 / 1 / 0 / 1 / 0 | FAIL / `2c1ab8cd23ee5c067203a1b05538316ee4983dc8e19b7bec4989cb9ec98c22ea` |
+| Workload | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+| Recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+The PairPassed receipt SHA-256 is `e9e702aebeac60d4541ac09eae9629b135138297d17fdf5e70f6cf072cc192e1`. The first two Chromium cutover cases passed. In the third case, `restart preserves UNKNOWN while revoked and restored epochs fail closed`, the drafts dialog contained two buttons named `Gửi lại đúng thao tác`: the enabled button in the current `Đối soát thao tác` region and a disabled historical-row button. The unscoped strict Playwright locator refused the click. This is a pilot-harness locator failure; it does not establish a product runtime failure. Edge cutover did not start.
+
+Each browser-pair cleanup removed its one database, one login, three processes, three queues and one runtime directory and was native ACCEPTED. Cutover retained three databases, three runtime logins, three SQL control roots and nine cutover directories. Six intent and six confirmation records exist, every confirmation matches its intent digest, and deletion authority is false. The process tree was drained; a read-only check found zero IIS Express processes and zero candidate listeners. No post-failure SQL query, cleanup, retry or access to any earlier retained candidate occurred.
+
+Frontend correction `e5e083ffd1bf8f70ce49e2e9bad81661e9c6e669` / tree `928b9878a8b408244433e0eb3ee89130a46f4fd6` scopes resend selection to the exact current `Đối soát thao tác` region. It changes only pilot tests/helpers and evidence, not product runtime. Focused unit passed 43/43, full unit passed 1,798/1,798, typecheck/build passed, Chromium E2E passed 286/286 and production isolation passed 2/2. Independent review found no issue. Protected push run `43590748324` and rerun pull-request run `43590752462` both terminal-PASS; the initial PR job failure was an unrelated `web6BoundaryObserver` fake-timer flake outside the diff and its focused test passed 10/10 repeated local runs before the unchanged rerun passed.
+
+Backend pin TDD reproduced the exact inverse RED: 27 passed / 3 failed / 0 skipped because the new SHA was blocked, `fa032...` remained admitted and paired-source Prepare was blocked. After changing only `PreparedCandidateReceipt.ReviewedFrontendSha`, the same 30 rows passed. Review then strengthened the paired test to extract the exact helper and `restartRevokeRestore` bodies and bind the chained region/button selector, both guarded clicks, zero confirmation, one write, `DISPATCHED`, protected state and no-cutover-mutation assertions. The post-review integrated non-live selection passed 740/740; Release/net48 build passed with zero warnings and errors.
+
+| Backend verification | TRX SHA-256 |
+| --- | --- |
+| Current-region pin and paired-source RED, 27 / 30 passed | `e3670c9b0679205a1043778097d6a776debc3c2a88ca084b6c32e38daa7db646` |
+| Current-region pin and paired-source post-review GREEN, 30 / 30 passed | `c53db459385e8036faec2e407ee4d18684f42ef824985fa4e42b9f98e6a9e5af` |
+| Current-region post-review integrated non-live, 740 / 740 passed | `b56f255d23a0eac56e9eac5cd163dc146fbfb5ceacb4ecdaa0a162d7a0c71cd2` |
+
+This correction does not alter or accept the retained candidate. A new exact backend commit, independent review, protected CI and separate explicit Owner authorization are required before any fresh live attempt. Ordinary resend remains OFF. Full IIS and unperformed Narrator remain NOT RUN. Staging remains NOT ACCEPTED and production NO-GO.
 
 ## Task 6 fresh attempts and exact-wire pilot correction — 2026-11-14
 
