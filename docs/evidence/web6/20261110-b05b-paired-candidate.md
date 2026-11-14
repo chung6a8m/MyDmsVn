@@ -1,6 +1,6 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-14): candidate `web6-20261114-de43c0c7` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control failed the exact restored-session metadata verification after the zero-row parser correction.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. The field-level metadata difference is not recorded, so a reviewed diagnosis/source correction and new explicit Owner authorization are required before another fresh attempt.
+**Latest disposition (2026-11-14): candidate `web6-20261114-de43c0c7` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control copied `datetime2(7)` session values through SQL `datetime` parameters and failed exact restored-session metadata verification.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Source correction `221b4da6098871ae3219a61c43d2d569b5a59177` is locally verified; protected CI and new explicit Owner authorization remain required. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN.
 
 ## Task 6 attempt24 restored-session exact-metadata failure — 2026-11-14
 
@@ -26,6 +26,20 @@ The cached-WEB4 and exact12-old-host Chromium cases passed. The third case, `res
 Each pair cleanup was native ACCEPTED with process drain, HTTP queues absent, SQL quiescence and nine resources verified; its cleanup inventory carries `deletionAuthority=false`. Cutover retains three databases, three runtime logins, three SQL control roots and nine control/runtime/browser directories. All six confirmation records match their intent SHA-256 and carry `deletionAuthority=false`. The owned process tree drained; a read-only OS check found zero IIS Express processes and zero listeners on candidate ports 44321/44322. No post-failure SQL query, manual cleanup, retry, resource adoption or access to an earlier retained candidate occurred.
 
 CandidateVerified is absent. Ordinary resend remains OFF. Full IIS and unperformed Narrator remain NOT RUN, staging remains NOT ACCEPTED and production remains NO-GO.
+
+## Attempt24 non-live restored-session precision correction — 2026-11-14
+
+The Owner authorized a narrow source-only diagnosis/correction with no fresh live run and no access to retained attempt24 resources. TDD RED reproduced the exact boundary on the designated nonproduction SQL server using only a read-only scalar: the existing parameter path exposed all three timestamps as `SqlDbType.DateTime`, and `2026-11-10T01:02:03.1234567Z` returned as `2026-11-10T01:02:03.1233333`. This proves SQL `datetime` parameter precision loss caused the final exact metadata mismatch; no inference from the retained database was needed.
+
+Backend source commit `221b4da6098871ae3219a61c43d2d569b5a59177` narrows the correction to `Web6CutoverSessionCopy`: `CreatedAtUtc`, `AbsoluteExpiresAtUtc` and `IdleExpiresAtUtc` are copied through explicit `SqlDbType.DateTime2` parameters with scale 7. The shared test-oracle mapping, schema, grants, product runtime, automatic-retry policy and retained resources are unchanged. Exact metadata failures now include only fixed allowlisted field names (or `metadata-shape`) and never timestamp/session values.
+
+Local GREEN verification:
+
+- focused restored-session parser/identity/parameter/SQL round-trip selection: **4 passed / 0 failed / 0 skipped**;
+- complete `Web6CandidateCutoverTests`: **117 passed / 0 failed / 0 skipped**;
+- broader SQL-excluded Security selection: **1,459 passed / 1 failed / 20 skipped**. The sole failure was `Web6CandidateSafetyTests.Exact_net48_http_and_crash_graph_loads_without_SQL` at the pre-existing GUI crash-cleanup poison assertion. It reproduced unchanged in an exact rerun and again with the DateTime correction temporarily removed, so it is recorded as unrelated and not converted to PASS.
+
+No fresh bootstrap authorize/prepare/run, IIS/browser invocation, retained SQL query, cleanup, retry or historical-attempt access occurred. Protected CI and a new explicit Owner authorization remain prerequisites for any fresh live attempt. Attempt24 stays `FailedRetained`; Task 6 remains OPEN and `CandidateVerified` absent.
 
 ## Task 6 attempt23 restored-session null-scalar failure — 2026-11-14
 
