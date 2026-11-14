@@ -1,6 +1,33 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-14): candidate `web6-20261114-de43c0c7` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control copied `datetime2(7)` session values through SQL `datetime` parameters and failed exact restored-session metadata verification.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Source correction `221b4da6098871ae3219a61c43d2d569b5a59177` is locally verified and protected CI passed; new explicit Owner authorization remains required. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN.
+**Latest disposition (2026-11-14): candidate `web6-20261114-6850edc6` reached PairPassed, then FailedRetained when the third Chromium cutover case restored a different deployment epoch and the frontend's current-epoch IndexedDB listing no longer exposed the protected UNKNOWN draft required by the live contract.** Both browser-pair cleanups were accepted. Cutover retained owned resources with deletion authority false. This is a frontend runtime/acceptance-contract mismatch, not the earlier timestamp, exact-wire or locator failure. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN.
+
+## Task 6 attempt25 restored-epoch protected-draft visibility failure — 2026-11-14
+
+The Owner authorized exactly one fresh nonproduction attempt for backend `985777c4686ab428e0b286c8de1915085fb4a623` / tree `b3a6f4bdf1e8fbbff926b060485e9237bf3dbb22` and frontend `e5e083ffd1bf8f70ce49e2e9bad81661e9c6e669` / tree `928b9878a8b408244433e0eb3ee89130a46f4fd6`. Backend protected push/PR runs `43601635299` / `43601639092` and frontend protected push/PR runs `43590748324` / `43590752462` were terminal-PASS before execution. Effective SQL was `master` on SQL Server 14.0.2150.2 with approved server hash `956ab0c9e40a3109023eed4fba416fc3d02df062cf9375deae2635d6bd773dff`. Edge 157.0.4341.60, IIS Express and TLS hashes remained the reviewed pins.
+
+Fresh authority, task, SQL-control and tool roots were created only for candidate `web6-20261114-6850edc6`; every proposed root was absent before creation. The protected tool copy contained 2,337 files, zero reparse points, Node SHA-256 `33b1bc1a8aca11fd5a4f2699e51019c63c0af30cf437701d07af69be7706771b` and npm CLI SHA-256 `8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7`. Owner authority, request and independent SQL approval SHA-256 were `042095add273bdf9067ca1043b32b14d582189bfae4dd24ff1041bc15316c7f1`, `8f89d56f78150a6c00557b2cf0811ffe62bbfb2c855eaf539e2af28560dc5835` and `18929f5a4c5591075a2b6c458edcfc27ba5419229155d0a9739b4d9104f46ba2`.
+
+Authorize and Prepare each ran exactly once. Prepare returned `PREPARED` / `PIN_MATCHED` at `2026-11-14T14:13:03.0022322Z`; receipt SHA-256 `c24a2c38253e5d89c22f414648564da170bd2a57edcf4f484c5f262211f68136`. Independent admission verified five clean detached source pins, ordinary marker null/OFF, the exact candidate marker, 10/10 byte-equal candidate dist and published `wwwroot`, no run receipt, no candidate SQL database, no IIS Express process and no listeners on 44321/44322. Candidate dist and current publish SHA-256 were `395007d9c27be8029d88c865762c20e42b8a7d431a6fec72c3ada6c160fd9e0f` and `c08b683e27d1e4dc56d0f2ac5004b6a95a6b833fb4b94024c34da24928995c7a`.
+
+Run ran exactly once and returned exit 5 / `FailedRetained`; terminal SHA-256 `0b866d5fe37740bdf727ee81d2fe8b2b2d956cafe30cd437d7bb9f2a44218747`. PairPassed SHA-256 is `181846ee3d32772540ede64aec9a7cc0a674214c7b03ba6d243c8ad3d89b7645`.
+
+| Selector | Discovered / executed / passed / failed / skipped | Outcome / SHA-256 |
+| --- | --- | --- |
+| Chromium pair | 1 / 1 / 1 / 0 / 0 | native ACCEPTED / TRX `4e125d0ea2406eca1e2ff29b9289c10a67cd36b1f9ca2b196fd4e087f2ce41f4` |
+| Edge pair | 1 / 1 / 1 / 0 / 0 | native ACCEPTED / TRX `b981982b2af43d0ff17458e0d63f8bc4a65bd3b9bed3d3306b6c2322faf48c1b` |
+| Cutover wrapper | 1 / 1 / 0 / 1 / 0 | FAIL / TRX `78d08a5b6bff3dfc2652bf98f76e6f4ae1072e6220560dba063bdeae14754de5` |
+| Chromium cutover pack | 3 / 3 / 2 / 1 / 0 | third case failed / log `1d024c4a9e37bd669c8245fa80cbcf0a030b21682b5ff15cd2a0319ab8e87fe7` |
+| Edge cutover | 0 / 0 / 0 / 0 / 0 | NOT RUN |
+| Workload / recovery | 0 / 0 / 0 / 0 / 0 | NOT RUN / NOT MEASURED |
+
+The cached-WEB4 and exact12-old-host Chromium cases passed. The third case passed committed-response-loss support, same-epoch restart and revoked-grant checks, then completed `restoreEpoch`. After reload, the dialog `Bản nháp trên thiết bị` contained no protected draft for the prior UNKNOWN operation: the exact locator expected one row and observed zero for five seconds. The page snapshot showed an empty list and `Không có bản nháp khác để mở.`
+
+The failure is deterministic from the admitted source path. `createIndexedDbDraftRepository.list(namespace)` bounds its cursor by `[deploymentEpoch, actorKey]`; `createDurableDraftWorkspace.review()` filters the result through the same current namespace; and `canReviewRecord()` also rejects a different epoch. After `restoreEpoch`, the authenticated runtime is reconstructed under the restored epoch while the protected UNKNOWN record remains keyed by the previous epoch. It is therefore excluded before the UI can present a support-only stale record or prove that resend stays disabled. The live spec requires that protected record to remain visible after reload and then verifies no resend/new mutation. This is a product/runtime versus acceptance-contract mismatch; changing the test alone or widening cross-epoch visibility without a reviewed support-only security design would be unsafe.
+
+Both pair cleanup envelopes were accepted with process drain, absent HTTP queues, SQL quiescence and nine verified resources each. Cutover intentionally retained three databases and three logins; all six identities matched their protected confirmations, all databases were online, active session count was zero and every confirmation carried `deletionAuthority=false`. IIS Express count and listeners on 44321/44322 were zero after the terminal receipt. No cleanup, retry, adoption or access to earlier retained attempts occurred.
+
+CandidateVerified is absent. Ordinary resend remains OFF. Full IIS and unperformed Narrator remain NOT RUN, staging remains NOT ACCEPTED and production remains NO-GO. Before another fresh attempt, the Owner must select the intended stale-epoch support behavior, then the frontend correction and backend paired-source pin must receive focused RED/GREEN verification, independent review and protected CI.
 
 ## Task 6 attempt24 restored-session exact-metadata failure — 2026-11-14
 
