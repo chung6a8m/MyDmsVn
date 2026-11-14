@@ -1,6 +1,6 @@
 # WEB6 B05b — paired candidate, cutover, workload and recovery evidence
 
-**Latest disposition (2026-11-14): candidate `web6-20261114-3046899d` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control returned EOF after the restored-session copy passed a null SQL JSON scalar to `JArray.Parse`.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. Source commit `be49fc7e...` contains the locally verified parser correction; protected CI and a new explicit Owner authorization remain required before another fresh attempt.
+**Latest disposition (2026-11-14): candidate `web6-20261114-3046899d` reached PairPassed, then FailedRetained when the third Chromium cutover case's `restoreEpoch` control returned EOF after the restored-session copy passed a null SQL JSON scalar to `JArray.Parse`.** Both browser-pair cleanups were accepted. Cutover retained owned resources. Workload/recovery NOT RUN, CandidateVerified absent, Task 6 OPEN. Source commit `be49fc7e...` contains the locally and protected-CI verified parser correction; a new explicit Owner authorization remains required before another fresh attempt.
 
 ## Task 6 attempt23 restored-session null-scalar failure — 2026-11-14
 
@@ -35,7 +35,7 @@ The retained stack established that the target-session scalar could be null befo
 
 Local Windows/net48 verification used the ordinary Security test project with no retained SQL access. The new focused case passed 1/1. The complete SQL-free `Web6CandidateCutoverTests` class passed 115/115 with TRX SHA-256 `8a3fa7b8e1333b593f8245539b7ed5d1de5e5ef21818f6cad2b071cf7e295c10`. `Web6CandidateBackendSourceTests` reported 77 passed / 0 failed / 1 skipped, TRX SHA-256 `569e6f2089a87d006470a3518004e5747fc0339691938aed391ea7ec3988bec3`; the sole prepared-frontend wire/deadline case remained environment-dependent and NotExecuted, so it is not claimed PASS. A fresh final combined selection on the documented branch head reported 192 passed / 0 failed / 1 skipped, TRX SHA-256 `db0c0249ca7fa69a0d86425412651cd02466d7137d807f54f7a1a87e5ebffab1`. No broad SQL owner, IIS Express, browser or live candidate command ran.
 
-This correction does not mutate or adopt attempt23 retained resources. It is not restored-epoch acceptance, CandidateVerified or authorization for a fresh attempt. Protected push/PR CI must pass for the resulting branch head, then any live attempt needs a new exact candidate pair and explicit Owner authorization.
+This correction does not mutate or adopt attempt23 retained resources. Protected backend push run `43596344995` and pull-request run `43596349570` passed on branch head `590400f8888be9f4a82a5769e291f9a94b02971d`. It is not restored-epoch acceptance, CandidateVerified or authorization for a fresh attempt. Any live attempt needs a new exact candidate pair and explicit Owner authorization.
 
 ## Task 6 attempt22 current-recovery-region locator correction — 2026-11-14
 
