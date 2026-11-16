@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using MyDmsVn.Contracts;
 using MyDmsVn.Server.Application.Operations;
 using Newtonsoft.Json;
@@ -37,6 +38,22 @@ public sealed class WebOperationWireTests
         Assert.Equal(Guid.Parse(Key), context.OperationId); Assert.Equal(Guid.Parse(Epoch), context.DeploymentEpoch);
         Assert.Equal(Session, context.SessionId); Assert.Equal(target, context.RequestTargetId); Assert.Equal(kind, context.Kind);
         Assert.IsType<WebOperationResultCodec>(context.Codec);
+    }
+
+    [Fact]
+    public async Task Typed_boundary_fingerprint_uses_preserved_strict_source_not_DTO_reserialization()
+    {
+        var vector = Fixture("fingerprint-vectors.json")["vectors"]!.OfType<JObject>().Single(item => (string?)item["name"] == "sales-create");
+        var intent = (JObject)vector["intent"]!;
+        using var request = Request("POST", "/api/v1/sales-receipts");
+        request.Content = new StringContent(intent["body"]!.ToString(Formatting.None), Encoding.UTF8, "application/json");
+        var typed = await StrictJsonRequest.Read(request, SalesWireInput.Create);
+
+        var context = WebOperationWireInput.CreateContext(request, WebOperationKind.SalesCreate, null, typed, Session);
+
+        Assert.Equal((string?)vector["sha256"], WebOperationWireInput.FingerprintHex(context.Fingerprint));
+        var reserialized = JObject.FromObject(typed.Value, JsonSerializer.Create(ApiJson.CreateSerializerSettings()));
+        Assert.Throws<WireInputException>(() => WebOperationWireInput.Canonicalize(WebOperationKind.SalesCreate, null, reserialized));
     }
 
     [Theory]
