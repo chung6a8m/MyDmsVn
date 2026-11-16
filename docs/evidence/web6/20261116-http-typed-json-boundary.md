@@ -4,7 +4,7 @@
 
 - Owner request: Sales-only HTTP typed DTO/shared JSON boundary refactor; no contract or runtime behavior change.
 - Baseline: `main` / `origin/main` `00aca21b56df46befa166ee64bce0f6dbb36be06` after fetch.
-- Code candidate: `96a35fd89e589d982217f4bccb7de0cf3e95692a` on `codex/http-typed-json-boundary`.
+- Source candidate: `d1997dcaa3b9b40a9d17932a5d39d835a88afe90` on `codex/http-typed-json-boundary` (includes required C# BOM/CRLF normalization).
 - Target: `net48`; ASP.NET Web API 2, OWIN/Katana and Newtonsoft.Json unchanged.
 - Environment: Windows 11 Home Single Language, `Microsoft Windows NT 10.0.26300.0`, .NET SDK `8.0.428`, VSTest `17.11.2` x64.
 - SQL, IIS/IIS Express, browser, frontend and production deployment: **NOT RUN / NOT IN SCOPE**. No release or resend-enable claim is made.
@@ -53,11 +53,11 @@ The existing independent `fingerprint-vectors.json` canonical text and SHA-256 v
 ## Final verification
 
 ```powershell
-dotnet test tests\MyDmsVn.Server.HttpHost.Tests\MyDmsVn.Server.HttpHost.Tests.csproj -c Release -f net48 --no-restore --logger "trx;LogFileName=http-typed-json-candidate.trx"
+dotnet test tests\MyDmsVn.Server.HttpHost.Tests\MyDmsVn.Server.HttpHost.Tests.csproj -c Release -f net48 --no-restore --logger "trx;LogFileName=http-typed-json-final.trx"
 dotnet build src\MyDmsVn.Server.HttpHost\MyDmsVn.Server.HttpHost.csproj -c Release -f net48 --no-restore
 ```
 
-- Full SQL-free HTTP host suite: 1 assembly discovered, 640 executed, 640 passed, 0 failed, 0 skipped; duration 10 seconds. TRX: `tests/MyDmsVn.Server.HttpHost.Tests/TestResults/http-typed-json-candidate.trx` (local evidence; not committed).
+- Full SQL-free HTTP host suite on the source candidate: 1 assembly discovered, 640 executed, 640 passed, 0 failed, 0 skipped; duration 10 seconds. TRX: `tests/MyDmsVn.Server.HttpHost.Tests/TestResults/http-typed-json-final.trx` (local evidence; not committed).
 - HTTP host build: succeeded, 0 warnings, 0 errors.
 
 Required interpretation remains: these are source/SQL-free HTTP host results only; SQL/IIS/browser categories above remain NOT RUN.
