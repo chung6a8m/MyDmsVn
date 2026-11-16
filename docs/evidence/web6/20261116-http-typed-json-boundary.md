@@ -4,7 +4,9 @@
 
 - Owner request: Sales-only HTTP typed DTO/shared JSON boundary refactor; no contract or runtime behavior change.
 - Baseline: `main` / `origin/main` `00aca21b56df46befa166ee64bce0f6dbb36be06` after fetch.
-- Source candidate: `d1997dcaa3b9b40a9d17932a5d39d835a88afe90` on `codex/http-typed-json-boundary` (includes required C# BOM/CRLF normalization).
+- Remotely verifiable source anchor (before this documentation-only correction): [`7a57deba977f2bcd8f9f0bdc9a07096360cdb4b5`](https://github.com/chung6a8m/MyDmsVn/commit/7a57deba977f2bcd8f9f0bdc9a07096360cdb4b5) on `codex/http-typed-json-boundary` (includes required C# BOM/CRLF normalization).
+- Historical local source SHA recorded during development: `d1997dcaa3b9b40a9d17932a5d39d835a88afe90`. This SHA is **not resolvable on GitHub**; it is retained for local provenance only and must not be used as a remotely auditable candidate identifier.
+- GitHub Actions verification anchor: [Backend Web checks run #250](https://github.com/chung6a8m/MyDmsVn/actions/runs/43792736535), using merge candidate [`1e914b1017a764f7eec893e7d13e9799bbfeaea5`](https://github.com/chung6a8m/MyDmsVn/commit/1e914b1017a764f7eec893e7d13e9799bbfeaea5) of source `7a57deba977f2bcd8f9f0bdc9a07096360cdb4b5` into base `00aca21b56df46befa166ee64bce0f6dbb36be06`.
 - Target: `net48`; ASP.NET Web API 2, OWIN/Katana and Newtonsoft.Json unchanged.
 - Environment: Windows 11 Home Single Language, `Microsoft Windows NT 10.0.26300.0`, .NET SDK `8.0.428`, VSTest `17.11.2` x64.
 - SQL, IIS/IIS Express, browser, frontend and production deployment: **NOT RUN / NOT IN SCOPE**. No release or resend-enable claim is made.
@@ -57,10 +59,11 @@ dotnet test tests\MyDmsVn.Server.HttpHost.Tests\MyDmsVn.Server.HttpHost.Tests.cs
 dotnet build src\MyDmsVn.Server.HttpHost\MyDmsVn.Server.HttpHost.csproj -c Release -f net48 --no-restore
 ```
 
-- Full SQL-free HTTP host suite on the source candidate: 1 assembly discovered, 640 executed, 640 passed, 0 failed, 0 skipped; duration 10 seconds. TRX: `tests/MyDmsVn.Server.HttpHost.Tests/TestResults/http-typed-json-final.trx` (local evidence; not committed).
-- HTTP host build: succeeded, 0 warnings, 0 errors.
+- Local SQL-free HTTP host verification as reported in the development record: 1 assembly discovered, 640 executed, 640 passed, 0 failed, 0 skipped; duration 10 seconds. TRX: `tests/MyDmsVn.Server.HttpHost.Tests/TestResults/http-typed-json-final.trx` (local only; not committed). Its historical local SHA cannot be independently resolved on GitHub.
+- Local HTTP host build as reported: succeeded, 0 warnings, 0 errors.
+- **Independently retrievable hosted CI:** [Backend Web checks run #250](https://github.com/chung6a8m/MyDmsVn/actions/runs/43792736535) succeeded on the merge candidate documented above. `http-host` job: `MyDmsVn.Server.HttpHost.Tests` **640/640 passed**, 0 failed, 0 skipped (Release/net48); `MyDmsVn.Server.Infrastructure.Security.Tests` **132/132 passed**, 0 failed, 0 skipped (Release/net48); locked restore and both builds succeeded. This documents the source tree prior to this evidence-only correction, not a claim that later HEAD commits have already been tested.
 
-Required interpretation remains: these are source/SQL-free HTTP host results only; SQL/IIS/browser categories above remain NOT RUN.
+Required interpretation: these are SQL-free HTTP host / recovery-security results only. SQL/IIS/IIS Express/browser/frontend and production deployment remain **NOT RUN / NOT IN SCOPE**. A fresh CI run must be checked on the final PR HEAD before merge.
 
 ## Limits and findings
 
