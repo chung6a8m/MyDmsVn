@@ -61,6 +61,14 @@ public sealed class SalesWireEndpointTests
         Assert.Equal("AAAAAAAAAAI=", postApplication.ExpectedVersion);
     }
 
+    [Fact]
+    public void Sales_output_mappers_return_named_HTTP_response_DTOs()
+    {
+        Assert.IsType<SalesDetailHttpResponse>(SalesWireOutput.Detail(WireCorpus.Dto<SalesReceiptDto>("sales-get-posted-response.json")));
+        Assert.IsType<SalesListPageHttpResponse>(SalesWireOutput.Page(WireCorpus.Dto<SalesReceiptListPage>("sales-list-response.json")));
+        Assert.IsType<SalesPostHttpResponse>(SalesWireOutput.Post(WireCorpus.Dto<PostSalesReceiptResponse>("sales-post-response.json")));
+    }
+
     [Theory]
     [InlineData("GET", "/sales-receipts/9223372036854775807", "sales-get-posted-response.json", null)]
     [InlineData("GET", "/sales-receipts", "sales-list-response.json", null)]
