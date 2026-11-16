@@ -42,6 +42,25 @@ public sealed class SalesWireEndpointTests
         Assert.Equal("typed", (string?)decoded.Source["value"]);
     }
 
+    [Fact]
+    public void Sales_wire_decoder_returns_named_HTTP_DTOs_before_explicit_Application_mapping()
+    {
+        var create = SalesWireInput.Create(WireCorpus.Json("sales-create-request.json"));
+        var update = SalesWireInput.Update(long.MaxValue, WireCorpus.Json("sales-update-request.json"));
+        var post = SalesWireInput.Post(long.MaxValue, WireCorpus.Json("sales-post-request.json"));
+
+        Assert.IsType<SalesCreateDraftHttpRequest>(create);
+        Assert.IsType<SalesUpdateDraftHttpRequest>(update);
+        Assert.IsType<SalesPostHttpRequest>(post);
+
+        var createApplication = SalesHttpRequestMapper.ToApplication(create);
+        var updateApplication = SalesHttpRequestMapper.ToApplication(update);
+        var postApplication = SalesHttpRequestMapper.ToApplication(post);
+        Assert.Equal(3, createApplication.Lines.Count);
+        Assert.Equal(long.MaxValue, updateApplication.SaleId);
+        Assert.Equal("AAAAAAAAAAI=", postApplication.ExpectedVersion);
+    }
+
     [Theory]
     [InlineData("GET", "/sales-receipts/9223372036854775807", "sales-get-posted-response.json", null)]
     [InlineData("GET", "/sales-receipts", "sales-list-response.json", null)]
