@@ -22,7 +22,10 @@ public abstract class WireApiController : ApiController
     protected WireApiController(IMediator mediator, IRequestCorrelationAccessor correlation) { Mediator = mediator; Correlation = correlation; }
     protected IMediator Mediator { get; }
     private IRequestCorrelationAccessor Correlation { get; }
-    protected WebOperationContext? Operation(WebOperationKind kind, long? target, JObject body)
+    private protected WebOperationContext? Operation<T>(WebOperationKind kind, long? target, StrictJsonRequest<T> request) =>
+        Operation(kind, target, request.Source);
+
+    private protected WebOperationContext? Operation(WebOperationKind kind, long? target, JObject body)
     {
         var context = Request.GetOwinContext();
         if (!context.Get<WebHostOptions>(AuthController.OptionsKey).Web4Enabled)
@@ -65,34 +68,37 @@ public sealed class SalesReceiptsController : WireApiController
     public Task<HttpResponseMessage> List(CancellationToken cancellationToken) => Execute<SalesReceiptListPage>(async () =>
     {
         await SalesWireInput.EmptyBody(Request).ConfigureAwait(false);
-        return await Mediator.Send(new ListSalesReceiptsQuery(SalesWireInput.List(Request)), cancellationToken).ConfigureAwait(false);
+        return await Mediator.Send(new ListSalesReceiptsQuery(SalesHttpRequestMapper.ToApplication(SalesWireInput.List(Request))), cancellationToken).ConfigureAwait(false);
     }, SalesWireOutput.Page);
     [HttpGet, Route("{saleId}")]
     public Task<HttpResponseMessage> Get(string saleId, CancellationToken cancellationToken) => Execute<SalesReceiptDto>(async () =>
     {
         SalesWireInput.NoQuery(Request); await SalesWireInput.EmptyBody(Request).ConfigureAwait(false);
-        return await Mediator.Send(new GetSalesReceiptByIdQuery(SalesWireInput.Long(saleId)), cancellationToken).ConfigureAwait(false);
+        var input = SalesWireInput.Get(saleId);
+        return await Mediator.Send(new GetSalesReceiptByIdQuery(input.SaleId), cancellationToken).ConfigureAwait(false);
     }, SalesWireOutput.Detail);
     [HttpPost, Route("")]
     public Task<HttpResponseMessage> Create(CancellationToken cancellationToken) => Execute<SalesReceiptDto>(async () =>
     {
-        var body = await SalesWireInput.Body(Request).ConfigureAwait(false);
-        var input = SalesWireInput.Create(body);
-        return await Mediator.Send(new CreateSalesReceiptDraftCommand(input, Operation(WebOperationKind.SalesCreate, null, body)), cancellationToken).ConfigureAwait(false);
+        var request = await SalesWireInput.Body(Request, SalesWireInput.Create).ConfigureAwait(false);
+        var input = SalesHttpRequestMapper.ToApplication(request.Value);
+        return await Mediator.Send(new CreateSalesReceiptDraftCommand(input, Operation(WebOperationKind.SalesCreate, null, request)), cancellationToken).ConfigureAwait(false);
     }, SalesWireOutput.Detail);
     [HttpPut, Route("{saleId}/draft")]
     public Task<HttpResponseMessage> Update(string saleId, CancellationToken cancellationToken) => Execute<SalesReceiptDto>(async () =>
     {
-        var id = SalesWireInput.Long(saleId); var body = await SalesWireInput.Body(Request).ConfigureAwait(false);
-        var input = SalesWireInput.Update(id, body);
-        return await Mediator.Send(new UpdateSalesReceiptDraftCommand(input, Operation(WebOperationKind.SalesUpdate, id, body)), cancellationToken).ConfigureAwait(false);
+        var id = SalesWireInput.Long(saleId);
+        var request = await SalesWireInput.Body(Request, body => SalesWireInput.Update(id, body)).ConfigureAwait(false);
+        var input = SalesHttpRequestMapper.ToApplication(request.Value);
+        return await Mediator.Send(new UpdateSalesReceiptDraftCommand(input, Operation(WebOperationKind.SalesUpdate, id, request)), cancellationToken).ConfigureAwait(false);
     }, SalesWireOutput.Detail);
     [HttpPost, Route("{saleId}/post")]
     public Task<HttpResponseMessage> Post(string saleId, CancellationToken cancellationToken) => Execute<PostSalesReceiptResponse>(async () =>
     {
-        var id = SalesWireInput.Long(saleId); var body = await SalesWireInput.Body(Request).ConfigureAwait(false);
-        var input = SalesWireInput.Post(id, body);
-        return await Mediator.Send(new PostSalesReceiptCommand(input, Operation(WebOperationKind.SalesPost, id, body)), cancellationToken).ConfigureAwait(false);
+        var id = SalesWireInput.Long(saleId);
+        var request = await SalesWireInput.Body(Request, body => SalesWireInput.Post(id, body)).ConfigureAwait(false);
+        var input = SalesHttpRequestMapper.ToApplication(request.Value);
+        return await Mediator.Send(new PostSalesReceiptCommand(input, Operation(WebOperationKind.SalesPost, id, request)), cancellationToken).ConfigureAwait(false);
     }, SalesWireOutput.Post);
 }
 

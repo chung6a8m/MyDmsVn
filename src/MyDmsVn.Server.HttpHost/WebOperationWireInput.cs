@@ -15,6 +15,9 @@ public static class WebOperationWireInput
     private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
 
     // Body must come from StrictWireJson, before conversion to transport-neutral command DTOs.
+    internal static WebOperationContext CreateContext<T>(HttpRequestMessage request, WebOperationKind kind, long? target, StrictJsonRequest<T> strictlyDecodedRequest, Guid sessionId) =>
+        CreateContext(request, kind, target, strictlyDecodedRequest.Source, sessionId);
+
     public static WebOperationContext CreateContext(HttpRequestMessage request, WebOperationKind kind, long? target, JObject strictlyDecodedBody, Guid sessionId)
     {
         var key = OperationId(Header(request, "Idempotency-Key"));

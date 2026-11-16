@@ -18,30 +18,31 @@ internal static class SalesWireInput
     public static async Task<JObject> Body(HttpRequestMessage request)
     {
         NoQuery(request);
-        var content = request.Content;
-        if (content?.Headers.ContentType == null || !string.Equals(content.Headers.ContentType.MediaType, "application/json", StringComparison.OrdinalIgnoreCase) ||
-            (content.Headers.ContentType.CharSet != null && !string.Equals(content.Headers.ContentType.CharSet.Trim('"'), "utf-8", StringComparison.OrdinalIgnoreCase)) || content.Headers.ContentEncoding.Any())
-            throw new WireInputException();
-        return StrictWireJson.Read(await content.ReadAsByteArrayAsync().ConfigureAwait(false));
+        return (await StrictJsonRequest.Read(request, body => body).ConfigureAwait(false)).Value;
+    }
+    public static async Task<StrictJsonRequest<T>> Body<T>(HttpRequestMessage request, Func<JObject, T> decode)
+    {
+        NoQuery(request);
+        return await StrictJsonRequest.Read(request, decode).ConfigureAwait(false);
     }
     public static async Task EmptyBody(HttpRequestMessage request)
     { if (request.Content != null && (await request.Content.ReadAsByteArrayAsync().ConfigureAwait(false)).Length != 0) throw new WireInputException(); }
     public static void NoQuery(HttpRequestMessage request)
     { if (!string.IsNullOrEmpty(request.GetOwinContext().Request.QueryString.Value)) throw new WireInputException(); }
-    public static SaveSalesReceiptRequest Create(JObject body) => Save(body, false);
-    public static UpdateSalesReceiptDraftRequest Update(long id, JObject body)
+    public static SalesCreateDraftHttpRequest Create(JObject body) => Save(body, false);
+    public static SalesUpdateDraftHttpRequest Update(long id, JObject body)
     {
         var save = Save(body, true);
-        return new UpdateSalesReceiptDraftRequest(id, Version(body), save.SaleDate, save.CustomerId, save.WarehouseId, save.EmployeeId, save.Note, save.Lines);
+        return new SalesUpdateDraftHttpRequest(id, Version(body), save.SaleDate, save.CustomerId, save.WarehouseId, save.EmployeeId, save.Note, save.Lines);
     }
-    public static PostSalesReceiptRequest Post(long id, JObject body)
-    { Fields(body, new[] { "expectedVersion" }, new[] { "expectedVersion" }); return new PostSalesReceiptRequest(id, Version(body)); }
-    private static SaveSalesReceiptRequest Save(JObject body, bool update)
+    public static SalesPostHttpRequest Post(long id, JObject body)
+    { Fields(body, new[] { "expectedVersion" }, new[] { "expectedVersion" }); return new SalesPostHttpRequest(id, Version(body)); }
+    private static SalesCreateDraftHttpRequest Save(JObject body, bool update)
     {
         Fields(body, update ? HeaderFields.Concat(new[] { "expectedVersion" }).ToArray() : HeaderFields,
             update ? HeaderFields.Where(f => f != "note").Concat(new[] { "expectedVersion" }).ToArray() : HeaderFields.Where(f => f != "note").ToArray());
         if (body["lines"] is not JArray lines || lines.Count < 1 || lines.Count > SalesContractLimits.MaximumLines) throw new WireInputException("lines");
-        var parsed = new List<SaveSalesReceiptLineRequest>(lines.Count);
+        var parsed = new List<SalesSaveLineHttpRequest>(lines.Count);
         for (var index = 0; index < lines.Count; index++)
         {
             var prefix = "lines[" + index.ToString(CultureInfo.InvariantCulture) + "]";
@@ -51,13 +52,13 @@ internal static class SalesWireInput
             var id = Long(String(line["saleLineId"], prefix + ".saleLineId"), true, prefix + ".saleLineId");
             if (!update && id != 0) throw new WireInputException(prefix + ".saleLineId");
             if (line["isGift"]?.Type != JTokenType.Boolean) throw new WireInputException(prefix + ".isGift");
-            parsed.Add(new SaveSalesReceiptLineRequest(id, Int(line["productId"], prefix + ".productId"),
+            parsed.Add(new SalesSaveLineHttpRequest(id, Int(line["productId"], prefix + ".productId"),
                 Decimal(line["qty"], true, SalesContractLimits.MaximumQuantity, prefix + ".qty"),
                 Decimal(line["unitPrice"], false, SalesContractLimits.MaximumUnitPrice, prefix + ".unitPrice"), (bool)line["isGift"]!));
         }
         string? note = body["note"] == null || body["note"]!.Type == JTokenType.Null ? null : String(body["note"], "note");
         if (note != null) Text(note, 1000, "note");
-        return new SaveSalesReceiptRequest(Date(String(body["saleDate"], "saleDate"), "saleDate", true), Int(body["customerId"], "customerId"),
+        return new SalesCreateDraftHttpRequest(Date(String(body["saleDate"], "saleDate"), "saleDate", true), Int(body["customerId"], "customerId"),
             Int(body["warehouseId"], "warehouseId"), Int(body["employeeId"], "employeeId"), note, parsed);
     }
     public static long Long(string text, bool zero = false, string field = "saleId")
@@ -105,7 +106,7 @@ internal static class SalesWireInput
         if (body.Properties().Any(p => !allowed.Contains(p.Name, StringComparer.Ordinal))) throw new WireInputException(prefix);
         foreach (var name in required) if (body[name] == null) throw new WireInputException(prefix == null ? name : prefix + "." + name);
     }
-    public static SalesReceiptListRequest List(HttpRequestMessage request)
+    public static SalesListHttpRequest List(HttpRequestMessage request)
     {
         var query = Query(request, new[] { "fromDate", "toDate", "customerId", "warehouseId", "employeeId", "status", "productId", "search", "pageSize", "cursor" });
         string? Value(string key) => query.TryGetValue(key, out var value) ? value : null;
@@ -114,9 +115,10 @@ internal static class SalesWireInput
         var status = Value("status"); if (status != null && status != "Draft" && status != "Posted") throw new WireInputException("status");
         var cursor = Value("cursor"); if (cursor != null && (cursor.Length == 0 || cursor.Length > 4096)) throw new WireInputException("cursor");
         var search = Value("search"); if (search != null) Text(search.Trim(), 256, "search");
-        return new SalesReceiptListRequest(OptionalDate("fromDate"), OptionalDate("toDate"), OptionalInt("customerId"), OptionalInt("warehouseId"), OptionalInt("employeeId"), status,
+        return new SalesListHttpRequest(OptionalDate("fromDate"), OptionalDate("toDate"), OptionalInt("customerId"), OptionalInt("warehouseId"), OptionalInt("employeeId"), status,
             OptionalInt("productId"), search, query.TryGetValue("pageSize", out var size) ? Int(size, "pageSize", 200) : 25, cursor);
     }
+    public static SalesGetHttpRequest Get(string saleId) => new SalesGetHttpRequest(Long(saleId));
     public static CatalogLookupRequest Lookup(HttpRequestMessage request)
     {
         var query = Query(request, new[] { "search", "limit" });

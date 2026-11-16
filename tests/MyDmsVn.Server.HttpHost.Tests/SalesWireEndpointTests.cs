@@ -24,6 +24,51 @@ namespace MyDmsVn.Server.HttpHost.Tests;
 
 public sealed class SalesWireEndpointTests
 {
+    [Fact]
+    public async Task Shared_strict_boundary_returns_typed_value_and_preserves_the_validated_source()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://web2.mydmsvn.test/api/v1/sales-receipts")
+        {
+            Content = new StringContent("{\"value\":\"typed\"}", Encoding.UTF8, "application/json"),
+        };
+
+        var decoded = await StrictJsonRequest.Read(request, body =>
+        {
+            Assert.Equal(new[] { "value" }, body.Properties().Select(property => property.Name));
+            return (string)body["value"]!;
+        });
+
+        Assert.Equal("typed", decoded.Value);
+        Assert.Equal("typed", (string?)decoded.Source["value"]);
+    }
+
+    [Fact]
+    public void Sales_wire_decoder_returns_named_HTTP_DTOs_before_explicit_Application_mapping()
+    {
+        var create = SalesWireInput.Create(WireCorpus.Json("sales-create-request.json"));
+        var update = SalesWireInput.Update(long.MaxValue, WireCorpus.Json("sales-update-request.json"));
+        var post = SalesWireInput.Post(long.MaxValue, WireCorpus.Json("sales-post-request.json"));
+
+        Assert.IsType<SalesCreateDraftHttpRequest>(create);
+        Assert.IsType<SalesUpdateDraftHttpRequest>(update);
+        Assert.IsType<SalesPostHttpRequest>(post);
+
+        var createApplication = SalesHttpRequestMapper.ToApplication(create);
+        var updateApplication = SalesHttpRequestMapper.ToApplication(update);
+        var postApplication = SalesHttpRequestMapper.ToApplication(post);
+        Assert.Equal(3, createApplication.Lines.Count);
+        Assert.Equal(long.MaxValue, updateApplication.SaleId);
+        Assert.Equal("AAAAAAAAAAI=", postApplication.ExpectedVersion);
+    }
+
+    [Fact]
+    public void Sales_output_mappers_return_named_HTTP_response_DTOs()
+    {
+        Assert.IsType<SalesDetailHttpResponse>(SalesWireOutput.Detail(WireCorpus.Dto<SalesReceiptDto>("sales-get-posted-response.json")));
+        Assert.IsType<SalesListPageHttpResponse>(SalesWireOutput.Page(WireCorpus.Dto<SalesReceiptListPage>("sales-list-response.json")));
+        Assert.IsType<SalesPostHttpResponse>(SalesWireOutput.Post(WireCorpus.Dto<PostSalesReceiptResponse>("sales-post-response.json")));
+    }
+
     [Theory]
     [InlineData("GET", "/sales-receipts/9223372036854775807", "sales-get-posted-response.json", null)]
     [InlineData("GET", "/sales-receipts", "sales-list-response.json", null)]
