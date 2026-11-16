@@ -18,11 +18,7 @@ internal static class SalesWireInput
     public static async Task<JObject> Body(HttpRequestMessage request)
     {
         NoQuery(request);
-        var content = request.Content;
-        if (content?.Headers.ContentType == null || !string.Equals(content.Headers.ContentType.MediaType, "application/json", StringComparison.OrdinalIgnoreCase) ||
-            (content.Headers.ContentType.CharSet != null && !string.Equals(content.Headers.ContentType.CharSet.Trim('"'), "utf-8", StringComparison.OrdinalIgnoreCase)) || content.Headers.ContentEncoding.Any())
-            throw new WireInputException();
-        return StrictWireJson.Read(await content.ReadAsByteArrayAsync().ConfigureAwait(false));
+        return (await StrictJsonRequest.Read(request, body => body).ConfigureAwait(false)).Value;
     }
     public static async Task EmptyBody(HttpRequestMessage request)
     { if (request.Content != null && (await request.Content.ReadAsByteArrayAsync().ConfigureAwait(false)).Length != 0) throw new WireInputException(); }

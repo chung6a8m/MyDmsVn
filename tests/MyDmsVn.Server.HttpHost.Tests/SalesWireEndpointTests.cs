@@ -24,6 +24,24 @@ namespace MyDmsVn.Server.HttpHost.Tests;
 
 public sealed class SalesWireEndpointTests
 {
+    [Fact]
+    public async Task Shared_strict_boundary_returns_typed_value_and_preserves_the_validated_source()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://web2.mydmsvn.test/api/v1/sales-receipts")
+        {
+            Content = new StringContent("{\"value\":\"typed\"}", Encoding.UTF8, "application/json"),
+        };
+
+        var decoded = await StrictJsonRequest.Read(request, body =>
+        {
+            Assert.Equal(new[] { "value" }, body.Properties().Select(property => property.Name));
+            return (string)body["value"]!;
+        });
+
+        Assert.Equal("typed", decoded.Value);
+        Assert.Equal("typed", (string?)decoded.Source["value"]);
+    }
+
     [Theory]
     [InlineData("GET", "/sales-receipts/9223372036854775807", "sales-get-posted-response.json", null)]
     [InlineData("GET", "/sales-receipts", "sales-list-response.json", null)]
